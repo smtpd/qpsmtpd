@@ -365,7 +365,35 @@ sub data {
   my $self = shift;
   $self->respond(503, "MAIL first"), return 1 unless $self->transaction->sender;
   $self->respond(503, "RCPT first"), return 1 unless $self->transaction->recipients;
-  $self->respond(354, "go ahead");
+  
+  my ($rc, $msg) = $self->run_hooks("data");
+  if ($rc == DONE) {
+    return 1;
+  }
+  elsif ($rc == DENY) {
+    $self->respond(554, $msg || "Message denied");
+    $self->reset_transaction();
+    return 1;
+  }
+  elsif ($rc == DENYSOFT) {
+    $self->respond(451, $msg || "Message denied temporarily");
+    $self->reset_transaction();
+    return 1;
+  } 
+  elsif ($rc == DENY_DISCONNECT) {
+    $self->respond(554, $msg || "Message denied");
+    $self->disconnect;
+    return 1;
+  }
+  elsif ($rc == DENYSOFT_DISCONNECT) {
+    $self->respond(451, $msg || "Message denied temporarily");
+    $self->disconnect;
+    return 1;
+  }
+  else {
+    $self->respond(354, "go ahead");
+  }
+  
   my $buffer = '';
   my $size = 0;
   my $i = 0;
