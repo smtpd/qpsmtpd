@@ -1,5 +1,8 @@
 0.27 
 
+  Modified the dnsbl plugin to better support both A and TXT records and 
+  support all of the RBLSMTPD functionality. (Thanks to Mark Powell)
+
   reject bare carriage-returns in addition to the  bare line-feeds
   (based on a patch from Robert James Kaes, thanks!)
 
