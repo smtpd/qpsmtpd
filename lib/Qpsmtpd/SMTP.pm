@@ -207,7 +207,7 @@ sub rcpt {
   }
   elsif ($rc == DENYSOFT) {
     $msg ||= 'relaying denied';
-    return $self->respond(550, $msg);
+    return $self->respond(450, $msg);
   }
   elsif ($rc == OK) {
     $self->respond(250, $rcpt->format . ", recipient ok");
