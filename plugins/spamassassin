@@ -40,7 +40,7 @@ sub check_spam {
   
   $transaction->body_resetpos;
   
-  print SPAMD "YAREPORT SPAMC/1.0" . CRLF;
+  print SPAMD "REPORT_IFSPAM SPAMC/1.0" . CRLF;
   # or CHECK or REPORT or SYMBOLS
 
   print SPAMD join CRLF, split /\n/, $transaction->header->as_string;
