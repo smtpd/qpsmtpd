@@ -51,9 +51,11 @@ sub process_sockets {
   my @ready = $sel->can_read(5);
 
   $self->log(8, "DONE waiting for dnsbl dns, got " , scalar @ready, " answers ...") ;
+  return '' unless @ready;
 
   for my $socket (@ready) {
     my $query = $res->bgread($socket);
+    $sel->remove($socket);
     undef $socket;
 
     my $dnsbl;
@@ -79,6 +81,11 @@ sub process_sockets {
 
     last if $result;
 
+  }
+
+  if ($sel->count) {
+    # loop around if we have dns blacklists left to see results from
+    return $self->process_sockets();
   }
 
   # if there was more to read; then forget it
