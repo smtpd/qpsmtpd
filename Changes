@@ -1,5 +1,9 @@
 0.27 
 
+  Took out the last "exit" call from the SMTP object; the "transport"
+  module ("TcpServer", "SelectServer") needs to do the right thing in
+  it's disconnect method.
+
   Update the SPF plugin (Philip Gladstone, philip@gladstonefamily.net):
    * Integrated with Mail::SPF::Query 1.991
    * Don't do SPF processing when you are acting as a relay system
