@@ -227,7 +227,7 @@ sub mail {
     my $from_parameter = join " ", @_;
     $self->log(LOGINFO, "full from_parameter: $from_parameter");
 
-    my ($from) = ($from_parameter =~ m/^from:\s*(<[^>]+>)/i)[0];
+    my ($from) = ($from_parameter =~ m/^from:\s*(<[^>]*>)/i)[0];
 
     # support addresses without <> ... maybe we shouldn't?
     ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
