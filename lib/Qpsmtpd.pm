@@ -17,10 +17,11 @@ BEGIN{$^W=0;}
 use Net::DNS;
 BEGIN{$^W=1;}
 
-$Qpsmtpd::VERSION = "0.10";
+$Qpsmtpd::VERSION = "0.11-dev";
 my $TRACE_LEVEL = 6;
 
-# $SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a timeout; I just can't wait that long..."); exit };
+# $SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a
+# timeout; I just can't wait that long..."); exit };
 
 
 sub new {
@@ -111,10 +112,14 @@ sub start_conversation {
 
 sub transaction {
   my $self = shift;
-  use Data::Dumper;
-  #warn Data::Dumper->Dump([\$self], [qw(self)]);
-  return $self->{_transaction} || ($self->{_transaction} = Qpsmtpd::Transaction->new());
+  return $self->{_transaction} || $self->reset_transaction();
 }
+
+sub reset_transaction {
+  my $self = shift;
+  return $self->{_transaction} = Qpsmtpd::Transaction->new();
+}
+
 
 sub connection {
   my $self = shift;
@@ -153,6 +158,27 @@ sub ehlo {
 sub mail {
   my $self = shift;
   return $self->respond(501, "syntax error in parameters") if $_[0] !~ m/^from:/i;
+
+  # -> from RFC2821
+  # The MAIL command (or the obsolete SEND, SOML, or SAML commands)
+  # begins a mail transaction.  Once started, a mail transaction
+  # consists of a transaction beginning command, one or more RCPT
+  # commands, and a DATA command, in that order.  A mail transaction
+  # may be aborted by the RSET (or a new EHLO) command.  There may be
+  # zero or more transactions in a session.  MAIL (or SEND, SOML, or
+  # SAML) MUST NOT be sent if a mail transaction is already open,
+  # i.e., it should be sent only if no mail transaction had been
+  # started in the session, or it the previous one successfully
+  # concluded with a successful DATA command, or if the previous one
+  # was aborted with a RSET.
+
+  # sendmail (8.11) rejects a second MAIL command.
+
+  # qmail-smtpd (1.03) accepts it and just starts a new transaction.
+  # Since we are a qmail-smtpd thing we will do the same.
+
+  $self->reset_transaction;
+
   unless ($self->connection->hello) {
     return $self->respond(503, "please say hello first ...");
   }
@@ -269,8 +295,7 @@ sub vrfy {
 
 sub rset {
   my $self = shift;
-  $self->{_transaction} = undef;
-  $self->transaction->start();
+  $self->reset_transaction;
   $self->respond(250, "OK");
 }
 
@@ -377,10 +402,11 @@ sub data {
     $self->respond(452, $msg || "Message denied temporarily");
   } 
   else {
-    return $self->queue($self->transaction);    
+    $self->queue($self->transaction);    
   }
 
-
+  # DATA is always the end of a "transaction"
+  return $self->reset_transaction;
 
 }
 
