@@ -220,11 +220,12 @@ sub mail {
 sub rcpt {
   my $self = shift;
   return $self->respond(501, "syntax error in parameters") unless $_[0] =~ m/^to:/i;
-  return(503, "Use MAIL before RCPT") unless $self->transaction->sender;
+  return $self->respond(503, "Use MAIL before RCPT") unless $self->transaction->sender;
 
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
   $rcpt = (Mail::Address->parse($rcpt))[0];
+
   return $self->respond(501, "could not parse recipient") unless $rcpt;
 
   my ($rc, $msg) = $self->run_hooks("rcpt", $rcpt);
