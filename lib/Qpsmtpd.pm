@@ -53,15 +53,14 @@ sub get_qmail_config {
   if ($self->{_config_cache}->{$config}) {
     return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
   }
-  my $configdir = '/var/qmail/control';
+  my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
   $configdir = "$name/config" if (-e "$name/config/$config");
 
   my $configfile = "$configdir/$config";
 
   if ($type and $type eq "map")  {
-    warn "MAP!";
-    return +{} unless -e $configfile;
+    return +{} unless -e $configfile . ".cdb";
     eval { require CDB_File };
 
     if ($@) {
