@@ -31,12 +31,16 @@ sub check_spam {
   my $port    = 783;
   if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') }
   die "No port" unless $port;
-  my $iaddr   = inet_aton($remote) || die "no host: $remote";
+  my $iaddr   = inet_aton($remote) or 
+    $self->log(1, "Could not resolve host: $remote") and return (DECLINED);
   my $paddr   = sockaddr_in($port, $iaddr);
   
   my $proto   = getprotobyname('tcp');
-  socket(SPAMD, PF_INET, SOCK_STREAM, $proto)  || die "socket: $!";
-  connect(SPAMD, $paddr)    || warn "SA: connect: $!", return undef;
+  socket(SPAMD, PF_INET, SOCK_STREAM, $proto)
+    or $self->log(1, "Could not open socket: $!") and return (DECLINED);
+
+  connect(SPAMD, $paddr) 
+    or $self->log(1, "Could not connect to spamassassin daemon: $!") and return DECLINED;
 
   SPAMD->autoflush(1);
   
