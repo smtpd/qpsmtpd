@@ -226,10 +226,11 @@ sub run_hooks {
       $self->log(LOGINFO, "running plugin ", $code->{name});
       eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
       $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
-      !defined $r[0] 
-	  and $self->log(LOGERROR, "plugin ".$code->{name}
-			 ."running the $hook hook returned undef!")
-	  and next;
+
+      !defined $r[0]
+        and $self->log(LOGERROR, "plugin ".$code->{name}
+                       ."running the $hook hook returned undef!")
+          and next;
 
       # should we have a hook for "OK" too? 
       if ($r[0] == DENY or $r[0] == DENYSOFT) {
