@@ -1,6 +1,7 @@
 package Qpsmtpd::TcpServer;
+use Qpsmtpd;
+@ISA = qw(Qpsmtpd);
 use strict;
-use base qw(Qpsmtpd);
 
 sub start_connection {
     my $self = shift;
