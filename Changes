@@ -1,4 +1,8 @@
-0.12-dev
+0.12 - 2002/10/17
+
+  Better error messages when a plugin fails
+  
+  Remove some debug messages in the log 
 
   Fix NOOP command with perl 5.6.
 
