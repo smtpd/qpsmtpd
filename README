@@ -5,6 +5,13 @@ web:
 mailinglist:
   qpsmtpd-subscribe@perl.org
 
+Problems:
+  First thing to try is to set $TRACE in qpsmtpd to some number higher
+  than 0 (higher gives more detail) and watch the log.  If it doesn't
+  help you, or even if it does, please post to the maliinglist
+  (subscription instructions above).  qpsmtpd is meant to be a drop-in 
+  replacement for qmail-smtpd, so it should be very easy to get going.
+
 
 Configuration files:
   All configuration files goes into $DIR/config/ or /var/qmail/control/
