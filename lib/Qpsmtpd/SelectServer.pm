@@ -42,6 +42,7 @@ sub main {
     # before quitting!
     while (!$QUIT) {
         foreach my $client ($select->can_read(1)) {
+            #print "Reading $client\n";
             if ($client == $server) {
                 my $client_addr;
                 $client = $server->accept();
@@ -68,6 +69,7 @@ sub main {
                 my $qp = Qpsmtpd::SelectServer->new();
                 $qp->client($qpclient);
                 $qp{$qpclient} = $qp;
+                $qp->log(1, "Connection number " . keys(%qp));
                 $inbuffer{$qpclient} = '';
                 $outbuffer{$qpclient} = '';
                 $ready{$qpclient} = [];
@@ -95,13 +97,16 @@ sub main {
                 $inbuffer{$client} .= $data;
                 
                 while ($inbuffer{$client} =~ s/^([^\r\n]*)\r?\n//) {
+                    #print "<$1\n";
                     push @{$ready{$client}}, $1;
                 }
             }
         }
         
+        #print "Processing...\n";
         foreach my $client (keys %ready) {
             my $qp = $qp{$client};
+            #print "Processing $client = $qp\n";
             foreach my $req (@{$ready{$client}}) {
                 if ($indata{$client}) {
                     $qp->data_line($req . CRLF);
@@ -115,6 +120,7 @@ sub main {
             delete $ready{$client};
         }
         
+        #print "Writing...\n";
         foreach my $client ($select->can_write(1)) {
             next unless $outbuffer{$client};
             #print "Writing to $client\n";
@@ -148,6 +154,7 @@ sub main {
 
 sub freeclient {
     my $client = shift;
+    #print "Freeing client: $client\n";
     delete $inbuffer{$client};
     delete $outbuffer{$client};
     delete $ready{$client};
@@ -207,8 +214,9 @@ sub respond {
 
 sub disconnect {
   my $self = shift;
-  $self->SUPER::disconnect(@_);
+  #print "Disconnecting\n";
   $self->{__quitting} = 1;
+  $self->SUPER::disconnect(@_);
 }
 
 sub data {
@@ -231,6 +239,7 @@ sub data_line {
   
   if ($_ eq ".\r\n") {
       $self->log(6, "max_size: $self->{__max_size} / size: $self->{__size}");
+      delete $indata{$self->client()};
     
       my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
     
