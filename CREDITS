@@ -18,3 +18,6 @@ Matt Sergeant <matt@sergeant.org>: Clamav plugin.
 
 Rasjid Wilcox <rasjidw@openminddev.net>: Lots of patches as per the
 Changes file.
+
+Kee Hinckley <nazgul@somewhere.com>: Sent me the correct strftime
+format for the dates in the "Received" headers.

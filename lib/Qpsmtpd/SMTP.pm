@@ -329,7 +329,7 @@ sub data {
   $header->add("Received", "from ".$self->connection->remote_info 
 	       ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip 
 	       . ") by ".$self->config('me')." (qpsmtpd/".$self->version
-	       .") with SMTP; ". (strftime('%Y-%m-%d %TZ', gmtime)),
+	       .") with SMTP; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
 	       0);
 
   # if we get here without seeing a terminator, the connection is

@@ -1,7 +1,14 @@
 0.21-dev
 
-  All major changes in the this release where by Rasjid Wilcox
-  <rasjidw@openminddev.net>.
+  Use the proper RFC2822 date format in the Received headers. (Somehow
+  I had convinced myself that ISO8601 dates were okay). Thanks to
+  Kee Hinckley <nazgul@somewhere.com>.
+
+  Print the date in the local timezone instead of in -0000. (Not
+  entirely convinced this is a good idea)
+
+  The following major changes in the this release where by Rasjid
+  Wilcox <rasjidw@openminddev.net>.
 
   Fix error handling in queue/qmail-queue.
 
