@@ -21,6 +21,7 @@ my $MAXCONN   = 15;				# max simultaneous connections
 my $PORT      = 25;				# port number
 my $LOCALADDR = '0.0.0.0';		# ip address to bind to
 my $USER      = 'smtpd';		# user to suid to
+my $MAXCONNIP = 5;              # max simultaneous connections from one IP
 
 sub usage {
         print <<"EOT";
@@ -110,10 +111,30 @@ while (1) {
         # possible something condition...
         next;
     }
+    my ($port, $iaddr) = sockaddr_in($hisaddr);
+    if ($MAXCONNIP) {
+        my $num_conn = 0;
+        foreach my $rip (values %childstatus) {
+            if ($rip eq $iaddr) {
+                ++$num_conn;
+            }
+        }
+        ++$num_conn; # count this connection, too :)
+        if ($num_conn > $MAXCONNIP) {
+            my $rem_ip = inet_ntoa($iaddr);
+            ::log(LOGINFO,"Too many connections from $rem_ip: "
+                         ."$num_conn > $MAXCONNIP. Denying connection.");
+            $client->autoflush(1);
+            print $client "451 Sorry, too many connections from $rem_ip, try again later\r\n";
+            close $client;
+            next;
+        }
+    }
     my $pid = fork;
     if ($pid) {
         # parent
-        $childstatus{$pid} = 1;	# add to table
+        $childstatus{$pid} = $iaddr;	# add to table
+        # $childstatus{$pid} = 1;	# add to table
         $running++;
         close($client);
         next;
@@ -128,7 +149,7 @@ while (1) {
     my $localsockaddr = getsockname($client);
     my ($lport, $laddr) = sockaddr_in($localsockaddr);
     $ENV{TCPLOCALIP} = inet_ntoa($laddr);
-    my ($port, $iaddr) = sockaddr_in($hisaddr);
+    # my ($port, $iaddr) = sockaddr_in($hisaddr);
     $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
     $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
 
