@@ -1,5 +1,9 @@
 0.26-dev
 
+  Have the qmail-queue plugin add the message-id to the "Queued!"
+  message we send back to the client (to help those odd sendmail using
+  people debug their logs)
+
   Set the process name to "qpsmtpd [1.2.3.4 : host.name.tld]"
 
   Fixed timeout bug when the client sent DATA and then stopped before

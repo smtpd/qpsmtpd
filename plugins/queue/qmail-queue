@@ -70,7 +70,10 @@ sub queue_handler {
     waitpid($child, 0);
     my $exit_code = $? >> 8;
     $exit_code and return(DECLINED, "Unable to queue message ($exit_code)");
-    return (OK, "Queued!");
+
+    my $msg_id = $transaction->header->get('Message-Id') || '';
+    $msg_id =~ s/[\r\n].*//s;  # don't allow newlines in the Message-Id here
+    return (OK, "Queued! $msg_id");
   }
   elsif (defined $child) {
     # Child
