@@ -286,6 +286,7 @@ sub data {
     # add a transaction->blocked check back here when we have line by line plugin access...
     unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
+      s/^\.\./\./;
       if ($in_header and m/^\s*$/) {
 	$in_header = 0;
 	my @header = split /\n/, $buffer;

@@ -1,5 +1,7 @@
 0.20 - development
 
+  Fix the "too many dots in the beginning of the line" bug.
+
   Add munge_subject_threshold and reject_threshold options to the
   spamassassin plugin.  Add documentation to the spamassassin plugin.
 
