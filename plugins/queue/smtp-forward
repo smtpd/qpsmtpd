@@ -51,6 +51,7 @@ sub queue_handler {
                             $self->{_smtp_server},
                             Port => $self->{_smtp_port},
                             Timeout => 60,
+                            Hello => $self->qp->config("me"),
                            ) || die $!;
   $smtp->mail( $transaction->sender->address || "" ) or return(DECLINED, "Unable to queue message ($!)");
   for ($transaction->recipients) {
