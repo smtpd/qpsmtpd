@@ -1,5 +1,8 @@
 0.26-dev
 
+  Don't break under taint mode on OpenBSD. (thanks to Frank Denis /
+  Jedi/Sector One)
+
   Have the qmail-queue plugin add the message-id to the "Queued!"
   message we send back to the client (to help those odd sendmail using
   people debug their logs)

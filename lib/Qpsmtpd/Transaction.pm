@@ -55,6 +55,7 @@ sub notes {
   my $self = shift;
   my $key  = shift;
   @_ and $self->{_notes}->{$key} = shift;
+  #warn Data::Dumper->Dump([\$self->{_notes}], [qw(notes)]);
   $self->{_notes}->{$key};
 }
 
@@ -71,6 +72,14 @@ sub body_write {
                                                 : Qpsmtpd::Utils::tildeexp('~/tmp/');
 
      $spool_dir .= "/" unless ($spool_dir =~ m!/$!);
+     
+     $spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
+     $spool_dir = $1;
+
+     if (-e $spool_dir) {
+       my $mode = (stat($spool_dir))[2];
+       die "Permissions on the spool_dir are not 0700" if $mode & 07077;
+     }
 
      -d $spool_dir or mkdir($spool_dir, 0700) or die "Could not create spool_dir: $!";
      $self->{_filename} = $spool_dir . join(":", time, $$, $transaction_counter++);
