@@ -5,3 +5,5 @@ dnsbl
 
 # this plugin needs to run after all other "rcpt" plugins
 check_relay
+
+spamassassin

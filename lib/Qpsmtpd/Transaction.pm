@@ -1,5 +1,10 @@
 package Qpsmtpd::Transaction;
 use strict;
+use IO::File qw(O_RDWR O_CREAT);
+
+# For unique filenames. We write to a local tmp dir so we don't need
+# to make them unpredictable.
+my $transaction_counter = 0; 
 
 sub new { start(@_) }
 
@@ -33,11 +38,11 @@ sub header {
   $self->{_header};
 }
 
-sub body {
-  my $self = shift;
-  @_ and $self->{_body} = shift;
-  $self->{_body};
-}
+#sub body {
+#  my $self = shift;
+#  @_ and $self->{_body} = shift;
+#  $self->{_body};
+#}
 
 sub blocked {
   my $self = shift;
@@ -52,10 +57,45 @@ sub notes {
   $self->{_notes}->{$key};
 }
 
-#sub add_header_line {
-#}
+sub add_header_line {
+  my $self = shift;
+  $self->{_header} .= shift;
+}
 
-#sub add_body_line {
-#}
+sub body_write {
+  my $self = shift;
+  my $data = shift;
+  #$self->{_body} .= shift;
+  unless ($self->{_body_file}) {
+    -d "tmp" or mkdir("tmp", 0700) or die "Could not create dir tmp: $!";
+    $self->{_filename} = "/home/smtpd/qpsmtpd/tmp/" . join(":", time, $$, $transaction_counter++);
+    $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT)    
+      or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
+  }
+  # go to the end of the file
+  seek($self->{_body_file},0,2)
+    unless $self->{_body_file_writing};
+  $self->{_body_file_writing} = 1;
+  $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data);
+}
+
+sub body_resetpos {
+  my $self = shift;
+  return unless $self->{_body_file};
+  seek($self->{_body_file}, 0,0);
+  $self->{_body_file_writing} = 0;
+  1;
+}
+
+sub body_getline {
+  my $self = shift;
+  return unless $self->{_body_file};
+  seek($self->{_body_file}, 0,0)
+    if $self->{_body_file_writing};
+  $self->{_body_file_writing} = 0;
+  my $line = $self->{_body_file}->getline;
+  return $line;
+  
+}
 
 1;

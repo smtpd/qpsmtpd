@@ -335,7 +335,8 @@ sub data {
 	#. ..
       }
       
-      $buffer .= $_;
+      $self->transaction->body_write($_);
+
       $size += length $_;
     }
     $self->log(5, "size is at $size\n") unless ($i % 300);
@@ -346,26 +347,26 @@ sub data {
   $self->log(6, "max_size: $max_size / size: $size");
 
   $self->transaction->header($header);
-  $self->transaction->body(\$buffer);
 
   # if we get here without seeing a terminator, the connection is
   # probably dead.
   $self->respond(451, "Incomplete DATA"), return 1 unless $complete;
 
-  #
-  #  FIXME - Call plugins to work on the body here
-  #
-
   $self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
-
   $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
-  
-  return $self->queue($self->transaction);
+
+  my ($rc, $msg) = $self->run_hooks("data_post");
+  if ($rc != DONE) {
+    warn "QPSM100";
+    return $self->queue($self->transaction);    
+  }
 
 }
 
 sub queue {
   my ($self, $transaction) = @_;
+
+  warn "QPSM2000";
 
   # these bits inspired by Peter Samuels "qmail-queue wrapper"
   pipe(MESSAGE_READER, MESSAGE_WRITER) or fault("Could not create message pipe"), exit;
@@ -391,7 +392,10 @@ sub queue {
     print MESSAGE_WRITER "X-smtpd: qpsmtpd/",$self->version,", http://develooper.com/code/qpsmtpd/\n";
 
     $transaction->header->print(\*MESSAGE_WRITER);
-    print MESSAGE_WRITER ${$transaction->body};
+    $transaction->body_resetpos;
+    while (my $line = $transaction->body_getline) {
+      print MESSAGE_WRITER $line;
+    }
     close MESSAGE_WRITER;
 
     my @rcpt = map { "T" . $_->address } $transaction->recipients;
