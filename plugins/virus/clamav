@@ -24,7 +24,11 @@ new installations should use the name=value form as follows:
 =item clamscan_path=I<path> (e.g. I<clamscan_path=/usr/bin/clamdscan>)
 
 Path to the clamav commandline scanner.  Using clamdscan is recommended
-for sake of performance.
+for sake of performance.  However, in this case, the user executing clamd
+requires access to the qpsmtpd spool directory, which usually means either
+running clamd as the same user, or changing the group ownership of the
+spool directory to be the clamd group and changing the permissions to 0750
+(this will emit warning when the qpsmtpd service starts up).
 
 Mail will be passed to the clamav scanner in Berkeley mbox format (that is,
 with a "From " line).
@@ -48,7 +52,12 @@ can take an exceedingly long time to scan.  The default is 524288, or 512k.
 
 Specify an alternate temporary directory.  If not specified, the qpsmtpd
 I<spool_dir> will be used.  If neither is available, I<~/tmp/> will be tried,
-and if that that fails the plugin will gracefully fail.
+and if that that fails the plugin will gracefully fail.  
+
+=item back_compat
+
+If you are using a version of ClamAV prior to 0.80, you need to set this
+variable to include a couple of now deprecated options.
 
 =back
 
@@ -92,6 +101,9 @@ sub register {
     elsif (/^action=(add-header|reject)$/) {
         $self->{_action} = $1;
     }
+    elsif (/back_compat/) {
+	$self->{_back_compat} = '-i --max-recursion=50';
+    }
     else {
         $self->log(LOGERROR, "Unrecognized argument '$_' to clamav plugin");
         return undef;
@@ -99,10 +111,8 @@ sub register {
   }
 
   $self->{_max_size} ||= 512 * 1024;
-  $self->{_spool_dir} ||=
-          $self->qp->config('spool_dir') ||
-	      Qpsmtpd::Utils::tildeexp('~/tmp/');
-  $self->{_spool_dir} = $1 if $self->{_spool_dir} =~ /(.*)/;
+  $self->{_spool_dir} ||= $self->spool_dir();
+  $self->{_back_compat} ||= ''; # make sure something is set
 
   unless ($self->{_spool_dir}) {
         $self->log(LOGERROR, "No spool dir configuration found");
@@ -142,7 +152,9 @@ sub clam_scan {
   seek($temp_fh, 0, 0);
  
   # Now do the actual scanning!
-  my $cmd = $self->{_clamscan_loc}." --stdout -i --max-recursion=50 --disable-summary $filename 2>&1";
+  my $cmd = $self->{_clamscan_loc}." --stdout "
+    .$self->{_back_compat}
+    ." --disable-summary $filename 2>&1";
   $self->log(LOGDEBUG, "Running: $cmd");
   my $output = `$cmd`;
  
