@@ -8,6 +8,7 @@ config.sample/relayclients
 config.sample/require_resolvable_fromhost
 config.sample/rhsbl_zones
 CREDITS
+lib/Apache/Qpsmtpd.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
@@ -30,12 +31,15 @@ plugins/auth/authdeny
 plugins/auth/authnull
 plugins/check_badmailfrom
 plugins/check_badrcptto
+plugins/check_badmailfromto
+plugins/check_basicheaders
 plugins/check_earlytalker
 plugins/check_relay
 plugins/check_spamhelo
 plugins/content_log
 plugins/count_unrecognized_commands
 plugins/dnsbl
+plugins/dns_whitelist_soft
 plugins/http_config
 plugins/ident/geoip
 plugins/ident/p0f
@@ -45,6 +49,7 @@ plugins/queue/postfix-queue
 plugins/queue/qmail-queue
 plugins/queue/smtp-forward
 plugins/quit_fortune
+plugins/rcpt_ok
 plugins/require_resolvable_fromhost
 plugins/rhsbl
 plugins/sender_permitted_from
@@ -66,4 +71,8 @@ t/addresses.t
 t/helo.t
 t/qpsmtpd-address.t
 t/Test/Qpsmtpd.pm
+t/plugin_tests.t
+t/plugin_tests/check_badrcptto
+t/plugin_tests/dnsbl
+t/Test/Qpsmtpd/Plugin.pm
 META.yml                                 Module meta-data (added by MakeMaker)
