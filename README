@@ -60,9 +60,10 @@ Make a new user and a directory where you'll install qpsmtpd.  I
 usually use "smtpd" for the user and /home/smtpd/qpsmtpd/ for the
 directory.
 
-Put the files there.  If you install from CVS you can just do
+Put the files there.  If you install from CVS you can just do run the
+following command in the /home/smtpd/ directory.
+
    cvs C<-d> :pserver:anonymous@cvs.perl.org:/cvs/public co qpsmtpd
-in the /home/smtpd/ dir.
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
@@ -77,6 +78,14 @@ qmail-smtpd if you are replacing it with qpsmtpd.
 
 If you don't use supervise, then you need to run the ./run script in
 some other way.
+
+The smtpd user needs write access to ~smtpd/qpsmtpd/tmp/ but should
+not need to write anywhere else.  This directory can be configured
+with the "spool_dir" configuration.
+
+As per version 0.25 the distributed ./run script runs tcpserver with
+the -R flag to disable identd lookups.  Remove the -R flag if that's
+not what you want.
 
 
 =head2 Configuration
