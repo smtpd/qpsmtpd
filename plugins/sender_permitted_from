@@ -1,0 +1,61 @@
+
+=head1 NAME
+
+SPF - plugin to implement Sender Permitted From
+
+=head1 SYNOPSIS
+
+  # in config/plugins
+  sender_permitted_from
+
+=cut
+
+use Mail::SPF::Query;
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("mail", "mail_handler");
+  $self->register_hook("rcpt", "rcpt_handler");
+}
+
+sub mail_handler {
+  my ($self, $transaction, $sender) = @_;
+
+  return (DECLINED) unless ($sender->format ne "<>"
+                            and $sender->host && $sender->user);
+
+  my $host = lc $sender->host;
+  my $from = $sender->user . '@' . $host;
+
+  my $ip = $self->qp->connection->remote_ip;
+  my $query = Mail::SPF::Query->new(ip => $ip, sender => $from)
+    || die "Couldn't construct Mail::SPF::Query object";
+  $transaction->notes('spfquery', $query);
+               
+  return (DECLINED);
+}
+
+sub rcpt_handler {
+  my ($self, $transaction, $rcpt) = @_;
+  my $query = $transaction->notes('spfquery');
+  my ($result, $comment) = $query->result();
+  
+  if ($result eq "pass") {
+    # domain is not forged
+    $self->qp->connection->notes('spf_ok', 1);
+  }
+  elsif ($result eq "deny") {
+    # domain is forged
+    return (DENY, "SPF forgery ($comment)");
+  }
+  elsif ($result eq "softdeny") {
+    # domain may be forged
+    $self->qp->connection->notes('spf_ok', 0);
+  } 
+  else {
+    # domain has not implemented SPF
+  }
+   
+  return (DECLINED);
+}
+
