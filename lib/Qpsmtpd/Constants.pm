@@ -2,7 +2,7 @@ package Qpsmtpd::Constants;
 use strict;
 require Exporter;
 
-my (@common) = qw(OK DECLINED DONE DENY DENYSOFT TRACE DISCARD);
+my (@common) = qw(OK DECLINED DONE DENY DENYSOFT TRACE);
 
 use vars qw($VERSION @ISA @EXPORT);
 @ISA    = qw(Exporter);
@@ -15,7 +15,6 @@ use constant DENY     => 901;
 use constant DENYSOFT => 902;
 use constant DECLINED => 909;
 use constant DONE     => 910;
-use constant DISCARD  => 920;
 
 
 1;
@@ -58,12 +57,6 @@ on to the next plugin.
 
 Returning this from a hook implies success, but tells qpsmtpd to
 skip any remaining plugins for this phase.
-
-=item C<DISCARD>
-
-This can only be returned for the DATA phase. It tells qpsmtpd to
-return 250 to the client implying delivery success, but silently
-drops the email.
 
 =back
 

@@ -403,9 +403,6 @@ sub data {
   elsif ($rc == DENYSOFT) {
     $self->respond(452, $msg || "Message denied temporarily");
   } 
-  elsif ($rc == DISCARD) {
-    $self->respond(250, $msg || "Message quietly discarded");
-  }
   else {
     $self->queue($self->transaction);    
   }
