@@ -1,5 +1,13 @@
 0.26-dev
 
+  If a plugin running the ehlo hook add something to the ARRAY
+  reference $self->transaction->notes('capabilities') then it will be
+  added to the EHLO response.
+
+  Add command_counter method to the SMTP object.  Plugins can use this
+  to catch (or not) consecutive commands.  In particular useful with
+  the unrecognized_command hook.
+
   Filter out all uncommon characters from the remote_host
   setting. (thanks to Frank Denis / Jedi/Sector One for the hint).
 

@@ -37,11 +37,16 @@ sub new {
   $self;
 }
 
-
+sub command_counter {
+  my $self = shift;
+  $self->{_counter} || 0;
+}
 
 sub dispatch {
   my $self = shift;
   my ($cmd) = lc shift;
+
+  $self->{_counter}++; 
 
   #$self->respond(553, $state{dnsbl_blocked}), return 1
   #  if $state{dnsbl_blocked} and ($cmd eq "rcpt");
@@ -157,11 +162,16 @@ sub ehlo {
     $conn->hello_host($hello_host);
     $self->transaction;
 
+    my @capabilities = $self->transaction->notes('capabilities')
+                        ? @{ $self->transaction->notes('capabilities') }
+			: ();  
+
     $self->respond(250,
 		 $self->config("me") . " Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]",
 		 "PIPELINING",
 		 "8BITMIME",
 		 ($self->config('databytes') ? "SIZE ". ($self->config('databytes'))[0] : ()),
+		 @capabilities,  
 		);
   }
 }
