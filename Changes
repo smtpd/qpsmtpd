@@ -1,7 +1,22 @@
 
+v0.10
+  New object oriented internals
+  
+  Very flexible plugin
+
+  All functionality not core to SMTP moved to plugins
+
+
+2002/07/15
+  DNS RBL and RHSBL support via plugins.
+
+  More hooks.
+
 2002/07/03
   First (non functional) version of the new object oriented mail engine.
  
+
+Changes on the old v0.0x branch:
 
 2002/05/09
   Klez filter (thanks to Robert Spier)
