@@ -71,8 +71,8 @@ $ao = Qpsmtpd::Address->new($as);
 ok ($ao, "new $as");
 is ($ao->format, $as, "format $as");
 
-$as = '<foo@foo.x.example.com>';
-ok ($ao = Qpsmtpd::Address->parse($as), "parse $as");
+$as = 'foo@foo.x.example.com';
+ok ($ao = Qpsmtpd::Address->parse("<$as>"), "parse <$as>");
 is ($ao && $ao->address, $as, "address $as");
 
 
