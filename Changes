@@ -2,6 +2,9 @@
 
   [ many changes from cvs logs, gah ]
 
+  Fix warning in count_unrecognized_commands plugin (thanks to spaze
+  and Roger Walker)
+
   Improve error messages from the Postfix module (Erik I. Bolsø,
   <knan at mo.himolde.no>)
 
