@@ -1,43 +1,119 @@
-
 sub register {
   my ($self, $qp) = @_;
-  $self->register_hook("mail", "mail_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
+
+  $self->register_hook('mail', 'mail_handler');
+  $self->register_hook('rcpt', 'rcpt_handler');
+  $self->register_hook('disconnect', 'disconnect_handler');
 }
 
 sub mail_handler {
   my ($self, $transaction, $sender) = @_;
-  # lookup the address here; but always just return DECLINED
-  # we will store the state for rejection when rcpt is being run, some
+
+  my $res = new Net::DNS::Resolver;
+  my $sel = IO::Select->new();
+  my %rhsbl_zones_map = ();
+
+  # Perform any RHS lookups in the background. We just send the query packets here
+  # and pick up any results in the RCPT handler.
   # MTAs gets confused when you reject mail during MAIL FROM:
-  #
-  # If we were really clever we would do the lookup in the background
-  # but that must wait for another day.  (patches welcome! :-) )
-  if ($sender->format ne "<>" and $self->qp->config('rhsbl_zones')) {
+
     my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
-    my $host = $sender->host;
+
+  if ($sender->format ne '<>' and %rhsbl_zones) {
+    my $helo = $self->qp->connection->hello_host;
+    push(my @hosts, $sender->host);
+    push(@hosts, $helo) if $helo && $helo ne $sender->host;
+    for my $host (@hosts) {
     for my $rhsbl (keys %rhsbl_zones) {
-      $transaction->notes('rhsbl', "Mail from $host rejected because it $rhsbl_zones{$rhsbl}")
-	if check_rhsbl($self, $rhsbl, $host);
+        $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record in the background");
+        $sel->add($res->bgsend("$host.$rhsbl"));
+        $rhsbl_zones_map{"$host.$rhsbl"} = $rhsbl_zones{$rhsbl};
     }
   }
+
+    %{$self->{_rhsbl_zones_map}} = %rhsbl_zones_map;
+    $transaction->notes('rhsbl_sockets', $sel);
+  } else {
+    $self->log(LOGDEBUG, 'no RHS checks necessary');
+  }
+
   return DECLINED;
 }
 
 sub rcpt_handler {
   my ($self, $transaction, $rcpt) = @_;
-  my $note = $transaction->notes('rhsbl');
-  return (DENY, $note) if $note;
+  my $host = $transaction->sender->host;
+  my $hello = $self->qp->connection->hello_host;
+
+  my $result = $self->process_sockets;
+  if ($result && defined($self->{_rhsbl_zones_map}{$result})) {
+    if ($result =~ /^$host\./ ) {
+      return (DENY, "Mail from $host rejected because it " . $self->{_rhsbl_zones_map}{$result});
+    } else {
+      return (DENY, "Mail from HELO $hello rejected because it " . $self->{_rhsbl_zones_map}{$result});
+    }
+  }
+  return (DENY, $result) if $result;
   return DECLINED;
 }
 
-sub check_rhsbl {
-  my ($self, $rhsbl, $host) = @_;
-  return 0 unless $host;
-  $self->log(LOGDEBUG, "checking $host in $rhsbl");
-  return 1 if ((gethostbyname("$host.$rhsbl"))[4]);
-  return 0;
+sub process_sockets {
+  my ($self) = @_;
+  my $trans = $self->transaction;
+  my $result = '';
+
+  return $trans->notes('rhsbl') if $trans->notes('rhsbl');
+
+  my $res = new Net::DNS::Resolver;
+  my $sel = $trans->notes('rhsbl_sockets') or return '';
+
+  $self->log(LOGDEBUG, 'waiting for rhsbl dns');
+
+  # don't wait more than 8 seconds here
+  my @ready = $sel->can_read(8);
+
+  $self->log(LOGDEBUG, 'DONE waiting for rhsbl dns, got ' , scalar @ready, ' answers ...') ;
+  return '' unless @ready;
+
+  for my $socket (@ready) {
+    my $query = $res->bgread($socket);
+    $sel->remove($socket);
+    undef $socket;
+
+    if ($query) {
+      foreach my $rr ($query->answer) {
+        $self->log(LOGDEBUG, 'got an ' . $rr->type . ' record ' . $rr->name);
+        if ($rr->type eq 'A') {
+          $result = $rr->name;
+          $self->log(LOGDEBUG, "A record found for $result with IP " . $rr->address);
+          last;
+        }
+      }
+    } else {
+      $self->log(LOGCRIT, "query failed: ", $res->errorstring) unless $res->errorstring eq 'NXDOMAIN';
+    }
+
+    if ($result) {
+      #kill any other pending I/O
+      $trans->notes('rhsbl_sockets', undef);
+      return $trans->notes('rhsbl', $result);
+    }
+  }
+
+  if ($sel->count) {
+    # loop around if we have dns results left
+    return $self->process_sockets();
+  }
+
+  # if there was more to read; then forget it
+  $trans->notes('rhsbl_sockets', undef);
+
+  return $trans->notes('rhsbl', $result);
 }
 
+sub disconnect_handler {
+  my ($self, $transaction) = @_;
 
-
+  $transaction->notes('rhsbl_sockets', undef);
+  return DECLINED;
+}

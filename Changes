@@ -2,6 +2,8 @@
 
   [ many changes from cvs logs, gah ]
 
+  Make the rhsbl plugin do DNS lookups in the background. (Mark Powell)
+
   Fix warning in count_unrecognized_commands plugin (thanks to spaze
   and Roger Walker)
 
