@@ -13,14 +13,14 @@ sub connect_handler {
   # perform RBLSMTPD checks to mimic Dan Bernstein's rblsmtpd
   if (defined($ENV{'RBLSMTPD'})) {
     if ($ENV{'RBLSMTPD'} ne '') {
-      $self->log(1, "RBLSMTPD=\"$ENV{'RBLSMTPD'}\" for $remote_ip");
+      $self->log(LOGINFO, "RBLSMTPD=\"$ENV{'RBLSMTPD'}\" for $remote_ip");
       return DECLINED;
     } else {
-      $self->log(1, "RBLSMTPD set, but empty for $remote_ip");
+      $self->log(LOGINFO, "RBLSMTPD set, but empty for $remote_ip");
       return DECLINED;
     }
   } else {
-    $self->log(1, "RBLSMTPD not set for $remote_ip");
+    $self->log(LOGDEBUG, "RBLSMTPD not set for $remote_ip");
   }
 
   my $allow = grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) } $self->qp->config('dnsbl_allow');
