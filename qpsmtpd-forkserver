@@ -113,17 +113,16 @@ while (1) {
     }
     my ($port, $iaddr) = sockaddr_in($hisaddr);
     if ($MAXCONNIP) {
-        my $num_conn = 0;
-        # If we for-loop directly over values %childstatus, a SIGCHLD can call
-        # REAPER and slip $rip out from under us.  Causes "Use of freed value in
-        # iteration" under perl 5.8.4.
+        my $num_conn = 1; # seed with current value
+
+        # If we for-loop directly over values %childstatus, a SIGCHLD
+        # can call REAPER and slip $rip out from under us.  Causes
+        # "Use of freed value in iteration" under perl 5.8.4.
         my @rip = values %childstatus;
         foreach my $rip (@rip) {
-            if ($rip eq $iaddr) {
-                ++$num_conn;
-            }
+          ++$num_conn if (defined $rip && $rip eq $iaddr) {
         }
-        ++$num_conn; # count this connection, too :)
+
         if ($num_conn > $MAXCONNIP) {
             my $rem_ip = inet_ntoa($iaddr);
             ::log(LOGINFO,"Too many connections from $rem_ip: "
