@@ -5,6 +5,7 @@ check_badmailfrom and check_mailrcptto plugins.
 Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
 the connection gets dropped at the wrong moment.  Support and enable
 taint checking. MAIL FROM host dns check configurable.  HELO hook.
+initial earlytalker plugin.
 
 Andrew Pam <xanni@glasswings.com.au>: fixing the maximum message size
 (databytes) stuff.

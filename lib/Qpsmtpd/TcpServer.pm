@@ -1,5 +1,7 @@
 package Qpsmtpd::TcpServer;
 use Qpsmtpd::SMTP;
+use Qpsmtpd::Constants;
+
 @ISA = qw(Qpsmtpd::SMTP);
 use strict;
 
@@ -25,7 +27,8 @@ sub run {
     # should be somewhere in Qpsmtpd.pm and not here...
     $self->load_plugins;
 
-    $self->start_conversation;
+    my $rc = $self->start_conversation;
+    return if $rc != DONE;
 
     # this should really be the loop and read_input should just get one line; I think
 

@@ -1,5 +1,11 @@
 0.26-dev
 
+  check_earlytalker plugin.  Deny the connection if the client talks
+  before we show our SMTP banner.  (From Devin Carraway)
+
+  Patch Qpsmtpd::SMTP to allow connect plugins to give DENY and
+  DENYSOFT return codes.  Based on patch from Devin Carraway.
+
   Support morercpthosts.cdb
 
   config now takes an extra "type" parameter.  If it's "map" then a

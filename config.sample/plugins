@@ -7,7 +7,10 @@
 #   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
 
 quit_fortune
+
+#check_earlytalker
 require_resolvable_fromhost
+
 rhsbl
 dnsbl
 check_badmailfrom

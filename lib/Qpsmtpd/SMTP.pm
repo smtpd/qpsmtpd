@@ -73,9 +73,21 @@ sub start_conversation {
     # this should maybe be called something else than "connect", see
     # lib/Qpsmtpd/TcpServer.pm for more confusion.
     my ($rc, $msg) = $self->run_hooks("connect");
-    if ($rc != DONE) {
+    if ($rc == DENY) {
+      $self->respond(550, ($msg || 'Connection from you denied, bye bye.'));
+      return $rc;
+    }
+    elsif ($rc == DENYSOFT) {
+      $self->respond(450, ($msg || 'Connection from you temporarily denied, bye bye.'));
+      return $rc;
+    }
+    elsif ($rc == DONE) {
+      return $rc;
+    }
+    elsif ($rc != DONE) {
       $self->respond(220, $self->config('me') ." ESMTP qpsmtpd "
 		     . $self->version ." ready; send us your mail, but not your spam.");
+      return DONE;
     }
 }
 
