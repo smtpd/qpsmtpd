@@ -1,3 +1,9 @@
+Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
+the connection gets dropped at the wrong moment.  Support and enable
+taint checking. MAIL FROM host dns check configurable.
 
-send patches to ask@perl.org.  :-)
+Andrew Pam <xanni@glasswings.com.au>: fixing the maximum message size
+(databytes) stuff.
 
+Marius Kjeldahl <marius@kjeldahl.net>, Zukka Zitting
+<jukka.zitting@iki.fi>: Patches for supporting $ENV{RELAYCLIENT}
