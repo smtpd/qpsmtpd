@@ -15,6 +15,15 @@
 
   Add "plugin/virus/uvscan" - McAfee commandline virus scanner
 
+  Inbound connections logged as soon as the remote host address is known
+  when running under tcpserver.
+
+  check_earlytalker -
+    + optionally react to an earlytalker by denying all MAIL-FROM commands
+      rather than issuing a 4xx/5xx greeting and disconnecting. (Mark
+      Powell)
+    + initial "awkward silence" period now configurable (Mark Powell)
+    + DENY/DENYSOFT now configurable
 
 0.28 - 2004/06/05
 
