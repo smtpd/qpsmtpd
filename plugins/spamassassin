@@ -138,18 +138,18 @@ sub check_spam {
   # or CHECK or REPORT or SYMBOLS
 
   print SPAMD "X-Envelope-From: ", $transaction->sender->format, CRLF
-    or warn "Could not print to spamd: $!";
+    or $self->log(LOGWARN, "Could not print to spamd: $!");
 
   print SPAMD join CRLF, split /\n/, $transaction->header->as_string
-    or warn "Could not print to spamd: $!";
+    or $self->log(LOGWARN, "Could not print to spamd: $!");
 
   print SPAMD CRLF
-    or warn "Could not print to spamd: $!";
+    or $self->log(LOGWARN, "Could not print to spamd: $!");
 
   while (my $line = $transaction->body_getline) {
     chomp $line;
     print SPAMD $line, CRLF
-      or warn "Could not print to spamd: $!";
+      or $self->log(LOGWARN, "Could not print to spamd: $!");
   }
 
   print SPAMD CRLF;

@@ -43,7 +43,7 @@ sub check_dns {
     }
   }
   else {
-    warn "$$ query for $host failed: ", $res->errorstring, "\n"
+    $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
       unless $res->errorstring eq "NXDOMAIN";
   }
   return 0;

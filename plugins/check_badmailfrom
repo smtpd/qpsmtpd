@@ -42,7 +42,7 @@ sub mail_handler {
     $bad =~ s/^\s*(\S+).*/$1/;
     next unless $bad;
     $bad = lc $bad;
-    warn "Bad badmailfrom config: No \@ sign in $bad\n" and next unless $bad =~ m/\@/;
+    $self->log(LOGWARN, "Bad badmailfrom config: No \@ sign in $bad") and next unless $bad =~ m/\@/;
     $transaction->notes('badmailfrom', "sorry, your envelope sender is in my badmailfrom list")
       if ($bad eq $from) || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
   }

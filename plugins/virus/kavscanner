@@ -60,7 +60,7 @@ sub register {
   $self->register_hook("data_post", "kav_scan");
 
   if (@args % 2) {
-    warn "kavscanner: Wrong number of arguments";
+    $self->log(LOGWARN, "kavscanner: Wrong number of arguments");
     $self->{_kavscanner_bin} = "/opt/AVP/kavscanner";
   } else {
     my %args = @args;
