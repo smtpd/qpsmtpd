@@ -81,6 +81,16 @@ Allowed return codes
   DENYHARD - Return a hard failure code and disconnect
   DONE     - skip further processing
 
+=head2 data
+
+Hook for the "data" command.  Defaults to '354, "go ahead"'.
+
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DENYHARD - Return a hard failure code and disconnect
+  DONE     - Plugin took care of receiving data and calling the queue (not
+             recommended)
+
 =head2 data_post
 
 Hook after receiving all data; just before the message is queued.
