@@ -115,7 +115,7 @@ sub canonify {
     my $atom = '[a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~]+';
     my $address_literal = 
 '(?:\[(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|IPv6:[0-9A-Fa-f:.]+)\])';
-    my $subdomain = '(?:[a-zA-Z0-9](?:[-a-zA-Z0-9]*[a-zA-Z0-9]))';
+    my $subdomain = '(?:[a-zA-Z0-9](?:[-a-zA-Z0-9]*[a-zA-Z0-9])?)';
     my $domain = "(?:$address_literal|$subdomain(?:\.$subdomain)*)";
     my $qtext = '[\x01-\x08\x0B\x0C\x0E-\x1F\x21\x23-\x5B\x5D-\x7F]';
     my $text = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
