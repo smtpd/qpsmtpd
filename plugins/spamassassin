@@ -50,6 +50,14 @@ Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix
 domain sockets for spamd.  This is faster and more secure than using
 a TCP connection.
 
+=item leave_old_headers [drop|rename|keep]
+
+Another mail server before might have checked this mail already and may have
+added X-Spam-Status, X-Spam-Flag and X-Spam-Check-By lines. Normally you can
+not trust such headers and should either rename them to X-Old-... (default,
+parameter 'rename') or have them removed (parameter 'drop'). If you know
+what you are doing, you can also leave them intact (parameter 'keep').
+
 =back
 
 With both of the first options the configuration line will look like the following
@@ -88,6 +96,8 @@ sub check_spam {
 
   $self->log(6, "check_spam");
   return (DECLINED) if $transaction->body_size > 500_000;
+
+  my $leave_old_headers = lc($self->{_args}->{leave_old_headers}) || 'rename';
 
   my $remote  = 'localhost';
   my $port    = 783;
@@ -144,6 +154,20 @@ sub check_spam {
   my $line0 = <SPAMD>; # get the first protocol lines out
   if ($line0) {
     $self->log(6, "check_spam: spamd: $line0");
+
+    if ( $leave_old_headers eq 'rename' )
+    {
+      foreach my $header ( $transaction->header->get('X-Spam-Check-By') )
+      {
+        $transaction->header->add('X-Old-Spam-Check-By', $header);
+      }
+    }
+    
+    if ( $leave_old_headers eq 'drop' || $leave_old_headers eq 'rename' )
+    {
+      $transaction->header->delete('X-Spam-Check-By');
+    }
+
     $transaction->header->add("X-Spam-Check-By", $self->qp->config('me'), 0);
   }
 
@@ -161,6 +185,25 @@ sub check_spam {
   $tests =~ s/\015//;  # hack for outlook
   $flag = $flag eq 'True' ? 'Yes' : 'No';
   $self->log(6, "check_spam: finished reading from spamd");
+
+  if ( $leave_old_headers eq 'rename' )
+  {
+    foreach my $header ( $transaction->header->get('X-Spam-Flag') )
+    {
+      $transaction->header->add('X-Old-Spam-Flag', $header);
+    }
+
+    foreach my $header ( $transaction->header->get('X-Spam-Status') )
+    {
+      $transaction->header->add('X-Old-Spam-Status', $header);
+    }
+  }
+    
+  if ( $leave_old_headers eq 'drop' || $leave_old_headers eq 'rename' )
+  {
+    $transaction->header->delete('X-Spam-Flag');
+    $transaction->header->delete('X-Spam-Status');
+  }
 
   $transaction->header->add('X-Spam-Flag', 'YES', 0) if ($flag eq 'Yes');
   $transaction->header->add('X-Spam-Status',
