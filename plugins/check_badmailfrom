@@ -1,4 +1,18 @@
-# this plugin checks the standard badmailfrom config
+=head1 NAME
+
+check_badmailfrom - checks the standard badmailfrom config
+
+=head1 DESCRIPTION
+
+Reads the "badmailfrom" configuration like qmail-smtpd does.  From the
+qmail-smtpd docs:
+
+"Unacceptable envelope sender addresses.  qmail-smtpd will reject every
+recipient address for a message if the envelope sender address is
+listed in badmailfrom.  A line in badmailfrom may be of the form
+@host, meaning every address at host."
+
+=cut
 
 sub register {
   my ($self, $qp) = @_;
@@ -8,6 +22,7 @@ sub register {
 
 sub mail_handler {
   my ($self, $transaction, $sender) = @_;
+
   my @badmailfrom = $self->qp->config("badmailfrom")
     or return (DECLINED);
 
@@ -18,7 +33,9 @@ sub mail_handler {
   my $from = $sender->user . '@' . $host;
 
   for my $bad (@badmailfrom) {
-    $bad =~ s/^\s*(\S+)/$1/;
+    $bad =~ s/^\s*(\S+).*/$1/;
+    next unless $bad;
+    warn "Bad badmailfrom config: No \@ sign in $bad\n" and next unless $bad =~ m/\@/;
     $transaction->notes('badmailfrom', "Mail from $bad not accepted here")
       if ($bad eq $from)
       || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
