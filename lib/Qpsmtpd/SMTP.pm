@@ -343,7 +343,7 @@ sub data {
       s/^\.\./\./;
       if ($in_header and m/^\s*$/) {
 	$in_header = 0;
-	my @header = split /\n/, $buffer;
+	my @header = split /^/m, $buffer;
 
 	# ... need to check that we don't reformat any of the received lines.
 	#
