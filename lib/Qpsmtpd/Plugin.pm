@@ -52,4 +52,37 @@ sub connection {
   shift->qp->connection;
 }
 
+sub wrap_plugin {
+  my ($self, $plugin_file, @args) = @_;
+
+  # Wrap all of the methods in an existing plugin so that functions
+  # can easily be replaced.  Yes, we could use something like
+  # Hook::Lexwrap isntead, but since it's only 15 lines of code, might
+  # as well do it ourself.
+
+  # Static methods in plugins will probably not work right in this
+  # scheme.
+
+  # Load the new plugin under our namespace.
+  my $newPackage = __PACKAGE__."::_wrap_";
+  Qpsmtpd::_compile($self->plugin_name, $newPackage, $plugin_file)
+      unless defined &{"${newPackage}::register"};
+
+  no strict 'refs';
+  my $currentPackage = ref $self;
+  local *{${newPackage}."::register_hook"} = sub {
+    if (defined &{ $currentPackage . "::$_[2]"}) {
+      # We're wrapping this hook.  Store the old value in $self-{_wrap_FUNC}
+      $self->{"_wrap_".$_[2]} = \&{${newPackage}."::$_[2]"};
+    } else {
+      # We're not wrapping this hook.  Alias it into our namespace.
+      *{$currentPackage."::$_[2]"} = \&{${newPackage}."::$_[2]"};
+    }
+    $self->register_hook($_[1],$_[2]);
+  };
+
+  $self->{_wrapped_package} = $newPackage;
+  $newPackage->register($self->{_qp},@args);
+}
+
 1;
