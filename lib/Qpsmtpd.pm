@@ -305,6 +305,8 @@ sub data {
 
   my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
 
+  my $timeout = $self->config('timeout');
+
   while (<STDIN>) {
     $complete++, last if $_ eq ".\r\n";
     $i++;
@@ -341,7 +343,7 @@ sub data {
     }
     $self->log(5, "size is at $size\n") unless ($i % 300);
 
-    alarm $self->config('timeout');
+    alarm $timeout;
   }
 
   $self->log(6, "max_size: $max_size / size: $size");
