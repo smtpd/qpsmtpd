@@ -32,6 +32,11 @@ Action denied
 
 Action denied; return a temporary rejection code (say 450 instead of 550).
 
+=item DENYHARD
+
+Action denied; return a permanent rejection code and disconnect the client.
+Use this for "rude" clients.
+
 =item DECLINED
 
 Plugin declined work; proceed as usual.  This return code is _always_
@@ -59,6 +64,7 @@ Allowed return codes
   OK       - sender allowed
   DENY     - Return a hard failure code
   DENYSOFT - Return a soft failure code
+  DENYHARD - Return a hard failure code and disconnect
   DONE     - skip further processing
 
 
@@ -72,6 +78,7 @@ Allowed return codes
   OK       - recipient allowed
   DENY     - Return a hard failure code
   DENYSOFT - Return a soft failure code
+  DENYHARD - Return a hard failure code and disconnect
   DONE     - skip further processing
 
 =head2 data_post
@@ -80,6 +87,7 @@ Hook after receiving all data; just before the message is queued.
 
   DENY     - Return a hard failure code
   DENYSOFT - Return a soft failure code
+  DENYHARD - Return a hard failure code and disconnect
   DONE     - skip further processing (message will not be queued)
 
 All other codes and the message will be queued normally
@@ -92,6 +100,7 @@ Called on completion of the DATA command.
    OK       - Return success message 
    DENY     - Return hard failure code
    DENYSOFT - Return soft failure code
+  DENYHARD - Return a hard failure code and disconnect
 
 Any other code will return a soft failure code.
 
@@ -121,6 +130,7 @@ Called on "helo" from the client.
 
   DENY - Return a 550 code
   DENYSOFT - Return a 450 code
+  DENYHARD - Return a hard failure code and disconnect
   DONE - Qpsmtpd won't do anything; the plugin sent the message
   DECLINED - Qpsmtpd will send the standard HELO message
 
