@@ -72,7 +72,18 @@ be compatible with qmail-smtpd making qpsmtpd a drop-in replacement.
 If there is anything missing, then please send a patch (or just
 information about what's missing) to the mailinglist or to
 ask@develooper.com.
- 
+
+
+Better Performance
+------------------
+
+As of version 0.21 qpsmtpd supports "PPerl"
+http://search.cpan.org/search?dist=PPerl
+
+"PPerl turns ordinary perl scripts into long running daemons, making
+subsequent executions extremely fast. It forks several processes for
+each script, allowing many processes to call the script at once."
+
 
 Problems
 --------

@@ -29,11 +29,13 @@ protocols to use the qpsmtpd framework.
 Future Ideas
 ============
 
-Run under pperl.  There is some perl internals problem with it.  Matt
-Sergeant is looking into it.
-
 Methods to create a bounce message easily; partly so we can accept a
 mail for one user but bounce it right away for another RCPT'er.
+
+The data_post hook should be able to put in the notes what addresses
+should go through, bounce and get rejected respectively, and qpsmtpd
+should just do the right thing.  See also
+http://nntp.perl.org/group/perl.qpsmtpd/170
 
 David Carraway has some thoughts for "user filters"
 http://nntp.perl.org/group/perl.qpsmtpd/2
