@@ -15,6 +15,10 @@
 
   Added Makefile.PL etc to make it easier to build a package (Matt).
 
+  Added Apache::Qpsmtpd to the distro.
+
+  Make the distro follow the CPAN module style (Makefile.PL, MANIFEST, etc)
+
   Make the rhsbl plugin do DNS lookups in the background. (Mark Powell)
 
   Fix warning in count_unrecognized_commands plugin (thanks to spaze
