@@ -1,0 +1,52 @@
+#!/usr/bin/perl -w
+# Clam-AV plugin.
+ 
+use File::Temp qw(tempfile);
+ 
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("data_post", "clam_scan");
+}
+ 
+sub clam_scan {
+  my ($self, $transaction) = @_;
+ 
+  my ($temp_fh, $filename) = tempfile();
+  print $temp_fh $transaction->header->as_string;
+  print $temp_fh "\n";
+  while (my $line = $transaction->body_getline) {
+    print $temp_fh $line;
+  }
+  seek($temp_fh, 0, 0);
+ 
+  # Now do the actual scanning!
+  my $cmd = "/usr/local/bin/clamscan --stdout -i --max-recursion=50 --disable-summary $filename 2>&1";
+  $self->log(1, "Running: $cmd");
+  my $output = `$cmd`;
+ 
+  my $result = ($? >> 8);
+  my $signal = ($? & 127);
+ 
+  unlink($filename);
+  chomp($output);
+ 
+  $output =~ s/^.* (.*) FOUND$/$1 /mg;
+ 
+  $self->log(1, "clamscan results: $output");
+ 
+  if ($signal) {
+    $self->log(1, "clamscan exited with signal: $signal");
+    return (DECLINED);
+  }
+  if ($result == 1) {
+    $self->log(1, "Virus(es) found");
+    # return (DENY, "Virus Found: $output");
+    $transaction->header->add('X-Virus-Found', 'Yes');
+    $transaction->header->add('X-Virus-Details', $output);
+  }
+  elsif ($result) {
+    $self->log(1, "ClamAV error: $result\n");
+  }
+  $transaction->header->add('X-Virus-Checked', 'Checked');
+  return (DECLINED);
+} 

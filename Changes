@@ -15,6 +15,10 @@
 
 0.12 - 2002/10/17
 
+  clamav plugin, thanks to Matt Sergeant, matt@sergeant.org.
+  Enabling this might require you to increase your memory limits in
+  the run file.  http://www.clamav.org/
+
   Better error messages when a plugin fails
   
   Remove some debug messages in the log 
