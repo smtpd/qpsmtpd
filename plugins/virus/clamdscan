@@ -55,7 +55,7 @@ Full path to the clamd socket (the recommended mode); defaults to
 =item B<clamd_port>
 
 If present, must be the TCP port where the clamd service is running,
-typically 3310; default disabled.
+typically 3310; default disabled.  If present, overrides the clamd_socket.
 
 =item B<deny_viruses>
 
@@ -138,8 +138,14 @@ sub clamdscan {
 
     my $clamd;
 
-    if (    $self->{"_clamd"}->{"clamd_port"}
-        and $self->{"_clamd"}->{"clamd_port"} =~ /(\d+)/ )
+    if (
+        (
+                $self->{"_clamd"}->{"clamd_port"}
+            and $self->{"_clamd"}->{"clamd_port"} =~ /(\d+)/
+        )
+        or (    $self->{"_clamd"}->{"clamd_socket"}
+            and $self->{"_clamd"}->{"clamd_socket"} =~ /([\w\/.]+)/ )
+      )
     {
         my $port = $1;
         $clamd = Clamd->new( port => $port );
@@ -152,7 +158,7 @@ sub clamdscan {
 
     if ( my %found = $clamd->scan($filename) ) {
         my $viruses = join( ",", values(%found) );
-	$self->log( LOGERROR, "One or more virus(es) found: $viruses" );
+        $self->log( LOGERROR, "One or more virus(es) found: $viruses" );
 
         if ( lc( $self->{"_clamd"}->{"deny_viruses"} ) eq "yes" ) {
             return ( DENY,
