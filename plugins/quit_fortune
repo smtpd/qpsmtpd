@@ -10,7 +10,12 @@ sub quit_handler {
   # fun, so skip it.
   return (DECLINED) if ($qp->connection->hello || '') eq "ehlo";
 
-  my @fortune = `/usr/games/fortune -s`;
+  my $fortune = '/usr/games/fortune';
+  return DECLINED unless -e $fortune;
+
+  # local %ENV = ();
+
+  my @fortune = `$fortune -s`;
   @fortune = map { chop; s/^/  \/ /; $_ } @fortune;
   $qp->respond(221, $qp->config('me') . " closing connection.", @fortune);
   return DONE;

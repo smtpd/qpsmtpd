@@ -1,3 +1,18 @@
+0.20 - development
+
+  Store hooks runtime config globally so they will work within the
+  transaction objects too.
+
+  content_log plugin - log the content of all mails for
+  debugging. Robert Spier <robert@perl.org>.
+
+  http_config plugin - get configuration via http
+
+  plugins can take arguments via their line in the "plugins" file
+
+  make the quit_fortune plugin check that the fortune program exists
+
+
 0.12 - 2002/10/17
 
   Better error messages when a plugin fails

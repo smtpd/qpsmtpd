@@ -12,6 +12,8 @@ plugin support;
   plugin access to the data line by line during the DATA phase
   (instead of just after)
 
+  if qmail-queue can't be loaded we still return 250 ?!
+
 
 TRACE in Constants.pm is not actually being used.  Should it be?
 
