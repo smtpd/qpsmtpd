@@ -131,3 +131,96 @@ sub DESTROY {
 
 
 1;
+__END__
+
+=head1 NAME
+
+Qpsmtpd::Transaction - single SMTP session transaction data
+
+=head1 SYNOPSIS
+
+  foreach my $recip ($transaction->recipients) {
+    print "T", $recip->address, "\0";
+  }
+
+=head1 DESCRIPTION
+
+Qpsmtpd::Transaction maintains a single SMTP session's data, including
+the envelope details and the mail header and body.
+
+The docs below cover using the C<$transaction> object from within plugins
+rather than constructing a C<Qpsmtpd::Transaction> object, because the
+latter is done for you by qpsmtpd.
+
+=head1 API
+
+=head2 add_recipient($recipient)
+
+This adds a new recipient (as in RCPT TO) to the envelope of the mail.
+
+The C<$recipient> is a C<Mail::Address> object. See L<Mail::Address>
+for more details.
+
+=head2 recipients()
+
+This returns a list of the current recipients in the envelope.
+
+Each recipient returned is a C<Mail::Address> object.
+
+=head2 sender( [ ADDRESS ] )
+
+Get or set the sender (MAIL FROM) address in the envelope.
+
+The sender is a C<Mail::Address> object.
+
+=head2 header( [ HEADER ] )
+
+Get or set the header of the email.
+
+The header is a <Mail::Header> object, which gives you access to all
+the individual headers using a simple API. e.g.:
+
+  my $headers = $transaction->header();
+  my $msgid = $headers->get('Message-Id');
+  my $subject = $headers->get('Subject');
+
+=head2 notes( $key [, $value ] )
+
+Get or set a note on the transaction. This is a piece of data that you wish
+to attach to the transaction and read somewhere else. For example you can
+use this to pass data between plugins.
+
+Note though that these notes will be lost on a C<RSET>, so you probably
+want to use the notes field in the C<Qpsmtpd::Connection> object instead.
+
+=head2 add_header_line( $data )
+
+This function appears to be unused. See C<header()> instead.
+
+=head2 body_write( $data )
+
+Write data to the end of the email.
+
+C<$data> can be either a plain scalar, or a reference to a scalar.
+
+=head2 body_size()
+
+Get the current size of the email.
+
+=head2 body_resetpos()
+
+Resets the body filehandle to the start of the file (via C<seek()>).
+
+Use this function before every time you wish to process the entire
+body of the email to ensure that some other plugin has not moved the
+file pointer.
+
+=head2 body_getline()
+
+Returns a single line of data from the body of the email.
+
+=head1 SEE ALSO
+
+L<Mail::Header>, L<Mail::Address>
+
+=cut
