@@ -5,9 +5,21 @@ web:
 mailinglist:
   qpsmtpd-subscribe@perl.org
 
+
+---- this file needs updating for version 0.10 ! ------
+
+--
+--
+-- version 0.10 is a new object oriented version of qpsmtpd.  
+--
+-- it is meant to be an easily extensibly smtpd engine.
+--
+--
+
+---------------------------------------------------------
+
 Problems:
-  First thing to try is to set $TRACE in qpsmtpd to some number higher
-  than 0 (higher gives more detail) and watch the log.  If it doesn't
+  First thing to do is to watch the log carefully.  If it doesn't
   help you, or even if it does, please post to the maliinglist
   (subscription instructions above).  qpsmtpd is meant to be a drop-in 
   replacement for qmail-smtpd, so it should be very easy to get going.
