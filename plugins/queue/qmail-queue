@@ -99,16 +99,11 @@ sub queue_handler {
     POSIX::dup2(fileno(MESSAGE_READER), 0) or die "Unable to dup MESSAGE_READER: $!";
     POSIX::dup2(fileno(ENVELOPE_READER), 1) or die "Unable to dup ENVELOPE_READER: $!";
 
-    $self->log(LOGNOTICE, "Queuing to $queue_exec");
+    my $ppid = getppid();
+    $self->log(LOGNOTICE, "(for $ppid ) Queuing to $queue_exec");
 
     my $rc = exec $queue_exec;
 
-    # restore the original STDIN and STDOUT
-    open(STDIN, "<&SAVE_STDIN");
-    open(STDOUT, ">&SAVE_STDOUT");
-
-    # NB: The "if not $rc" is redundant since exec() won't return if it
-    # succeeds.
-    exit 6 if not $rc;
+    exit 6; # we'll only get here if the exec fails
   }
 }
