@@ -1,0 +1,67 @@
+=head1 NAME
+
+smtp-forward
+
+=head1 DESCRIPTION
+
+This plugin forwards the mail via SMTP to a specified server, rather than
+delivering the email locally.
+
+=head1 CONFIG
+
+It takes one required parameter, the IP address or hostname to forward to. 
+
+  queue/smtp-forward 10.2.2.2
+
+Optionally you can also add a port:
+
+  queue/smtp-forward 10.2.2.2 9025
+
+=cut
+
+use Net::SMTP;
+
+sub register {
+  my ($self, $qp, @args) = @_;
+  $self->register_hook("queue", "queue_handler");
+
+  if (@args > 0) {
+    if ($args[0] =~ /^([\w_-]+)$/) {
+      $self->{_smtp_server} = $1;
+    }
+    else {
+      die "Bad data in smtp server: $args[0]";
+    }
+    $self->{_smtp_port} = 25;
+    if (@args > 1 and $args[1] =~ /^(\d+)$/) {
+      $self->{_smtp_port} = $1;
+    }
+    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 2);
+  } else {
+    die("No SMTP server specified in smtp-forward config");
+  }
+
+}
+
+sub queue_handler {
+  my ($self, $transaction) = @_;
+
+  $self->log(1, "forwarding to $self->{_smtp_server}:$self->{_smtp_port}");
+  my $smtp = Net::SMTP->new(
+                            $self->{_smtp_server},
+                            Port => $self->{_smtp_port},
+                            Timeout => 60,
+                           ) || die $!;
+  $smtp->mail( $transaction->sender->address || "" );
+  $smtp->to($_->address) for $transaction->recipients;
+  $smtp->data();
+  $smtp->datasend($transaction->header->as_string);
+  $transaction->body_resetpos;
+  while (my $line = $transaction->body_getline) {
+    $smtp->datasend($line);
+  }
+  $smtp->dataend();
+  $smtp->quit() or return(DECLINED, "Unable to queue message ($!)");
+  $self->log(1, "finished queueing");
+  return (OK, "Queued!");
+}
