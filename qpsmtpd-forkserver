@@ -27,6 +27,7 @@ $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 my %childstatus = ();
 
 sub REAPER {
+  $SIG{CHLD} = \&REAPER;
   while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
     last unless $chld > 0;
     warn("$$ cleaning up after $chld\n");
@@ -34,7 +35,15 @@ sub REAPER {
   }
 }
 
+sub HUNTSMAN {
+  $SIG{CHLD} = 'DEFAULT';
+  kill 'INT' => keys %childstatus;
+  exit(0);
+}
+
 $SIG{CHLD} = \&REAPER;
+$SIG{INT} = \&HUNTSMAN;
+$SIG{TERM} = \&HUNTSMAN;
 
 # establish SERVER socket, bind and listen.
 my $server = IO::Socket::INET->new(LocalPort => $PORT,
@@ -86,8 +95,7 @@ while (1) {
 
     close($server);
 
-    $SIG{CHLD} = $SIG{HUP} = $SIG{PIPE} = $SIG{INT} = 
-        $SIG{TERM} = $SIG{QUIT} = 'DEFAULT';
+    $SIG{$_} = 'DEFAULT' for keys %SIG;
     
     my $localsockaddr = getsockname($client);
     my ($lport, $laddr) = sockaddr_in($localsockaddr);
