@@ -1,3 +1,11 @@
+0.29 - 
+
+  [ many changes from cvs logs, gah ]
+
+  Mail::Address does RFC822 addresses, we need SMTP addresses.
+  Replace Mail::Address with Peter J. Holzer's Qpsmtpd::Address module.
+
+
 0.28 - 2004/06/05
 
   Don't keep adding ip addresses to the process status line ($0) when running under PPerl.

@@ -4,7 +4,7 @@ Near term roadmap
 
 0.29:
       - Add the first time denysoft plugin
-      - Support email addresses with spaces in them
+      - Support email addresses with spaces in them (done)
       - Bugfixes
 
 0.40:
@@ -28,6 +28,9 @@ Near term roadmap
 
 Issues
 ======
+
+Understand "extension parameters" to the MAIL FROM and RCPT TO
+parameters (and make the plugin hooks able to get at them).
 
 plugins/queue/qmail-queue is still calling exit inappropriately
 (should call disconnect or some such)

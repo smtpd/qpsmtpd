@@ -11,8 +11,8 @@ use Qpsmtpd::Transaction;
 use Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Auth;
+use Qpsmtpd::Address ();
 
-use Mail::Address ();
 use Mail::Header ();
 #use Data::Dumper;
 use POSIX qw(strftime);
@@ -229,10 +229,10 @@ sub mail {
     my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
     warn "$$ from email address : [$from]\n";
     if ($from eq "<>" or $from =~ m/\[undefined\]/) {
-      $from = Mail::Address->new("<>");
+      $from = Qpsmtpd::Address->new("<>");
     } 
     else {
-      $from = (Mail::Address->parse($from))[0];
+      $from = (Qpsmtpd::Address->parse($from))[0];
     }
     return $self->respond(501, "could not parse your mail from command") unless $from;
 
@@ -277,7 +277,7 @@ sub rcpt {
 
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
-  $rcpt = (Mail::Address->parse($rcpt))[0];
+  $rcpt = (Qpsmtpd::Address->parse($rcpt))[0];
 
   return $self->respond(501, "could not parse recipient") unless $rcpt;
 

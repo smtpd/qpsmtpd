@@ -160,14 +160,14 @@ latter is done for you by qpsmtpd.
 
 This adds a new recipient (as in RCPT TO) to the envelope of the mail.
 
-The C<$recipient> is a C<Mail::Address> object. See L<Mail::Address>
+The C<$recipient> is a C<Qpsmtpd::Address> object. See L<Qpsmtpd::Address>
 for more details.
 
 =head2 recipients( )
 
 This returns a list of the current recipients in the envelope.
 
-Each recipient returned is a C<Mail::Address> object.
+Each recipient returned is a C<Qpsmtpd::Address> object.
 
 =head2 relaying( )
 
@@ -178,7 +178,7 @@ by the C<check_relay> plugin.
 
 Get or set the sender (MAIL FROM) address in the envelope.
 
-The sender is a C<Mail::Address> object.
+The sender is a C<Qpsmtpd::Address> object.
 
 =head2 header( [ HEADER ] )
 
@@ -225,6 +225,6 @@ Returns a single line of data from the body of the email.
 
 =head1 SEE ALSO
 
-L<Mail::Header>, L<Mail::Address>
+L<Mail::Header>, L<Qpsmtpd::Address>, L<Qpsmtpd::Connection>
 
 =cut
