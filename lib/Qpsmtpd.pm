@@ -264,5 +264,121 @@ sub quit {
   exit;
 }
 
+sub data {
+  my $self = shift;
+  $self->respond(503, "MAIL first"), return 1 unless $self->transaction->sender;
+  $self->respond(503, "RCPT first"), return 1 unless $self->transaction->recipients;
+  $self->respond(354, "go ahead");
+  my $buffer = '';
+  my $size = 0;
+  my $i = 0;
+  my $max_size = ($self->config('databytes'))[0] || 0;  # this should work in scalar context
+  my $blocked = "";
+  my %matches;
+  my $header = 1;
+  my $complete = 0;
+
+  $self->log(6, "max_size: $max_size / size: $size");
+
+  while (<STDIN>) {
+    $complete++, last if $_ eq ".\r\n";
+    $i++;
+    $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
+      if $_ eq ".\n";
+    unless ($max_size and $size > $max_size) {
+      s/\r\n$/\n/;
+      $header = 0 if $header and m/^\s*$/;
+
+      if ($header) {
+
+	$matches{"aol.com"} = 1 if m/aol\.com/;
+
+	$blocked = "Your mail looks too much like that SirCam nonsense, please go away"
+	  if $self->transaction->sender->format eq "<>"
+	     and $_ eq "Content-Disposition: Multipart message\n";
+	   
+	$blocked = "No List Builder spam for us, thank you."
+	  if m/^From: List Builder <notifications\@bcentral.com>/;
+
+	$blocked = q[Don't send W32.Badtrans.B@mm virus to us, please]
+	  if $matches{"aol.com"} and m/^From: .* <_/;
+      }
+      
+
+      # Might be klez
+      m/^Content-type:.*(?:audio|application)/i
+          and $matches{"klez"}=1;
+
+      # we've seen the Klez signature, we're probably infected
+      $blocked = q[Take your Klez virus and stuff it!  HAND.]
+         if $matches{"klez"} and m!^TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQA!;
+
+      $buffer .= $_;
+      $size += length $_;
+    }
+    warn "$$ size is at $size\n" unless ($i % 300);
+
+    alarm $self->config('timeout');
+  }
+
+  $self->log(6, "max_size: $max_size / size: $size");
+
+  # if we get here without seeing a terminator, the connection is
+  # probably dead.
+  $self->respond(451, "Incomplete DATA"), return 1 unless $complete;
+ 
+  $self->respond(550, $blocked),return 1 if $blocked;
+  $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
+
+  
+
+  # these bits inspired by Peter Samuels "qmail-queue wrapper"
+  pipe(MESSAGE_READER, MESSAGE_WRITER) or fault("Could not create message pipe"), exit;
+  pipe(ENVELOPE_READER, ENVELOPE_WRITER) or fault("Could not create envelope pipe"), exit;
+
+  my $child = fork();
+  
+  not defined $child and fault(451, "Could not fork"), exit;
+
+  if ($child) {
+    # Parent
+    my $oldfh = select(MESSAGE_WRITER); $| = 1; 
+                select(ENVELOPE_WRITER); $| = 1;
+    select($oldfh);
+
+    close MESSAGE_READER  or fault("close msg reader fault"),exit;
+    close ENVELOPE_READER or fault("close envelope reader fault"), exit;
+    print MESSAGE_WRITER "Received: from ".$self->connection->remote_info." (HELO ".$self->connection->hello_host . ") [".$self->connection->remote_ip . "]\n";
+    print MESSAGE_WRITER "  by ".$self->config('me')." (qpsmtpd/".$self->version.") with SMTP; ", scalar gmtime, "Z\n";
+    print MESSAGE_WRITER $buffer;
+    close MESSAGE_WRITER;
+
+    my @rcpt = map { "T" . $_->address } $self->transaction->recipients;
+    my $from = "F".($self->transaction->sender->address|| "" );
+    print ENVELOPE_WRITER "$from\0", join("\0",@rcpt), "\0\0"
+      or respond(451,"Could not print addresses to queue"),exit;
+    
+    close ENVELOPE_WRITER;
+    waitpid($child, 0);
+    my $exit_code = $? >> 8;
+    $exit_code and respond(451, "Unable to queue message ($exit_code)"), exit;
+    $self->respond(250, "Message queued; it better be worth it.");
+  }
+  elsif (defined $child) {
+    # Child
+    close MESSAGE_WRITER or die "could not close message writer in parent";
+    close ENVELOPE_WRITER or die "could not close envelope writer in parent";
+    
+    open(STDIN, "<&MESSAGE_READER") or die "b1";
+    open(STDOUT, "<&ENVELOPE_READER") or die "b2";
+    
+    unless (exec '/var/qmail/bin/qmail-queue') {
+      die "should never be here!";
+    }
+  }
+  
+  return 1;
+}
+
 
 1;

@@ -1,2 +1,5 @@
 #! /bin/sh
-exec multilog t s1000000 n20 /var/log/qmail/qpsmtpd
+export LOGDIR=./main
+mkdir $LOGDIR
+exec multilog t s1000000 n20 $LOGDIR
+
