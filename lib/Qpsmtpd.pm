@@ -34,7 +34,6 @@ sub log {
     if $trace <= $level;
 }
 
-
 #
 # method to get the configuration.  It just calls get_qmail_config by
 # default, but it could be overwritten to look configuration up in a
@@ -143,7 +142,7 @@ sub _load_plugins {
 
   my @ret;  
   for my $plugin (@plugins) {
-    $self->log(LOGINFO, "Loading $plugin");
+    $self->log(LOGDEBUG, "Loading $plugin");
     ($plugin, my @args) = split /\s+/, $plugin;
     
     if (lc($plugin) eq '$include') {
@@ -207,7 +206,7 @@ sub run_hooks {
   if ($hooks->{$hook}) {
     my @r;
     for my $code (@{$hooks->{$hook}}) {
-      $self->log(LOGINFO, "running plugin ", $code->{name});
+      $self->log(LOGINFO, "running plugin ($hook):", $code->{name});
       eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
       $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
 
