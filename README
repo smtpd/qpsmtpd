@@ -115,6 +115,15 @@ Extra files you can use to configure qpsmtpd:
       rejection (450).
 
 
+   spool_dir
+
+      If this file contains a directory, it will be the spool
+      directory smtpd uses during the data transactions. If this file
+      doesnt exist, it will default to use $ENV{HOME}/tmp/. This
+      directory should be set with a mode of 700 and owned by the
+      smtpd user.
+
+
   ... everything (?) that qmail-smtpd supports. 
 
       In my test qpsmtpd installation I have a "config/me" file

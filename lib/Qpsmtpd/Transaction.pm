@@ -1,6 +1,9 @@
 package Qpsmtpd::Transaction;
+use Qpsmtpd;
+@ISA = qw(Qpsmtpd);
 use strict;
-#use Carp qw(carp);
+use Qpsmtpd::Utils;
+
 use IO::File qw(O_RDWR O_CREAT);
 
 # For unique filenames. We write to a local tmp dir so we don't need
@@ -64,8 +67,14 @@ sub body_write {
   my $self = shift;
   my $data = shift;
   unless ($self->{_body_file}) {
-    -d "tmp" or mkdir("tmp", 0700) or die "Could not create dir tmp: $!";
-    $self->{_filename} = "/home/smtpd/qpsmtpd/tmp/" . join(":", time, $$, $transaction_counter++);
+     my $spool_dir = $self->config('spool_dir') ? $self->config('spool_dir') 
+                                                : Qpsmtpd::Utils::tildeexp('~/tmp/');
+
+     $spool_dir .= "/" unless ($spool_dir =~ m!/$!);
+
+     -d $spool_dir or mkdir($spool_dir, 0700) or die "Could not create spool_dir: $!";
+     $self->{_filename} = $spool_dir . join(":", time, $$, $transaction_counter++);
+     $self->{_filename} =~ tr!A-Za-z0-9:/_-!!cd;
     $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT)    
       or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
   }

@@ -1,3 +1,12 @@
+2002/09/24
+  Reorganize most of Qpsmtpd.pm into Qpsmtpd/SMTP.pm.
+
+  Add spool_dir option (thanks to Ross Mueller <ross@visual.com>)
+
+  Add plugin name to the "hooks" data structure, so we can log plugin
+  module had an error when we run a hook.
+
+
 2002/09/22
   Make klez filter run for mails bigger than 220KB; they are sometimes
   bigger than that.

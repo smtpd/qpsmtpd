@@ -1,6 +1,6 @@
 package Qpsmtpd::TcpServer;
-use Qpsmtpd;
-@ISA = qw(Qpsmtpd);
+use Qpsmtpd::SMTP;
+@ISA = qw(Qpsmtpd::SMTP);
 use strict;
 
 sub start_connection {

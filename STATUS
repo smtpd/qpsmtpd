@@ -2,9 +2,6 @@
 Issues
 ======
 
-transaction should maybe be a part of the connection object instead
-of off the main object
-
 plugin support;
 
   support plugins for the rest of the commands.
@@ -12,10 +9,14 @@ plugin support;
   specify a priority in register_hook. ("LAST", "FIRST", "MIDDLE", or
   maybe a number)
 
-  plugin access to the data line by line during the DATA phase.
+  plugin access to the data line by line during the DATA phase
+  (instead of just after)
 
 
 TRACE in Constants.pm is not actually being used.  Should it be?
+
+Move dispatch() etc from SMTP.pm to Qpsmtpd.pm to allow other similar
+protocols to use the qpsmtpd framework. 
 
 
 
