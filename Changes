@@ -4,7 +4,7 @@
   Support comments in configuration files (prefix the line with #)
   
   Support RELAYCLIENT like qmail-smtpd (thanks to Marius Kjeldahl
-  <marius@kjeldahl.net>) )
+  <marius@kjeldahl.net> and Zukka Zitting <jukka.zitting@iki.fi>)
 
   If the connection fails while in DATA we would just accept the
   message. Ouch! Thanks to Devin Carraway <qpsmtpd@devin.com> for the
