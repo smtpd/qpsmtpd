@@ -115,6 +115,15 @@ Allowed return codes:
 
 Works like the "connect" hook.
 
+=head2 helo
+
+Called on "helo" from the client.
+
+  DENY - Return a 550 code
+  DENYSOFT - Return a 450 code
+  DONE - Qpsmtpd won't do anything; the plugin sent the message
+  DECLINED - Qpsmtpd will send the standard HELO message
+
 
 =head2 disconnect
 
