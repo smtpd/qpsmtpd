@@ -46,17 +46,14 @@ sub main {
                 my $client_addr;
                 $client = $server->accept();
                 next unless $client;
-                my $ip = $client->sockhost;
-                #my $revip = join('.', reverse(split(/\./, $ip)));
-                #print "Looking up: $revip.in-addr.arpa\n";
-                #my $bgsock  = $res->bgsend("$revip.in-addr.arpa", 'PTR');
+                my $ip = $client->peerhost;
                 my $bgsock  = $res->bgsend($ip);
                 $select->add($bgsock);
                 $lookup{$bgsock} = $client;
             }
             elsif (my $qpclient = $lookup{$client}) {
                 my $packet = $res->bgread($client);
-                my $ip = $qpclient->sockhost;
+                my $ip = $qpclient->peerhost;
                 my $hostname = $ip;
                 if ($packet) {
                     foreach my $rr ($packet->answer) {
