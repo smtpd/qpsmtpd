@@ -151,7 +151,11 @@ while (1) {
     close($server);
 
     $SIG{$_} = 'DEFAULT' for keys %SIG;
-    
+    $SIG{ALRM} = sub { 
+       print $client "421 Connection Timed Out\n";
+       ::log(LOGINFO, "Connection Timed Out"); 
+       exit; };
+
     my $localsockaddr = getsockname($client);
     my ($lport, $laddr) = sockaddr_in($localsockaddr);
     $ENV{TCPLOCALIP} = inet_ntoa($laddr);
@@ -169,7 +173,13 @@ while (1) {
     POSIX::dup2(fileno($client), 1);
     
     my $qpsmtpd = Qpsmtpd::TcpServer->new();
-    $qpsmtpd->start_connection();
+    $qpsmtpd->start_connection
+      (
+       local_ip    => $ENV{TCPLOCALIP},
+       local_port  => $lport,
+       remote_ip   => $ENV{TCPREMOTEIP},
+       remote_port => $port,
+      );
     $qpsmtpd->run();
 
     exit;                                   # child leaves
