@@ -429,11 +429,8 @@ sub data {
 
   my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
 
-  my $timeout = $self->config('timeout');
 
-  alarm $timeout;
-
-  while (<STDIN>) {
+  while (defined($_ = $self->getline)) {
     $complete++, last if $_ eq ".\r\n";
     $i++;
 
@@ -481,8 +478,6 @@ sub data {
       $size += length $_;
     }
     #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
-
-    alarm $timeout;
   }
 
   $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
@@ -526,6 +521,17 @@ sub data {
   # DATA is always the end of a "transaction"
   return $self->reset_transaction;
 
+}
+
+sub getline {
+  my $self = shift;
+  
+  my $timeout = $self->config('timeout');
+
+  alarm $timeout;
+  my $line = <STDIN>; # default implementation
+  alarm 0;
+  return $line;
 }
 
 sub queue {
