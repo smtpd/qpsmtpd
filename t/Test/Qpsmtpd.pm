@@ -103,7 +103,7 @@ sub run_plugin_tests {
     # Now run them
     
     foreach my $plugin (@plugins) {
-        $plugin->run_tests();
+        $plugin->run_tests($self);
     }
 }
 

@@ -1,0 +1,25 @@
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test("test_local", 1);
+    $self->register_test("test_returnval", 1);
+}
+
+sub test_local {
+    my $self = shift;
+    
+    my $connection = $self->qp->connection;
+    $connection->remote_ip('127.0.0.2'); # standard dnsbl test value
+    
+    $self->connect_handler($self->qp->transaction);
+    
+    ok($self->qp->connection->notes('dnsbl_sockets'));
+}
+
+sub test_returnval {
+    my $self = shift;
+    
+    my ($ret, $note) = $self->rcpt_handler($self->qp->transaction, 'rcpt@example.com');
+    is($ret, DENY, "Check we got a DENY");
+    diag("dnsbl result: $note");
+}

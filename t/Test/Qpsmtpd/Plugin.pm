@@ -30,10 +30,11 @@ sub total_tests {
 }
 
 sub run_tests {
-    my ($plugin) = @_;
+    my ($plugin, $qp) = @_;
     foreach my $t (@{$plugin->{_tests}}) {
         my $method = $t->{name};
         diag "Running $method tests for plugin " . $plugin->plugin_name;
+        local $plugin->{_qp} = $qp;
         $plugin->$method();
     }
 }
