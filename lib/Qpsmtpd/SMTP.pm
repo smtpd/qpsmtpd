@@ -382,11 +382,12 @@ sub data {
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
 
-  $header->add("Received", "from ".$self->connection->remote_info 
-	       ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip 
-	       . ") by ".$self->config('me')." (qpsmtpd/".$self->version
-	       .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
-	       0);
+
+  $header->add("Received", "from ".$self->connection->remote_info
+               ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
+               . ")\n  by ".$self->config('me')." (qpsmtpd/".$self->version
+               .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
+               0);
 
   # if we get here without seeing a terminator, the connection is
   # probably dead.
