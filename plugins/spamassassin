@@ -44,11 +44,21 @@ might want to make another plugin that does this on a per user basis.
 
 The default is to never munge the subject based on the SpamAssassin score.
 
+=item spamd_socket [/path/to/socket]
+
+Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix 
+domain sockets for spamd.  This is faster and more secure than using
+a TCP connection.
+
 =back
 
-With both options the configuration line will look like the following
+With both of the first options the configuration line will look like the following
 
  spamasssasin  reject_threshold 18  munge_subject_threshold 8
+
+=head1 TODO
+
+Make the "subject munge string" configurable
 
 =cut
 
@@ -88,8 +98,18 @@ sub check_spam {
   my $paddr   = sockaddr_in($port, $iaddr);
 
   my $proto   = getprotobyname('tcp');
-  socket(SPAMD, PF_INET, SOCK_STREAM, $proto)
-    or $self->log(1, "Could not open socket: $!") and return (DECLINED);
+  if ( $self->{_args}->{spamd_socket} =~ /^([\w\/.]+)$/ ) { # connect to Unix Domain Socket
+    my $spamd_socket = $1;
+    
+    socket(SPAMD, PF_UNIX, SOCK_STREAM, 0)
+      or $self->log(1, "Could not open socket: $!") and return (DECLINED);
+
+    $paddr = sockaddr_un($spamd_socket); 
+  }
+  else {
+    socket(SPAMD, PF_INET, SOCK_STREAM, $proto)
+      or $self->log(1, "Could not open socket: $!") and return (DECLINED);
+  }
 
   connect(SPAMD, $paddr) 
     or $self->log(1, "Could not connect to spamassassin daemon: $!") and return DECLINED;
@@ -101,6 +121,9 @@ sub check_spam {
   
   print SPAMD "SYMBOLS SPAMC/1.0" . CRLF;
   # or CHECK or REPORT or SYMBOLS
+
+  print SPAMD "X-Envelope-From: ", $transaction->sender->format, CRLF
+    or warn "Could not print to spamd: $!";
 
   print SPAMD join CRLF, split /\n/, $transaction->header->as_string
     or warn "Could not print to spamd: $!";
