@@ -1,0 +1,183 @@
+#!/usr/bin/perl -w
+=head1 NAME
+
+aveclient
+
+=head1 DESCRIPTION
+
+This qpsmtpd plugin uses the aveclient of a kaspersky 5.x server-suite. The original kaspersky
+aveclient is called within this plugin to connect to the local socket of the aveserver. 
+The aveserver runs as a daemon with all virusdefinitions already loaded, what makes scanning veeery
+quick and performant without much load.
+
+When a virus is detected, the mail is blocked and the connection is denied! Further configuration 
+is simple to be added.
+
+=head1 INSTALL AND CONFIG
+
+Place this plugin in the default plugin directory of your qpsmtpd installation. Normaly you can use 
+it with default options (nothing specified):
+
+=over 4
+
+=item B<aveclient>
+
+Optional you may set the path to original aveclient and/or the socket:
+
+=over 4
+
+=item avclient_bin I</path/to/ave/binary>
+
+Set the path to the original aveclient of kaspersky 5.x server-suite.
+Default: /opt/kav/bin/aveclient
+
+=item avdaemon_sock I</path/to/socket>
+
+Set the path to the unix socket of the original aveserver of kaspersky 5.x server-suite.
+Default: /var/run/aveserver
+
+=item blockonerror I<(1|0)>
+
+Whether to block mails on scanning errors or to accept connections.
+Default: 0 (No)
+
+=back
+
+=back
+
+=head1 EXIT CODES OF aveclient (taken from man aveclient)
+
+When launched with the -s option, aveclient returns one of the following codes (if several files to be scanned are indicated  in  the
+command line, the return code corresponds to the results of scanning the last file):
+
+0      no viruses have been detected.
+
+1      unable to connect to aveserver.
+
+2      objects with an unknown viral code have been found.
+
+3      suspicious objects have been found.
+
+4      infected objects have been detected.
+
+5      all infected objects have been disinfected.
+
+6      scan results are unavailable: encrypted or password protected file.
+
+7      system error launching the application (file not found, unable to read the file).
+
+8      scan results are unavailable: file is corrupted or input/output error.
+
+9      some of the required parameters are missing from the command line.
+   
+=head1 VERSION
+
+0.1rc first proof of concept.
+How is load and performance on larger systems? This is tested whith aprox. 900 Clients
+on a small RH-System (AMD, 768 Mhz, 512 MB) MAXCLIENTS set to 40.
+
+=head1 AUTHOR
+
+Adopted by Marcus Spiegel <aveclient@uscreen.de> from kavscanner plugin of Hanno Hecker.
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+   
+=cut
+
+use File::Temp qw(tempfile);
+use Mail::Address;
+ 
+sub register {
+	my ($self, $qp, @args) = @_;
+	
+	# where to be called
+	$self->register_hook("data_post", "avscan");
+	
+	# defaults to be used
+	$self->{_avclient_bin} 	= "/opt/kav/bin/aveclient";
+	$self->{_avdaemon_sock} = "/var/run/aveserver";
+	$self->{_blockonerror} 	= 0;
+	
+	# parse optional arguments
+	my %args = @args;
+	foreach my $key (keys %args) {
+		my $arg = $key;
+		$key =~ s/^/_/;
+		$self->{$key} = $args{$arg};
+	}
+
+	# Untaint client location
+	# socket will be tested during scan (response-code)
+	if (exists $self->{_avclient_bin} && $self->{_avclient_bin} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+		$self->{_avclient_bin} = $1;
+	} else {
+		$self->log(1, "FATAL ERROR: No binary aveclient found: '".$self->{_avclient_bin}."'");
+		exit 3;
+	}
+}
+ 
+sub avscan {
+	my ($self, $transaction) = @_;
+	my ($temp_fh, $filename) = tempfile();
+	my $description = 'clean';
+	
+	# a temporary file is needed to be scanned
+	print $temp_fh $transaction->header->as_string;
+	print $temp_fh "\n";
+	
+	$transaction->body_resetpos;
+	
+	while (my $line = $transaction->body_getline) {
+		print $temp_fh $line;
+	}
+	seek($temp_fh, 0, 0);
+	
+	# Now scan this file
+	my $cmd = $self->{_avclient_bin}." -p ".$self->{_avdaemon_sock}." -s $filename 2>&1";
+
+	my @output = `$cmd`;
+	chomp(@output);
+	
+	my $result = ($? >> 8);
+	my $signal = ($? & 127);
+	
+	# tidy up a bit
+	unlink($filename);
+	close $temp_fh;
+	
+	# check if something went wrong
+	if ($signal) {
+		$self->log(1, "kavscanner exited with signal: $signal");
+		return (DECLINED);
+	}
+	
+	# either we found a virus or something went wrong
+	if ($result > 0) {
+		if ($result =~ /^(2|3|4|6|8)$/) {
+			
+			# ok a somewhat virus was found
+			shift @output;
+			$description = "REPORT: ".join(", ",@output);
+			$self->log(1, "Virus found! ($description)");
+			
+			# we don't want to be disturbed be these, so block mail and DENY connection
+			return(DENY, "Virus found: $description");
+			
+		} else {
+			$self->log(0, "aveserver: no viruses have been detected.") if($result =~ /^0$/);
+			$self->log(0, "aveserver: system error launching the application (file not found, unable to read the file).") if($result =~ /^0$/);
+			$self->log(0, "aveserver: some of the required parameters are missing from the command line.") if($result =~ /^9$/);
+			return(DENY, "Unable to scan for virus, please contact admin of ".$self->qp->config("me").", if you feel this is an error!") if $self->{_blockonerror};
+		}
+	}
+	
+	$self->log(1, "kavscanner results: $description");
+	$transaction->header->add('X-Virus-Checked', 'Checked by Kaspersky on '.$self->qp->config("me"));
+	return (DECLINED);
+} 
