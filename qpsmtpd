@@ -12,7 +12,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.04";
+$QPsmtpd::VERSION = "0.05";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -23,7 +23,9 @@ BEGIN{$^W=0;}
 use Net::DNS;
 BEGIN{$^W=1;}
 
-my $TRACE = 1;
+use vars qw($TRACE);
+
+$TRACE = 1;
 
 my %config;
 $config{me} = get_config('me') || hostname;
@@ -59,7 +61,7 @@ sub dispatch {
   my ($cmd) = lc shift;
 
   respond(553, $state{dnsbl_blocked}), return 1
-    if $state{dnsbl_blocked} and ($cmd eq "mail" or $cmd eq "rcpt");
+    if $state{dnsbl_blocked} and ($cmd eq "rcpt");
 
   if (exists $commands{$cmd}) {
     my ($result) = eval "&$cmd";
@@ -117,9 +119,9 @@ sub mail {
   }
   else {
     my $from_parameter = join " ", @_;
-    warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
+    #warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
     my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
-    warn "$$ from email address : $from\n" if $TRACE;
+    #warn "$$ from email address : $from\n" if $TRACE;
     if ($from eq "<>") {
       $from = Mail::Address->new("<>");
     } 
@@ -127,17 +129,11 @@ sub mail {
       $from = (Mail::Address->parse($from))[0];
     }
     return respond(501, "could not parse your mail from command") unless $from;
-    if ($from->format ne "<>" and get_config('rhsbl_zones')) {
-      my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } get_config('rhsbl_zones');
-      my $host = $from->host;
-      for my $rhsbl (keys %rhsbl_zones) {
-	respond("550", "Mail from $host rejected because it $rhsbl_zones{$rhsbl}"), return 1
-	  if check_rhsbl($rhsbl, $host);
-      }
-    }
 
     if ($from->format ne "<>") {
-      respond(450, "Could not resolve ". $from->host),return 1 unless check_dns($from->host);
+      return respond(450, "Could not resolve ". $from->host) unless check_dns($from->host);
+      return respond(450, "Don't like your spam; please go away now.") if $from->host eq "6x6.net";
+
     }
 
     #warn "$$ getting mail from ",$from->format,"\n" if $TRACE;
@@ -150,12 +146,25 @@ sub mail {
 sub rcpt {
   return respond(501, "syntax error in parameters") unless $_[0] =~ m/^to:/i;
   return(503, "Use MAIL before RCPT") unless $state{transaction}->{from};
+
+  my $from = $state{transaction}->{from};
+  if ($from->format ne "<>" and get_config('rhsbl_zones')) {
+    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } get_config('rhsbl_zones');
+    my $host = $from->host;
+    for my $rhsbl (keys %rhsbl_zones) {
+      respond("550", "Mail from $host rejected because it $rhsbl_zones{$rhsbl}"), return 1
+	if check_rhsbl($rhsbl, $host);
+    }
+  }
+
+
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
   $rcpt = (Mail::Address->parse($rcpt))[0];
   return respond(501, "could not parse recipient") unless $rcpt;
   return respond(550, "will not relay for ". $rcpt->host) unless check_relay($rcpt->host);
   return respond(550, "no such mailbox") if lc $rcpt->address eq 'unicode@perl.org';
+  return respond(550, "no such mailbox") if lc $rcpt->address eq 'porters@perl.org';
   push @{$state{transaction}->{rcpt}}, $rcpt;
   respond(250, $rcpt->format . ", recipient OK");
 }
@@ -169,6 +178,7 @@ sub data {
   my $i = 0;
   my $max_size = get_config('databytes') || 0;
   my $blocked = "";
+  my %matches;
   my $header = 1;
   while (<STDIN>) {
     last if $_ eq ".\r\n";
@@ -178,10 +188,23 @@ sub data {
     unless ($max_size and $size > $max_size) {
       s/\r\n$/\n/;
       $header = 0 if $header and m/^\s*$/;
-      $blocked = "Your mail looks too much like that SirCam nonsense, please go away"
-	  if $header 
-	      and $state{transaction}->{from}->format eq "<>"
-	      and $_ eq "Content-Disposition: Multipart message";
+
+      if ($header) {
+
+	$matches{"aol.com"} = 1 if m/aol\.com/;
+
+	$blocked = "Your mail looks too much like that SirCam nonsense, please go away"
+	  if $state{transaction}->{from}->format eq "<>"
+	     and $_ eq "Content-Disposition: Multipart message\n";
+	   
+	$blocked = "No List Builder spam for us, thank you."
+	  if m/^From: List Builder <notifications\@bcentral.com>/;
+
+	$blocked = q[Don't send W32.Badtrans.B@mm virus to us, please]
+	  if $matches{"aol.com"} and m/^From: .* <_/;
+      }
+      
+
       $buffer .= $_;
       $size += length $_;
     }
@@ -196,10 +219,6 @@ sub data {
   # these bits inspired by Peter Samuels "qmail-queue wrapper"
   pipe(MESSAGE_READER, MESSAGE_WRITER) or fault("Could not create message pipe"), exit;
   pipe(ENVELOPE_READER, ENVELOPE_WRITER) or fault("Could not create envelope pipe"), exit;
-  my $oldfh = 
-    select(MESSAGE_WRITER); $| = 1;
-  select(ENVELOPE_WRITER); $| = 1;
-  select($oldfh);
 
   my $child = fork();
   
@@ -207,6 +226,10 @@ sub data {
 
   if ($child) {
     # Parent
+    my $oldfh = select(MESSAGE_WRITER); $| = 1; 
+                select(ENVELOPE_WRITER); $| = 1;
+    select($oldfh);
+
     close MESSAGE_READER  or fault("close msg reader fault"),exit;
     close ENVELOPE_READER or fault("close envelope reader fault"), exit;
     print MESSAGE_WRITER "Received: from $state{remote_info} (HELO $state{hello_host}) ($state{remote_ip})\n";
@@ -275,7 +298,8 @@ sub check_rhsbl {
 }
 
 sub check_dnsbl {
-  my $ip = shift;
+  my ($ip, $debug) = @_;
+  local $TRACE = 5 if $debug;
   my %dnsbl_zones = map { (split /\s+/, $_, 2)[0,1] } get_config('dnsbl_zones');
   return unless %dnsbl_zones;
   
@@ -283,13 +307,14 @@ sub check_dnsbl {
 
   my $res = new Net::DNS::Resolver;
   for my $dnsbl (keys %dnsbl_zones) {
-    warn "$$ Checking $reversed_ip in $dnsbl ..." if $TRACE > 2;
-    my $query = $res->search("$reversed_ip.$dnsbl");
+    warn "$$ Checking $reversed_ip.$dnsbl ..." if $TRACE > 2;
+    my $query = $res->query("$reversed_ip.$dnsbl", "TXT");
     if ($query) {
       my $a_record = 0;
       foreach my $rr ($query->answer) {
 	$a_record = 1 if $rr->type eq "A";
 	next unless $rr->type eq "TXT";
+	warn "got txt record";
 	return $rr->txtdata;
       }
       return "Blocked by $dnsbl" if $a_record;
@@ -320,7 +345,7 @@ sub check_dns {
   return 0;
 }
 
-
+ 
 sub check_relay {
   my $host = lc shift;
   my @rcpt_hosts = get_config("rcpthosts");
