@@ -1,5 +1,10 @@
 0.26-dev
 
+  Filter out all uncommon characters from the remote_host
+  setting. (thanks to Frank Denis / Jedi/Sector One for the hint).
+
+  Added a check for the spool_dir having mode 0700.
+
   Don't break under taint mode on OpenBSD. (thanks to Frank Denis /
   Jedi/Sector One)
 

@@ -15,6 +15,11 @@ sub start_connection {
     my $remote_info = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
     my $remote_ip   = $ENV{TCPREMOTEIP};
 
+    # if the local dns resolver doesn't filter it out we might get
+    # ansi escape characters that could make a ps axw do "funny"
+    # things. So to be safe, cut them out.  
+    $remote_host =~ tr/a-zA-Z\.\-0-9//cd;
+
     $0 = "$0 [$remote_ip : $remote_host]";
 
     $self->SUPER::connection->start(remote_info => $remote_info,
