@@ -3,14 +3,17 @@ Near term roadmap
 =================
 
 0.27:
-      Bugfixes to 0.26 if needed
+      Add the first time denysoft plugin
+      Support email addresses with spaces in them
+      Bugfixes
 
 0.30:
       Add plugin API for checking if a local email address is valid
 
 0.50:
-      include check_delivery[1] functionality via the 0.30 API
-      [1] http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
+      Include the popular check_delivery[1] functionality via the 0.30 API
+      [1] until then get it from 
+          http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
 
       Add API to reject individual recipients after the RCPT has been
       accepted and generate individual bounce messages.
