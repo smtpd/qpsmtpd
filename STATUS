@@ -1,0 +1,24 @@
+
+things to do for v0.10
+----------------------
+
+plugin support;
+
+  load plugins in a funny namespace
+  let them register the "hooks" they want to run in
+
+
+data command
+  
+  how to spool the file?
+
+... 
+
+
+
+TRACE in Constants.pm is not actually being used.
+
+
+
+Plugin Documentation!
+
