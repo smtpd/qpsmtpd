@@ -112,11 +112,13 @@ sub getline {
         my $rc = $c->input_filters->get_brigade($bb, Apache::MODE_GETLINE);
         return if $rc == APR::EOF;
         die APR::Error::strerror($rc) unless $rc == APR::SUCCESS;
-        
+        my $data = '';
+
         while (!$bb->is_empty) {
             my $b = $bb->first;
             $b->remove;
-            $b->read(my $data);
+            $b->read(my $newdata);
+           $data .= $newdata;
             return $data if index($data, "\n") >= 0;
         }
     }
