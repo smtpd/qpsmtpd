@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-authsql - Authenticate to vpopmail via MySQL
+auth_vpopmail_sql - Authenticate to vpopmail via MySQL
 
 =head1 DESCRIPTION
 
