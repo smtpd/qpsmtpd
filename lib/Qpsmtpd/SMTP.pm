@@ -233,6 +233,8 @@ sub mail {
     ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
       unless $from;
 
+    $self->log(LOGWARN, "$$ from email address : [$from]");
+
     if ($from eq "<>" or $from =~ m/\[undefined\]/) {
       $from = Qpsmtpd::Address->new("<>");
     } 
