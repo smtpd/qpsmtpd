@@ -74,6 +74,17 @@ Allowed return codes
   DENYSOFT - Return a soft failure code
   DONE     - skip further processing
 
+=head2 data_post
+
+Hook after receiving all data; just before the message is queued.
+
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DONE     - skip further processing (message will not be queued)
+
+All other codes and the message will be queued normally
+
+
 =head2 connect
 
 Allowed return codes:

@@ -16,7 +16,7 @@ plugin support;
   specify a priority in register_hook. ("LAST", "FIRST", "MIDDLE", or
   maybe a number)
 
-  proper access to the message body through the transaction
+  plugin access to the data line by line during the DATA phase.
 
 
 
