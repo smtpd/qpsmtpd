@@ -131,7 +131,7 @@ sub helo {
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  my ($rc, $msg) = $self->run_hooks("helo", $hello_host);
+  my ($rc, $msg) = $self->run_hooks("helo", $hello_host, @stuff);
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
@@ -151,7 +151,7 @@ sub ehlo {
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  my ($rc, $msg) = $self->run_hooks("ehlo", $hello_host);
+  my ($rc, $msg) = $self->run_hooks("ehlo", $hello_host, @stuff);
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
