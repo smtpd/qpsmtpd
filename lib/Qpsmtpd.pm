@@ -190,7 +190,7 @@ sub _load_plugins {
 
   my @ret;  
   for my $plugin_line (@plugins) {
-    my ($plugin, @args) = split /\s+/, $plugin_line;
+    my ($plugin, @args) = split ' ', $plugin_line;
     
     if (lc($plugin) eq '$include') {
       my $inc = shift @args;
