@@ -2,7 +2,9 @@ package Qpsmtpd::Constants;
 use strict;
 require Exporter;
 
-my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD DENYSOFTHARD);
+my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD
+                  DENY_DISCONNECT DENYSOFT_DISCONNECT
+                 );
 my (@loglevels) = qw(LOGDEBUG LOGINFO LOGNOTICE LOGWARN LOGERROR LOGCRIT LOGALERT LOGEMERG LOGRADAR);
 
 use vars qw($VERSION @ISA @EXPORT);
@@ -12,8 +14,9 @@ use vars qw($VERSION @ISA @EXPORT);
 use constant OK       => 900;
 use constant DENY     => 901;   # 550
 use constant DENYSOFT => 902;   # 450
-use constant DENYHARD => 903;   # 550 + disconnect
-use constant DENYSOFTHARD => 904; # 450 + disconnect
+use constant DENYHARD => 903;   # 550 + disconnect  (deprecated in 0.29)
+use constant DENY_DISCONNECT     => 903; # 550 + disconnect
+use constant DENYSOFT_DISCONNECT => 904; # 450 + disconnect
 use constant DECLINED => 909;
 use constant DONE     => 910;
 
