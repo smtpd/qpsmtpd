@@ -99,7 +99,13 @@ sub fault {
 
 sub start_conversation {
     my $self = shift;
-    $self->respond(220, $self->config('me') ." ESMTP qpsmtpd ". $self->version ." ready; send us your mail, but not your spam.");
+    # this should maybe be called something else than "connect", see
+    # lib/Qpsmtpd/TcpServer.pm for more confusion.
+    my ($rc, $msg) = $self->run_hooks("connect");
+    if ($rc != DONE) {
+      $self->respond(220, $self->config('me') ." ESMTP qpsmtpd "
+		     . $self->version ." ready; send us your mail, but not your spam.");
+    }
 }
 
 sub transaction {
@@ -448,8 +454,6 @@ sub load_plugins {
 
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
-    warn "PLUGIN PACKAGE: $package";
-
     my $line = "\n#line 1 $dir/$plugin\n";
 
     my $eval = join(
@@ -464,13 +468,12 @@ sub load_plugins {
 		    "\n", # last line comment without newline?
 		   );
 
-    warn "eval: $eval";
+    #warn "eval: $eval";
 
     $eval =~ m/(.*)/s;
     $eval = $1;
 
     eval $eval;
-    warn "EVAL: $@";
     die "eval $@" if $@;
 
     my $plug = $package->new(qpsmtpd => $self);

@@ -1,0 +1,62 @@
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("connect", "connect_handler");
+  $self->register_hook("rcpt", "rcpt_handler");
+  #$self->register_hook("disconnect", "disconnect_handler");
+}
+
+sub connect_handler {
+  my ($self, $transaction) = @_;
+  my $remote_ip = $self->qp->connection->remote_ip;
+
+  my %dnsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
+  return unless %dnsbl_zones;
+  
+  my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
+
+  # we should queue these lookups in the background and just fetch the
+  # results in the first rcpt handler ... oh well.
+
+  my $result = "";
+
+  my $res = new Net::DNS::Resolver;
+  for my $dnsbl (keys %dnsbl_zones) {
+    $self->log(3, "Checking $reversed_ip.$dnsbl");
+    my $query = $res->query("$reversed_ip.$dnsbl", "TXT");
+    if ($query) {
+      my $a_record = 0;
+      foreach my $rr ($query->answer) {
+	$a_record = 1 if $rr->type eq "A";
+	next unless $rr->type eq "TXT";
+	$self->log(10, "got txt record");
+	$result = $rr->txtdata and last;
+      }
+      $a_record and $result = "Blocked by $dnsbl";
+    }
+    else {
+      warn "$$ query for $reversed_ip.$dnsbl failed: ", $res->errorstring, "\n"
+	unless $res->errorstring eq "NXDOMAIN";
+    }
+  }
+
+  $transaction->notes('dnsbl', $result);
+
+  return DECLINED;
+}
+
+sub rcpt_handler {
+  my ($self, $transaction, $rcpt) = @_;
+  my $note = $transaction->notes('rhsbl');
+  return (DENY, $note) if $note;
+  return DECLINED;
+}
+
+sub disconnect_handler {
+  # if we queued stuff in the background we should make sure it got
+  # cleaned up here.
+  return DECLINED;
+}
+
+
+1;

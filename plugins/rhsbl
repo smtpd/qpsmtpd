@@ -8,6 +8,11 @@ sub register {
 sub mail_handler {
   my ($self, $transaction, $sender) = @_;
   # lookup the address here; but always just return DECLINED
+  # we will store the state for rejection when rcpt is being run, some
+  # MTAs gets confused when you reject mail during MAIL FROM:
+  #
+  # If we were really clever we would do the lookup in the background
+  # but that must wait for another day.  (patches welcome! :-) )
   if ($sender->format ne "<>" and $self->qp->config('rhsbl_zones')) {
     my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
     my $host = $sender->host;

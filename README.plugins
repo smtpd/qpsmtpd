@@ -34,8 +34,8 @@ Action denied; return a temporary rejection code (say 450 instead of 550).
 
 =item DECLINED
 
-Plugin declined work; proceed as usual.  This return code is always
-allowed unless noted otherwise.
+Plugin declined work; proceed as usual.  This return code is _always_
+_allowed_ unless noted otherwise.
 
 =item DONE
 
@@ -74,6 +74,13 @@ Allowed return codes
   DENYSOFT - Return a soft failure code
   DONE     - skip further processing
 
+=head2 connect
+
+Allowed return codes:
+
+  OK       - Stop processing plugins, give the default response
+  DECLINED - Process the next plugin
+  DONE     - Stop processing plugins and don't give the default response
 
 =head2 quit
 
@@ -83,7 +90,7 @@ Allowed return codes:
 
   DONE 
 
-All other codes will qpsmtpd do the default response.
+Works like the "connect" hook.
 
 
 =head2 disconnect
