@@ -12,7 +12,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.01";
+$QPsmtpd::VERSION = "0.02";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -49,7 +49,7 @@ alarm $config{timeout};
 while (<STDIN>) {
   alarm 0;
   $_ =~ s/\r?\n$//s; # advanced chomp
-  warn "dispatching $_\n" if $TRACE;
+  warn "$$ dispatching $_\n" if $TRACE;
   defined dispatch(split / +/, $_)
     or respond(502, "command unrecognized: '$_'");
   alarm $config{timeout};
@@ -63,7 +63,7 @@ sub dispatch {
 
   if (exists $commands{$cmd}) {
     my ($result) = eval "&$cmd";
-    warn $@ if $@;
+    warn "$$ $@" if $@;
     return $result if defined $result;
     return fault("command '$cmd' failed unexpectedly");
   }
@@ -76,7 +76,7 @@ sub respond {
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
     print "$line\r\n";
-    warn "$line\n" if $TRACE;
+    warn "$$ $line\n" if $TRACE;
   }
   return 1;
 }
@@ -117,7 +117,9 @@ sub mail {
   }
   else {
     my $from_parameter = join " ", @_;
-    my ($from) = ($from_parameter =~ m/^from:\s*(.*)/i)[0];
+    warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
+    my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
+    warn "$$ from email address : $from\n" if $TRACE;
     if ($from eq "<>") {
       $from = Mail::Address->new("<>");
     } 
@@ -133,7 +135,7 @@ sub mail {
 	  if check_rhsbl($rhsbl, $host);
       }
     }
-    warn "getting mail from ",$from->format,"\n" if $TRACE;
+    #warn "$$ getting mail from ",$from->format,"\n" if $TRACE;
     respond(250, $from->format . ", sender OK - I always like getting mail from you!");
 
     $state{transaction} = { from => $from };
@@ -168,7 +170,7 @@ sub data {
       $buffer .= $_;
       $size += length $_;
     }
-    warn "size is at $size" unless ($i % 300);
+    warn "$$ size is at $size\n" unless ($i % 300);
 
     alarm $config{timeout};
   }
@@ -250,14 +252,14 @@ sub quit {
 
 sub check_rhsbl {
   my ($rhsbl, $host) = @_;
-  warn "checking $host in $rhsbl\n" if $TRACE;
+  return 0 unless $host;
+  warn "$$ checking $host in $rhsbl\n" if $TRACE > 2;
   return 1 if ((gethostbyname("$host.$rhsbl"))[4]);
   return 0;
 }
 
 sub check_dnsbl {
   my $ip = shift;
-  warn "1b!";
   my %dnsbl_zones = map { (split /\s+/, $_, 2)[0,1] } get_config('dnsbl_zones');
   return unless %dnsbl_zones;
   
@@ -265,7 +267,7 @@ sub check_dnsbl {
 
   my $res = new Net::DNS::Resolver;
   for my $dnsbl (keys %dnsbl_zones) {
-    warn "Checking $reversed_ip in $dnsbl ...";
+    warn "$$ Checking $reversed_ip in $dnsbl ..." if $TRACE > 2;
     my $query = $res->search("$reversed_ip.$dnsbl");
     if ($query) {
       my $a_record = 0;
@@ -277,7 +279,8 @@ sub check_dnsbl {
       return "Blocked by $dnsbl" if $a_record;
     }
     else {
-      print "query failed: ", $res->errorstring, "\n";
+      warn "$$ query for $reversed_ip.$dnsbl failed: ", $res->errorstring, "\n"
+	unless $res->errorstring eq "NXDOMAIN";
     }
   }
   return "";
@@ -298,15 +301,15 @@ sub check_relay {
 my %config_cache;
 sub get_config {
   my $config = shift;
-  #warn "trying to get config for $config" if $TRACE;
+  #warn "$$ trying to get config for $config" if $TRACE;
   return @{$config_cache{$config}} if $config_cache{$config};
   my $configdir = '/var/qmail/control';
   $configdir = "/home/smtpd/qpsmtpd/config" if (-e "/home/smtpd/qpsmtpd/config/$config");
-  open CF, "<$configdir/$config" or warn "could not open configfile $config: $!", return;
+  open CF, "<$configdir/$config" or warn "$$ could not open configfile $config: $!", return;
   my @config = <CF>;
   chomp @config;
   close CF;
-  #warn "returning ",Data::Dumper->Dump([\@config], [qw(config)]);
+  #warn "$$ returning ",Data::Dumper->Dump([\@config], [qw(config)]);
   $config_cache{$config} = \@config;
   return wantarray ? @config : $config[0];
 }
