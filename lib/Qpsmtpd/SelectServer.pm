@@ -104,7 +104,7 @@ sub main {
                     $qp->data_line($req . CRLF);
                 }
                 else {
-                    $qp->log(1, "dispatching $req to $qp");
+                    $qp->log(1, "dispatching $req");
                     defined $qp->dispatch(split / +/, $req)
                         or $qp->respond(502, "command unrecognized: '$req'");
                 }
@@ -189,16 +189,6 @@ sub nonblock {
 sub read_input {
   my $self = shift;
   die "read_input is disabled in SelectServer";
-  my $timeout = $self->config('timeout');
-  alarm $timeout;
-  while (<STDIN>) {
-    alarm 0;
-    $_ =~ s/\r?\n$//s; # advanced chomp
-    $self->log(1, "dispatching $_");
-    defined $self->dispatch(split / +/, $_)
-      or $self->respond(502, "command unrecognized: '$_'");
-    alarm $timeout;
-  }
 }
 
 sub respond {
@@ -208,7 +198,6 @@ sub respond {
     my $line = $code . (@messages?"-":" ").$msg;
     $self->log(1, ">$line");
     $outbuffer{$client} .= "$line\r\n";
-    # print "$line\r\n" or ($self->log(1, "Could not print [$line]: $!"), return 0);
   }
   return 1;
 }
