@@ -15,6 +15,8 @@ sub start_connection {
     my $remote_info = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
     my $remote_ip   = $ENV{TCPREMOTEIP};
 
+    $0 = "$0 [$remote_ip : $remote_host]";
+
     $self->SUPER::connection->start(remote_info => $remote_info,
 				    remote_ip   => $remote_ip,
 				    remote_host => $remote_host,

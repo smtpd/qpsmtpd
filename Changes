@@ -1,5 +1,7 @@
 0.26-dev
 
+  Set the process name to "qpsmtpd [1.2.3.4 : host.name.tld]"
+
   Fixed timeout bug when the client sent DATA and then stopped before
   sending the next line. (Gergely Risko <risko@risko.hu>) 
 
