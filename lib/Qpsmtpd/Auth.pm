@@ -319,7 +319,7 @@ sub SASL {
         $msg = "Authentication successful" .
 	    ( defined $msg ? " - " . $msg : "" );
         $session->respond( 235, $msg );
-        $ENV{RELAYCLIENT} = 1;
+        $session->connection->relay_client(1);
         $session->log( LOGINFO, $msg );
         return OK;
     }

@@ -25,6 +25,17 @@
     + initial "awkward silence" period now configurable (Mark Powell)
     + DENY/DENYSOFT now configurable
 
+  Move relay flag to connection object (John Peacock):
+    + add relay_client() method to Connection.pm
+    + change SMTP.pm to copy relay_client() flag to transaction relaying
+      flag (for compatibility purposes) - should deprecate instead
+    + Update Auth.pm module to set $connection->relay_client()
+
+  Split check_relay plugin into two plugins (John Peacock):
+    + check_relay now fires on connect and sets relay_client() flag
+    + rcpt_ok runs last of rcpt plugins and performs final OK/DENY
+    + change default config/plugins to reflect new order
+
 0.28 - 2004/06/05
 
   Don't keep adding ip addresses to the process status line ($0) when running under PPerl.

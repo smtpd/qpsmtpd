@@ -10,6 +10,7 @@ quit_fortune
 
 check_earlytalker
 count_unrecognized_commands 4
+check_relay
 
 require_resolvable_fromhost
 
@@ -22,7 +23,7 @@ check_spamhelo
 # sender_permitted_from
 
 # this plugin needs to run after all other "rcpt" plugins
-check_relay
+rcpt_ok
 
 # content filters
 virus/klez_filter

@@ -59,6 +59,12 @@ sub remote_info {
   $self->{_remote_info};
 }
 
+sub relay_client {
+  my $self = shift;
+  @_ and $self->{_relay_client} = shift;
+  $self->{_relay_client};
+}
+
 sub hello {
   my $self = shift;
   @_ and $self->{_hello} = shift;

@@ -1,26 +1,15 @@
-# this plugin checks the standard rcpthosts config and
+# this plugin checks the relayclients config file and
 # $ENV{RELAYCLIENT} to see if relaying is allowed.
-#
-# It should be configured to be run _LAST_!
 #
 
 sub register {
   my ($self, $qp) = @_;
-  $self->register_hook("rcpt", "check_relay");
+  $self->register_hook("connect", "check_relay");
 }
 
 sub check_relay {
-  my ($self, $transaction, $recipient) = @_;
-  my $host = lc $recipient->host;
-
-  my @rcpt_hosts = ($self->qp->config("me"), $self->qp->config("rcpthosts"));
-  
-  # Allow 'no @' addresses for 'postmaster' and 'abuse'
-  # qmail-smtpd will do this for all users without a domain, but we'll
-  # be a bit more picky.  Maybe that's a bad idea.
-  my $user = $recipient->user;
-  $host = $self->qp->config("me")
-    if ($host eq "" && (lc $user eq "postmaster" || lc $user eq "abuse"));
+  my ($self, $transaction) = @_;
+  my $connection = $self->qp->connection;
 
   # Check if this IP is allowed to relay
   my @relay_clients = $self->qp->config("relayclients");
@@ -32,21 +21,11 @@ sub check_relay {
         exists($relay_clients{$client_ip}) or
         exists($more_relay_clients->{$client_ip}))
     {
-      $transaction->relaying(1);
-      return (OK);
+      $connection->relay_client(1);
+      last;
     }
     $client_ip =~ s/\d+\.?$//; # strip off another 8 bits
   }
   
-  # Check if this recipient host is allowed
-  for my $allowed (@rcpt_hosts) {
-    $allowed =~ s/^\s*(\S+)/$1/;
-    return (OK) if $host eq lc $allowed;
-    return (OK) if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
-  }
-
-  my $more_rcpt_hosts = $self->qp->config('morercpthosts', 'map');
-  return (OK) if exists $more_rcpt_hosts->{$host};
-
-  return (DENY);
+  return (DECLINED);
 }
