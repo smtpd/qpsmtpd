@@ -59,3 +59,65 @@ sub notes {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Qpsmtpd::Connection - A single SMTP connection
+
+=head1 SYNOPSIS
+
+  my $rdns = $qp->connection->remote_host;
+  my $ip = $qp->connection->remote_ip;
+
+=head1 DESCRIPTION
+
+This class contains details about an individual SMTP connection. A
+connection lasts the lifetime of a TCP connection to the SMTP server.
+
+See also L<Qpsmtpd::Transaction> which is a class containing details
+about an individual SMTP transaction. A transaction lasts from
+C<MAIL FROM> to the end of the C<DATA> marker, or a C<RSET> command,
+whichever comes first, whereas a connection lasts until the client
+disconnects.
+
+=head1 API
+
+These API docs assume you already have a connection object. See the
+source code if you need to construct one. You can access the connection
+object via the C<Qpsmtpd> object's C<< $qp->connection >> method.
+
+=head2 remote_host( )
+
+The remote host connecting to the server as looked up via reverse dns.
+
+=head2 remote_ip( )
+
+The remote IP address of the connecting host.
+
+=head2 remote_info( )
+
+If your server does an ident lookup on the remote host, this is the
+identity of the remote client.
+
+=head2 hello( )
+
+Either C<"helo"> or C<"ehlo"> depending on how the remote client
+greeted your server.
+
+NOTE: This field is empty during the helo or ehlo hooks, it is only
+set after a successful return from those hooks.
+
+=head2 hello_host( )
+
+The host name specified in the C<HELO> or C<EHLO> command.
+
+NOTE: This field is empty during the helo or ehlo hooks, it is only
+set after a successful return from those hooks.
+
+=head2 notes($key [, $value])
+
+Connection-wide notes, used for passing data between plugins.
+
+=cut
