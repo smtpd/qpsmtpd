@@ -15,38 +15,39 @@ use POSIX qw(:sys_wait_h :errno_h :signal_h);
 use strict;
 $| = 1;
 
+# Configuration
+my $MAXCONN   = 15;				# max simultaneous connections
+my $PORT      = 25;				# port number
+my $LOCALADDR = '0.0.0.0';		# ip address to bind to
+my $USER      = 'smtpd';		# user to suid to
+
 delete $ENV{ENV};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 
+my %childstatus = ();
+
 sub REAPER {
-    while (defined(my $child = waitpid(-1, WNOHANG)) ) {
-        if ($child == -1) {
-            # No child here? Loop back
-        }
-        elsif (WIFEXITED($?)) {
-            # Process exited
-            last;
-        }
-        else {
-            # Possibly SIGSTOP on child...
-            last;
-        }
-    }
+  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
+    last unless $chld > 0;
+    warn("$$ cleaning up after $chld\n");
+    delete $childstatus{$chld};
+  }
 }
 
 $SIG{CHLD} = \&REAPER;
 
 # establish SERVER socket, bind and listen.
-my $server = IO::Socket::INET->new(LocalPort => 25,
+my $server = IO::Socket::INET->new(LocalPort => $PORT,
+				   LocalAddr => $LOCALADDR,
                                    Proto     => 'tcp',
                                    Reuse     => 1,
                                    Listen    => SOMAXCONN )
   or die "making socket: $@\n";
 
 # Drop priviledges
-my $user = 'smtpd';
-my (undef, undef, $quid, $qgid) = getpwnam $user or
-      die "unable to determine uid/gid for $user\n";
+my $user = 'mailfw';
+my (undef, undef, $quid, $qgid) = getpwnam $USER or
+      die "unable to determine uid/gid for $USER\n";
 $) = "";
 POSIX::setgid($qgid) or
       die "unable to change gid: $!\n";
@@ -58,9 +59,15 @@ $> = $quid;
 my $plugin_loader = Qpsmtpd::TcpServer->new();
 $plugin_loader->load_plugins;
 
-# $plugin_loader->log(LOGINFO, "Listening on port 25");
+::log(LOGINFO,"Listening on port $PORT\n");
 
 while (1) {
+  my $running = scalar keys %childstatus;
+  while ($running >= $MAXCONN) { 
+    ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.  Waiting one second.");
+    sleep(1) ;
+    $running = scalar keys %childstatus;
+  }
     my $hisaddr = accept(my $client, $server);
     if (!$hisaddr) {
         # possible something condition...
@@ -68,6 +75,9 @@ while (1) {
     }
     my $pid = fork;
     if ($pid) {
+        # parent
+        $childstatus{$pid} = 1;	# add to table
+        $running++;
         close($client);
         next;
     }
@@ -85,6 +95,11 @@ while (1) {
     my ($port, $iaddr) = sockaddr_in($hisaddr);
     $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
     $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
+
+    # don't do this!
+    #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
+
+    ::log(LOGINFO, "Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}");
     
     # dup to STDIN/STDOUT
     POSIX::dup2(fileno($client), 0);
@@ -95,6 +110,12 @@ while (1) {
     $qpsmtpd->run();
 
     exit;                                   # child leaves
+}
+
+sub log {
+  my ($level,$message) = @_;
+  # $level not used yet.  this is reimplemented from elsewhere anyway
+  warn("$$ $message\n");
 }
 
 __END__
