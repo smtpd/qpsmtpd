@@ -6,7 +6,7 @@ sub register {
 sub check_klez {
   my ($self, $transaction) = @_;
 
-  # klez files are always around 140K, no?
+  # klez files are always around 140K 
   return (DECLINED)
     if $transaction->body_size < 60_000
       or $transaction->body_size > 220_000;
@@ -21,8 +21,8 @@ sub check_klez {
   my $seen_klez_signature = 0;
 
   while ($_ = $transaction->body_getline) {
-    $line_number++; 
-    warn "$_";
+    last if $line_number++ > 40;
+
     m/^Content-type:.*(?:audio|application)/i
       and ++$seen_klez_signature and next;
 
@@ -30,9 +30,7 @@ sub check_klez {
       if $seen_klez_signature 
 	and m!^TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQA!;
 
-    last if $line_number > 40;
   }
 
-  warn "DECLINED is ", DECLINED;
   return (DECLINED);
 }
