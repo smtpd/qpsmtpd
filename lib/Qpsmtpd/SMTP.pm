@@ -487,7 +487,7 @@ sub data {
   #$self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
   $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
 
-  my ($rc, $msg) = $self->run_hooks("data_post");
+  ($rc, $msg) = $self->run_hooks("data_post");
   if ($rc == DONE) {
     return 1;
   }
