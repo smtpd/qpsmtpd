@@ -8,13 +8,11 @@ config/relayclients
 config/require_resolvable_fromhost
 config/rhsbl_zones
 CREDITS
-lib/Danga/Socket.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
 lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
-lib/Qpsmtpd/DNS.pm
 lib/Qpsmtpd/Plugin.pm
 lib/Qpsmtpd/Postfix.pm
 lib/Qpsmtpd/SelectServer.pm
@@ -38,7 +36,6 @@ plugins/check_spamhelo
 plugins/content_log
 plugins/count_unrecognized_commands
 plugins/dnsbl
-plugins/fprot_scan
 plugins/http_config
 plugins/ident/geoip
 plugins/ident/p0f
