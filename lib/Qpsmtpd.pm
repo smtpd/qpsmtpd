@@ -24,7 +24,7 @@ sub log {
 sub config {
   my ($self, $c) = @_;
 
-  warn "SELF->config($c) ", ref $self;
+  #warn "SELF->config($c) ", ref $self;
 
   my %defaults = (
 		  me      => hostname,
@@ -130,10 +130,13 @@ sub run_hooks {
   if ($self->{_hooks}->{$hook}) {
     my @r;
     for my $code (@{$self->{_hooks}->{$hook}}) {
-      $self->log(1, "running plugin ", $code->{name});
+      $self->log(5, "running plugin ", $code->{name});
       eval { (@r) = &{$code->{code}}($self->transaction, @_); };
       $@ and $self->log(0, "FATAL PLUGIN ERROR: ", $@) and next;
-      $self->log(1, "a $hook hook returned undef!") and next unless defined $r[0];
+      !defined $r[0] 
+	  and $self->log(1, "plugin ".$code->{name}
+			 ."running the $hook hook returned undef!")
+	  and next;
       last unless $r[0] == DECLINED; 
     }
     return @r;
