@@ -272,7 +272,7 @@ sub data {
   my $in_header = 1;
   my $complete = 0;
 
-  $self->log(6, "max_size: $max_size / size: $size");
+  $self->log(8, "max_size: $max_size / size: $size");
 
   my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
 
