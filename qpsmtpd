@@ -1,4 +1,4 @@
-#!/home/perl/bin/perl -Tw
+#!/usr/bin/perl -Tw
 # Copyright (c) 2001 Ask Bjoern Hansen. See the LICENSE file for details.
 # The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
 #
