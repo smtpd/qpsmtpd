@@ -3,7 +3,7 @@ sub register {
   my ($self, $qp) = @_;
   $self->register_hook("connect", "connect_handler");
   $self->register_hook("rcpt", "rcpt_handler");
-  #$self->register_hook("disconnect", "disconnect_handler");
+  $self->register_hook("disconnect", "disconnect_handler");
 }
 
 sub connect_handler {
@@ -23,7 +23,7 @@ sub connect_handler {
   my $sel = IO::Select->new();
 
   for my $dnsbl (keys %dnsbl_zones) {
-    $self->log(5, "Checking $reversed_ip.$dnsbl in the background");
+    $self->log(7, "Checking $reversed_ip.$dnsbl in the background");
     $sel->add($res->bgsend("$reversed_ip.$dnsbl", "TXT"));
   }
 
@@ -45,12 +45,12 @@ sub process_sockets {
 
   my $result; 
 
-  $self->log(6, "waiting for dnsbl dns");
+  $self->log(8, "waiting for dnsbl dns");
 
   # don't wait more than 5 seconds here
   my @ready = $sel->can_read(5);
 
-  $self->log(6, "DONE waiting for dnsbl dns");
+  $self->log(8, "DONE waiting for dnsbl dns, got " , scalar @ready, " answers ...") ;
 
   for my $socket (@ready) {
     my $query = $res->bgread($socket);
@@ -98,9 +98,7 @@ sub rcpt_handler {
 sub disconnect_handler {
   my ($self, $transaction) = @_;
 
-  my $sockets = $self->qp->connection->notes('dnsbl_sockets');
-  # if there were more to read; then forget about them again ...
-  undef $_ for (@{$sockets});
+  $self->qp->connection->notes('dnsbl_sockets', undef);
 
   return DECLINED;
 }
