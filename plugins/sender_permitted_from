@@ -45,7 +45,7 @@ sub mail_handler {
   # If we are receving from a relay permitted host, then we are probably
   # not the delivery system, and so we shouldn't check
 
-  return (DECLINED) if exists $ENV{RELAYCLIENT};
+  return (DECLINED) if $self->qp->connection->relay_client();
   my @relay_clients = $self->qp->config("relayclients");
   my $more_relay_clients = $self->qp->config("morerelayclients", "map");
   my %relay_clients = map { $_ => 1 } @relay_clients;
