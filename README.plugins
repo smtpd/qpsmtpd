@@ -159,6 +159,18 @@ hook returned.
 Returning DONE or OK will stop the next deny hook from being run.
 DECLINED will make qpsmtpd run the remaining configured deny hooks.
 
+=head2 vrfy
+
+Hook for the "VRFY" command.  Defaults to returning a message telling
+the user to just try sending the message.
+
+Allowed return codes:
+
+   OK       - Recipient Exists
+   DENY     - Return a hard failure code
+   DONE     - Return nothing and move on
+   Anything Else - Return a 252
+
 =head1 Return Values and Notes
 
 Insert stuff here about how:

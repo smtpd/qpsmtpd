@@ -337,7 +337,29 @@ sub noop {
 }
 
 sub vrfy {
-  shift->respond(252, "Just try sending a mail and we'll see how it turns out ...");
+  my $self = shift;
+
+  # Note, this doesn't support the multiple ambiguous results
+  # documented in RFC2821#3.5.1
+  # I also don't think it provides all the proper result codes.
+
+  my ($rc, $msg) = $self->run_hooks("vrfy");
+  if ($rc == DONE) {
+    return 1;
+  }
+  elsif ($rc == DENY) {
+    $self->respond(554, $msg || "Access Denied");
+    $self->reset_transaction();
+    return 1;
+  }
+  elsif ($rc == OK) {
+    $self->respond(250, $msg || "User OK");
+    return 1;
+  }
+  else { # $rc == DECLINED or anything else
+    $self->respond(252, "Just try sending a mail and we'll see how it turns out ...");
+    return 1;
+  }
 }
 
 sub rset {
