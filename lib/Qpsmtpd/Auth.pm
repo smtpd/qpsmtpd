@@ -221,6 +221,8 @@ sub Qpsmtpd::SMTP::auth {
     return $self->respond( 503, "but you already said AUTH ..." )
       if ( defined $self->{_auth}
         and $self->{_auth} == OK );
+    return $self->respond( 503, "AUTH not defined for HELO" )
+      if ( $self->connection->hello eq "helo" );
 
     return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $arg, @stuff );
 }
