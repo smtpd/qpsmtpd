@@ -126,14 +126,15 @@ sub canonify {
     $path = $1;
 
     # strip source route
-    $path =~ s/[EMAIL PROTECTED](?:,[EMAIL PROTECTED])*://;
+    $path =~ s/^\@$domain(?:,\@$domain)*://;
 
     # empty path is ok
     return "" if $path eq "";
 
     # 
     my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
-    return undef unless (defined $localpart && defined $domainpart);
+    return undef unless defined $localpart;
+
     if ($localpart =~ /^$atom(\.$atom)*/) {
         # simple case, we are done
         return $path;
@@ -158,7 +159,7 @@ sub parse {
 sub address {
     my ($self, $val) = @_;
     my $oldval = $self->[0];
-    $self->[0] = $val if (defined($val));
+    return $self->[0] = $val if (defined($val));
     return $oldval;
 }
 
