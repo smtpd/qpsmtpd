@@ -84,6 +84,17 @@ Hook after receiving all data; just before the message is queued.
 
 All other codes and the message will be queued normally
 
+=head2 queue
+
+Called on completion of the DATA command.
+
+   DONE     - skip further processing (plugin gave response code)
+   OK       - Return success message 
+   DENY     - Return hard failure code
+   DENYSOFT - Return soft failure code
+
+Any other code will return a soft failure code.
+
 
 =head2 connect
 
@@ -92,6 +103,7 @@ Allowed return codes:
   OK       - Stop processing plugins, give the default response
   DECLINED - Process the next plugin
   DONE     - Stop processing plugins and don't give the default response
+
 
 =head2 quit
 

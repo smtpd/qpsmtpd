@@ -8,7 +8,9 @@ check_badrcptto
 # this plugin needs to run after all other "rcpt" plugins
 check_relay
 
-
+# content filters
 klez_filter
-
 spamassassin
+
+queue/qmail-queue
+

@@ -300,6 +300,8 @@ sub data {
 	#   way a Received: line that is already in the header.
 
 	$header->extract(\@header);
+	$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://develooper.com/code/qpsmtpd/");
+
 	$buffer = "";
 
 	# FIXME - call plugins to work on just the header here; can
@@ -360,55 +362,23 @@ sub data {
 sub queue {
   my ($self, $transaction) = @_;
 
-  # these bits inspired by Peter Samuels "qmail-queue wrapper"
-  pipe(MESSAGE_READER, MESSAGE_WRITER) or fault("Could not create message pipe"), exit;
-  pipe(ENVELOPE_READER, ENVELOPE_WRITER) or fault("Could not create envelope pipe"), exit;
-
-  my $child = fork();
-
-  not defined $child and fault(451, "Could not fork"), exit;
-
-  if ($child) {
-    # Parent
-    my $oldfh = select(MESSAGE_WRITER); $| = 1; 
-                select(ENVELOPE_WRITER); $| = 1;
-    select($oldfh);
-
-    close MESSAGE_READER  or fault("close msg reader fault"),exit;
-    close ENVELOPE_READER or fault("close envelope reader fault"), exit;
-
-    $transaction->header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://develooper.com/code/qpsmtpd/");
-
-    $transaction->header->print(\*MESSAGE_WRITER);
-    $transaction->body_resetpos;
-    while (my $line = $transaction->body_getline) {
-      print MESSAGE_WRITER $line;
-    }
-    close MESSAGE_WRITER;
-
-    my @rcpt = map { "T" . $_->address } $transaction->recipients;
-    my $from = "F".($transaction->sender->address|| "" );
-    print ENVELOPE_WRITER "$from\0", join("\0",@rcpt), "\0\0"
-      or respond(451,"Could not print addresses to queue"),exit;
-    
-    close ENVELOPE_WRITER;
-    waitpid($child, 0);
-    my $exit_code = $? >> 8;
-    $exit_code and respond(451, "Unable to queue message ($exit_code)"), exit;
-    $self->respond(250, "Queued.");
+  my ($rc, $msg) = $self->run_hooks("queue");
+  if ($rc == DONE) {
+    return 1;
   }
-  elsif (defined $child) {
-    # Child
-    close MESSAGE_WRITER or die "could not close message writer in parent";
-    close ENVELOPE_WRITER or die "could not close envelope writer in parent";
-    
-    open(STDIN, "<&MESSAGE_READER") or die "b1";
-    open(STDOUT, "<&ENVELOPE_READER") or die "b2";
-    
-    unless (exec '/var/qmail/bin/qmail-queue') {
-      die "should never be here!";
-    }
+  elsif ($rc == OK) {
+    $self->respond(250, ($msg || 'Queued'));
   }
+  elsif ($rc == DENY) {
+    $self->respond(552, $msg || "Message denied");
+  }
+  elsif ($rc == DENYSOFT) {
+    $self->respond(452, $msg || "Message denied temporarily");
+  } 
+  else {
+    $self->respond(451, $msg || "Queuing declined or disabled; try again later" );
+  }
+
 
 }
 
