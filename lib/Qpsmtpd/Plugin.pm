@@ -20,7 +20,8 @@ sub qp {
 }
 
 sub log {
-    shift->qp->log(@_);
+  my $self = shift;
+  $self->qp->log(shift, $self->plugin_name . " plugin: " . shift, @_);
 }
 
 sub transaction {
