@@ -75,20 +75,20 @@ sub check_results {
                 $transaction->body_write($result->{value});
             }
             else {
-                $transaction->header->add($result->{header}, $result->{value});
+                push @{$transaction->notes('milter_header_changes')->{add}},
+                        [$result->{header}, $result->{value}];
             }
         }
         elsif ($result->{action} eq 'delete') {
-            $transaction->header->delete($result->{header});
+            push @{$transaction->notes('milter_header_changes')->{delete}},
+                $result->{header};
         }
         elsif ($result->{action} eq 'accept') {
             # TODO - figure out what this is used for
         }
         elsif ($result->{action} eq 'replace') {
-            $transaction->header->replace($result->{header}, $result->{value});
-        }
-        elsif ($result->{action} eq 'continue') {
-            # just carry on as normal
+            push @{$transaction->notes('milter_header_changes')->{replace}},
+                    [$result->{header}, $result->{value}];
         }
     }
 }
@@ -102,7 +102,10 @@ sub connect_handler {
     $milter->protocol_negotiation();
 
     $self->qp->connection->notes(milter => $milter);
-    
+
+    $self->qp->connection->notes(
+        milter_header_changes => { add => [], delete => [], replace => [], }
+    );    
     my $remote_ip = $self->qp->connection->remote_ip;
     my $remote_host = $self->qp->connection->remote_host;
     $self->log(LOGDEBUG, "milter $self->{name} checking connect from $remote_host\[$remote_ip\]");
@@ -221,6 +224,18 @@ sub data_handler {
                                 $milter->send_end_body()) };
     return(DENY, $@) if $@;
 
+    my $milter_header_changes = $transaction->notes('milter_header_changes'); 
+
+    foreach my $add (@{$milter_header_changes->{add}}) {
+        $headers->add($add->[0], $add->[1]);
+    }
+    foreach my $del (@{$milter_header_changes->{'delete'}}) {
+        $headers->delete($del);
+    }
+    foreach my $repl (@{$milter_header_changes->{replace}}) {
+        $headers->replace($repl->[0], $repl->[1]);
+    }
+    
     return DECLINED;
 }
 
