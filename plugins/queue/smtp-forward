@@ -52,15 +52,17 @@ sub queue_handler {
                             Port => $self->{_smtp_port},
                             Timeout => 60,
                            ) || die $!;
-  $smtp->mail( $transaction->sender->address || "" );
-  $smtp->to($_->address) for $transaction->recipients;
-  $smtp->data();
-  $smtp->datasend($transaction->header->as_string);
+  $smtp->mail( $transaction->sender->address || "" ) or return(DECLINED, "Unable to queue message ($!)");
+  for ($transaction->recipients) {
+    $smtp->to($_->address) or return(DECLINED, "Unable to queue message ($!)");
+  }
+  $smtp->data() or return(DECLINED, "Unable to queue message ($!)");
+  $smtp->datasend($transaction->header->as_string) or return(DECLINED, "Unable to queue message ($!)");
   $transaction->body_resetpos;
   while (my $line = $transaction->body_getline) {
-    $smtp->datasend($line);
+    $smtp->datasend($line) or return(DECLINED, "Unable to queue message ($!)");
   }
-  $smtp->dataend();
+  $smtp->dataend() or return(DECLINED, "Unable to queue message ($!)");
   $smtp->quit() or return(DECLINED, "Unable to queue message ($!)");
   $self->log(LOGINFO, "finished queueing");
   return (OK, "Queued!");
