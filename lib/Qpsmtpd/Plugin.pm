@@ -12,10 +12,11 @@ sub register_hook {
   my ($plugin, $hook, $method) = @_;
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
-  $plugin->qp->_register_hook($hook, { code => sub { $plugin->$method(@_) },
+  $plugin->qp->_register_hook($hook, { code => sub { local $plugin->{_qp} = shift; $plugin->$method(@_) },
 				       name => $plugin->plugin_name 
 				     }
 			     );
+  delete $plugin->{_qp};
 }
 
 sub qp {

@@ -2,7 +2,7 @@ package Qpsmtpd;
 use strict;
 
 $Qpsmtpd::VERSION = "0.27-dev";
-sub TRACE_LEVEL { 6 }
+sub TRACE_LEVEL () { 6 }
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
@@ -88,7 +88,6 @@ sub get_qmail_config {
 }
 
 
-
 sub load_plugins {
   my $self = shift;
   my @plugins = $self->config('plugins');
@@ -100,7 +99,7 @@ sub load_plugins {
   for my $plugin (@plugins) {
     $self->log(7, "Loading $plugin");
     ($plugin, my @args) = split /\s+/, $plugin;
-
+    
     my $plugin_name = $plugin;
 
     # Escape everything into valid perl identifiers
@@ -116,7 +115,7 @@ sub load_plugins {
 
     # don't reload plugins if they are already loaded
     next if defined &{"Qpsmtpd::Plugin::${plugin_name}::register"};
-
+    
     my $sub;
     open F, "$dir/$plugin" or die "could not open $dir/$plugin: $!";
     { 
@@ -163,7 +162,7 @@ sub run_hooks {
     my @r;
     for my $code (@{$self->{_hooks}->{$hook}}) {
       $self->log(5, "running plugin ", $code->{name});
-      eval { (@r) = &{$code->{code}}($self->can('transaction') ? $self->transaction : {}, @_); };
+      eval { (@r) = $code->{code}->($self, $self->can('transaction') ? $self->transaction : {}, @_); };
       $@ and $self->log(0, "FATAL PLUGIN ERROR: ", $@) and next;
       !defined $r[0] 
 	  and $self->log(1, "plugin ".$code->{name}
