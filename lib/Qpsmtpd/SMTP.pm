@@ -18,8 +18,10 @@ use Mail::Header ();
 use POSIX qw(strftime);
 use Net::DNS;
 
-# $SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a
-# timeout; I just can't wait that long..."); exit };
+# this is only good for forkserver
+# can't set these here, cause forkserver resets them
+#$SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a timeout; I just can't wait that long..."); exit };
+#$SIG{ALRM} = sub { warn "Connection Timed Out\n"; exit; };
 
 sub new {
   my $proto = shift;
@@ -33,7 +35,6 @@ sub new {
   my (%commands); @commands{@commands} = ('') x @commands;
   # this list of valid commands should probably be a method or a set of methods
   $self->{_commands} = \%commands;
-
   $self;
 }
 
@@ -233,7 +234,7 @@ sub mail {
     ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
       unless $from;
 
-    $self->log(LOGWARN, "$$ from email address : [$from]");
+    $self->log(LOGWARN, "from email address : [$from]");
 
     if ($from eq "<>" or $from =~ m/\[undefined\]/) {
       $from = Qpsmtpd::Address->new("<>");
@@ -284,7 +285,7 @@ sub rcpt {
 
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
-  $self->log(LOGWARN, "$$ to email address : [$rcpt]");
+  $self->log(LOGWARN, "to email address : [$rcpt]");
   $rcpt = (Qpsmtpd::Address->parse($rcpt))[0];
 
   return $self->respond(501, "could not parse recipient") unless $rcpt;
