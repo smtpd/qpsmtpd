@@ -170,3 +170,11 @@ in
     - if we're in a connection, store things in the connection notes instead.
 
 
+=head1 Include Files
+
+(put more about how the $Include stuff works here)
+
+With the $Include stuff you order using the filename of the plugin.d
+file. So if you have a plugin called xyz but want it to come early on,
+you call it's config file 00_xyz, but that file still refers to the
+plugin called xyz.
