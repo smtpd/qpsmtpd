@@ -101,10 +101,19 @@ sub helo {
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  $conn->hello("helo");
-  $conn->hello_host($hello_host);
-  $self->transaction;
-  $self->respond(250, $self->config('me') ." Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]; I am so happy to meet you.");
+  my ($rc, $msg) = $self->run_hooks("helo", $hello_host);
+  if ($rc == DONE) {
+    # do nothing
+  } elsif ($rc == DENY) {
+    $self->respond(550, $msg);
+  } elsif ($rc == DENYSOFT) {
+    $self->respond(450, $msg);
+  } else {
+    $conn->hello("helo");
+    $conn->hello_host($hello_host);
+    $self->transaction;
+    $self->respond(250, $self->config('me') ." Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]; I am so happy to meet you.");
+  }
 }
 
 sub ehlo {
@@ -112,16 +121,25 @@ sub ehlo {
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  $conn->hello("ehlo");
-  $conn->hello_host($hello_host);
-  $self->transaction;
+  my ($rc, $msg) = $self->run_hooks("ehlo", $hello_host);
+  if ($rc == DONE) {
+    # do nothing
+  } elsif ($rc == DENY) {
+    $self->respond(550, $msg);
+  } elsif ($rc == DENYSOFT) {
+    $self->respond(450, $msg);
+  } else {
+    $conn->hello("ehlo");
+    $conn->hello_host($hello_host);
+    $self->transaction;
 
-  $self->respond(250,
+    $self->respond(250,
 		 $self->config("me") . " Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]",
 		 "PIPELINING",
 		 "8BITMIME",
 		 ($self->config('databytes') ? "SIZE ". ($self->config('databytes'))[0] : ()),
 		);
+  }
 }
 
 sub mail {
