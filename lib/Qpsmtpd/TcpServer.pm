@@ -52,7 +52,11 @@ sub run {
 sub read_input {
   my $self = shift;
 
-  my $timeout = $self->config('timeout');
+  my $timeout =
+    $self->config('timeoutsmtpd')   # qmail smtpd control file
+      || $self->config('timeout')   # qpsmtpd control file
+        || 1200;                    # default value
+
   alarm $timeout;
   while (<STDIN>) {
     alarm 0;
