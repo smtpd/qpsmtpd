@@ -27,6 +27,9 @@ Qpsmtpd::Constants - Constants for plugins to use
 
 =head1 CONSTANTS
 
+See L<README.plugins> for hook specific information on applicable
+constants.
+
 Constants available:
 
 =over 4
