@@ -1,51 +1,67 @@
-use Net::DNS qw(mx);
+#!/usr/bin/perl
+
+use Danga::DNS;
 
 sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("mail", "mail_handler");
+    my ($self) = @_;
+    $self->register_hook("mail", "mail_handler");
+    $self->register_hook("rcpt", "rcpt_handler");
 }
 
 sub mail_handler {
-  my ($self, $transaction, $sender) = @_;
-
-  return DECLINED
-        if ($self->qp->connection->notes('whitelistclient'));
-
-  $sender->format ne "<>"
-    and $self->qp->config("require_resolvable_fromhost")
-    and !$self->check_dns($sender->host)
-    and return (DENYSOFT, 
-                ($sender->host
-                   ? "Could not resolve ". $sender->host
-                   : "FQDN required in the envelope sender"));
-  
-   return DECLINED;
-
+    my ($self, $transaction, $sender) = @_;
+    
+    $sender->format ne "<>" and $self->check_dns($sender->host);
+    
+    return DECLINED;
 }
 
 
 sub check_dns {
-  my ($self, $host) = @_;
-
-  # for stuff where we can't even parse a hostname out of the address
-  return 0 unless $host;
-
-  return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
-
-  my $res = new Net::DNS::Resolver;
-  $res->tcp_timeout(30);
-  $res->udp_timeout(30);
-  return 1 if mx($res, $host);
-  my $query = $res->search($host);
-  if ($query) {
-    foreach my $rr ($query->answer) {
-      return 1 if $rr->type eq "A" or $rr->type eq "MX";
-    }
-  }
-  else {
-    $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
-      unless $res->errorstring eq "NXDOMAIN";
-  }
-  return 0;
+    my ($self, $host) = @_;
+    
+    # for stuff where we can't even parse a hostname out of the address
+    return unless $host;
+    
+    return $self->transaction->notes('resolvable', 1)
+        if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+    
+    Danga::DNS->new(
+        callback => sub { $self->dns_result(@_) },
+        host => $host,
+        type => "MX",
+        client => $self->argh->input_sock,
+    );
+    Danga::DNS->new(
+        callback => sub { $self->dns_result(@_) },
+        host => $host,
+        client => $self->argh->input_sock,
+    );
 }
 
+sub dns_result {
+    my ($self, $result, $query) = @_;
+    
+    if ($result =~ /^[A-Z]+$/) {
+        # probably an error
+        $self->log(LOGDEBUG, "DNS error: $result looking up $query");
+        return;
+    }
+    
+    $self->log(LOGDEBUG, "DNS lookup $query returned: $result");
+    $self->transaction->notes('resolvable', 1);
+}
+
+sub rcpt_handler {
+    my ($self, $transaction) = @_;
+    
+    if (!$transaction->notes('resolvable')) {
+        my $sender = $transaction->sender;
+        return (DENYSOFT, 
+		      ($sender->host
+    		   ? "Could not resolve ". $sender->host
+           	   : "FQDN required in the envelope sender"));
+    }
+    
+    return DECLINED;
+}
