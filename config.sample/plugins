@@ -8,7 +8,7 @@
 
 quit_fortune
 
-#check_earlytalker
+check_earlytalker
 count_unrecognized_commands 4
 
 require_resolvable_fromhost
@@ -18,6 +18,8 @@ dnsbl
 check_badmailfrom
 check_badrcptto
 check_spamhelo
+
+# sender_permitted_from
 
 # this plugin needs to run after all other "rcpt" plugins
 check_relay

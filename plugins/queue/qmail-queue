@@ -16,7 +16,6 @@ makes it easy to use a qmail-queue replacement.
 
 If set the environment variable QMAILQUEUE overrides this setting.
 
-
 =cut
 
 sub register {
@@ -26,12 +25,12 @@ sub register {
   if (@args > 0) {
     $self->{_queue_exec} = $args[0];
     $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
-  } else {
-    $self->{_queue_exec} = "/var/qmail/bin/qmail-queue";
+  }
+  else {
+    $self->{_queue_exec} = ($ENV{QMAIL} || '/var/qmail') . "/bin/qmail-queue";
   }
 
   $self->{_queue_exec} = $ENV{QMAILQUEUE} if $ENV{QMAILQUEUE};
-
 }
 
 sub queue_handler {

@@ -1,3 +1,12 @@
+0.27 
+
+  Use $ENV{QMAIL} to override /var/qmail for where to find the
+  control/ directory.
+
+  Enable "check_earlytalker" in the default plugins config
+
+  [.. todo, fill in older changes ..] spf changes etc?
+
 0.26 - 2003/06/11
 
   Add queue/smtp-forward plugin (Matt Sergeant)
