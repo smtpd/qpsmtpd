@@ -5,6 +5,9 @@ use base qw(Qpsmtpd);
 sub start_connection {
     my $self = shift;
 
+    die "Qpsmtpd::TcpServer must be started by tcpserver\n"
+      unless $ENV{TCPREMOTEIP};
+
     my $remote_host = $ENV{TCPREMOTEHOST} || ( $ENV{TCPREMOTEIP} ? "[$ENV{TCPREMOTEIP}]" : "[noip!]");
     my $remote_info = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
     my $remote_ip   = $ENV{TCPREMOTEIP};
