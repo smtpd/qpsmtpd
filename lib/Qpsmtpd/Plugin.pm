@@ -16,7 +16,6 @@ sub register_hook {
 				       name => $plugin->plugin_name 
 				     }
 			     );
-  delete $plugin->{_qp};
 }
 
 sub qp {
