@@ -2,7 +2,8 @@
 Near term roadmap
 =================
 
-0.27:
+0.28 (early April 2004):
+      Add logging system patch from Matt
       Add the first time denysoft plugin
       Support email addresses with spaces in them
       Bugfixes
@@ -27,6 +28,9 @@ Near term roadmap
 
 Issues
 ======
+
+plugins/queue/qmail-queue is still calling exit inappropriately
+(should call disconnect or some such)
 
 add whitelist support to the dnsbl plugin (and maybe to the rhsbl
 plugin too).  Preferably both supporting DNS based whitelists and
