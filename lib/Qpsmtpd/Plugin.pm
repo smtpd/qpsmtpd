@@ -10,8 +10,7 @@ my %hooks = map { $_ => 1 } qw(
 sub new {
   my $proto = shift;
   my $class = ref($proto) || $proto;
-  my %args = @_;
-  bless ({ _qp => $args{qpsmtpd} }, $class);
+  bless ({}, $class);
 }
 
 sub register_hook {
@@ -28,6 +27,13 @@ sub register_hook {
 			     );
 }
 
+sub _register {
+  my $self = shift;
+  my $qp = shift;
+  local $self->{_qp} = $qp;
+  $self->register($qp, @_);
+}
+
 sub qp {
   shift->{_qp};
 }
@@ -40,6 +46,10 @@ sub log {
 sub transaction {
   # not sure if this will work in a non-forking or a threaded daemon
   shift->qp->transaction;
+}
+
+sub connection {
+  shift->qp->connection;
 }
 
 1;

@@ -169,7 +169,7 @@ sub ehlo {
 
     # Check for possible AUTH mechanisms
     my %auth_mechanisms;
-HOOK: foreach my $hook ( keys %{$self->{_hooks}} ) {
+HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
         if ( $hook =~ m/^auth-?(.+)?$/ ) {
             if ( defined $1 ) {
                 $auth_mechanisms{uc($1)} = 1;

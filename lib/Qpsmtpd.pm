@@ -10,8 +10,6 @@ sub TRACE_LEVEL { $LogLevel }
 
 sub version { $VERSION };
 
-$Qpsmtpd::_hooks = {};
-
 sub init_logger {
     my $self = shift;
     # Get the loglevel - we localise loglevel to zero while we do this
@@ -116,6 +114,9 @@ sub _config_from_file {
 
 sub load_plugins {
   my $self = shift;
+  
+  $self->{hooks} ||= {};
+  
   my @plugins = $self->config('plugins');
 
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
@@ -206,20 +207,24 @@ sub _load_plugins {
     eval $eval;
     die "eval $@" if $@;
 
-    my $plug = $package->new(qpsmtpd => $self);
-    $plug->register($self, @args);
+    my $plug = $package->new();
+    $plug->_register($self, @args);
 
   }
 }
 
+sub transaction {
+    return {}; # base class implements empty transaction
+}
+
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
-  $self->{_hooks} = $Qpsmtpd::_hooks;
-  if ($self->{_hooks}->{$hook}) {
+  my $hooks = $self->{hooks};
+  if ($hooks->{$hook}) {
     my @r;
-    for my $code (@{$self->{_hooks}->{$hook}}) {
+    for my $code (@{$hooks->{$hook}}) {
       $self->log(LOGINFO, "running plugin ", $code->{name});
-      eval { (@r) = $code->{code}->($self, $self->can('transaction') ? $self->transaction : {}, @_); };
+      eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
       $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
       !defined $r[0] 
 	  and $self->log(LOGERROR, "plugin ".$code->{name}
@@ -245,10 +250,7 @@ sub _register_hook {
   my $self = shift;
   my ($hook, $code, $unshift) = @_;
 
-  #my $plugin = shift;  # see comment in Plugin.pm:register_hook
-
-  $self->{_hooks} = $Qpsmtpd::_hooks;
-  my $hooks = $self->{_hooks};
+  my $hooks = $self->{hooks};
   if ($unshift) {
     unshift @{$hooks->{$hook}}, $code;
   }
