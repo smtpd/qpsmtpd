@@ -25,7 +25,7 @@ check_spamhelo
 check_relay
 
 # content filters
-klez_filter
+virus/klez_filter
 
 
 # You can run the spamassassin plugin with options.  See perldoc
@@ -40,7 +40,7 @@ spamassassin
 
 
 # run the clamav virus checking plugin
-# clamav
+# virus/clamav
 
 # queue the mail with qmail-queue
 queue/qmail-queue
