@@ -120,7 +120,7 @@ while (1) {
         # "Use of freed value in iteration" under perl 5.8.4.
         my @rip = values %childstatus;
         foreach my $rip (@rip) {
-          ++$num_conn if (defined $rip && $rip eq $iaddr) {
+          ++$num_conn if (defined $rip && $rip eq $iaddr);
         }
 
         if ($num_conn > $MAXCONNIP) {
