@@ -27,12 +27,13 @@ sub run {
     $self->start_conversation;
 
     # this should really be the loop and read_input should just get one line; I think
-    
+
     $self->read_input;
 }
 
 sub read_input {
   my $self = shift;
+
   my $timeout = $self->config('timeout');
   alarm $timeout;
   while (<STDIN>) {
@@ -50,7 +51,7 @@ sub respond {
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
     $self->log(1, "$line");
-    print "$line\r\n" or ($self->log("Could not print [$line]: $!"), return 0);
+    print "$line\r\n" or ($self->log(1, "Could not print [$line]: $!"), return 0);
   }
   return 1;
 }
