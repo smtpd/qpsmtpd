@@ -1,0 +1,272 @@
+=head1 NAME
+
+denysoft_greylist
+
+=head1 DESCRIPTION
+
+Plugin to implement the 'greylisting' algorithm proposed by Evan 
+Harris in http://projects.puremagic.com/greylisting/. Greylisting is 
+a form of denysoft filter, where unrecognised new connections are 
+temporarily denied for some initial period, to foil spammers using 
+fire-and-forget spamware, http_proxies, etc.
+
+Greylisting adds two main features: it tracks incoming connections 
+using a triplet of remote IP address, sender, and recipient, rather 
+than just using the remote IP; and it uses a set of timeout periods 
+(black/grey/white) to control whether connections are allowed, instead 
+of using connection counts or rates.
+
+This plugin allows connection tracking on any or all of IP address, 
+sender, and recipient (but uses IP address only, by default), with 
+configurable greylist timeout periods. A simple dbm database is used 
+for tracking connections, and relayclients are always allowed 
+through. The plugin supports whitelisting using the whitelist_soft
+plugin (optional).
+
+
+=head1 CONFIG
+
+The following parameters can be passed to denysoft_greylist:
+
+=over 4
+
+=item remote_ip <bool>
+
+Whether to include the remote ip address in tracking connections.
+Default: 1.
+
+=item sender <bool>
+
+Whether to include the sender in tracking connections. Default: 0.
+
+=item recipient <bool>
+
+Whether to include the recipient in tracking connections. Default: 0.
+
+=item deny_late <bool>
+
+Whether to defer denials during the 'mail' hook until 'data_post'
+e.g. to allow per-recipient logging. Default: 0.
+
+=item black_timeout <timeout_seconds>
+
+The initial period, in seconds, for which we issue DENYSOFTs for 
+connections from an unknown (or timed out) IP address and/or sender
+and/or recipient (a 'connection triplet'). Default: 50 minutes.
+
+=item grey_timeout <timeout_seconds>
+
+The subsequent 'grey' period, after the initial black blocking period,
+when we will accept a delivery from a formerly-unknown connection
+triplet. If a new connection is received during this time, we will 
+record a successful delivery against this IP address, which whitelists 
+it for future deliveries (see following). Default: 3 hours 20 minutes.
+
+=item white_timeout <timeout_seconds>
+
+The period after which a known connection triplet will be considered 
+stale, and we will issue DENYSOFTs again. New deliveries reset the 
+timestamp on the address and renew this timeout. Default: 36 days.
+
+=item mode ( denysoft | testonly | off )
+
+Operating mode. In 'denysoft' mode we log and track connections and 
+issue DENYSOFTs for black connections; in 'testonly' mode we log and 
+track connections as normal, but never actually issue DENYSOFTs 
+(useful for seeding the database and testing without impacting 
+deliveries); in 'off' mode we do nothing (useful for turning 
+greylisting off globally if using per_recipient configs). 
+Default: denysoft.
+
+=item per_recipient <bool>
+
+Flag to indicate whether to use per-recipient configs. 
+
+=item per_recipient_db <bool>
+
+Flag to indicate whether to use per-recipient greylisting 
+databases (default is to use a shared database).
+
+=back
+
+=head1 BUGS
+
+Database locking is implemented using flock, which may not work on 
+network filesystems e.g. NFS. If this is a problem, you may want to
+use something like File::NFSLock instead.
+
+=head1 AUTHOR
+
+Written by Gavin Carr <gavin@openfusion.com.au>.
+
+=cut
+
+BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
+use AnyDBM_File;
+use Fcntl qw(:DEFAULT :flock);
+use strict;
+
+my $VERSION = '0.07';
+
+my $DENYMSG = "This mail is temporarily denied";
+my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
+my $DB = "denysoft_greylist.dbm";
+my %ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
+  black_timeout grey_timeout white_timeout deny_late mode);
+my %DEFAULTS = (
+  remote_ip => 1,
+  sender => 0,
+  recipient => 0,
+  black_timeout => 50 * 60,
+  grey_timeout =>  3 * 3600 + 20 * 60,
+  white_timeout => 36 * 24 * 3600,
+  mode => 'denysoft',
+);
+
+sub register {
+  my ($self, $qp, %arg) = @_;
+  my $config = { %DEFAULTS, 
+    map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'), 
+    %arg };
+  if (my @bad = grep { ! exists $ARGS{$_} } sort keys %$config) {
+    $self->log(1, "invalid parameter(s): " . join(',',@bad));
+  }
+  $self->{_greylist_config} = $config;
+  unless ($config->{recipient} || $config->{per_recipient}) {
+    $self->register_hook("mail", "mail_handler");
+  } else {
+    $self->register_hook("rcpt", "rcpt_handler");
+  }
+  $self->register_hook("data_post", "data_handler");
+}
+
+sub mail_handler {
+  my ($self, $transaction, $sender) = @_;
+  my ($status, $msg) = $self->denysoft_greylist($transaction, $sender, undef);
+  if ($status == DENYSOFT) {
+    my $config = $self->{_greylist_config};
+    return DENYSOFT, $msg unless $config->{deny_late};
+    $transaction->notes('denysoft_greylist', $msg) 
+  }
+  return DECLINED;
+}
+
+sub rcpt_handler {
+  my ($self, $transaction, $rcpt) = @_;
+  # Load per_recipient configs
+  my $config = { %{$self->{_greylist_config}},
+    map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist', { rcpt => $rcpt }) };
+  # Check greylisting
+  my $sender = $transaction->sender;
+  my ($status, $msg) = $self->denysoft_greylist($transaction, $sender, $rcpt, $config);
+  if ($status == DENYSOFT) {
+    # Deny here (per-rcpt) unless this is a <> sender, for smtp probes
+    return DENYSOFT, $msg if $sender->address;
+    $transaction->notes('denysoft_greylist', $msg);
+  }
+  return DECLINED;
+}
+
+sub data_handler {
+  my ($self, $transaction) = @_;
+  my $note = $transaction->notes('denysoft_greylist');
+  return DECLINED unless $note;
+  # Decline if ALL recipients are whitelisted
+  if (($transaction->notes('whitelistrcpt')||0) == scalar($transaction->recipients)) {
+    $self->log(4,"all recipients whitelisted - skipping");
+    return DECLINED;
+  }
+  return DENYSOFT, $note;
+}
+
+sub denysoft_greylist {
+  my ($self, $transaction, $sender, $rcpt, $config) = @_;
+  $config ||= $self->{_greylist_config};
+  $self->log(7, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
+
+  # Always allow relayclients and whitelisted hosts/senders
+  return DECLINED if exists $ENV{RELAYCLIENT};
+  return DECLINED if $self->qp->connection->notes('whitelisthost');
+  return DECLINED if $transaction->notes('whitelistsender');
+
+  # Setup database location
+  my $dbdir = $transaction->notes('per_rcpt_configdir') 
+    if $config->{per_recipient_db};
+  $dbdir ||= -d "$QPHOME/var/db" ? "$QPHOME/var/db" : "$QPHOME/config";
+  my $db = "$dbdir/$DB";
+  $self->log(6,"using $db as greylisting database");
+
+  my $remote_ip = $self->qp->connection->remote_ip;
+  my $fmt = "%s:%d:%d:%d";
+
+  # Check denysoft db
+  unless (open LOCK, ">$db.lock") {
+    $self->log(2, "opening lockfile failed: $!");
+    return DECLINED;
+  }
+  unless (flock LOCK, LOCK_EX) {
+    $self->log(2, "flock of lockfile failed: $!");
+    close LOCK;
+    return DECLINED;
+  }
+  my %db = ();
+  unless (tie %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) {
+    $self->log(2, "tie to database $db failed: $!");
+    close LOCK;
+    return DECLINED;
+  }
+  my @key;
+  push @key, $remote_ip             if $config->{remote_ip};
+  push @key, $sender->address || '' if $config->{sender};
+  push @key, $rcpt->address         if $rcpt && $config->{recipient};
+  my $key = join ':', @key;
+  my ($ts, $new, $black, $white) = (0,0,0,0);
+  if ($db{$key}) {
+    ($ts, $new, $black, $white) = split /:/, $db{$key};
+    $self->log(3, "ts: " . localtime($ts) . ", now: " . localtime);
+    if (! $white) {
+      # Black IP - deny, but don't update timestamp
+      if (time - $ts < $config->{black_timeout}) {
+        $db{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
+        $self->log(2, "key $key black DENYSOFT - $black failed connections");
+        untie %db;
+        close LOCK;
+        return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
+      }
+      # Grey IP - accept unless timed out
+      elsif (time - $ts < $config->{grey_timeout}) {
+        $db{$key} = sprintf $fmt, time, $new, $black, 1;
+        $self->log(2, "key $key updated grey->white");
+        untie %db;
+        close LOCK;
+        return DECLINED;
+      }
+      else {
+        $self->log(3, "key $key has timed out (grey)");
+      }
+    }
+    # White IP - accept unless timed out
+    else {
+      if (time - $ts < $config->{white_timeout}) {
+        $db{$key} = sprintf $fmt, time, $new, $black, ++$white;
+        $self->log(2, "key $key is white, $white deliveries");
+        untie %db;
+        close LOCK;
+        return DECLINED;
+      }
+      else {
+        $self->log(3, "key $key has timed out (white)");
+      }
+    }
+  }
+
+  # New ip or entry timed out - record new and return DENYSOFT
+  $db{$key} = sprintf $fmt, time, ++$new, $black, 0;
+  $self->log(2, "key $key initial DENYSOFT, unknown");
+  untie %db;
+  close LOCK;
+  return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
+}
+
+# arch-tag: 6ef5919e-404b-4c87-bcfe-7e9f383f3901
+

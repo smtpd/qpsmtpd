@@ -1,5 +1,9 @@
 
-0.29 - 
+0.29
+
+  Added Gavin Carr's greylisting plugin
+
+  Renamed config/ to config.sample/
 
   Qpsmtpd::Auth - document $mechanism option, improve fallback to generic
   hooks, document that auth-login works now, stash auth user and method for
