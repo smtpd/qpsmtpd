@@ -28,6 +28,7 @@ use Danga::DNS;
 use Mail::Header;
 use POSIX qw(strftime);
 use Socket qw(inet_aton AF_INET CRLF);
+use strict;
 
 sub input_sock {
     my $self = shift;
@@ -292,16 +293,21 @@ sub end_of_data {
     
     #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
     
-    $self->log(LOGDEBUG, "max_size: $self->{max_size} / size: $size");
+    $self->log(LOGDEBUG, "max_size: $self->{max_size} / size: $self->{data_size}");
     
     my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
     
+    my $header = $self->transaction->header;
+    if (!$header) {
+        $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
+        $self->transaction->header($header);
+    }
     # only true if client authenticated
     if ( defined $self->{_auth} and $self->{_auth} == OK ) { 
         $header->add("X-Qpsmtpd-Auth","True");
     }
     
-    $self->transaction->header->add("Received", "from ".$self->connection->remote_info
+    $header->add("Received", "from ".$self->connection->remote_info
                  ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
                  . ")\n  by ".$self->config('me')." (qpsmtpd/".$self->version
                  .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
@@ -309,7 +315,7 @@ sub end_of_data {
     
     return $self->respond(552, "Message too big!") if $self->{max_size} and $self->{data_size} > $self->{max_size};
     
-    ($rc, $msg) = $self->run_hooks("data_post");
+    my ($rc, $msg) = $self->run_hooks("data_post");
     if ($rc == DONE) {
         return;
     }
