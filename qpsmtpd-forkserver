@@ -27,9 +27,10 @@ sub usage {
         print <<"EOT";
 usage: qpsmtpd-forkserver [ options ]
  -l, --listen-address addr : listen on a specific address; default 0.0.0.0
- -p, --port P              : listen on a specific port; default 25
+ -p, --port P              : listen on a specific port; default 2525
  -c, --limit-connections N : limit concurrent connections to N; default 15
  -u, --user U              : run as a particular user (defualt 'smtpd')
+ -m, --max-from-ip M       : limit connections from a single IP; default 5
 EOT
         exit 0;
 }
@@ -37,6 +38,7 @@ EOT
 GetOptions('h|help' => \&usage,
            'l|listen-address=s' => \$LOCALADDR,
            'c|limit-connections=i' => \$MAXCONN,
+           'm|max-from-ip=i' => \$MAXCONNIP,
            'p|port=i' => \$PORT,
            'u|user=s' => \$USER) || &usage;
 
