@@ -1,5 +1,8 @@
 0.26-dev
 
+  unrecognized_command hook and a count_unrecognized_commands
+  plugin. (Rasjid Wilcox)
+
   check_earlytalker plugin.  Deny the connection if the client talks
   before we show our SMTP banner.  (From Devin Carraway)
 

@@ -1,0 +1,47 @@
+=head1 NAME
+
+count_unrecognized_commands - Count unrecognized commands and disconnect when we have too many
+
+=head1 DESCRIPTION
+
+Disconnect the client if it sends too many unrecognized commands.
+Good for rejecting spam sent through open HTTP proxies.
+
+=head1 CONFIGURATION
+
+Takes one parameter, the number of allowed unrecognized commands
+before we disconnect the client.  Defaults to 4.
+
+=cut
+
+sub register {
+  my ($self, $qp, @args) = @_;
+  $self->register_hook("unrecognized_command", "check_unrec_cmd");
+
+  if (@args > 0) {
+    $self->{_unrec_cmd_max} = $args[0];
+    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+  } else {
+    $self->{_unrec_cmd_max} = 4;
+  }
+
+  $self->{_unrec_cmd_count} = 0;
+}
+
+sub check_unrec_cmd {
+  my ($self, $transaction, $cmd) = @_;
+  
+  $self->log(5, "Unrecognized command '$cmd'");
+
+  $self->{_unrec_cmd_count}++;
+
+  my $badcmdcount = $self->{_unrec_cmd_count};
+
+  if ($badcmdcount >= $self->{_unrec_cmd_max}) {
+    $self->log(5, "Closing connection. Too many unrecognized commands.");
+    return (DENY, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
+  }
+
+  return DECLINED;
+}
+

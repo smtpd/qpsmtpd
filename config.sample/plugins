@@ -9,6 +9,8 @@
 quit_fortune
 
 #check_earlytalker
+count_unrecognized_commands 4
+
 require_resolvable_fromhost
 
 rhsbl

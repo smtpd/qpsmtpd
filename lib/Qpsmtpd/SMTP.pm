@@ -46,8 +46,20 @@ sub dispatch {
   #$self->respond(553, $state{dnsbl_blocked}), return 1
   #  if $state{dnsbl_blocked} and ($cmd eq "rcpt");
 
-  $self->respond(500, "Unrecognized command"), return 1
-    if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1});
+  if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
+    my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd);
+    if ($rc == DENY) {
+      $self->respond(521, $msg);
+      $self->disconnect;
+    }
+    elsif ($rc == DONE) {
+      1;
+    }
+    else {
+      $self->respond(500, "Unrecognized command");
+    }
+    return 1
+  }
   $cmd = $1;
 
   if (1 or $self->{_commands}->{$cmd} and $self->can($cmd)) {
