@@ -243,7 +243,7 @@ sub run_hooks {
       } else {
         my $cnotes = $self->connection->notes( $code->{name} );
         $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $cnotes || $cnotes eq "HASH");
+          if (!defined $cnotes || ref $cnotes eq "HASH");
       }
 
       # should we have a hook for "OK" too?
