@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w
+# Copyright (c) 2001 Ask Bjoern Hansen. See the LICENSE file for details.
+# The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
+#
+# For more information see http://develooper.com/code/qpsmtpd/
+#
+#
+
+use lib 'lib';
+use Qpsmtpd::TcpServer;
+use Qpsmtpd::Constants;
+use IO::Socket;
+use Socket;
+use POSIX qw(:sys_wait_h);
+use strict;
+$| = 1;
+
+delete $ENV{ENV};
+$ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
+
+sub REAPER {
+    1 until (-1 == waitpid(-1, WNOHANG));
+    $SIG{CHLD} = \&REAPER;                 # unless $] >= 5.002
+}
+
+$SIG{CHLD} = \&REAPER;
+
+# establish SERVER socket, bind and listen.
+my $server = IO::Socket::INET->new(LocalPort => 25,
+                                   Proto     => 'tcp',
+                                   Reuse     => 1,
+                                   Listen    => SOMAXCONN )
+  or die "making socket: $@\n";
+
+# Drop priviledges
+my $user = 'smtpd';
+my (undef, undef, $quid, $qgid) = getpwnam $user or
+      die "unable to determine uid/gid for $user\n";
+$) = "";
+POSIX::setgid($qgid) or
+      die "unable to change gid: $!\n";
+POSIX::setuid($quid) or
+      die "unable to change uid: $!\n";
+$> = $quid;
+
+# Load plugins here
+my $plugin_loader = Qpsmtpd::TcpServer->new();
+$plugin_loader->load_plugins;
+
+# $plugin_loader->log(LOGINFO, "Listening on port 25");
+
+my $client;
+while (1) {
+    my $hisaddr = accept($client, $server);
+    if (!$hisaddr) {
+        # possible something condition...
+        next;
+    }
+    my $pid = fork;
+    next if $pid;
+    die "fork: $!" unless defined $pid;     # failure
+    # otherwise child
+    close($server);                          # no use to child
+
+    $SIG{CHLD} = 'DEFAULT';
+    
+    my ($port, $iaddr) = sockaddr_in($hisaddr);
+    $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
+    $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
+    
+    # dup to STDIN/STDOUT
+    POSIX::dup2(fileno($client), 0);
+    POSIX::dup2(fileno($client), 1);
+    
+    my $qpsmtpd = Qpsmtpd::TcpServer->new();
+    $qpsmtpd->start_connection();
+    $qpsmtpd->run();
+
+    exit;                                   # child leaves
+} continue { 
+    close($client);                          # no use to parent
+}
+
+__END__
+
+1;
