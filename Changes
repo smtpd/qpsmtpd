@@ -1,5 +1,8 @@
 0.26-dev
 
+  Fix bug hiding the error message when an existing configuration file
+  isn't readable.
+
   If a plugin running the ehlo hook add something to the ARRAY
   reference $self->transaction->notes('capabilities') then it will be
   added to the EHLO response.

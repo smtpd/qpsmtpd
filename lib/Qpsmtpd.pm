@@ -77,7 +77,7 @@ sub get_qmail_config {
     return \%h;
   }
 
-  open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!", return;
+  open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!" and return;
   my @config = <CF>;
   chomp @config;
   @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
