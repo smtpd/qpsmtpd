@@ -1,13 +1,15 @@
 package Qpsmtpd;
 use strict;
 
-$Qpsmtpd::VERSION = "0.12";
+$Qpsmtpd::VERSION = "0.20-dev";
 sub TRACE_LEVEL { 6 }
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
 sub version { $Qpsmtpd::VERSION };
+
+$Qpsmtpd::_hooks = {};
 
 sub log {
   my ($self, $trace, @log) = @_;
@@ -31,13 +33,16 @@ sub config {
 		  timeout => 1200,
 		  );
 
+  my ($rc, @config) = $self->run_hooks("config", $c);
+  @config = () unless $rc == OK;
+
   if (wantarray) {
-      my @config = $self->get_qmail_config($c);
+      @config = $self->get_qmail_config($c) unless @config;
       @config = @{$defaults{$c}} if (!@config and $defaults{$c});
       return @config;
   } 
   else {
-      return ($self->get_qmail_config($c) || $defaults{$c});
+      return ($config[0] || $self->get_qmail_config($c) || $defaults{$c});
    }
 }
 
@@ -73,7 +78,10 @@ sub load_plugins {
 
   for my $plugin (@plugins) {
     $self->log(7, "Loading $plugin");
+    my ($plugin, @args) = split /\s+/, $plugin;
+
     my $plugin_name = $plugin;
+
     # Escape everything into valid perl identifiers
     $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
 
@@ -120,18 +128,19 @@ sub load_plugins {
     die "eval $@" if $@;
 
     my $plug = $package->new(qpsmtpd => $self);
-    $plug->register($self);
+    $plug->register($self, @args);
 
   }
 }
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
+  $self->{_hooks} = $Qpsmtpd::_hooks;
   if ($self->{_hooks}->{$hook}) {
     my @r;
     for my $code (@{$self->{_hooks}->{$hook}}) {
       $self->log(5, "running plugin ", $code->{name});
-      eval { (@r) = &{$code->{code}}($self->transaction, @_); };
+      eval { (@r) = &{$code->{code}}($self->can('transaction') ? $self->transaction : {}, @_); };
       $@ and $self->log(0, "FATAL PLUGIN ERROR: ", $@) and next;
       !defined $r[0] 
 	  and $self->log(1, "plugin ".$code->{name}
@@ -139,9 +148,9 @@ sub run_hooks {
 	  and next;
       last unless $r[0] == DECLINED; 
     }
+    $r[0] = DECLINED if not defined $r[0];
     return @r;
   }
-  warn "Did not run any hooks ...";
   return (0, '');
 }
 
@@ -151,7 +160,7 @@ sub _register_hook {
 
   #my $plugin = shift;  # see comment in Plugin.pm:register_hook
 
-  $self->{_hooks} ||= {};
+  $self->{_hooks} = $Qpsmtpd::_hooks;
   my $hooks = $self->{_hooks};
   push @{$hooks->{$hook}}, $code;
 }
