@@ -53,6 +53,10 @@ sub connection {
   shift->qp->connection;
 }
 
+sub config {
+  shift->qp->config(@_);
+}
+
 sub spool_dir {
   shift->qp->spool_dir;
 }

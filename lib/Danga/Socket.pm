@@ -193,16 +193,16 @@ sub KQueueEventLoop {
                 next;
             }
             
-            push @objs, [$pob, $fd, $filter, $flags, $fflags];
+            DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), flags=%d \@ %s\n",
+                                                        $fd, ref($pob), $flags, time);
+            
+            push @objs, [$pob, $filter, $flags, $fflags];
         }
         
         # TODO - prioritize the objects
         
         foreach (@objs) {
-            my ($pob, $fd, $filter, $flags, $fflags) = @$_;
-            
-            DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), flags=%d \@ %s\n",
-                                                        $fd, ref($pob), $flags, time);
+            my ($pob, $filter, $flags, $fflags) = @$_;
             
             $pob->event_read  if $filter == IO::KQueue::EVFILT_READ()  && !$pob->{closed};
             $pob->event_write if $filter == IO::KQueue::EVFILT_WRITE() && !$pob->{closed};
@@ -236,6 +236,7 @@ sub EpollEventLoop {
         my $evcount;
         # get up to 1000 events, 1000ms timeout
         while ($evcount = epoll_wait($Epoll, 1000, 1000, \@events)) {
+            my @objs;
           EVENT:
             for ($i=0; $i<$evcount; $i++) {
                 my $ev = $events[$i];
@@ -260,11 +261,17 @@ sub EpollEventLoop {
                 DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), state=%d \@ %s\n",
                                                     $ev->[0], ref($pob), $ev->[1], time);
 
+                push @objs, [$pob, $state];
+            }
+            
+            foreach (@objs) {
+                my ($pob, $state) = @$_;
                 $pob->event_read   if $state & EPOLLIN && ! $pob->{closed};
                 $pob->event_write  if $state & EPOLLOUT && ! $pob->{closed};
                 $pob->event_err    if $state & EPOLLERR && ! $pob->{closed};
                 $pob->event_hup    if $state & EPOLLHUP && ! $pob->{closed};
             }
+            
             return unless PostEventLoop();
 
         }
