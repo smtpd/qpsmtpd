@@ -8,14 +8,20 @@ SPF - plugin to implement Sender Permitted From
   # in config/plugins
   sender_permitted_from
 
+Or if you wish to issue 5xx on SPF fail:
+
+  sender_permitted_from spf_deny 1
+
 =cut
 
 use Mail::SPF::Query;
 
 sub register {
-  my ($self, $qp) = @_;
+  my ($self, $qp, @args) = @_;
+  %{$self->{_args}} = @args;
   $self->register_hook("mail", "mail_handler");
   $self->register_hook("rcpt", "rcpt_handler");
+  $self->register_hook("data_post", "data_handler");
 }
 
 sub mail_handler {
@@ -40,22 +46,40 @@ sub rcpt_handler {
   my $query = $transaction->notes('spfquery');
   my ($result, $comment) = $query->result();
   
-  if ($result eq "pass") {
-    # domain is not forged
-    $self->qp->connection->notes('spf_ok', 1);
-  }
-  elsif ($result eq "deny") {
-    # domain is forged
+  $self->qp->connection->notes('spf_result', $result);
+  $self->qp->connection->notes('spf_comment', $comment);
+
+  if ($result eq "fail" and $self->{_args}{spf_deny}) {
     return (DENY, "SPF forgery ($comment)");
-  }
-  elsif ($result eq "softdeny") {
-    # domain may be forged
-    $self->qp->connection->notes('spf_ok', 0);
-  } 
-  else {
-    # domain has not implemented SPF
   }
    
   return (DECLINED);
+}
+
+sub data_handler {
+    my ($self, $transaction) = @_;
+    
+    my $spf = $self->qp->connection->notes('spf_result');
+
+    my $host = $self->qp->connection->remote_host;
+    my $ip = $self->qp->connection->remote_ip;
+    my $sender = $transaction->sender;
+
+    my $details = '';
+    if ($spf eq 'fail') {
+        $details = "fail (client $host[$ip] is not a designated mailer for domain of sender $sender)";
+    }
+    elsif ($spf eq 'softfail') {
+        $details = "error (temporary failure while resolving designated mailer status for domain of sender $sender)";
+    }
+    elsif ($spf eq 'pass') {
+        $details = "pass (client $host[$ip] is designated mailer for domain of sender $sender)";
+    }
+    else {
+        $details = "unknown (domain of sender $sender does not designate mailers)";
+    }
+    $transaction->header->add('Received-SPF' => $details);
+
+    return DECLINED;
 }
 
