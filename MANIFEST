@@ -1,12 +1,12 @@
 Changes
-config/badhelo
-config/dnsbl_zones
-config/IP
-config/loglevel
-config/plugins
-config/relayclients
-config/require_resolvable_fromhost
-config/rhsbl_zones
+config.sample/badhelo
+config.sample/dnsbl_zones
+config.sample/IP
+config.sample/loglevel
+config.sample/plugins
+config.sample/relayclients
+config.sample/require_resolvable_fromhost
+config.sample/rhsbl_zones
 CREDITS
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
@@ -66,3 +66,4 @@ t/addresses.t
 t/helo.t
 t/qpsmtpd-address.t
 t/Test/Qpsmtpd.pm
+META.yml                                 Module meta-data (added by MakeMaker)

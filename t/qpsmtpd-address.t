@@ -2,7 +2,7 @@
 use strict;
 $^W = 1;
 
-use Test::More tests => 24;
+use Test::More tests => 28;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
