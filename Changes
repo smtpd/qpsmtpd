@@ -1,3 +1,8 @@
+2002/09/22
+  Make klez filter run for mails bigger than 220KB; they are sometimes
+  bigger than that.
+
+
 2002/09/20
   Avoid "use of uninitialized variable" warning when the "MAIL" or the
   "RCPT" command is executed without a parameter.

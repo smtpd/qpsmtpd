@@ -6,10 +6,11 @@ sub register {
 sub check_klez {
   my ($self, $transaction) = @_;
 
-  # klez files are always around 140K 
+  # klez files are always sorta big .. how big?  Dunno. 
   return (DECLINED)
-    if $transaction->body_size < 60_000
-      or $transaction->body_size > 220_000;
+    if $transaction->body_size < 60_000;
+   #   220k was too little, so let's just disable the "big size check"
+   #   or $transaction->body_size > 1_000_000;
 
   # maybe it would be worthwhile to add a check for
   # Content-Type: multipart/alternative; here?
