@@ -10,11 +10,13 @@ use vars qw($VERSION @ISA @EXPORT);
 @EXPORT = (@common, @loglevels);
 
 use constant OK       => 900;
-use constant DENY     => 901;
-use constant DENYSOFT => 902;
+use constant DENY     => 901;   # 550
+use constant DENYSOFT => 902;   # 450
+use constant DENYHARD => 903;   # 550 + disconnect
+use constant DENYSOFTHARD => 904; # 450 + disconnect
 use constant DECLINED => 909;
 use constant DONE     => 910;
-use constant DENYHARD     => 903;
+
 
 # log levels
 use constant LOGDEBUG   => 8;

@@ -236,6 +236,12 @@ sub mail {
       $self->respond(550, $msg);
       $self->disconnect;
     }
+    elsif ($rc == DENYSOFTHARD) {
+      $msg ||= $from->format . ', temporarily denied';
+      $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
+      $self->respond(450, $msg);
+      $self->disconnect;
+    }
     else { # includes OK
       $self->log(LOGINFO, "getting mail from ".$from->format);
       $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
