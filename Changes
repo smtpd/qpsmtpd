@@ -1,7 +1,11 @@
 0.28
 
+  Proper "Log levels" with a configuration option
 
-0.27 
+  $Include feature in config/plugins
+
+
+0.27 - 2004/03/10
 
   Support for unix sockets in the spamassassin plugin (requires SA
   2.60 or higher).  Thanks to John Peacock!
