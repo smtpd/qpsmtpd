@@ -1,5 +1,6 @@
 package Qpsmtpd::Transaction;
 use strict;
+#use Carp qw(carp);
 use IO::File qw(O_RDWR O_CREAT);
 
 # For unique filenames. We write to a local tmp dir so we don't need
@@ -38,17 +39,14 @@ sub header {
   $self->{_header};
 }
 
-#sub body {
+# blocked() will return when we actually can do something useful with it...
+#sub blocked {
 #  my $self = shift;
-#  @_ and $self->{_body} = shift;
-#  $self->{_body};
+#  carp 'Use of transaction->blocked is deprecated;'
+#       . 'tell ask@develooper.com if you have a reason to use it';
+#  @_ and $self->{_blocked} = shift;
+#  $self->{_blocked};
 #}
-
-sub blocked {
-  my $self = shift;
-  @_ and $self->{_blocked} = shift;
-  $self->{_blocked};
-}
 
 sub notes {
   my $self = shift;
