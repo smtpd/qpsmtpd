@@ -157,7 +157,7 @@ sub ehlo {
 
 sub mail {
   my $self = shift;
-  return $self->respond(501, "syntax error in parameters") if $_[0] !~ m/^from:/i;
+  return $self->respond(501, "syntax error in parameters") if !$_[0] or $_[0] !~ m/^from:/i;
 
   # -> from RFC2821
   # The MAIL command (or the obsolete SEND, SOML, or SAML commands)
@@ -219,7 +219,7 @@ sub mail {
 
 sub rcpt {
   my $self = shift;
-  return $self->respond(501, "syntax error in parameters") unless $_[0] =~ m/^to:/i;
+  return $self->respond(501, "syntax error in parameters") unless $_[0] and $_[0] =~ m/^to:/i;
   return $self->respond(503, "Use MAIL before RCPT") unless $self->transaction->sender;
 
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];

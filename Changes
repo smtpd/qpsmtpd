@@ -1,6 +1,14 @@
+2002/09/20
+  Avoid "use of uninitialized variable" warning when the "MAIL" or the
+  "RCPT" command is executed without a parameter.
+
+  Compatibility with perl 5.5.3.
+
+
 2002/09/12
   Fix "Could not print" error message in the TcpServer object. (Thanks
   to Ross Mueller <ross@visual.com>)
+
 
 2002/09/10
   dnsbl plugin queues lookups in the background upon connect but
