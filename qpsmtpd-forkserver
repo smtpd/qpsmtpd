@@ -141,6 +141,11 @@ while (1) {
     }
     die "fork: $!" unless defined $pid;     # failure
     # otherwise child
+    
+    ## call srand(), else we will have (e.g.) the same tempfile in
+    ## _all_ children 
+    ## i.e. after 'use File::Temp; ($fh,$name)=tempfile();' in a plugin
+    srand( ($$ ^ $port) ^ (time ^ unpack("C*", $iaddr)) );
 
     close($server);
 
