@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 use strict;
-use warnings;
+$^W = 1;
 
-use Test::More tests => 20;
+use Test::More tests => 24;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
@@ -62,6 +62,15 @@ $as = '<foo@example.com>';
 $ao = Qpsmtpd::Address->new($as);
 ok ($ao, "new $as");
 is ($ao->address, 'foo@example.com', "address $as");
+
+$as = '<foo@foo.x.example.com>';
+$ao = Qpsmtpd::Address->new($as);
+ok ($ao, "new $as");
+is ($ao->format, $as, "format $as");
+
+$as = 'foo@foo.x.example.com';
+ok ($ao = Qpsmtpd::Address->parse($as), "parse $as");
+is ($ao && $ao->address, $as, "address $as");
 
 # Not sure why we can change the address like this, but we can so test it ...
 is ($ao->address('test@example.com'), 'test@example.com', 'address(test@example.com)');
