@@ -4,8 +4,21 @@
 use File::Temp qw(tempfile);
  
 sub register {
-  my ($self, $qp) = @_;
+  my ($self, $qp, @args) = @_;
   $self->register_hook("data_post", "clam_scan");
+
+  if (@args > 0) {
+    # Untaint scanner location
+    if ($args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+      $self->{_clamscan_loc} = $1;
+    } else {
+      $self->log(1, "FATAL ERROR: Unexpected characters in clamav argument 1");
+      exit 3;
+    }
+    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+  } else {
+    $self->{_clamscan_loc} = "/usr/local/bin/clamscan";
+  }
 }
  
 sub clam_scan {
@@ -14,13 +27,14 @@ sub clam_scan {
   my ($temp_fh, $filename) = tempfile();
   print $temp_fh $transaction->header->as_string;
   print $temp_fh "\n";
+  $transaction->body_resetpos;
   while (my $line = $transaction->body_getline) {
     print $temp_fh $line;
   }
   seek($temp_fh, 0, 0);
  
   # Now do the actual scanning!
-  my $cmd = "/usr/local/bin/clamscan --stdout -i --max-recursion=50 --disable-summary $filename 2>&1";
+  my $cmd = $self->{_clamscan_loc}." --stdout -i --max-recursion=50 --disable-summary $filename 2>&1";
   $self->log(1, "Running: $cmd");
   my $output = `$cmd`;
  
