@@ -1,13 +1,18 @@
 =head1 NAME
 
-spamassassin
+spamassassin - SpamAssassin integration for qpsmtpd
 
 =head1 DESCRIPTION
 
 Plugin that checks if the mail is spam by using the "spamd" daemon
-from the SpamAssassin package.  L<http://www.spamassassin.org>
+from the SpamAssassin package.  F<http://www.spamassassin.org>
 
 SpamAssassin 2.40 or newer is required.
+
+B<WARNING>: SpamAssassin 2.50 is incompatible with qpsmtpd.
+See F<http://nntp.x.perl.org/group/perl.qpsmtpd/188>
+F<http://bugzilla.spamassassin.org/show_bug.cgi?id=1640>
+F<http://bugzilla.spamassassin.org/show_bug.cgi?id=1614>
 
 =head1 CONFIG
 
