@@ -16,11 +16,16 @@ easily extensible!  See plugins/quit_fortune for a very useful, er,
 cute example.
 
 
-
-What's new in version 0.10?
+What's new in this release?
 ---------------------------
 
-Version 0.10 is all rearchitected, with an object oriented plugin
+See the Changes file! :-)
+
+
+What's new in version 0.1x from 0.0x?
+-------------------------------------
+
+Version 0.1x is all rearchitected, with an object oriented plugin
 infrastructure.  Weeh, that sounds fancy!  Of course it is keeping the
 well tested core code from version 0.0x which have had more than a
 years production usage on many sites.
