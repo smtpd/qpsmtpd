@@ -241,13 +241,18 @@ sub run_hooks {
 
 sub _register_hook {
   my $self = shift;
-  my ($hook, $code) = @_;
+  my ($hook, $code, $unshift) = @_;
 
   #my $plugin = shift;  # see comment in Plugin.pm:register_hook
 
   $self->{_hooks} = $Qpsmtpd::_hooks;
   my $hooks = $self->{_hooks};
-  push @{$hooks->{$hook}}, $code;
+  if ($unshift) {
+    unshift @{$hooks->{$hook}}, $code;
+  }
+  else {
+    push @{$hooks->{$hook}}, $code;
+  }
 }
 
 1;
