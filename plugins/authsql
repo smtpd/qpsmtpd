@@ -1,0 +1,116 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+authsql - Authenticate to vpopmail via MySQL
+
+=head1 DESCRIPTION
+
+This plugin authenticates vpopmail users directly against a standard
+vpopmail MySQL database.  It makes the not-unreasonable assumption that
+both pw_name and pw_domain are lowercase only (qmail doesn't actually care).
+It also requires that vpopmail be built with the recommended 
+'--enable-clear-passwd=y' option, because there is no other way to compare
+the password with CRAM-MD5.
+
+=head1 CONFIGURATION
+
+Decide which authentication methods you are willing to support and uncomment
+the lines in the register() sub.  See the POD for Qspmtpd::Auth for more
+details on the ramifications of supporting various authentication methods.
+Then, change the database information at the top of the authsql() sub so that
+the module can access the database.  This can be a read-only account since 
+the plugin does not update the last accessed time (yet, see below).
+
+The remote user must login with a fully qualified e-mail address (i.e. both
+account name and domain), even if they don't normally need to.  This is 
+because the vpopmail table has a unique index on pw_name/pw_domain, and this
+module requires that only a single record be returned from the database.
+
+=head1 FUTURE DIRECTION
+
+The default MySQL configuration for vpopmail includes a table to log access,
+lastauth, which could conceivably be updated upon sucessful authentication.
+The addition of this feature is left as an exercise for someone who cares. ;)
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2004 John Peacock
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+
+=cut
+
+sub register {
+    my ( $self, $qp ) = @_;
+
+    $self->register_hook( "auth-plain", "authsql" );
+
+    #  $self->register_hook("auth-cram-md5", "authsql");
+
+}
+
+sub authsql {
+    use DBI;
+    use Qpsmtpd::Constants;
+    use Digest::HMAC_MD5 qw(hmac_md5_hex);
+
+#    $DB::single = 1;
+
+    my $connect  = "dbi:mysql:dbname=vpopmail";
+    my $dbuser   = "vpopmailuser";
+    my $dbpasswd = "**********";
+
+    my $dbh = DBI->connect( $connect, $dbuser, $dbpasswd );
+    $dbh->{ShowErrorStatement} = 1;
+
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
+      @_;
+    my ( $pw_name, $pw_domain ) = split "@", lc($user);
+
+    unless ( defined $pw_domain ) {
+        return DECLINED;
+    }
+
+    my $sth = $dbh->prepare(<<SQL);
+select pw_clear_passwd
+from vpopmail
+where pw_name = ? and pw_domain = ?
+SQL
+
+    $sth->execute( $pw_name, $pw_domain );
+
+    my ($pw_clear_passwd) = $sth->fetchrow_array;
+
+    $sth->finish;
+    $dbh->disconnect;
+
+    unless ( defined $pw_clear_passwd ) {
+
+        # if this isn't defined then the user doesn't exist here
+        # or the administrator forgot to build with --enable-clear-passwd=y
+        return ( DECLINED, "authsql/$method" );
+    }
+
+    # at this point we can assume the user name matched
+    if (
+        ( defined $passClear
+            and $pw_clear_passwd eq $passClear ) or
+        ( defined $passHash
+            and $passHash eq hmac_md5_hex( $ticket, $pw_clear_passwd ) )
+      )
+    {
+
+        return ( OK, "authsql/$method" );
+    }
+    else {
+        return ( DENY, "authsql/$method - wrong password" );
+    }
+}
+

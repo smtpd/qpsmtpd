@@ -10,6 +10,7 @@ use Qpsmtpd::Connection;
 use Qpsmtpd::Transaction;
 use Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Auth;
 
 use Mail::Address ();
 use Mail::Header ();
@@ -165,6 +166,25 @@ sub ehlo {
     my @capabilities = $self->transaction->notes('capabilities')
                         ? @{ $self->transaction->notes('capabilities') }
 			: ();  
+
+    # Check for possible AUTH mechanisms
+    my %auth_mechanisms;
+HOOK: foreach my $hook ( keys %{$self->{_hooks}} ) {
+        if ( $hook =~ m/^auth-?(.+)?$/ ) {
+            if ( defined $1 ) {
+                $auth_mechanisms{uc($1)} = 1;
+            }
+            else { # at least one polymorphous auth provider
+                %auth_mechanisms = map {$_,1} qw(PLAIN CRAM-MD5);
+                last HOOK;
+            }
+        }
+    }
+
+    if ( %auth_mechanisms ) {
+        push @capabilities, 'AUTH '.join(" ",keys(%auth_mechanisms));    
+        $self->{_commands}->{'auth'} = "";
+    }
 
     $self->respond(250,
 		 $self->config("me") . " Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]",
@@ -415,6 +435,10 @@ sub data {
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
 
+  # only true if client authenticated
+  if ( defined $self->{_auth} and $self->{_auth} == OK ) { 
+    $header->add("X-Qpsmtpd-Auth","True");
+  }
 
   $header->add("Received", "from ".$self->connection->remote_info
                ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip

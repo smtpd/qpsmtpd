@@ -3,6 +3,7 @@ use strict;
 
 my %hooks = map { $_ => 1 } qw(
     config  queue  data_post  quit  rcpt  mail  ehlo  helo
+    auth auth-plain auth-login auth-cram-md5
     connect  reset_transaction  unrecognized_command  disconnect
 );
 
