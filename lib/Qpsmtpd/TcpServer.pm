@@ -18,6 +18,7 @@ sub start_connection {
     my $remote_host = $ENV{TCPREMOTEHOST} || ( $ENV{TCPREMOTEIP} ? "[$ENV{TCPREMOTEIP}]" : "[noip!]");
     my $remote_info = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
     my $remote_ip   = $ENV{TCPREMOTEIP};
+    $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
 
     # if the local dns resolver doesn't filter it out we might get
     # ansi escape characters that could make a ps axw do "funny"
@@ -67,7 +68,7 @@ sub respond {
   my ($self, $code, @messages) = @_;
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
-    $self->log(LOGDEBUG, "$line");
+    $self->log(LOGDEBUG, $line);
     print "$line\r\n" or ($self->log(LOGERROR, "Could not print [$line]: $!"), return 0);
   }
   return 1;
