@@ -98,7 +98,7 @@ sub check_spam {
   my $paddr   = sockaddr_in($port, $iaddr);
 
   my $proto   = getprotobyname('tcp');
-  if ( $self->{_args}->{spamd_socket} =~ /^([\w\/.]+)$/ ) { # connect to Unix Domain Socket
+  if ( $self->{_args}->{spamd_socket} =~ /^([\w\/.-]+)$/ ) { # connect to Unix Domain Socket
     my $spamd_socket = $1;
     
     socket(SPAMD, PF_UNIX, SOCK_STREAM, 0)
