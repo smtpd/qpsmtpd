@@ -219,7 +219,6 @@ sub data {
   $self->respond(503, "MAIL first"), return 1 unless $self->transaction->sender;
   $self->respond(503, "RCPT first"), return 1 unless $self->transaction->recipients;
   $self->respond(354, "go ahead");
-  print "Setting indata for " . $self->client . "\n";
   $indata{$self->client()} = 1;
   $self->{__buffer} = '';
   $self->{__size} = 0;
