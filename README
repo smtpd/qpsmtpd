@@ -111,6 +111,12 @@ http://search.cpan.org/search?dist=PPerl
 subsequent executions extremely fast. It forks several processes for
 each script, allowing many processes to call the script at once."
 
+Running under PPerl is easy - just change your "run" file to contain
+the following command:
+
+  pperl -Tw -- --prefork=$MAXCLIENTS --maxclients=$MAXCLIENTS \
+    --no-cleanup ./qpsmtpd 2>&1
+
 =head1 Plugins
 
 The qpsmtpd core only implements the SMTP protocol.  No useful
