@@ -19,6 +19,8 @@ use Time::HiRes qw(gettimeofday);
 sub register {
   my ($self, $qp, @args) = @_;
 
+  # TODO: support per user/domain/? maildirs
+
   if (@args > 0) {
     ($self->{_maildir}) = ($args[0] =~ m!([/\w\.]+)!);
   }
@@ -50,6 +52,10 @@ sub queue_handler {
   my $unique  = "P$$" . "M$microseconds" . "Q" . $maildir_counter++;
   my $file    = join ".", $time, $unique, $self->{_hostname};
   my $maildir = $self->{_maildir};
+
+  # TODO: deliver the mail once per recipient instead 
+  $transaction->header->add('Delivered-To', $_->address, 0)
+    for $transaction->recipients;
 
   open (MF, ">$maildir/tmp/$file") or 
     $self->log(LOGWARN, "could not open $maildir/tmp/$file: $!"),

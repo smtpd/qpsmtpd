@@ -2,6 +2,9 @@
 
   [ many changes from cvs logs, gah ]
 
+  Improve error messages from the Postfix module (Erik I. Bolsø,
+  <knan at mo.himolde.no>)
+
   Mail::Address does RFC822 addresses, we need SMTP addresses.
   Replace Mail::Address with Peter J. Holzer's Qpsmtpd::Address module.
 

@@ -93,6 +93,7 @@ sub open_cleanup {
   my ($class) = @_;
   my $self = IO::Socket::UNIX->new(Type => SOCK_STREAM,
   				   Peer => "/var/spool/postfix/public/cleanup");
+  die qq[Couldn't open unix socket "/var/spool/postfix/public/cleanup": $!] unless ref $self;
   bless ($self, $class);
   $self->init();
   return $self;
