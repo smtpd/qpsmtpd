@@ -1,3 +1,7 @@
+Matt Sergeant <matt@sergeant.org>: Clamav plugin.
+
+Robert Spier <robert@perl.org>: Klez filter.
+
 Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
 the connection gets dropped at the wrong moment.  Support and enable
 taint checking. MAIL FROM host dns check configurable.
