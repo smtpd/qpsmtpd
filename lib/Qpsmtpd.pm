@@ -273,7 +273,12 @@ sub quit {
   if ($rc != DONE) {
     $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day.");
   }
-  exit;
+  $self->disconnect();
+}
+
+sub disconnect {
+  my $self = shift;
+  $self->run_hooks("disconnect");
 }
 
 sub data {

@@ -52,5 +52,10 @@ sub respond {
   return 1;
 }
 
+sub disconnect {
+  my $self = shift;
+  $self->SUPER::disconnect(@_);
+  exit;
+}
 
 1;

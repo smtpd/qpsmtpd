@@ -85,3 +85,11 @@ Allowed return codes:
 
 All other codes will qpsmtpd do the default response.
 
+
+=head2 disconnect
+
+Called just before we shutdown a connection.
+
+The return code is ignored.  If a plugin returns anything but DECLINED
+the following plugins will not be run (like with all other hooks).
+
