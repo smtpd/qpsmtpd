@@ -13,7 +13,6 @@ use Qpsmtpd::Constants;
 
 use Mail::Address ();
 use Mail::Header ();
-use IPC::Open2;
 #use Data::Dumper;
 use POSIX qw(strftime);
 use Net::DNS;
@@ -291,7 +290,7 @@ sub help {
   $self->respond(214, 
 	  "This is qpsmtpd " . $self->version,
 	  "See http://develooper.com/code/qpsmtpd/",
-	  'To report bugs or send comments, mail to <ask@perl.org>.');
+	  'To report bugs or send comments, mail to <ask@develooper.com>.');
 }
 
 sub noop {
@@ -348,8 +347,9 @@ sub data {
   while (<STDIN>) {
     $complete++, last if $_ eq ".\r\n";
     $i++;
-    $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
-      if $_ eq ".\n";
+    $_ eq ".\n" 
+      and $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html")
+      and $self->disconnect;
     # add a transaction->blocked check back here when we have line by line plugin access...
     unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
