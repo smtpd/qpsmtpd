@@ -1,7 +1,37 @@
+=head1 NAME
+
+qmail-queue
+
+=head1 DESCRIPTION
+
+This is the most common plugin used to queue incoming mails.  A
+variation of this plugin would maybe forward the mail via smtp.
+
+=head1 CONFIG
+
+It takes one optional parameter, the location of qmail-queue.  This
+makes it easy to use a qmail-queue replacement.
+
+  queue/qmail-queue  /var/qmail/bin/another-qmail-queue
+
+If set the environment variable QMAILQUEUE overrides this setting.
+
+
+=cut
 
 sub register {
-  my ($self, $qp) = @_;
+  my ($self, $qp, @args) = @_;
   $self->register_hook("queue", "queue_handler");
+
+  if (@args > 0) {
+    $self->{_queue_exec} = $args[0];
+    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+  } else {
+    $self->{_queue_exec} = "/var/qmail/bin/qmail-queue";
+  }
+
+  $self->{_queue_exec} = $ENV{QMAILQUEUE} if $ENV{QMAILQUEUE};
+
 }
 
 sub queue_handler {
@@ -44,14 +74,34 @@ sub queue_handler {
   }
   elsif (defined $child) {
     # Child
-    close MESSAGE_WRITER or die "could not close message writer in parent";
-    close ENVELOPE_WRITER or die "could not close envelope writer in parent";
+    close MESSAGE_WRITER or exit 1;
+    close ENVELOPE_WRITER or exit 2;
     
-    open(STDIN, "<&MESSAGE_READER") or die "b1";
-    open(STDOUT, "<&ENVELOPE_READER") or die "b2";
-    
-    unless (exec '/var/qmail/bin/qmail-queue') {
-      return (DECLINED, "fatal error spawning qmail-queue");
+    # Untaint $self->{_queue_exec}
+    my $queue_exec = $self->{_queue_exec};
+    if ($queue_exec =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+      $queue_exec = $1;
+    } else {
+      $self->log(1, "FATAL ERROR: Unexpected characters in qmail-queue plugin argument");
+      exit 3;
     }
+
+    # save the original STDIN and STDOUT
+    open(SAVE_STDIN, "<&STDIN");
+    open(SAVE_STDOUT, ">&STDOUT");
+
+    # what are those exit values for?  Why don't we die with a useful error message?
+    open(STDIN, "<&MESSAGE_READER") or exit 4;
+    open(STDOUT, "<&ENVELOPE_READER") or exit 5;
+
+    $self->log(7, "Queuing to $queue_exec");
+
+    my $rc = exec $queue_exec;
+
+    # restore the original STDIN and STDOUT
+    open(STDIN, "<&SAVE_STDIN");
+    open(STDOUT, ">&SAVE_STDOUT");
+
+    exit 6 if not $rc;
   }
 }
