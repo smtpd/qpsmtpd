@@ -1,4 +1,4 @@
-0.21-dev
+0.25 - 2003/03/18
 
   Use the proper RFC2822 date format in the Received headers. (Somehow
   I had convinced myself that ISO8601 dates were okay). Thanks to
@@ -7,22 +7,36 @@
   Print the date in the local timezone instead of in -0000. (Not
   entirely convinced this is a good idea)
 
-  The following major changes in the this release where by Rasjid
-  Wilcox <rasjidw@openminddev.net>.
+  Lots of changes from Rasjid Wilcox <rasjidw@openminddev.net>:
 
-  Fix error handling in queue/qmail-queue.
-
+  Fix error handling in queue/qmail-queue. (Rasjid)
+ 
   Add option to queue/qmail-queue to specify an alternate qmail-queue
-  location.
+  location. (Rasjid)
 
-  Add support for the QMAILQUEUE environment variable.
+  Add support for the QMAILQUEUE environment variable. (Rasjid)
 
-  PPerl compatibility (yay!)
+  PPerl compatibility (yay!)  (Rasjid)
 
-  Allow mail to <abuse> and <postmaster> to go through
+  Allow mail to <abuse> and <postmaster> to go through. (Rasjid)
 
   Add "deny" hook that gets called when another hook returns DENY or
-  DENYSOFT.
+  DENYSOFT. (Rasjid)
+
+  Add list of required modules to the README. Thanks to Skaag Argonius
+  <skaag@skaag.net>.
+
+  Fix dnsbl plugin to give us all the results. (Patch from Matt
+  Sergeant <matt@sergeant.org>)
+
+  Disable identd lookups by passing -R to tcpserver. (Thanks to Matt)
+
+  add plugin hooks for HELO and EHLO (Devin Carraway
+  <qpsmtpd-list@devin.com>)
+
+  check_spamhelo plugin to deny mail from claimed senders from the
+  list specified in F<badhelo>.  (For example aol.com or yahoo.com) 
+  (Devin Carraway)
 
 
 0.20 - 2002/12/09
