@@ -11,7 +11,7 @@ use Qpsmtpd::TcpServer;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use Socket;
-use POSIX qw(:sys_wait_h);
+use POSIX qw(:sys_wait_h :errno_h :signal_h);
 use strict;
 $| = 1;
 
@@ -19,8 +19,19 @@ delete $ENV{ENV};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 
 sub REAPER {
-    1 until (-1 == waitpid(-1, WNOHANG));
-    $SIG{CHLD} = \&REAPER;                 # unless $] >= 5.002
+    while (defined(my $child = waitpid(-1, WNOHANG)) ) {
+        if ($child == -1) {
+            # No child here? Loop back
+        }
+        elsif (WIFEXITED($?)) {
+            # Process exited
+            last;
+        }
+        else {
+            # Possibly SIGSTOP on child...
+            last;
+        }
+    }
 }
 
 $SIG{CHLD} = \&REAPER;
@@ -49,21 +60,28 @@ $plugin_loader->load_plugins;
 
 # $plugin_loader->log(LOGINFO, "Listening on port 25");
 
-my $client;
 while (1) {
-    my $hisaddr = accept($client, $server);
+    my $hisaddr = accept(my $client, $server);
     if (!$hisaddr) {
         # possible something condition...
         next;
     }
     my $pid = fork;
-    next if $pid;
+    if ($pid) {
+        close($client);
+        next;
+    }
     die "fork: $!" unless defined $pid;     # failure
     # otherwise child
-    close($server);                          # no use to child
 
-    $SIG{CHLD} = 'DEFAULT';
+    close($server);
+
+    $SIG{CHLD} = $SIG{HUP} = $SIG{PIPE} = $SIG{INT} = 
+        $SIG{TERM} = $SIG{QUIT} = 'DEFAULT';
     
+    my $localsockaddr = getsockname($client);
+    my ($lport, $laddr) = sockaddr_in($localsockaddr);
+    $ENV{TCPLOCALIP} = inet_ntoa($laddr);
     my ($port, $iaddr) = sockaddr_in($hisaddr);
     $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
     $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
@@ -77,8 +95,6 @@ while (1) {
     $qpsmtpd->run();
 
     exit;                                   # child leaves
-} continue { 
-    close($client);                          # no use to parent
 }
 
 __END__
