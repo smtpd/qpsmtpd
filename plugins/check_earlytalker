@@ -1,0 +1,42 @@
+=head1 NAME
+
+check_earlytalker - Check that the client doesn't talk before we send the SMTP banner
+
+=head1 DESCRIPTION
+
+Hooks connect, checks to see if the remote host starts talking before
+we've issued a 2xx greeting.  If so, we're likely looking at a
+direct-to-MX spam agent which pipelines its entire SMTP conversation,
+and will happily dump an entire spam into our mail log even if later
+tests deny acceptance.
+
+Such clients gets a 450 error code.  
+
+=head1 TODO
+
+Make how long we wait before reading from the socket configurable
+(currently 1 second)
+
+Make the soft/hard response code configurable (currently DENYSOFT)
+
+=cut
+
+use IO::Select;
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook('connect', 'connect_handler');
+}
+
+sub connect_handler {
+  my ($self, $transaction) = @_;
+  my $in = new IO::Select;
+  
+  $in->add(\*STDIN) || return DECLINED;
+  if ($in->can_read(1)) {
+    $self->log(1, "remote host started talking before we said hello");
+    return (DENYSOFT, "Don't be rude and talk before I say hello!");
+  }
+  $self->log(10,"remote host said nothing spontaneous, proceeding");
+  return DECLINED;
+}
