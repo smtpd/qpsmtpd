@@ -35,6 +35,9 @@ sub connect_handler {
   # results in the first rcpt handler ... oh well.
 
   my $res = new Net::DNS::Resolver;
+  $res->tcp_timeout(30);
+  $res->udp_timeout(30);
+
   my $sel = IO::Select->new();
 
   for my $dnsbl (keys %dnsbl_zones) {

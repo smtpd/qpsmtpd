@@ -94,7 +94,7 @@ sub register {
 sub check_spam {
   my ($self, $transaction) = @_;
 
-  $self->log(6, "check_spam");
+  $self->log(LOGDEBUG, "check_spam");
   return (DECLINED) if $transaction->body_size > 500_000;
 
   my $leave_old_headers = lc($self->{_args}->{leave_old_headers}) || 'rename';
@@ -129,8 +129,12 @@ sub check_spam {
   SPAMD->autoflush(1);
   
   $transaction->body_resetpos;
-  
-  print SPAMD "SYMBOLS SPAMC/1.0" . CRLF;
+  my $username = getpwuid($>);
+
+  print SPAMD "SYMBOLS SPAMC/1.3" . CRLF;
+  print SPAMD "User: $username" . CRLF;
+       # Content-Length: 
+  print SPAMD  CRLF;
   # or CHECK or REPORT or SYMBOLS
 
   print SPAMD "X-Envelope-From: ", $transaction->sender->format, CRLF
@@ -150,10 +154,10 @@ sub check_spam {
 
   print SPAMD CRLF;
   shutdown(SPAMD, 1);
-  $self->log(6, "check_spam: finished sending to spamd");
+  $self->log(LOGDEBUG, "check_spam: finished sending to spamd");
   my $line0 = <SPAMD>; # get the first protocol lines out
   if ($line0) {
-    $self->log(6, "check_spam: spamd: $line0");
+    $self->log(LOGDEBUG, "check_spam: spamd: $line0");
 
     if ( $leave_old_headers eq 'rename' )
     {
@@ -173,7 +177,7 @@ sub check_spam {
 
   my ($flag, $hits, $required);
   while (<SPAMD>) {
-    $self->log(6, "check_spam: spamd: $_");
+    $self->log(LOGDEBUG, "check_spam: spamd: $_");
     #warn "GOT FROM SPAMD1: $_";
     last unless m/\S/;
     if (m{Spam: (True|False) ; (-?\d+\.\d) / (-?\d+\.\d)}) {
@@ -184,7 +188,7 @@ sub check_spam {
   my $tests = <SPAMD>;
   $tests =~ s/\015//;  # hack for outlook
   $flag = $flag eq 'True' ? 'Yes' : 'No';
-  $self->log(6, "check_spam: finished reading from spamd");
+  $self->log(LOGDEBUG, "check_spam: finished reading from spamd");
 
   if ( $leave_old_headers eq 'rename' )
   {
@@ -218,14 +222,14 @@ sub check_spam {
 sub check_spam_reject {
   my ($self, $transaction) = @_;
 
-  $self->log(6, "check_spam_reject: reject_threshold=" . $self->{_args}->{reject_threshold});
+  $self->log(LOGDEBUG, "check_spam_reject: reject_threshold=" . $self->{_args}->{reject_threshold});
   my $score = $self->get_spam_score($transaction) or return DECLINED;  
-  $self->log(6, "check_spam_reject: score=$score");
+  $self->log(LOGDEBUG, "check_spam_reject: score=$score");
 
   return (DENY, "spam score exceeded threshold")
     if $score >= $self->{_args}->{reject_threshold};
 
-  $self->log(6, "check_spam_reject: passed");
+  $self->log(LOGDEBUG, "check_spam_reject: passed");
   return DECLINED;
 }
 

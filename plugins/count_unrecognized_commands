@@ -41,7 +41,7 @@ sub check_unrec_cmd {
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {
     $self->log(LOGINFO, "Closing connection. Too many unrecognized commands.");
-    return (DENY, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
+    return (DENYHARD, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
   }
 
   return DECLINED;
