@@ -94,8 +94,12 @@ SQL
     $sth->finish;
     $dbh->disconnect;
 
-    my $pw_clear_passwd = $passwd_hash->{'pw_clear_passwd'};
-    my $pw_passwd = $passwd_hash->{'pw_passwd'};
+    # if vpopmail was not built with '--enable-clear-passwd=y'
+    # then pw_clear_passwd may not even exist
+    my $pw_clear_passwd = exists $passwd_hash->{'pw_clear_passwd'} 
+                               ? $passwd_hash->{'pw_clear_passwd'} 
+			       : undef;
+    my $pw_passwd = $passwd_hash->{'pw_passwd'}; # this is always present
 
     if ( # clear_passwd isn't defined so we cannot support CRAM-MD5
          ( $method =~ /CRAM-MD5/i and not defined $pw_clear_passwd )
