@@ -1,5 +1,7 @@
 0.20 - development
 
+  Add -p to mkdir in log/run (Rasjid Wilcox <rasjid@openminddev.net>)
+
   clamav plugin, thanks to Matt Sergeant, matt@sergeant.org.
   Enabling this might require you to increase your "softlimit" in
   the run file.  http://www.clamav.org/
