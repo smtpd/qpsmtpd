@@ -1,0 +1,75 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+auth_flat_file - simple CRAM MD5 auth plugin using a flat password file
+
+=head1 SYNOPSIS
+
+in config/plugins:
+
+  auth/auth_flat_file
+
+in config/flat_auth_pw
+
+  username1:password1
+  username2:password2
+  ...
+
+=head1 DESCRIPTION
+
+This plugin implements a very simple authentication plugin using a flat password
+file containing username and password separated by colons.
+
+Note that this plugin enforces the use of a full email address (including
+@domain) as the username. There's no particular reason for this so feel free
+to modify the code to suit your setup.
+
+The password is stored on disk unencrypted, however authentication uses a HMAC
+algorithm so no password is transfered in the clear.
+
+=cut
+
+use Digest::HMAC_MD5 qw(hmac_md5_hex);
+
+sub register {
+    my ( $self, $qp ) = @_;
+
+    $self->register_hook("auth-cram-md5", "authsql");
+}
+
+sub authsql {
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
+      @_;
+
+    my ( $pw_name, $pw_domain ) = split "@", lc($user);
+
+    unless ( defined $pw_domain ) {
+        return DECLINED;
+    }
+
+    $self->log(LOGINFO, "Authentication for: $pw_name\@$pw_domain");
+
+    my ($auth_line) = grep {/^$pw_name\@$pw_domain:/} $self->qp->config('flat_auth_pw');
+    
+    unless (defined $auth_line) {
+        return DECLINED;
+    }
+    
+    my ($auth_user, $auth_pass) = split(/:/, $auth_line, 2);
+    
+    # at this point we can assume the user name matched
+    if (
+        ( defined $passClear
+            and $auth_pass eq $passClear ) or
+        ( defined $passHash
+            and $passHash eq hmac_md5_hex($ticket, $auth_pass) )
+      )
+    {
+        return ( OK, "authflat/$method" );
+    }
+    else {
+        return ( DENY, "authflat/$method - wrong password" );
+    }
+}
+
