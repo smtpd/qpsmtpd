@@ -18,7 +18,7 @@ $| = 1;
 
 # Configuration
 my $MAXCONN   = 15;				# max simultaneous connections
-my $PORT      = 25;				# port number
+my $PORT      = 2525;				# port number
 my $LOCALADDR = '0.0.0.0';		# ip address to bind to
 my $USER      = 'smtpd';		# user to suid to
 my $MAXCONNIP = 5;              # max simultaneous connections from one IP
@@ -141,11 +141,9 @@ while (1) {
     }
     die "fork: $!" unless defined $pid;     # failure
     # otherwise child
-    
-    ## call srand(), else we will have (e.g.) the same tempfile in
-    ## _all_ children 
-    ## i.e. after 'use File::Temp; ($fh,$name)=tempfile();' in a plugin
-    srand( ($$ ^ $port) ^ (time ^ unpack("C*", $iaddr)) );
+
+    # all children should have different seeds, to prevent conflicts
+    srand( time ^ ($$ + ($$ << 15)) );
 
     close($server);
 
