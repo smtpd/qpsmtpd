@@ -214,6 +214,14 @@ package Qpsmtpd::Auth;
 use Qpsmtpd::Constants;
 use MIME::Base64;
 
+sub e64
+{
+  my ($arg) = @_;
+  my $res = encode_base64($arg);
+  chomp($res);
+  return($res);
+}
+
 sub Qpsmtpd::SMTP::auth {
     my ( $self, $arg, @stuff ) = @_;
 
@@ -235,59 +243,39 @@ sub SASL {
     $mechanism = lc($mechanism);
 
     if ( $mechanism eq "plain" ) {
-        if ($prekey) {
-            ( $passHash, $user, $passClear ) = split /\x0/,
-              decode_base64($prekey);
+        if (!$prekey) {
+          $session->respond( 334, "Please continue" );
+          $prekey= <>;
         }
-        else {
-
-            $session->respond( 334, "Username:" );
-
-            # We read the username and password from STDIN
-            $user = <>;
-            chop($user);
-            chop($user);
-            if ( $user eq '*' ) {
-                $session->respond( 501, "Authentification canceled" );
-                return DECLINED;
-            }
-
-            $session->respond( 334, "Password:" );
-            $passClear = <>;
-            chop($passClear);
-            chop($passClear);
-            if ( $passClear eq '*' ) {
-                $session->respond( 501, "Authentification canceled" );
-                return DECLINED;
-            }
-        }
+        ( $passHash, $user, $passClear ) = split /\x0/,
+          decode_base64($prekey);
 
     }
+    elsif ($mechanism eq "login") {
 
-    #  elsif ($mechanism eq "login") {
-    #    if ( $prekey ) {
-    #      ($passHash, $user, $passClear) = split /\x0/, decode_base64($prekey);
-    #    }
-    #    else {
-    #
-    #      $session->respond(334, encode_base64("User Name:"));
-    #      $user = decode_base64(<>);
-    #      #warn("Debug: User: '$user'");
-    #      if ($user eq '*') {
-    #  	$session->respond(501, "Authentification canceled");
-    #  	return DECLINED;
-    #      }
-    #
-    #      $session->respond(334, encode_base64("Password:"));
-    #      $passClear = <>;
-    #      $passClear = decode_base64($passClear);
-    #      #warn("Debug: Pass: '$pass'");
-    #      if ($passClear eq '*') {
-    #  	$session->respond(501, "Authentification canceled");
-    #  	return DECLINED;
-    #      }
-    #    }
-    #  }
+        if ( $prekey ) {
+          ($passHash, $user, $passClear) = split /\x0/, decode_base64($prekey);
+        }
+        else {
+    
+          $session->respond(334, e64("Username:"));
+          $user = decode_base64(<>);
+          #warn("Debug: User: '$user'");
+          if ($user eq '*') {
+            $session->respond(501, "Authentification canceled");
+            return DECLINED;
+          }
+    
+          $session->respond(334, e64("Password:"));
+          $passClear = <>;
+          $passClear = decode_base64($passClear);
+          #warn("Debug: Pass: '$pass'");
+          if ($passClear eq '*') {
+            $session->respond(501, "Authentification canceled");
+            return DECLINED;
+          }
+        }
+    }
     elsif ( $mechanism eq "cram-md5" ) {
 
         # rand() is not cryptographic, but we only need to generate a globally
