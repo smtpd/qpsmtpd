@@ -239,7 +239,7 @@ sub mail {
     ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
       unless $from;
 
-    $self->log(LOGWARN, "from email address : [$from]");
+    $self->log(LOGALERT, "from email address : [$from]");
 
     if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
       $from = Qpsmtpd::Address->new("<>");
@@ -290,7 +290,7 @@ sub rcpt {
 
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
-  $self->log(LOGWARN, "to email address : [$rcpt]");
+  $self->log(LOGALERT, "to email address : [$rcpt]");
   $rcpt = (Qpsmtpd::Address->parse($rcpt))[0];
 
   return $self->respond(501, "could not parse recipient") unless $rcpt;

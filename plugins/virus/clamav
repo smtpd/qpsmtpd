@@ -163,7 +163,7 @@ sub clam_scan {
 
   my $filename = $transaction->body_filename;
   unless (defined $filename) {
-        $self->log(LOGERROR, "didn't get a filename");
+        $self->log(LOGWARN, "didn't get a filename");
         return DECLINED;
   }
   my $mode = (stat($self->{_spool_dir}))[2];

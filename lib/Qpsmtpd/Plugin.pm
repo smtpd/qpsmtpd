@@ -5,7 +5,7 @@ our %hooks = map { $_ => 1 } qw(
     config  queue  data  data_post  quit  rcpt  mail  ehlo  helo
     auth auth-plain auth-login auth-cram-md5
     connect  reset_transaction  unrecognized_command  disconnect
-    deny
+    deny logging ok
 );
 
 sub new {
@@ -21,7 +21,7 @@ sub register_hook {
 
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
-  $plugin->qp->_register_hook($hook, { code => sub { local $plugin->{_qp} = shift; $plugin->$method(@_) },
+  $plugin->qp->_register_hook($hook, { code => sub { local $plugin->{_qp} = shift; local $plugin->{_hook} = $hook; $plugin->$method(@_) },
 				       name => $plugin->plugin_name,
 				     },
 				     $unshift,
@@ -41,7 +41,8 @@ sub qp {
 
 sub log {
   my $self = shift;
-  $self->qp->log(shift, $self->plugin_name . " plugin: " . shift, @_);
+  $self->qp->varlog(shift, $self->hook_name, $self->plugin_name, @_)
+    unless defined $self->hook_name and $self->hook_name eq 'logging';
 }
 
 sub transaction {
@@ -124,6 +125,7 @@ sub compile {
 		    '@ISA = qw(Qpsmtpd::Plugin);',
 		    ($test_mode ? 'use Test::More;' : ''),
 		    "sub plugin_name { qq[$plugin] }",
+		    "sub hook_name { return shift->{_hook}; }",
 		    $line,
 		    $sub,
 		    "\n", # last line comment without newline?

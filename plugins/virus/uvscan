@@ -64,7 +64,7 @@ sub uvscan {
   unless ( $content_type
       && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
   {
-      $self->log( LOGERROR, "non-multipart mail - skipping" );
+      $self->log( LOGWARN, "non-multipart mail - skipping" );
       return DECLINED;
   }
 

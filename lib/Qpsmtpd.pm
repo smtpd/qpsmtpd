@@ -1,37 +1,85 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $LogLevel);
+use vars qw($VERSION $Logger $LogLevel $Spool_dir);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
 $VERSION = "0.30-dev";
-sub TRACE_LEVEL { $LogLevel }
 
 sub version { $VERSION };
 
-sub init_logger {
-    my $self = shift;
-    # Get the loglevel - we localise loglevel to zero while we do this
-    my $loglevel = do {
-        local $LogLevel = 0;
-        $self->config("loglevel");
-    };
-    if (defined($loglevel) and $loglevel =~ /^\d+$/) {
-        $LogLevel = $loglevel;
-    }
-    else {
-        $LogLevel = LOGWARN; # Default if no loglevel file found.
-    }
-    return $LogLevel;
+sub TRACE_LEVEL { log_level(); }; # leave for plugin compatibility
+
+sub load_logging {
+  # need to do this differently that other plugins so as to 
+  # not trigger logging activity
+  my $self = shift;
+  return if $self->{hooks}->{"logging"};
+  my $configdir = $self->config_dir("logging");
+  my $configfile = "$configdir/logging";
+  my @loggers = $self->_config_from_file($configfile,'logging');
+  my $dir = $self->plugin_dir;
+
+  $self->_load_plugins($dir, @loggers);
+
+  foreach my $logger (@loggers) {
+    $self->log(LOGINFO, "Loaded $logger");
+  }
+  
+  return @loggers;
+}
+  
+sub log_level {
+  my $self = shift;
+  return $LogLevel if $LogLevel;
+
+  my $configdir = $self->config_dir("loglevel");
+  my $configfile = "$configdir/loglevel";
+  my ($loglevel) = $self->_config_from_file($configfile,'loglevel');
+
+  if (defined($loglevel) and $loglevel =~ /^\d+$/) {
+    $LogLevel = $loglevel;
+  }
+  else {
+    $LogLevel = LOGWARN; # Default if no loglevel file found.
+  }
+
+  $self->log(LOGINFO, "Loaded default logger");
+
+  return $LogLevel;
 }
 
 sub log {
   my ($self, $trace, @log) = @_;
-  my $level = TRACE_LEVEL();
-  $level = $self->init_logger unless defined $level;
-  warn join(" ", $$, @log), "\n"
-    if $trace <= $level;
+  $self->varlog($trace,join(" ",@log));
+}
+
+sub varlog {
+  my ($self, $trace) = (shift,shift);
+  my ($hook, $plugin, @log);
+  if ( $#_ == 0 ) { # log itself
+    (@log) = @_;
+  }
+  elsif ( $#_ == 1 ) { # plus the hook
+    ($hook, @log) = @_;
+  }
+  else { # called from plugin
+    ($hook, $plugin, @log) = @_;
+  }
+
+  $self->load_logging; # in case we already don't have this loaded yet
+
+  my ($rc) = $self->run_hooks("logging", $trace, $hook, $plugin, @log);
+
+  unless ( $rc and $rc == DECLINED or $rc == OK ) {
+    # no logging plugins registered so fall back to STDERR
+    warn join(" ", $$ .
+      (defined $plugin ? " $plugin plugin:" : 
+       defined $hook   ? " running plugin ($hook):"  : ""),
+      @log), "\n"
+    if $trace <= $self->log_level();
+  }
 }
 
 #
@@ -141,9 +189,8 @@ sub _load_plugins {
   my ($dir, @plugins) = @_;
 
   my @ret;  
-  for my $plugin (@plugins) {
-    $self->log(LOGDEBUG, "Loading $plugin");
-    ($plugin, my @args) = split /\s+/, $plugin;
+  for my $plugin_line (@plugins) {
+    my ($plugin, @args) = split /\s+/, $plugin_line;
     
     if (lc($plugin) eq '$include') {
       my $inc = shift @args;
@@ -184,8 +231,12 @@ sub _load_plugins {
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     # don't reload plugins if they are already loaded
-    Qpsmtpd::Plugin->compile($plugin_name, $package, "$dir/$plugin", $self->{_test_mode}) unless
-        defined &{"${package}::register"};
+    unless ( defined &{"${package}::register"} ) {
+      Qpsmtpd::Plugin->compile($plugin_name,
+        $package, "$dir/$plugin", $self->{_test_mode});
+      $self->log(LOGDEBUG, "Loading $plugin_line") 
+        unless $plugin_line =~ /logging/;
+    }
     
     my $plug = $package->new();
     push @ret, $plug;
@@ -206,32 +257,43 @@ sub run_hooks {
   if ($hooks->{$hook}) {
     my @r;
     for my $code (@{$hooks->{$hook}}) {
-      $self->log(LOGINFO, "running plugin ($hook):", $code->{name});
-      eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-      $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
+      if ( $hook eq 'logging' ) { # without calling $self->log()
+        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
+        $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
+      }
+      else {
+        $self->varlog(LOGINFO, $hook, $code->{name});
+        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
+        $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
 
-      !defined $r[0]
-        and $self->log(LOGERROR, "plugin ".$code->{name}
-                       ."running the $hook hook returned undef!")
+        !defined $r[0]
+          and $self->log(LOGERROR, "plugin ".$code->{name}
+                         ." running the $hook hook returned undef!")
           and next;
 
-      if ($self->transaction) {
-        my $tnotes = $self->transaction->notes( $code->{name} );
-        $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $tnotes || ref $tnotes eq "HASH");
-      } else {
-        my $cnotes = $self->connection->notes( $code->{name} );
-        $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $cnotes || ref $cnotes eq "HASH");
-      }
+        if ($self->transaction) {
+          my $tnotes = $self->transaction->notes( $code->{name} );
+          $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+            if (!defined $tnotes || ref $tnotes eq "HASH");
+        } else {
+          my $cnotes = $self->connection->notes( $code->{name} );
+          $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+            if (!defined $cnotes || ref $cnotes eq "HASH");
+        }
 
-      # should we have a hook for "OK" too?
-      if ($r[0] == DENY or $r[0] == DENYSOFT or
-          $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
-      {
-        $r[1] = "" if not defined $r[1];
-        $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
-        $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+        # should we have a hook for "OK" too?
+        if ($r[0] == DENY or $r[0] == DENYSOFT or
+            $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
+        {
+          $r[1] = "" if not defined $r[1];
+          $self->log(LOGDEBUG, "Plugin ".$code->{name}.", hook $hook returned $r[0], $r[1]");
+          $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+        } else {
+          $r[1] = "" if not defined $r[1];
+          $self->log(LOGDEBUG, "Plugin ".$code->{name}.", hook $hook returned $r[0], $r[1]");
+          $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
+	}
+
       }
 
       last unless $r[0] == DECLINED;
@@ -255,35 +317,33 @@ sub _register_hook {
   }
 }
 
-my $spool_dir = "";
-
 sub spool_dir {
   my $self = shift;
 
-  unless ( $spool_dir ) { # first time through
+  unless ( $Spool_dir ) { # first time through
     $self->log(LOGINFO, "Initializing spool_dir");
-    $spool_dir = $self->config('spool_dir') 
+    $Spool_dir = $self->config('spool_dir') 
                || Qpsmtpd::Utils::tildeexp('~/tmp/');
 
-    $spool_dir .= "/" unless ($spool_dir =~ m!/$!);
+    $Spool_dir .= "/" unless ($Spool_dir =~ m!/$!);
   
-    $spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
-    $spool_dir = $1; # cleanse the taint
+    $Spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
+    $Spool_dir = $1; # cleanse the taint
 
     # Make sure the spool dir has appropriate rights
-    if (-e $spool_dir) {
-      my $mode = (stat($spool_dir))[2];
+    if (-e $Spool_dir) {
+      my $mode = (stat($Spool_dir))[2];
       $self->log(LOGWARN, 
-          "Permissions on spool_dir $spool_dir are not 0700")
+          "Permissions on spool_dir $Spool_dir are not 0700")
         if $mode & 07077;
     }
 
     # And finally, create it if it doesn't already exist
-    -d $spool_dir or mkdir($spool_dir, 0700) 
-      or die "Could not create spool_dir $spool_dir: $!";
-    }
+    -d $Spool_dir or mkdir($Spool_dir, 0700) 
+      or die "Could not create spool_dir $Spool_dir: $!";
+  }
     
-  return $spool_dir;
+  return $Spool_dir;
 }
 
 # For unique filenames. We write to a local tmp dir so we don't need
