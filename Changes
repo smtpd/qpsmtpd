@@ -1,5 +1,7 @@
 0.27 
 
+  Take out Data::Dumper to save a few bytes of memory
+
   Say Received: ... via ESMTP instead of via SMTP when the client
   speaks ESMTP.  (Hoping this can be a useful SpamAssassin rule).
 

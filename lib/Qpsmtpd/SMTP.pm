@@ -14,7 +14,7 @@ use Qpsmtpd::Constants;
 use Mail::Address ();
 use Mail::Header ();
 use IPC::Open2;
-use Data::Dumper;
+#use Data::Dumper;
 use POSIX qw(strftime);
 use Net::DNS;
 

@@ -43,7 +43,7 @@ sub http_config {
     chomp @config;
     @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
     close CF;
-    $self->log(0, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
+    # $self->log(0, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
     return (OK, @config) if @config;
   }
   return DECLINED;
