@@ -2,8 +2,7 @@
 # Copyright (c) 2001 Ask Bjoern Hansen. See the LICENSE file for details.
 # The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
 #
-# this is designed to be run under tcpserver
-# (http://cr.yp.to/ucspi-tcp.html)
+# this is designed to be run under tcpserver (http://cr.yp.to/ucspi-tcp.html)
 # or inetd if you're into that sort of thing
 #
 #
@@ -140,6 +139,7 @@ sub mail {
     return respond(501, "could not parse your mail from command") unless $from;
 
     $from->format ne "<>"
+      and get_config("require_resolvable_fromhost")
       and !check_dns($from->host)
       and return respond(450, "Could not resolve ". $from->host);
 

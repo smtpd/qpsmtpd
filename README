@@ -6,3 +6,36 @@ mailinglist:
   qpsmtpd-subscribe@perl.org
 
 
+Configuration files:
+  All configuration files goes into $DIR/config/ or /var/qmail/control/
+
+  qpsmtpd is supposed to support all the files that qmail-smtpd
+  supports and use them in the same way.  When you find that it is not
+  the case, feel free to send a patch to the mailinglist or to
+  ask@develooper.com.
+
+  Extra files you can use to configure qpsmtpd:
+
+     rhsbl_zones
+ 
+        Right hand side blocking lists, one per line. For example:
+
+           dsn.rfc-ignorant.org does not accept bounces - http://www.rfc-ignorant.org/
+
+        See http://www.rfc-ignorant.org/ for more examples.
+
+
+     dnsbl_zones
+
+        Normal ip based dns blocking lists ("RBLs"). For example:
+
+           relays.ordb.org
+	   spamsources.fabel.dk
+
+
+     require_resolvable_fromhost
+         
+        If this file contains anything but a 0 on the first line,
+        envelope senders will be checked against DNS. If an A or a MX
+        record can't be found the mail command will return a soft
+        rejection (450).

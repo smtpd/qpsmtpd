@@ -8,4 +8,9 @@
   support and enable taint checking (thanks to Devin Carraway
   <qpsmtpd@devin.com>)
 
+  Make the MAIL FROM host dns check configurable. (thanks to Devin
+  Carraway).
+
+  Add more documentation to the README file.
+  
 
