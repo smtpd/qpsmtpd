@@ -1,6 +1,6 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $Logger $LogLevel $Spool_dir);
+use vars qw($VERSION $Logger $TraceLevel $Spool_dir);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
@@ -9,7 +9,7 @@ $VERSION = "0.30-dev";
 
 sub version { $VERSION };
 
-sub TRACE_LEVEL { log_level(); }; # leave for plugin compatibility
+sub TRACE_LEVEL { trace_level(); }; # leave for plugin compatibility
 
 sub load_logging {
   # need to do this differently that other plugins so as to 
@@ -30,24 +30,24 @@ sub load_logging {
   return @loggers;
 }
   
-sub log_level {
+sub trace_level {
   my $self = shift;
-  return $LogLevel if $LogLevel;
+  return $TraceLevel if $TraceLevel;
 
   my $configdir = $self->config_dir("loglevel");
   my $configfile = "$configdir/loglevel";
-  my ($loglevel) = $self->_config_from_file($configfile,'loglevel');
+  my ($TraceLevel) = $self->_config_from_file($configfile,'loglevel');
 
-  if (defined($loglevel) and $loglevel =~ /^\d+$/) {
-    $LogLevel = $loglevel;
+  if (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
+    $TraceLevel = $TraceLevel;
   }
   else {
-    $LogLevel = LOGWARN; # Default if no loglevel file found.
+    $TraceLevel = LOGWARN; # Default if no loglevel file found.
   }
 
   $self->log(LOGINFO, "Loaded default logger");
 
-  return $LogLevel;
+  return $TraceLevel;
 }
 
 sub log {
@@ -78,7 +78,7 @@ sub varlog {
       (defined $plugin ? " $plugin plugin:" : 
        defined $hook   ? " running plugin ($hook):"  : ""),
       @log), "\n"
-    if $trace <= $self->log_level();
+    if $trace <= $self->trace_level();
   }
 }
 
@@ -171,7 +171,7 @@ sub _config_from_file {
 sub load_plugins {
   my $self = shift;
   
-  $self->log(LOGERROR, "Plugins already loaded") if $self->{hooks};
+  $self->log(LOGWARN, "Plugins already loaded") if $self->{hooks};
   $self->{hooks} = {};
   
   my @plugins = $self->config('plugins');
@@ -286,11 +286,13 @@ sub run_hooks {
             $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
         {
           $r[1] = "" if not defined $r[1];
-          $self->log(LOGDEBUG, "Plugin ".$code->{name}.", hook $hook returned $r[0], $r[1]");
+          $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
           $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
         } else {
           $r[1] = "" if not defined $r[1];
-          $self->log(LOGDEBUG, "Plugin ".$code->{name}.", hook $hook returned $r[0], $r[1]");
+          $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
           $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
 	}
 

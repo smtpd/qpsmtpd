@@ -1,0 +1,74 @@
+#
+# read this with 'perldoc README.logging'  ...
+#
+
+=head1 qpsmtpd logging system; developer documentation
+
+Qpsmtpd now (as of 0.30-dev) supports a plugable logging architecture, so
+that different logging plugins can be supported.  See the example logging
+plugins in plugins/logging, specifically the L<plugins/logging/warn> and
+L<plugins/logging/adaptive> files for examples of how to write your own
+logging plugins.
+
+=head1 Internal support for pluggable logging
+
+Any code in the core can call C<$self->log()> and those log lines will be
+dispatched to each of the registered logging plugins.  When C<log()> is
+called from a plugin, the plugin and hook names are automatically included
+in the parameters passed the logging hooks.  All plugins which register for
+the logging hook should expect the following parameters to be passed:
+
+  $self, $transaction, $trace, $hook, $plugin, @log
+
+where those terms are:
+
+=over 4
+
+=item C<$self>
+
+The object which was used to call the log() method; this can be any object
+within the system, since the core code will automatically load logging
+plugins on behalf of any object.
+
+=item C<$transaction>
+
+This is the current SMTP transaction (defined as everything that happens
+between HELO/EHLO and QUIT/RSET).  If you want to defer outputting certain
+log lines, you can store them in the transaction object, but you will need
+to bind the C<reset_transaction> hook in order to retrieve that information
+before it is discarded when the transaction is closed (see the
+L<logging/adaptive> plugin for an example of doing this).
+
+=item C<$trace>
+
+This is the log level (as shown in config.sample/loglevel) that the caller
+asserted when calling log().  If you want to output the textural
+representation (e.g. C<LOGERROR>) of this in your log messages, you can use
+the log_level() function exported by Qpsmtpd::Constants (which is
+automatically available to all plugins).
+
+=item C<$hook>
+
+This is the hook that is currently being executed.  If log() is called by
+any core code (i.e. not as part of a hook), this term will be C<undef>.
+
+=item C<$plugin>
+
+This is the plugin name that executed the log().  Like C<$hook>, if part of
+the core code calls log(), this wil be C<undef>.  See L<logging/warn> for a
+way to prevent logging your own plugin's log entries from within that
+plugin (the system will not infinitely recurse in any case).
+
+=item C<@log>
+
+The remaining arguments are as passed by the caller, which may be a single
+term or may be a list of values.  It is usually sufficient to call 
+C<join(" ",@log)> to deal with these terms, but it is possible that some
+plugin might pass additional arguments with signficance.
+
+=back
+
+Note: if you register a handler for certain hooks, e.g. C<deny>, there may
+be additional terms passed between C<$self> and C<$transaction>.  See
+L<logging/adaptive> for and example.
+
