@@ -103,9 +103,6 @@ sub load_plugins {
 
     my $plugin_name = $plugin;
 
-    # don't reload plugins if they are already loaded
-    next if defined &{"Qpsmtpd::Plugin::${plugin_name}::register"};
-    
     # Escape everything into valid perl identifiers
     $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
 
@@ -117,6 +114,8 @@ sub load_plugins {
 		       "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
 		      ]egx;
 
+    # don't reload plugins if they are already loaded
+    next if defined &{"Qpsmtpd::Plugin::${plugin_name}::register"};
 
     my $sub;
     open F, "$dir/$plugin" or die "could not open $dir/$plugin: $!";
