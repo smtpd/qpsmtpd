@@ -62,6 +62,7 @@ sub read_input {
       or $self->respond(502, "command unrecognized: '$_'");
     alarm $timeout;
   }
+  alarm(0);
 }
 
 sub respond {

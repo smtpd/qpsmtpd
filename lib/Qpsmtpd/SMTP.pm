@@ -429,8 +429,8 @@ sub data {
 
   my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
 
-
-  while (defined($_ = $self->getline)) {
+  my $timeout = $self->config('timeout');
+  while (defined($_ = $self->getline($timeout))) {
     $complete++, last if $_ eq ".\r\n";
     $i++;
 
@@ -524,10 +524,8 @@ sub data {
 }
 
 sub getline {
-  my $self = shift;
+  my ($self, $timeout) = @_;
   
-  my $timeout = $self->config('timeout');
-
   alarm $timeout;
   my $line = <STDIN>; # default implementation
   alarm 0;
