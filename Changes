@@ -1,3 +1,6 @@
+2002/01/26
+  Allow [1.2.3.4] for the hostname when checking if the dns resolves
+
 
 2002/01/21
   assorted fixes; getting dnsbl's to actually work
