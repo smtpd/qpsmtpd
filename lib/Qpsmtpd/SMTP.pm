@@ -268,6 +268,12 @@ sub rcpt {
     $msg ||= 'relaying denied';
     return $self->respond(450, $msg);
   }
+  elsif ($rc == DENYHARD) {
+      $msg ||= 'delivery denied';
+      $self->log(2, "delivery denied ($msg)");
+      $self->respond(550, $msg);
+      $self->disconnect;
+  }
   elsif ($rc == OK) {
     $self->respond(250, $rcpt->format . ", recipient ok");
     return $self->transaction->add_recipient($rcpt);
