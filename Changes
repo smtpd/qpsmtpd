@@ -65,7 +65,10 @@
 
   Use dup2() instead of perl open("<&") style. POSIX seems to work better.
 
-  [.. todo, fill in older changes ..] spf changes etc?
+  Added SPF, sender permitted from, plugin 
+
+  More minor changes and probably a few big ones that we missed adding here :-)
+ 
 
 0.26 - 2003/06/11
 
