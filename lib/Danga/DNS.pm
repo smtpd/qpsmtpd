@@ -15,7 +15,7 @@ my $resolver;
 
 sub trace {
     my $level = shift;
-    print ("[$$] dns lookup: @_") if $::DEBUG >= $level;
+    print STDERR ("[$$] dns lookup: @_") if $::DEBUG >= $level;
 }
 
 sub new {
@@ -93,7 +93,7 @@ sub DESTROY {
     my $now = time;
     foreach my $host (@{$self->{hosts}}) {
         if (!$self->{results}{$host}) {
-            print "DNS timeout (presumably) looking for $host after " . ($now - $self->{start}) . " secs\n";
+            print STDERR "DNS timeout (presumably) looking for $host after " . ($now - $self->{start}) . " secs\n";
             $self->{callback}->("NXDOMAIN", $host);
         }
     }

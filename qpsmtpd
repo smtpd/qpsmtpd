@@ -9,7 +9,8 @@ BEGIN {
 
 use strict;
 use vars qw($DEBUG);
-use FindBin;
+use FindBin qw();
+# TODO: need to make this taint friendly
 use lib "$FindBin::Bin/lib";
 use Danga::Socket;
 use Danga::Client;
@@ -94,7 +95,7 @@ my $POLL = "with " . ($Danga::Socket::HaveEpoll ? "epoll()" :
 my $server;
 
 # Code for inetd/tcpserver mode
-if ($ENV{REMOTE_HOST}) {
+if ($ENV{REMOTE_HOST} or $ENV{TCPREMOTEHOST}) {
     run_as_inetd();
     exit(0);
 }
