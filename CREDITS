@@ -4,7 +4,7 @@ check_badmailfrom and check_mailrcptto plugins.
 
 Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
 the connection gets dropped at the wrong moment.  Support and enable
-taint checking. MAIL FROM host dns check configurable.
+taint checking. MAIL FROM host dns check configurable.  HELO hook.
 
 Andrew Pam <xanni@glasswings.com.au>: fixing the maximum message size
 (databytes) stuff.
@@ -14,10 +14,14 @@ Marius Kjeldahl <marius@kjeldahl.net>, Zukka Zitting
 
 Robert Spier <robert@perl.org>: Klez filter.
 
-Matt Sergeant <matt@sergeant.org>: Clamav plugin.
+Matt Sergeant <matt@sergeant.org>: Clamav plugin.  Patch for the dnsbl
+plugin to give us all the dns results.  Resident SpamAssassin guru.  PPerl.
 
 Rasjid Wilcox <rasjidw@openminddev.net>: Lots of patches as per the
 Changes file.
 
 Kee Hinckley <nazgul@somewhere.com>: Sent me the correct strftime
 format for the dates in the "Received" headers.
+
+
+... and many others per the Change file!
