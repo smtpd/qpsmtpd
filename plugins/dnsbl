@@ -12,18 +12,43 @@ sub connect_handler {
 
   my %dnsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
   return unless %dnsbl_zones;
-  
+
   my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
   # we should queue these lookups in the background and just fetch the
   # results in the first rcpt handler ... oh well.
 
-  my $result = "";
+  my $res = new Net::DNS::Resolver;
+  my $sockets = [];
+
+  for my $dnsbl (keys %dnsbl_zones) {
+    $self->log(5, "Checking $reversed_ip.$dnsbl");
+    push @{$sockets}, [$dnsbl, $res->bgsend("$reversed_ip.$dnsbl", "TXT")];
+  }
+
+  $self->qp->connection->notes('dnsbl_sockets', $sockets);
+
+  return DECLINED;
+}
+
+sub process_sockets {
+  my ($self) = @_;
+
+  my $conn = $self->qp->connection;
+
+  return $conn->notes('dnsbl') 
+    if $conn->notes('dnsbl');
 
   my $res = new Net::DNS::Resolver;
-  for my $dnsbl (keys %dnsbl_zones) {
-    $self->log(3, "Checking $reversed_ip.$dnsbl");
-    my $query = $res->query("$reversed_ip.$dnsbl", "TXT");
+  my $sockets = $conn->notes('dnsbl_sockets') or return "";
+
+  my $result; 
+
+  for my $socket (@{$sockets}) {
+    my $query = $res->bgread($socket->[1]);
+    my $dnsbl = $socket->[0];
+    undef $socket;
+
     if ($query) {
       my $a_record = 0;
       foreach my $rr ($query->answer) {
@@ -35,26 +60,32 @@ sub connect_handler {
       $a_record and $result = "Blocked by $dnsbl";
     }
     else {
-      warn "$$ query for $reversed_ip.$dnsbl failed: ", $res->errorstring, "\n"
+      $self->log(4, "$dnsbl query failed: ", $res->errorstring)
 	unless $res->errorstring eq "NXDOMAIN";
     }
   }
 
-  $transaction->notes('dnsbl', $result);
+  # if there were more to read; then forget about them again ...
+  undef $_ for (@{$sockets});
 
-  return DECLINED;
+  return $conn->notes('dnsbl', $result);
+
 }
 
 sub rcpt_handler {
   my ($self, $transaction, $rcpt) = @_;
-  my $note = $transaction->notes('rhsbl');
+  my $note = $self->process_sockets;
   return (DENY, $note) if $note;
   return DECLINED;
 }
 
 sub disconnect_handler {
-  # if we queued stuff in the background we should make sure it got
-  # cleaned up here.
+  my ($self, $transaction) = @_;
+
+  my $sockets = $self->qp->connection->notes('dnsbl_sockets');
+  # if there were more to read; then forget about them again ...
+  undef $_ for (@{$sockets});
+
   return DECLINED;
 }
 
