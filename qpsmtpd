@@ -11,7 +11,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.06";
+$QPsmtpd::VERSION = "0.07";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -178,18 +178,19 @@ sub data {
   respond(503, "MAIL first"), return 1 unless $state{transaction}->{from};
   respond(503, "RCPT first"), return 1 unless $state{transaction}->{rcpt};
   respond(354, "go ahead");
-  my $buffer;
+  my $buffer = '';
   my $size = 0;
   my $i = 0;
   my $max_size = (get_config('databytes'))[0] || 0;
   my $blocked = "";
   my %matches;
   my $header = 1;
+  my $complete = 0;
 
   warn "$$ max_size: $max_size / size: $size" if $TRACE > 5;
 
   while (<STDIN>) {
-    last if $_ eq ".\r\n";
+    $complete++, last if $_ eq ".\r\n";
     $i++;
     respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
       if $_ eq ".\n";
@@ -223,6 +224,10 @@ sub data {
 
   warn "$$ max_size: $max_size / size: $size" if $TRACE > 5;
 
+  # if we get here without seeing a terminator, the connection is
+  # probably dead.
+  respond(451, "Incomplete DATA"), return 1 unless $complete;
+ 
   respond(550, $blocked),return 1 if $blocked;
   respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
 

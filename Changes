@@ -1,8 +1,14 @@
 2002/04/20
+  Bumped version number to 0.07
+
   Support comments in configuration files (prefix the line with #)
   
   Support RELAYCLIENT like qmail-smtpd (thanks to Marius Kjeldahl
   <marius@kjeldahl.net>) )
+
+  If the connection fails while in DATA we would just accept the
+  message. Ouch! Thanks to Devin Carraway <qpsmtpd@devin.com> for the
+  patch.
 
 
 2002/01/26
