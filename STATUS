@@ -38,6 +38,9 @@ that if available.
 
 plugin support;
 
+  allow plugins to return multiple response lines (does it have to
+  join them to one for SMTP?)
+
   support plugins for the rest of the commands.
 
   specify a priority in register_hook. ("LAST", "FIRST", "MIDDLE", or
@@ -47,6 +50,17 @@ plugin support;
   (instead of just after)
 
   if qmail-queue can't be loaded we still return 250 ?!
+
+Make a system for configuring the plugins per user/domain/...
+
+  support databytes per user / domain
+
+plugin to reject mails from <> if it has multiple recipients.  
+
+localiphost - support foo@[a.b.c.d] addresses 
+
+support smtpgreeting (?)
+
 
 
 TRACE in Constants.pm is not actually being used.  Should it be?
