@@ -22,7 +22,7 @@ sub register {
 
   if (@args > 0) {
     $self->{_queue_socket} = $args[0];
-    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
   } else {
     $self->{_queue_socket} = "/var/spool/postfix/public/cleanup";
   }
