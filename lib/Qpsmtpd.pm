@@ -359,7 +359,6 @@ sub data {
 
   my ($rc, $msg) = $self->run_hooks("data_post");
   if ($rc != DONE) {
-    warn "QPSM100";
     return $self->queue($self->transaction);    
   }
 
@@ -367,8 +366,6 @@ sub data {
 
 sub queue {
   my ($self, $transaction) = @_;
-
-  warn "QPSM2000";
 
   # these bits inspired by Peter Samuels "qmail-queue wrapper"
   pipe(MESSAGE_READER, MESSAGE_WRITER) or fault("Could not create message pipe"), exit;
