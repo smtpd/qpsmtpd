@@ -130,6 +130,8 @@ sub connection {
 
 sub helo {
   my ($self, $hello_host, @stuff) = @_;
+  return $self->respond (501,
+    "helo requires domain/address - see RFC-2821 4.1.1.1") unless $hello_host;
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
@@ -150,6 +152,8 @@ sub helo {
 
 sub ehlo {
   my ($self, $hello_host, @stuff) = @_;
+  return $self->respond (501,
+    "ehlo requires domain/address - see RFC-2821 4.1.1.1") unless $hello_host;
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
