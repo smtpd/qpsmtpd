@@ -15,6 +15,8 @@
 
   Enable "check_earlytalker" in the default plugins config
 
+  Added a milter plugin to allow use of sendmail milters
+
   [.. todo, fill in older changes ..] spf changes etc?
 
 0.26 - 2003/06/11
