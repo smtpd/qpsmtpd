@@ -11,7 +11,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.07";
+$QPsmtpd::VERSION = "0.07b";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -130,7 +130,7 @@ sub mail {
     warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
     my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
     #warn "$$ from email address : $from\n" if $TRACE;
-    if ($from eq "<>") {
+    if ($from eq "<>" or $from =~ m/\[undefined\]/) {
       $from = Mail::Address->new("<>");
     } 
     else {
@@ -213,6 +213,14 @@ sub data {
 	  if $matches{"aol.com"} and m/^From: .* <_/;
       }
       
+
+      # Might be klez
+      m/^Content-type:.*(?:audio|application)/i
+          and $matches{"klez"}=1;
+
+      # we've seen the Klez signature, we're probably infected
+      $blocked = q[Take your Klez virus and stuff it!  HAND.]
+         if $matches{"klez"} and m!^TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQA!;
 
       $buffer .= $_;
       $size += length $_;
