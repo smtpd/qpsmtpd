@@ -78,6 +78,9 @@ sub authsql {
         return DECLINED;
     }
 
+    $self->log(LOGINFO,
+	"Authentication to vpopmail via mysql: $pw_name\@$pw_domain");
+
     my $sth = $dbh->prepare(<<SQL);
 select pw_clear_passwd
 from vpopmail
