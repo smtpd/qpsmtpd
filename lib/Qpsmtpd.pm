@@ -63,6 +63,18 @@ sub config {
    }
 }
 
+sub config_dir {
+  my ($self, $config) = @_;
+  my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
+  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+  $configdir = "$name/config" if (-e "$name/config/$config");
+  return $configdir;
+}
+
+sub plugin_dir {
+    my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+    my $dir = "$name/plugins";
+}
 
 sub get_qmail_config {
   my ($self, $config, $type) = @_;
@@ -70,9 +82,7 @@ sub get_qmail_config {
   if ($self->{_config_cache}->{$config}) {
     return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
   }
-  my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
-  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-  $configdir = "$name/config" if (-e "$name/config/$config");
+  my $configdir = $self->config_dir($config);
 
   my $configfile = "$configdir/$config";
 
@@ -112,7 +122,7 @@ sub _config_from_file {
 }
 
 sub _compile {
-    my ($plugin, $package, $file) = @_;
+    my ($self, $plugin, $package, $file) = @_;
     
     my $sub;
     open F, $file or die "could not open $file: $!";
@@ -124,6 +134,15 @@ sub _compile {
 
     my $line = "\n#line 1 $file\n";
 
+    if ($self->{_test_mode}) {
+        if (open(F, "t/plugin_tests/$plugin")) {
+            local $/ = undef;
+            $sub .= "#line 1 t/plugin_tests/$plugin\n";
+            $sub .= <F>;
+            close F;
+        }
+    }
+
     my $eval = join(
 		    "\n",
 		    "package $package;",
@@ -131,6 +150,7 @@ sub _compile {
 		    "require Qpsmtpd::Plugin;",
 		    'use vars qw(@ISA);',
 		    '@ISA = qw(Qpsmtpd::Plugin);',
+		    ($self->{_test_mode} ? 'use Test::More;' : ''),
 		    "sub plugin_name { qq[$plugin] }",
 		    $line,
 		    $sub,
@@ -149,42 +169,43 @@ sub _compile {
 sub load_plugins {
   my $self = shift;
   
-  $self->{hooks} ||= {};
+  $self->log(LOGERROR, "Plugins already loaded") if $self->{hooks};
+  $self->{hooks} = {};
   
   my @plugins = $self->config('plugins');
 
-  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-  my $dir = "$name/plugins";
+  my $dir = $self->plugin_dir;
   $self->log(LOGNOTICE, "loading plugins from $dir");
 
-  $self->_load_plugins($dir, @plugins);
+  @plugins = $self->_load_plugins($dir, @plugins);
+  
+  return @plugins;
 }
 
 sub _load_plugins {
   my $self = shift;
   my ($dir, @plugins) = @_;
-  
+
+  my @ret;  
   for my $plugin (@plugins) {
     $self->log(LOGINFO, "Loading $plugin");
     ($plugin, my @args) = split /\s+/, $plugin;
     
     if (lc($plugin) eq '$include') {
       my $inc = shift @args;
-      my $config_dir = ($ENV{QMAIL} || '/var/qmail') . '/control';
-      my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-      $config_dir = "$name/config" if (-e "$name/config/$inc");
+      my $config_dir = $self->config_dir($inc);
       if (-d "$config_dir/$inc") {
         $self->log(LOGDEBUG, "Loading include dir: $config_dir/$inc");
         opendir(DIR, "$config_dir/$inc") || die "opendir($config_dir/$inc): $!";
         my @plugconf = sort grep { -f $_ } map { "$config_dir/$inc/$_" } grep { !/^\./ } readdir(DIR);
         closedir(DIR);
         foreach my $f (@plugconf) {
-            $self->_load_plugins($dir, $self->_config_from_file($f, "plugins"));
+            push @ret, $self->_load_plugins($dir, $self->_config_from_file($f, "plugins"));
         }
       }
       elsif (-f "$config_dir/$inc") {
         $self->log(LOGDEBUG, "Loading include file: $config_dir/$inc");
-        $self->_load_plugins($dir, $self->_config_from_file("$config_dir/$inc", "plugins"));
+        push @ret, $self->_load_plugins($dir, $self->_config_from_file("$config_dir/$inc", "plugins"));
       }
       else {
         $self->log(LOGCRIT, "CRITICAL PLUGIN CONFIG ERROR: Include $config_dir/$inc not found");
@@ -209,13 +230,16 @@ sub _load_plugins {
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     # don't reload plugins if they are already loaded
-    _compile($plugin_name, $package, "$dir/$plugin") unless
+    $self->_compile($plugin_name, $package, "$dir/$plugin") unless
         defined &{"${package}::register"};
     
     my $plug = $package->new();
+    push @ret, $plug;
     $plug->_register($self, @args);
 
   }
+  
+  return @ret;
 }
 
 sub transaction {

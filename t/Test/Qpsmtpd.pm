@@ -4,6 +4,7 @@ use Carp qw(croak);
 use base qw(Qpsmtpd::SMTP);
 use Test::More;
 use Qpsmtpd::Constants;
+use Test::Qpsmtpd::Plugin;
 
 sub new_conn {
   ok(my $smtpd = __PACKAGE__->new(), "new");
@@ -65,9 +66,46 @@ sub input {
   alarm $timeout;
 }
 
+sub config_dir {
+    './config';
+}
+
+sub plugin_dir {
+    './plugins';
+}
+
+sub log {
+    my ($self, $trace, @log) = @_;
+    my $level = Qpsmtpd::TRACE_LEVEL();
+    $level = $self->init_logger unless defined $level;
+    diag(join(" ", $$, @log)) if $trace <= $level;
+}
+
 # sub run
 # sub disconnect
 
+sub run_plugin_tests {
+    my $self = shift;
+    $self->{_test_mode} = 1;
+    my @plugins = $self->load_plugins();
+    # First count test number
+    my $num_tests = 0;
+    foreach my $plugin (@plugins) {
+        $plugin->register_tests();
+        $num_tests += $plugin->total_tests();
+    }
+    
+    require Test::Builder;
+    my $Test = Test::Builder->new();
+    
+    $Test->plan( tests => $num_tests );
+    
+    # Now run them
+    
+    foreach my $plugin (@plugins) {
+        $plugin->run_tests();
+    }
+}
 
 1;
 
