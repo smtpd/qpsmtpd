@@ -81,7 +81,7 @@ sub body_write {
 
      if (-e $spool_dir) {
        my $mode = (stat($spool_dir))[2];
-       die "Permissions on the spool_dir are not 0700" if $mode & 07077;
+       die "Permissions on spool_dir $spool_dir are not 0700" if $mode & 07077;
      }
 
      -d $spool_dir or mkdir($spool_dir, 0700) or die "Could not create spool_dir $spool_dir: $!";
