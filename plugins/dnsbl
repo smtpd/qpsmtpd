@@ -144,7 +144,7 @@ sub rcpt_handler {
     my $result = $ENV{'RBLSMTPD'};
     my $remote_ip = $self->qp->connection->remote_ip;
     $result =~ s/%IP%/$remote_ip/g;
-    return (DENY, join("\n", $self->qp->config('dnsbl_rejectmsg'), $result));
+    return (DENY, join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
   }
 
   my $note = $self->process_sockets;
