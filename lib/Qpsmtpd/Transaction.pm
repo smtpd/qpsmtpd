@@ -15,6 +15,10 @@ sub start {
   my %args = @_;
   my $self = { _rcpt => [], started => time };
   bless ($self, $class);
+  my $sz = $self->config('memory_threshold');
+  $sz = 10_000 unless defined($sz);
+  $self->{_size_threshold} = $sz;
+  return $self;
 }
 
 sub add_recipient {
@@ -57,12 +61,26 @@ sub notes {
   $self->{_notes}->{$key};
 }
 
+sub set_body_start {
+    my $self = shift;
+    $self->{_body_start} = $self->body_current_pos;
+}
+
 sub body_start {
   my $self = shift;
-  @_ and $self->{_body_start} = shift;
+  @_ and die "body_start now read only";
   $self->{_body_start};
 }
 
+sub body_current_pos {
+    my $self = shift;
+    if ($self->{_body_file}) {
+        return tell($self->{_body_file});
+    }
+    return $self->{_body_current_pos} || 0;
+}
+
+# TODO - should we create the file here if we're storing as an array?
 sub body_filename {
   my $self = shift;
   return unless $self->{_body_file};
@@ -72,17 +90,41 @@ sub body_filename {
 sub body_write {
   my $self = shift;
   my $data = shift;
-  unless ($self->{_body_file}) {
-    $self->{_filename} = $self->temp_file();
-    $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
-      or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
+  if ($self->{_body_file}) {
+    #warn("body_write to file\n");
+    # go to the end of the file
+    seek($self->{_body_file},0,2)
+      unless $self->{_body_file_writing};
+    $self->{_body_file_writing} = 1;
+    $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data)
+      and $self->{_body_size} += length (ref $data eq "SCALAR" ? $$data : $data);
   }
-  # go to the end of the file
-  seek($self->{_body_file},0,2)
-    unless $self->{_body_file_writing};
-  $self->{_body_file_writing} = 1;
-  $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data)
-    and $self->{_body_size} += length (ref $data eq "SCALAR" ? $$data : $data); 
+  else {
+    #warn("body_write to array\n");
+    $self->{_body_array} ||= [];
+    my $ref = ref($data) eq "SCALAR" ? $data : \$data;
+    pos($$ref) = 0;
+    while ($$ref =~ m/\G(.*?\n)/gc) {
+      push @{ $self->{_body_array} }, $1;
+      $self->{_body_size} += length($1);
+    }
+    if ($$ref =~ m/\G(.+)\z/gc) {
+      push @{ $self->{_body_array} }, $1;
+      $self->{_body_size} += length($1);
+    }
+    if ($self->{_body_size} >= $self->{_size_threshold}) {
+      #warn("spooling to disk\n");
+      $self->{_filename} = $self->temp_file();
+      $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
+        or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
+      if ($self->{_body_array}) {
+        foreach my $line (@{ $self->{_body_array} }) {
+          $self->{_body_file}->print($line) or die "Cannot print to temp file: $!";
+        }
+      }
+      $self->{_body_array} = undef;
+    }
+  }
 }
 
 sub body_size {
@@ -91,22 +133,46 @@ sub body_size {
 
 sub body_resetpos {
   my $self = shift;
-  return unless $self->{_body_file};
-  my $start = $self->{_body_start} || 0;
-  seek($self->{_body_file}, $start, 0);
-  $self->{_body_file_writing} = 0;
+  
+  if ($self->{_body_file}) {
+    my $start = $self->{_body_start} || 0;
+    seek($self->{_body_file}, $start, 0);
+    $self->{_body_file_writing} = 0;
+  }
+  else {
+    $self->{_body_current_pos} = $self->{_body_start};
+  }
+  
   1;
 }
 
 sub body_getline {
   my $self = shift;
-  return unless $self->{_body_file};
-  my $start = $self->{_body_start} || 0;
-  seek($self->{_body_file}, $start,0)
-    if $self->{_body_file_writing};
-  $self->{_body_file_writing} = 0;
-  my $line = $self->{_body_file}->getline;
-  return $line;
+  if ($self->{_body_file}) {
+    my $start = $self->{_body_start} || 0;
+    seek($self->{_body_file}, $start,0)
+      if $self->{_body_file_writing};
+    $self->{_body_file_writing} = 0;
+    my $line = $self->{_body_file}->getline;
+    return $line;
+  }
+  else {
+    return unless $self->{_body_array};
+    my $line = $self->{_body_array}->[$self->{_body_current_pos}];
+    $self->{_body_current_pos}++;
+    return $line;
+  }
+}
+
+sub body_as_string {
+    my $self = shift;
+    $self->body_resetpos;
+    local $/;
+    my $str = '';
+    while (defined(my $line = $self->body_getline)) {
+        $str .= $line;
+    }
+    return $str;
 }
 
 sub DESTROY {
