@@ -13,7 +13,7 @@ sub mail_handler {
 
   $sender->format ne "<>"
     and $self->qp->config("require_resolvable_fromhost")
-    and !check_dns($sender->host)
+    and !$self->check_dns($sender->host)
     and return (DENYSOFT, 
                 ($sender->host
                    ? "Could not resolve ". $sender->host
@@ -25,7 +25,7 @@ sub mail_handler {
 
 
 sub check_dns {
-  my $host = shift;
+  my ($self, $host) = @_;
 
   # for stuff where we can't even parse a hostname out of the address
   return 0 unless $host;
