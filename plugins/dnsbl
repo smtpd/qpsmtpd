@@ -8,10 +8,11 @@ sub register {
 
 sub connect_handler {
   my ($self, $transaction) = @_;
+
   my $remote_ip = $self->qp->connection->remote_ip;
 
   my %dnsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
-  return unless %dnsbl_zones;
+  return DECLINED unless %dnsbl_zones;
 
   my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
