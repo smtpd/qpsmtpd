@@ -154,8 +154,8 @@ sub rcpt {
 }
 
 sub data {
-  respond(503, "MAIL first") unless $state{transaction}->{from};
-  respond(503, "RCPT first") unless $state{transaction}->{rcpt};
+  respond(503, "MAIL first"), return 1 unless $state{transaction}->{from};
+  respond(503, "RCPT first"), return 1 unless $state{transaction}->{rcpt};
   respond(354, "go ahead");
   my $buffer;
   my $size = 0;
