@@ -7,7 +7,7 @@ sub register {
 
 sub mail_handler {
   my ($self, $transaction, $sender) = @_;
-   
+
   $sender->format ne "<>"
     and $self->qp->config("require_resolvable_fromhost")
     and !check_dns($sender->host)
@@ -30,6 +30,8 @@ sub check_dns {
   return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
 
   my $res = new Net::DNS::Resolver;
+  $res->tcp_timeout(30);
+  $res->udp_timeout(30);
   return 1 if mx($res, $host);
   my $query = $res->search($host);
   if ($query) {

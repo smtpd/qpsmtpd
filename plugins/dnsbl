@@ -67,6 +67,9 @@ sub process_sockets {
   my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
 
   my $res = new Net::DNS::Resolver;
+  $res->tcp_timeout(30);
+  $res->udp_timeout(30);
+
   my $sel = $conn->notes('dnsbl_sockets') or return "";
   my $remote_ip = $self->qp->connection->remote_ip;
 
