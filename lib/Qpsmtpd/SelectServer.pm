@@ -27,6 +27,12 @@ our $QUIT = 0;
 
 $SIG{INT} = $SIG{TERM} = sub { $QUIT++ };
 
+sub log {
+  my ($self, $trace, @log) = @_;
+  warn join(" ", fileno($self->client), @log), "\n"
+    if $trace <= Qpsmtpd::TRACE_LEVEL();
+}
+
 sub main {
     my $class = shift;
     my %opts = (LocalPort => 25, Reuse => 1, Listen => SOMAXCONN, @_);
@@ -272,9 +278,11 @@ sub data_line {
       # DATA is always the end of a "transaction"
       return $self->reset_transaction;
   }
-  
-  $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
-      if $_ eq ".\n";
+  elsif ($_ eq ".\n") {
+    $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html");
+    $self->{__quitting} = 1;
+    return;
+  }
   
   # add a transaction->blocked check back here when we have line by line plugin access...
   unless (($self->{__max_size} and $self->{__size} > $self->{__max_size})) {
