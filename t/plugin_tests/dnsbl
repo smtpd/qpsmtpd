@@ -18,8 +18,10 @@ sub test_local {
 
 sub test_returnval {
     my $self = shift;
-    
-    my ($ret, $note) = $self->rcpt_handler($self->qp->transaction, 'rcpt@example.com');
+
+    my $address = Qpsmtpd::Address->parse('<rcpt@example.com>');
+    my ($ret, $note) = $self->rcpt_handler($self->qp->transaction,
+      $address);
     is($ret, DENY, "Check we got a DENY");
     print("# dnsbl result: $note\n");
 }
