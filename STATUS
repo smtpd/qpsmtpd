@@ -19,13 +19,6 @@ plugin support;
   proper access to the message body through the transaction
 
 
-data command
-  
-  how to spool message to a file when it grows large and still give
-  reasonable easy access to the data from plugins?
-
-... 
-
 
 TRACE in Constants.pm is not actually being used.  Should it?
 
@@ -39,3 +32,5 @@ mail for one user but bounce it right away for another RCPT'er.
 
 David Carraway has some thoughts for "user filters"
 http://nntp.perl.org/group/perl.qpsmtpd/2
+
+Make it run as a mod_perl 2.0 connection handler module ...

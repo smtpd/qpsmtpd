@@ -1,3 +1,13 @@
+
+#
+#  Requires the spamd patch attached to this spamassassin bug:
+#    http://bugzilla.spamassassin.org/show_bug.cgi?id=660    
+#
+#  ... or you can change YAREPORT to REPORT below; but the headers
+#      will be a bit different than you are used to.
+#
+#
+
 use Socket qw(:DEFAULT :crlf);
 use IO::Handle;
 
@@ -28,7 +38,7 @@ sub check_spam {
   
   $transaction->body_resetpos;
   
-  print SPAMD "REPORT SPAMC/1.0" . CRLF;
+  print SPAMD "YAREPORT SPAMC/1.0" . CRLF;
   # or CHECK or REPORT or SYMBOLS
 
   while (my $line = $transaction->body_getline) {

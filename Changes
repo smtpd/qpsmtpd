@@ -7,6 +7,17 @@ v0.10
   All functionality not core to SMTP moved to plugins
 
 
+2002/08/06
+  Spool message bodies to a tmp file so we can support HUGE messages
+ 
+  API to read the message body (undocumented, subject to change)
+
+  data_post hook (undocumented)
+
+  SpamAssassin plugin (connects to spamd on localhost), see
+  plugins/spamassassin
+
+
 2002/07/15
   DNS RBL and RHSBL support via plugins.
 
