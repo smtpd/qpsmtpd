@@ -47,7 +47,10 @@ Put the files there.  If you install from CVS you can just do
   cvs -d :pserver:anonymous@cvs.perl.org:/cvs/public co qpsmtpd
 in the /home/smtpd/ dir.
 
-Now edit the file config/IP and put the ip address you want to use for
+chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
+in) to make supervise start the log process.
+
+Edit the file config/IP and put the ip address you want to use for
 qpsmtpd on the first line (or use 0 to bind to all interfaces).
 
 If you use the supervise tools, then you are practically done now!
@@ -56,7 +59,7 @@ or /var/svscan or whatever) directory.  Remember to shutdown
 qmail-smtpd if you are replacing it with qpsmtpd.
 
 If you don't use supervise, then you need to run the ./run script in
-some other way when you startup.
+some other way.
 
 
 Configuration
@@ -86,7 +89,11 @@ mailinglist (subscription instructions above).  If possibly then put
 the logfile on a webserver and include a reference to it in the mail.
 
 
-Extra files you can use to configure qpsmtpd:
+Configuration files
+-------------------
+
+All the files used by qmail-smtpd should be supported; so see the man
+page for qmail-smtpd.  Extra files used by qpsmtpd includes: 
 
    plugins
 
@@ -135,3 +142,20 @@ Extra files you can use to configure qpsmtpd:
       containing the hostname I use for testing qpsmtpd (so it doesn't
       introduce itself with the normal name of the server).
      
+
+
+Plugins
+-------
+
+The qpsmtpd core only implements the SMTP protocol.  No useful
+function can be done by qpsmtpd without loading plugins.
+
+Plugins are loaded on startup where each of them register their
+interest in various "hooks" provided by the qpsmtpd core engine.
+
+At least one plugin MUST allow or deny the RCPT command to enable
+receiving mail.  The "check_relay" plugin is the standard plugin for
+this.  Other plugins provides extra functionality related to this; for
+example the require_resolvable_fromhost plugin described above.
+
+

@@ -214,7 +214,7 @@ sub rcpt {
     return $self->transaction->add_recipient($rcpt);
   }
   else {
-    return $self->respond(450, "Could not determine of relaying is allowed");
+    return $self->respond(450, "No plugin decided if relaying is allowed");
   }
   return 0;
 }
