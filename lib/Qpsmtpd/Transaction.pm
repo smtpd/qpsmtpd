@@ -31,6 +31,12 @@ sub recipients {
   ($self->{_recipients} ? @{$self->{_recipients}} : ());
 }
 
+sub relaying {
+  my $self = shift;
+  @_ and $self->{_relaying} = shift;
+  $self->{_relaying};
+}
+
 sub sender {
   my $self = shift;
   @_ and $self->{_sender} = shift;
@@ -112,7 +118,6 @@ sub body_getline {
   $self->{_body_file_writing} = 0;
   my $line = $self->{_body_file}->getline;
   return $line;
-  
 }
 
 sub DESTROY {
@@ -163,6 +168,11 @@ for more details.
 This returns a list of the current recipients in the envelope.
 
 Each recipient returned is a C<Mail::Address> object.
+
+=head2 relaying( )
+
+Returns true if this mail transaction is relaying.  This value is set
+by the C<check_relay> plugin.
 
 =head2 sender( [ ADDRESS ] )
 
