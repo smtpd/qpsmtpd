@@ -96,6 +96,19 @@ help, unsubscribe, and other sub-list requests.
 Note: These addresses are easily forgeable. Patches welcome to add checking of rDNS
 into the mix to eliminate the forgery problem (though rDNS isn't available to everyone).
 
+=head2 bounce_verp.bounce_heuristics
+
+Put a 1 in this file to tell the plugin to use more aggressive heuristics
+in determining whether this email is a bounce or not. The default rules
+for detecting a bounce are:
+
+  MailFrom = <>
+  or MailFrom = <postmaster@domain> 
+  or MailFrom = <mailer-daemon@domain>
+
+Setting C<bounce_verp.bounce_heuristics> makes bounce_verp look in the mail
+headers for various clues too.
+
 =cut
 
 use Mail::SRS;
@@ -104,7 +117,12 @@ sub register {
     my ($plugin) = @_;
 
     $plugin->register_hook('data' => 'do_verp');
-    $plugin->register_hook('data_post' => 'check_verp');
+    if ($plugin->qp->config('bounce_verp.bounce_heuristics')) {
+        $plugin->register_hook('data_post' => 'check_verp');
+    }
+    else {
+        $plugin->register_hook('data' => 'check_verp');
+    }
 }
 
 sub do_verp {
@@ -150,6 +168,8 @@ sub get_srs {
 sub do_outbound_verp {
     my ($self, $transaction) = @_;
 
+    foreach my $recip ($transaction->recipients) {
+        if ($self->skip_verp($recip->address))
     my $sender = $transaction->sender->address;
     
     return DECLINED if $self->skip_verp($sender);
@@ -160,7 +180,9 @@ sub do_outbound_verp {
 
     my $hash = $srs->hash_create($timestamp, $sender);
 
-    my $new_address = join('=', $hash, $timestamp, $sender);
+    my ($local, $domain) = ($sender =~ /^(.*)\@(.*?)$/);
+    my $new_address = join('-', $local, $hash, $timestamp);
+    $new_address = "$new_address\@$domain";
 
     $self->log(LOGDEBUG, "setting sender to $new_address");
     $transaction->sender(Qpsmtpd::Address->new($new_address));
@@ -175,19 +197,27 @@ sub do_inbound_verp {
 
     $recip = $recip->address;
     
-    return DECLINED if $self->skip_verp($recip);
-
-    return DECLINED unless $self->is_bounce($transaction);
+    if ($self->skip_verp($recip)) {
+        $self->log(LOGINFO, "skipping inbound check");
+        return DECLINED;
+    }
+    
+    unless ($self->is_bounce($transaction)) {
+        $self->log(LOGINFO, "this mail is not a bounce - no need to check verp");
+        return DECLINED;
+    }
 
     $self->log(LOGDEBUG, "validating bounce recipient: $recip");
     #return DENY, "Multiple recipients of bounces not allowed" if $not_allowed;
     
     my $srs = $self->get_srs();
 
-    my ($hash, $timestamp, $address) = split('=', $recip, 3);
+    my ($local, $domain) = ($recip =~ /^(.*)\@(.*?)$/);
+    my ($user, $hash, $timestamp) = split('-', $local, 3);
 
+    my $address = "$user\@$domain";
     if (!$srs->hash_verify($hash, $timestamp, $address)) {
-        return DENY, "This mail did not originate here.";
+        return DENY, "Mail from $recip probably did not originate here.";
     }
     
     if (!$srs->timestamp_check($timestamp)) {
@@ -213,6 +243,8 @@ sub is_bounce {
 
     return 1 if ($sender =~ /^mailer[_-]daemon\@/i);
 
+    return 0 unless $self->qp->config('bounce_verp.bounce_heuristics');
+
     my $headers = $transaction->header();
     my $from = $headers->get('From');
     my $subject = $headers->get('Subject');
@@ -220,8 +252,8 @@ sub is_bounce {
     return 1 if ($from =~ /\bpostmaster\@/i);
     return 1 if ($from =~ /\bmailer-daemon\@/i);
     
-    return 1 if ($subject =~ /failure notice/i);
-    return 1 if ($subject =~ /Rejected mail/i);
+    return 1 if ($subject =~ /^failure notice/i);
+    return 1 if ($subject =~ /^Rejected mail/i);
 
     return 0;
 }
@@ -235,15 +267,22 @@ sub skip_verp {
     foreach my $skip (@skips) {
         if (index($skip, '@') < 0) {
             # skip a domain, and any subdomains
-            return 1 if $address =~ /[@\.]\Q$skip\E$/i;
+            if ($address =~ /[@\.]\Q$skip\E$/i) {
+                $self->log(LOGDEBUG, "skip domain: $skip");
+                return 1;
+            }
         }
         else {
             # skip an address.
-            return 1 if $address eq $skip;
+            if ($address eq $skip) {
+                $self->log(LOGDEBUG, "skip address: $skip");
+                return 1;
+            }
             
             # OK, it's not that address, but is it a mailing list verp
             my ($local, $domain) = ($skip =~ /^(.*)\@(.*?)$/);
             if ($address =~ /^\Q$local\E\b/i and $address =~ /\@\Q$domain\E$/i) {
+                $self->log(LOGDEBUG, "skip partial address: $skip");
                 return 1;
             }
         }
