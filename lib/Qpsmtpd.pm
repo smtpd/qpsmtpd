@@ -77,6 +77,7 @@ sub get_qmail_config {
     return \%h;
   }
 
+  return unless -e $configfile;
   open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!" and return;
   my @config = <CF>;
   chomp @config;
