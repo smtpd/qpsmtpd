@@ -110,7 +110,8 @@ sub register {
 sub do_verp {
     my ($self, $transaction) = @_;
 
-    if ($transaction->relaying) {
+    if ($self->qp->connection->relaying) {
+        $self->log(LOGINFO, "doing outbound verp");
         return $self->do_outbound_verp($transaction);
     }
 
@@ -120,10 +121,11 @@ sub do_verp {
 sub check_verp {
     my ($self, $transaction) = @_;
 
-    if ($transaction->relaying) {
+    if ($self->qp->connection->relaying) {
         return DECLINED;
     }
     
+    $self->log(LOGINFO, "checking inbound verp");
     return $self->do_inbound_verp($transaction);
 }
 
@@ -160,6 +162,7 @@ sub do_outbound_verp {
 
     my $new_address = join('=', $hash, $timestamp, $sender);
 
+    $self->log(LOGDEBUG, "setting sender to $new_address");
     $transaction->sender(Qpsmtpd::Address->new($new_address));
 
     return DECLINED;
@@ -176,6 +179,7 @@ sub do_inbound_verp {
 
     return DECLINED unless $self->is_bounce($transaction);
 
+    $self->log(LOGDEBUG, "validating bounce recipient: $recip");
     #return DENY, "Multiple recipients of bounces not allowed" if $not_allowed;
     
     my $srs = $self->get_srs();
@@ -192,6 +196,7 @@ sub do_inbound_verp {
     }
 
     # now set RCPTs to proper address.
+    $self->log(LOGDEBUG, "fixing inbound recipient to be $address");
     $transaction->recipients(Qpsmtpd::Address->new($address));
 
     return DECLINED;
