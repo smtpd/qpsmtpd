@@ -75,8 +75,10 @@ sub _uri_escape {
 
 sub data_handler {
     my ($self, $transaction) = @_;
-    
-    $transaction->header->add('Received-SPF' => $self->qp->connection->notes('spf_header'), 0);
+
+    my $header = $self->qp->connection->notes('spf_header') || 'unknown';
+
+    $transaction->header->add('Received-SPF' => $header, 0);
 
     return DECLINED;
 }
