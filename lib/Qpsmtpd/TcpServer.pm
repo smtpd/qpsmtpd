@@ -81,6 +81,7 @@ sub respond {
 
 sub disconnect {
   my $self = shift;
+  $self->log(LOGDEBUG,"click, disconnecting");
   $self->SUPER::disconnect(@_);
   exit;
 }
