@@ -29,11 +29,8 @@ protocols to use the qpsmtpd framework.
 Future Ideas
 ============
 
-Make config() better abstracted or configured (to allow configuration
-from LDAP etc).
-
-Make queue() better abstracted or configured (to allow LMTP delivery
-instead of using qmail-queue).
+Run under pperl.  There is some perl internals problem with it.  Matt
+Sergeant is looking into it.
 
 Methods to create a bounce message easily; partly so we can accept a
 mail for one user but bounce it right away for another RCPT'er.
