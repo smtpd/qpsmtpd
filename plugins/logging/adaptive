@@ -61,6 +61,7 @@ sub dlog {
     ": '$return_text'"), "\n";
 
   foreach my $row ( @{$transaction->{_log}} ) {
+      next unless scalar @$row; # skip over empty log lines
       my ($trace, $hook, $plugin, @log) = @$row;
       if ($trace <= $self->{_maxlevel}) {
 	  warn 
@@ -83,7 +84,7 @@ sub slog {
   my ($self, $transaction, @args) = @_;
 
   foreach my $row ( @{$transaction->{_log}} ) {
-      next unless scalar @$row;
+      next unless scalar @$row; # skip over empty log lines
       my ($trace, $hook, $plugin, @log) = @$row;
 	warn 
 	    join(" ", $$ .
