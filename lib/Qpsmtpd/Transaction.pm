@@ -7,10 +7,6 @@ use Qpsmtpd::Constants;
 
 use IO::File qw(O_RDWR O_CREAT);
 
-# For unique filenames. We write to a local tmp dir so we don't need
-# to make them unpredictable.
-my $transaction_counter = 0; 
-
 sub new { start(@_) }
 
 sub start {
@@ -71,22 +67,7 @@ sub body_write {
   my $self = shift;
   my $data = shift;
   unless ($self->{_body_file}) {
-     my $spool_dir = $self->config('spool_dir') ? $self->config('spool_dir') 
-                                                : Qpsmtpd::Utils::tildeexp('~/tmp/');
-
-     $spool_dir .= "/" unless ($spool_dir =~ m!/$!);
-     
-     $spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
-     $spool_dir = $1;
-
-     if (-e $spool_dir) {
-       my $mode = (stat($spool_dir))[2];
-       die "Permissions on spool_dir $spool_dir are not 0700" if $mode & 07077;
-     }
-
-     -d $spool_dir or mkdir($spool_dir, 0700) or die "Could not create spool_dir $spool_dir: $!";
-     $self->{_filename} = $spool_dir . join(":", time, $$, $transaction_counter++);
-     $self->{_filename} =~ tr!A-Za-z0-9:/_-!!cd;
+    $self->{_filename} = $self->temp_file();
     $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
       or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
   }
@@ -128,6 +109,25 @@ sub DESTROY {
   undef $self->{_body_file} if $self->{_body_file};
   if ($self->{_filename} and -e $self->{_filename}) {
     unlink $self->{_filename} or $self->log(LOGERROR, "Could not unlink ", $self->{_filename}, ": $!");
+  }
+
+  # These may not exist
+  if ( $self->{_temp_files} ) {
+    $self->log(LOGDEBUG, "Cleaning up temporary transaction files");
+    foreach my $file ( @{$self->{_temp_files}} ) {
+      next unless -e $file;
+      unlink $file or $self->log(LOGERROR,
+       "Could not unlink temporary file", $file, ": $!");
+    }
+  }
+  # Ditto
+  if ( $self->{_temp_dirs} ) {
+    eval {use File::Path};
+    $self->log(LOGDEBUG, "Cleaning up temporary directories");
+    foreach my $dir ( @{$self->{_temp_dirs}} ) {
+      rmtree($dir) or $self->log(LOGERROR, 
+        "Could not unlink temporary dir", $dir, ": $!");
+    }
   }
 }
 

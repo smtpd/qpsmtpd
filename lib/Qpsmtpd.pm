@@ -255,4 +255,52 @@ sub _register_hook {
   }
 }
 
+sub spool_dir {
+  my $self = shift;
+
+  unless ( $self->{_spool_dir} ) { # first time through
+    my $spool_dir = $self->config('spool_dir') 
+                 || Qpsmtpd::Utils::tildeexp('~/tmp/');
+
+    $spool_dir .= "/" unless ($spool_dir =~ m!/$!);
+
+    $spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
+    $spool_dir = $1; # cleanse the taint
+    $self->{_spool_dir} = $spool_dir;
+
+    # Make sure the spool dir has appropriate rights
+    if (-e $spool_dir) {
+      my $mode = (stat($spool_dir))[2];
+      warn "Permissions on spool_dir $spool_dir are not 0700" if $mode & 07077;
+    }
+
+    # And finally, create it if it doesn't already exist
+    -d $spool_dir or mkdir($spool_dir, 0700) 
+      or die "Could not create spool_dir $spool_dir: $!";
+  }
+
+  return $self->{_spool_dir};
+}
+
+# For unique filenames. We write to a local tmp dir so we don't need
+# to make them unpredictable.
+my $transaction_counter = 0; 
+
+sub temp_file {
+  my $self = shift;
+  my $filename = $self->spool_dir() 
+    . join(":", time, $$, $transaction_counter++);
+  $filename =~ tr!A-Za-z0-9:/_-!!cd;
+  return $filename;
+} 
+
+sub temp_dir {
+  my $self = shift;
+  my $mask = shift || 0700;
+  my $dirname = $self->temp_file();
+  -d $dirname or mkdir($dirname, $mask)
+    or die "Could not create temporary directory $dirname: $!";
+  return $dirname;
+}
+
 1;

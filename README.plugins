@@ -200,3 +200,32 @@ With the $Include stuff you order using the filename of the plugin.d
 file. So if you have a plugin called xyz but want it to come early on,
 you call it's config file 00_xyz, but that file still refers to the
 plugin called xyz.
+
+=head1 Temporary Files
+
+The temporary file and directory functions can be used for plugin specific
+workfiles and will automatically be deleted at the end of the current
+transaction.
+
+=over 4
+
+=item temp_file()
+
+Returns a unique name of a file located in the default spool directory, but
+does not open that file (i.e. it is the name not a file handle).
+
+=item temp_dir()
+
+Returns the name of a unique directory located in the default spool
+directory, after creating the directory with 0700 rights.  If you need a
+directory with different rights (say for an antivirus daemon), you will
+need to use the base function $self->qp->temp_dir() which takes a single
+parameter for the permissions requested (see L<mkdir> for details).  A
+directory created like this will B<not> be deleted when the transaction is
+ended.
+
+=item spool_dir()
+
+Returns the configured system-wide spool directory.
+
+=back

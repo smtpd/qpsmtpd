@@ -53,6 +53,24 @@ sub connection {
   shift->qp->connection;
 }
 
+sub spool_dir {
+  shift->qp->spool_dir;
+}
+
+sub temp_file {
+  my $self = shift;
+  my $tempfile = $self->qp->temp_file;
+  push @{$self->qp->transaction->{_temp_files}}, $tempfile;
+  return $tempfile;
+}
+
+sub temp_dir {
+  my $self = shift;
+  my $tempdir = $self->qp->temp_dir();
+  push @{$self->qp->transaction->{_temp_dirs}}, $tempdir;
+  return $tempdir;
+}
+
 # plugin inheritance:
 # usage:
 #  sub register {

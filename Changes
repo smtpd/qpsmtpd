@@ -1,6 +1,13 @@
 
 0.29
 
+  New temp_file() and temp_dir() methods; when used by plugins, they create
+  a filename or directory which will last only as long as the current 
+  transaction.  Also created a spool_dir() method which checks/creates the
+  spool_dir when the application starts up.  All three methods are also
+  available in the base class where the temp_* objects are not automatically
+  limited to the transaction's lifetime. (John Peacock)
+
   Added Gavin Carr's greylisting plugin
 
   Renamed config/ to config.sample/
