@@ -1,3 +1,11 @@
+# 
+#  Example configuration file for plugins
+#
+
+# enable this to get configuration via http; see perldoc
+# plugins/http_config for details.
+#   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
+
 quit_fortune
 require_resolvable_fromhost
 rhsbl
@@ -10,7 +18,21 @@ check_relay
 
 # content filters
 klez_filter
+
+
+# You can run the spamassassin plugin with options.  See perldoc
+# plugins/spamassassin for details. 
+#
 spamassassin
 
+# rejects mails with a SA score higher than 20 and munges the subject
+# of the score is higher than 10.  
+#
+#   spamassassin reject_threshold 20 munge_subject_threshold 10
+
+# run the clamav virus checking plugin
+# clamav
+
+# queue the mail with qmail-queue
 queue/qmail-queue
 

@@ -1,26 +1,77 @@
+=head1 NAME
 
-#
-#  Requires the spamd patch attached to this spamassassin bug:
-#    http://bugzilla.spamassassin.org/show_bug.cgi?id=660    
-#
-#  The patch is going to be included in SpamAssassin 2.40.
-#
-#  ... or you can change REPORT_IFSPAM to REPORT below; but the headers
-#      will be a bit different than you are used to.
-#
-#
+spamassassin
+
+=head1 DESCRIPTION
+
+Plugin that checks if the mail is spam by using the "spamd" daemon
+from the SpamAssassin package.  L<http://www.spamassassin.org>
+
+SpamAssassin 2.40 or newer is required.
+
+=head1 CONFIG
+
+Configured in the plugins file without any parameters, the
+spamassassin plugin will add relevant headers from the spamd
+(X-Spam-Status etc).
+
+The format goes like
+
+  spamassassin  option value  [option value]
+
+Options being those listed below and the values being parameters to
+the options.  Confused yet?  :-)
+
+=over 4
+
+=item reject_threshold [threshold]
+
+Set the threshold over which the plugin will reject the mail.  Some
+mail servers are so useless that they ignore 55x responses not coming
+after RCPT TO, so they might just keep retrying and retrying and
+retrying until the mail expires from their queue. 
+
+I like to configure this with 15 or 20 as the threshold.  
+
+The default is to never reject mail based on the SpamAssassin score.
+
+=item munge_subject_threshold [threshold]
+
+Set the threshold over which we will prefix the subject with
+'***SPAM***'.  A messed up subject is easier to filter on than the
+other headers for many people with not so clever mail clients.  You
+might want to make another plugin that does this on a per user basis.
+
+The default is to never munge the subject based on the SpamAssassin score.
+
+=back
+
+With both options the configuration line will look like the following
+
+ spamasssasin  reject_threshold 18  munge_subject_threshold 8
+
+=cut
+
 
 use Socket qw(:DEFAULT :crlf);
 use IO::Handle;
 
 sub register {
-  my ($self, $qp) = @_;
+  my ($self, $qp, @args) = @_;
   $self->register_hook("data_post", "check_spam");
-}
 
-#my $rv = check_spam();
-#die "failure!" unless defined $rv;
-#print "rv: $rv\n";
+  $self->log(0, "Bad parameters for the spamassassin plugin")
+    if @_ % 2;
+
+  %{$self->{_args}} = @args;
+
+  $self->register_hook("data_post", "check_spam_reject")
+    if $self->{_args}->{reject_threshold};
+
+  $self->register_hook("data_post", "check_spam_munge_subject")
+    if $self->{_args}->{munge_subject_threshold};
+
+}
 
 sub check_spam {
   my ($self, $transaction) = @_;
@@ -34,7 +85,7 @@ sub check_spam {
   my $iaddr   = inet_aton($remote) or 
     $self->log(1, "Could not resolve host: $remote") and return (DECLINED);
   my $paddr   = sockaddr_in($port, $iaddr);
-  
+
   my $proto   = getprotobyname('tcp');
   socket(SPAMD, PF_INET, SOCK_STREAM, $proto)
     or $self->log(1, "Could not open socket: $!") and return (DECLINED);
@@ -49,21 +100,27 @@ sub check_spam {
   print SPAMD "REPORT_IFSPAM SPAMC/1.0" . CRLF;
   # or CHECK or REPORT or SYMBOLS
 
-  print SPAMD join CRLF, split /\n/, $transaction->header->as_string;
-  print SPAMD CRLF;
+  print SPAMD join CRLF, split /\n/, $transaction->header->as_string
+    or warn "Could not print to spamd: $!";
+
+  print SPAMD CRLF
+    or warn "Could not print to spamd: $!";
 
   while (my $line = $transaction->body_getline) {
     chomp $line;
-    print SPAMD $line, CRLF;
+    print SPAMD $line, CRLF
+      or warn "Could not print to spamd: $!";
   }
+
   print SPAMD CRLF;
   shutdown(SPAMD, 1);
   my $line0 = <SPAMD>; # get the first protocol lines out
   if ($line0) {
     $transaction->header->add("X-Spam-Check-By", $self->qp->config('me'));
   }
+
   while (<SPAMD>) {
-    warn "GOT FROM SPAMD1: $_";
+    #warn "GOT FROM SPAMD1: $_";
     next unless m/\S/;
     s/\r?\n$/\n/;
     my @h = split /: /, $_, 2;
@@ -72,5 +129,37 @@ sub check_spam {
     last if $h[0] eq "Spam" and $h[1] =~ m/^False/;
 
   }
+
   return (DECLINED);
+}
+
+sub check_spam_reject {
+  my ($self, $transaction) = @_;
+
+  my $score = $self->get_spam_score($transaction) or return DECLINED;  
+
+  return (DENY, "spam score exceeded threshold")
+    if $score >= $self->{_args}->{reject_threshold};
+
+  return DECLINED;
+}
+
+
+sub check_spam_munge_subject {
+  my ($self, $transaction) = @_;
+  my $score = $self->get_spam_score($transaction) or return DECLINED;  
+
+  return DECLINED unless $score >= $self->{_args}->{munge_subject_threshold};
+
+  my $subject = $transaction->header->get('Subject') || '';
+  $transaction->header->replace('Subject', "***SPAM*** $subject");
+
+  return DECLINED;
+}
+
+sub get_spam_score {
+  my ($self, $transaction) = @_;
+  my $status  = $transaction->header->get('X-Spam-Status') or return; 
+  my ($score) = ($status =~ m/hits=(\d+\.\d+)/)[0];
+  return $score;
 }
