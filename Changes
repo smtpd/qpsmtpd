@@ -1,3 +1,10 @@
+2002/04/20
+  Support comments in configuration files (prefix the line with #)
+  
+  Support RELAYCLIENT like qmail-smtpd (thanks to Marius Kjeldahl
+  <marius@kjeldahl.net>) )
+
+
 2002/01/26
   Allow [1.2.3.4] for the hostname when checking if the dns resolves
 

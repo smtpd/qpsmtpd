@@ -44,7 +44,7 @@ my $remote_host = $ENV{TCPREMOTEHOST} || "[$ENV{TCPREMOTEIP}]";
 $state{remote_info} = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
 $state{remote_ip} = $ENV{TCPREMOTEIP};
 
-$SIG{ALRM} = sub { respond(421, "timeout pal, don't be so slow"); exit };
+$SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a timeout; I just can't wait that long..."); exit };
 
 $state{dnsbl_blocked} = check_dnsbl($state{remote_ip});
 
@@ -127,7 +127,7 @@ sub mail {
   }
   else {
     my $from_parameter = join " ", @_;
-    #warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
+    warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
     my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
     #warn "$$ from email address : $from\n" if $TRACE;
     if ($from eq "<>") {
@@ -141,9 +141,9 @@ sub mail {
     $from->format ne "<>"
       and get_config("require_resolvable_fromhost")
       and !check_dns($from->host)
-      and return respond(450, "Could not resolve ". $from->host);
+      and return respond(450, $from->host ? "Could not resolve ". $from->host : "FQDN required in the envelope sender");
 
-    #warn "$$ getting mail from ",$from->format,"\n" if $TRACE;
+    warn "$$ getting mail from ",$from->format,"\n" if $TRACE;
     respond(250, $from->format . ", sender OK - I always like getting mail from you!");
 
     $state{transaction} = { from => $from };
@@ -340,6 +340,9 @@ sub check_dnsbl {
 sub check_dns {
   my $host = shift;
 
+  # for stuff where we can't even parse a hostname out of the address
+  return 0 unless $host;
+
   return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
 
   my $res = new Net::DNS::Resolver;
@@ -361,6 +364,7 @@ sub check_dns {
 sub check_relay {
   my $host = lc shift;
   my @rcpt_hosts = get_config("rcpthosts");
+  return 1 if exists $ENV{RELAYCLIENT};
   for my $allowed (@rcpt_hosts) {
     $allowed =~ s/^\s*(\S+)/$1/;
     return 1 if $host eq lc $allowed;
@@ -372,7 +376,7 @@ sub check_relay {
 my %config_cache;
 sub get_config {
   my $config = shift;
-  warn "$$ trying to get config for $config" if $TRACE;
+  warn "$$ trying to get config for $config" if $TRACE > 4;
   return @{$config_cache{$config}} if $config_cache{$config};
   my $configdir = '/var/qmail/control';
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
@@ -380,7 +384,7 @@ sub get_config {
   open CF, "<$configdir/$config" or warn "$$ could not open configfile $config: $!", return;
   my @config = <CF>;
   chomp @config;
-  @config = grep { $_ } @config;
+  @config = grep { $_ and $_ !~ m/\s*#/ } @config;
   close CF;
   warn "$$ returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]) if $TRACE > 4;
   $config_cache{$config} = \@config;
