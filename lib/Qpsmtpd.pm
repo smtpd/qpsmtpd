@@ -7,9 +7,11 @@ use Qpsmtpd::Transaction;
 use Qpsmtpd::Constants;
 
 use Mail::Address ();
+use Mail::Header ();
 use Sys::Hostname;
 use IPC::Open2;
 use Data::Dumper;
+use POSIX qw(strftime);
 BEGIN{$^W=0;}
 use Net::DNS;
 BEGIN{$^W=1;}
@@ -49,8 +51,14 @@ sub config {
 		  timeout => 1200,
 		  );
 
-  return ($self->get_qmail_config($c) || $defaults{$c} || undef);
-
+  if (wantarray) {
+      my @config = $self->get_qmail_config($c);
+      @config = @{$defaults{$c}} if (!@config and $defaults{$c});
+      return @config;
+  } 
+  else {
+      return ($self->get_qmail_config($c) || $defaults{$c});
+   }
 };
 
 sub log {
@@ -200,7 +208,9 @@ sub check_relay {
   my $host = lc shift;
   my @rcpt_hosts = $self->config("rcpthosts");
   return 1 if exists $ENV{RELAYCLIENT};
+  warn "HOSTTOCHECK: $host";
   for my $allowed (@rcpt_hosts) {
+    warn "ALLOWED: $allowed";
     $allowed =~ s/^\s*(\S+)/$1/;
     return 1 if $host eq lc $allowed;
     return 1 if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
@@ -275,62 +285,74 @@ sub data {
   my $max_size = ($self->config('databytes'))[0] || 0;  # this should work in scalar context
   my $blocked = "";
   my %matches;
-  my $header = 1;
+  my $in_header = 1;
   my $complete = 0;
 
   $self->log(6, "max_size: $max_size / size: $size");
+
+  my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
 
   while (<STDIN>) {
     $complete++, last if $_ eq ".\r\n";
     $i++;
     $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
       if $_ eq ".\n";
-    unless ($max_size and $size > $max_size) {
+    unless ($self->transaction->blocked and ($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
-      $header = 0 if $header and m/^\s*$/;
+      if ($in_header and m/^\s*$/) {
+	$in_header = 0;
+	my @header = split /\n/, $buffer;
 
-      if ($header) {
+	# ... need to check that we don't reformat any of the received lines.
+	#
+	# 3.8.2 Received Lines in Gatewaying
+	#   When forwarding a message into or out of the Internet environment, a
+	#   gateway MUST prepend a Received: line, but it MUST NOT alter in any
+	#   way a Received: line that is already in the header.
 
-	$matches{"aol.com"} = 1 if m/aol\.com/;
+	$header->extract(\@header);
+	$buffer = "";
 
-	$blocked = "Your mail looks too much like that SirCam nonsense, please go away"
-	  if $self->transaction->sender->format eq "<>"
-	     and $_ eq "Content-Disposition: Multipart message\n";
-	   
-	$blocked = "No List Builder spam for us, thank you."
-	  if m/^From: List Builder <notifications\@bcentral.com>/;
+	# FIXME - call plugins to work on just the header here; can
+	# save us buffering the mail content.
 
-	$blocked = q[Don't send W32.Badtrans.B@mm virus to us, please]
-	  if $matches{"aol.com"} and m/^From: .* <_/;
+      }
+
+      if ($in_header) {
+	#. ..
       }
       
-
-      # Might be klez
-      m/^Content-type:.*(?:audio|application)/i
-          and $matches{"klez"}=1;
-
-      # we've seen the Klez signature, we're probably infected
-      $blocked = q[Take your Klez virus and stuff it!  HAND.]
-         if $matches{"klez"} and m!^TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQA!;
-
       $buffer .= $_;
       $size += length $_;
     }
-    warn "$$ size is at $size\n" unless ($i % 300);
+    $self->log(5, "size is at $size\n") unless ($i % 300);
 
     alarm $self->config('timeout');
   }
 
   $self->log(6, "max_size: $max_size / size: $size");
 
+  $self->transaction->header($header);
+  $self->transaction->body(\$buffer);
+
   # if we get here without seeing a terminator, the connection is
   # probably dead.
   $self->respond(451, "Incomplete DATA"), return 1 unless $complete;
- 
-  $self->respond(550, $blocked),return 1 if $blocked;
-  $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
 
+  #
+  #  FIXME - Call plugins to work on the body here
+  #
+
+  $self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
+
+  $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
   
+  return $self->queue($self->transaction);
+
+}
+
+sub queue {
+  my ($self, $transaction) = @_;
 
   # these bits inspired by Peter Samuels "qmail-queue wrapper"
   pipe(MESSAGE_READER, MESSAGE_WRITER) or fault("Could not create message pipe"), exit;
@@ -348,13 +370,19 @@ sub data {
 
     close MESSAGE_READER  or fault("close msg reader fault"),exit;
     close ENVELOPE_READER or fault("close envelope reader fault"), exit;
-    print MESSAGE_WRITER "Received: from ".$self->connection->remote_info." (HELO ".$self->connection->hello_host . ") [".$self->connection->remote_ip . "]\n";
-    print MESSAGE_WRITER "  by ".$self->config('me')." (qpsmtpd/".$self->version.") with SMTP; ", scalar gmtime, "Z\n";
-    print MESSAGE_WRITER $buffer;
+
+    print MESSAGE_WRITER "Received: from ".$self->connection->remote_info 
+	." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip 
+	. ")\n by ".$self->config('me')." (qpsmtpd/".$self->version
+	.") with SMTP; ". (strftime('%Y-%m-%d %TZ', gmtime)) . "\n";
+    print MESSAGE_WRITER "X-smtpd: qpsmtpd/",$self->version,", http://develooper.com/code/qpsmtpd/\n";
+
+    $transaction->header->print(\*MESSAGE_WRITER);
+    print MESSAGE_WRITER ${$transaction->body};
     close MESSAGE_WRITER;
 
-    my @rcpt = map { "T" . $_->address } $self->transaction->recipients;
-    my $from = "F".($self->transaction->sender->address|| "" );
+    my @rcpt = map { "T" . $_->address } $transaction->recipients;
+    my $from = "F".($transaction->sender->address|| "" );
     print ENVELOPE_WRITER "$from\0", join("\0",@rcpt), "\0\0"
       or respond(451,"Could not print addresses to queue"),exit;
     
@@ -376,9 +404,7 @@ sub data {
       die "should never be here!";
     }
   }
-  
-  return 1;
-}
 
+}
 
 1;

@@ -11,10 +11,6 @@ sub start {
   bless ($self, $class);
 }
 
-sub add_header {
-  my $self = shift;
-}
-
 sub add_recipient {
   my $self = shift;
   @_ and push @{$self->{_recipients}}, shift;
@@ -29,15 +25,31 @@ sub sender {
   my $self = shift;
   @_ and $self->{_sender} = shift;
   $self->{_sender};
-
 }
 
-sub add_header_line {
-
+sub header {
+  my $self = shift;
+  @_ and $self->{_header} = shift;
+  $self->{_header};
 }
 
-sub add_body_line {
-
+sub body {
+  my $self = shift;
+  @_ and $self->{_body} = shift;
+  $self->{_body};
 }
+
+sub blocked {
+  my $self = shift;
+  @_ and $self->{_blocked} = shift;
+  $self->{_blocked};
+}
+
+
+#sub add_header_line {
+#}
+
+#sub add_body_line {
+#}
 
 1;

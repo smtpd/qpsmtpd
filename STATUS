@@ -2,6 +2,12 @@
 things to do for v0.10
 ----------------------
 
+transaction should probably be a part of the connection object instead
+of off the main object
+
+get timeouts to work in "tcpserver" mode (or generally...)
+
+
 plugin support;
 
   load plugins in a funny namespace
