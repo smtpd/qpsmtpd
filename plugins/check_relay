@@ -1,0 +1,23 @@
+# this plugin checks the standard rcpthosts config and
+# $ENV{RELAYCLIENT} to see if relaying is allowed.
+#
+# It should be configured to be run _LAST_!
+#
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("rcpt", "check_relay");
+}
+
+sub check_relay {
+  my ($self, $transaction, $recipient) = @_;
+  my $host = lc $recipient->host;
+  my @rcpt_hosts = $self->qp->config("rcpthosts");
+  return (OK) if exists $ENV{RELAYCLIENT};
+  for my $allowed (@rcpt_hosts) {
+    $allowed =~ s/^\s*(\S+)/$1/;
+    return (OK) if $host eq lc $allowed;
+    return (OK) if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
+  }
+  return (DENY);
+}

@@ -45,6 +45,12 @@ sub blocked {
   $self->{_blocked};
 }
 
+sub notes {
+  my $self = shift;
+  my $key  = shift;
+  @_ and $self->{_notes}->{$key} = shift;
+  $self->{_notes}->{$key};
+}
 
 #sub add_header_line {
 #}

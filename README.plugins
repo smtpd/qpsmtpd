@@ -1,0 +1,87 @@
+#
+# read this with 'perldoc README.plugins'  ...
+#
+
+=head1 qpsmtpd plugin system; developer documentation
+
+See the examples in plugins/ and ask questions on the qpsmtpd
+mailinglist; subscribe by sending mail to qpsmtpd-subscribe@perl.org.
+
+=head1 General return codes
+
+Each plugin must return an allowed constant for the hook and (usually)
+optionally a "message".
+
+Generally all plugins for a hook are processed until one returns
+something other than "DECLINED".
+
+Plugins are run in the order they are listed in the "plugins"
+configuration.
+
+=over 4
+
+=item OK
+
+Action allowed
+
+=item DENY
+
+Action denied
+
+=item DENYSOFT
+
+Action denied; return a temporary rejection code (say 450 instead of 550).
+
+=item DECLINED
+
+Plugin declined work; proceed as usual.  This return code is always
+allowed unless noted otherwise.
+
+=item DONE
+
+Finishing processing of the request.  Usually used when the plugin
+sent the response to the client.
+
+=back
+
+See more detailed description for each hook below.
+
+=head1 Hooks
+
+=head2 mail
+
+Called right after the envelope sender address is passed.  The plugin
+gets passed a Mail::Address object.  Default is to allow the
+recipient.
+
+Allowed return codes
+
+  OK       - sender allowed
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DONE     - skip further processing
+
+
+=head2 rcpt
+
+Hook for the "rcpt" command.  Defaults to deny the mail with a soft
+error code.
+
+Allowed return codes
+
+  OK       - recipient allowed
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DONE     - skip further processing
+
+
+=head2 quit
+
+Called on the "quit" command.
+
+Allowed return codes:
+
+  DONE 
+
+All other codes will qpsmtpd do the default response.
+

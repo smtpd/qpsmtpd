@@ -72,8 +72,6 @@ sub dispatch {
   my $self = shift;
   my ($cmd) = lc shift;
 
-  warn "command: $cmd";
-
   #$self->respond(553, $state{dnsbl_blocked}), return 1
   #  if $state{dnsbl_blocked} and ($cmd eq "rcpt");
 
@@ -164,16 +162,25 @@ sub mail {
     }
     return $self->respond(501, "could not parse your mail from command") unless $from;
 
-    # this needs to be moved to a plugin --- FIXME
-    0 and $from->format ne "<>"
-      and $self->config("require_resolvable_fromhost")
-      and !check_dns($from->host)
-      and return $self->respond(450, $from->host ? "Could not resolve ". $from->host : "FQDN required in the envelope sender");
-
-    $self->log(2, "getting mail from ".$from->format);
-    $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
-
-    $self->transaction->sender($from);
+    my ($rc, $msg) = $self->run_hooks("mail", $from);
+    if ($rc == DONE) {
+      return 1;
+    }
+    elsif ($rc == DENY) {
+      $msg ||= $from->format . ', denied';
+      $self->log(2, "deny mail from " . $from->format . " ($msg)");
+      $self->respond(550, $msg);
+    }
+    elsif ($rc == DENYSOFT) {
+      $msg ||= $from->format . ', temporarily denied';
+      $self->log(2, "denysoft mail from " . $from->format . " ($msg)");
+      $self->respond(450, $msg);
+    }
+    else { # includes OK
+      $self->log(2, "getting mail from ".$from->format);
+      $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
+      $self->transaction->sender($from);
+    }
   }
 }
 
@@ -182,40 +189,33 @@ sub rcpt {
   return $self->respond(501, "syntax error in parameters") unless $_[0] =~ m/^to:/i;
   return(503, "Use MAIL before RCPT") unless $self->transaction->sender;
 
-  my $from = $self->transaction->sender;
-
-  # Move to a plugin -- FIXME
-  if (0 and $from->format ne "<>" and $self->config('rhsbl_zones')) {
-    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->config('rhsbl_zones');
-    my $host = $from->host;
-    for my $rhsbl (keys %rhsbl_zones) {
-      $self->respond("550", "Mail from $host rejected because it $rhsbl_zones{$rhsbl}"), return 1
-	if check_rhsbl($rhsbl, $host);
-    }
-  }
-
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
   $rcpt = (Mail::Address->parse($rcpt))[0];
   return $self->respond(501, "could not parse recipient") unless $rcpt;
-  return $self->respond(550, "will not relay for ". $rcpt->host) unless $self->check_relay($rcpt->host);
-  $self->transaction->add_recipient($rcpt);
-  $self->respond(250, $rcpt->format . ", recipient ok");
-}
 
- 
-sub check_relay {
-  my $self = shift;
-  my $host = lc shift;
-  my @rcpt_hosts = $self->config("rcpthosts");
-  return 1 if exists $ENV{RELAYCLIENT};
-  for my $allowed (@rcpt_hosts) {
-    $allowed =~ s/^\s*(\S+)/$1/;
-    return 1 if $host eq lc $allowed;
-    return 1 if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
+  my ($rc, $msg) = $self->run_hooks("rcpt", $rcpt);
+  if ($rc == DONE) {
+    return 1;
+  }
+  elsif ($rc == DENY) {
+    $msg ||= 'relaying denied';
+    $self->respond(550, $msg);
+  }
+  elsif ($rc == DENYSOFT) {
+    $msg ||= 'relaying denied';
+    return $self->respond(550, $msg);
+  }
+  elsif ($rc == OK) {
+    $self->respond(250, $rcpt->format . ", recipient ok");
+    return $self->transaction->add_recipient($rcpt);
+  }
+  else {
+    return $self->respond(450, "Could not determine of relaying is allowed");
   }
   return 0;
 }
+
 
 sub get_qmail_config {
   my ($self, $config) = (shift, shift);
@@ -269,9 +269,10 @@ sub rset {
 
 sub quit {
   my $self = shift;
-  my @fortune = `/usr/games/fortune -s`;
-  @fortune = map { chop; s/^/  \/ /; $_ } @fortune;
-  $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day.", @fortune);
+  my ($rc, $msg) = $self->run_hooks("quit");
+  if ($rc != DONE) {
+    $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day.");
+  }
   exit;
 }
 
@@ -449,36 +450,56 @@ sub load_plugins {
     my $eval = join(
 		    "\n",
 		    "package $package;",
+		    'use Qpsmtpd::Constants;',
 		    "require Qpsmtpd::Plugin;",
 		    'use vars qw(@ISA);',
 		    '@ISA = qw(Qpsmtpd::Plugin);',
-#		    $line,
+		    $line,
 		    $sub,
 		    "\n", # last line comment without newline?
 		   );
 
     warn "eval: $eval";
 
-    $eval =~ m/(.*)/;
+    $eval =~ m/(.*)/s;
     $eval = $1;
 
     eval $eval;
     warn "EVAL: $@";
     die "eval $@" if $@;
 
-    #my $package_path = $package;
-    #$package_path =~ s!::!/!g;
-    #$package_path .= ".pm";
-    #$INC{$package_path} = "$dir/$plugin";
-    #use Data::Dumper;
-    #warn Data::Dumper->Dump([\%INC, \@INC], [qw(INCh INCa)]);
-
-    my $plug = $package->new();
-    $plug->register();
+    my $plug = $package->new(qpsmtpd => $self);
+    $plug->register($self);
 
   }
-
 }
+
+sub run_hooks {
+  my ($self, $hook) = (shift, shift);
+  if ($self->{_hooks}->{$hook}) {
+    my @r;
+    for my $code (@{$self->{_hooks}->{$hook}}) {
+      (@r) = &{$code}($self->transaction, @_);
+      last unless $r[0] == DECLINED; 
+    }
+    return @r;
+  }
+  warn "Did not run any hooks ...";
+  return (0, '');
+}
+
+sub _register_hook {
+  my $self = shift;
+  my ($hook, $code) = @_;
+
+  #my $plugin = shift;  # see comment in Plugin.pm:register_hook
+
+  $self->{_hooks} ||= {};
+  my $hooks = $self->{_hooks};
+  push @{$hooks->{$hook}}, $code;
+}
+
+
 
 
 

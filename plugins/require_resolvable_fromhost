@@ -1,0 +1,46 @@
+use Net::DNS qw(mx);
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("mail", "mail_handler");
+}
+
+sub mail_handler {
+  my ($self, $transaction, $sender) = @_;
+   
+  $sender->format ne "<>"
+    and $self->qp->config("require_resolvable_fromhost")
+    and !check_dns($sender->host)
+    and return (DENYSOFT, 
+		($sender->host
+		   ? "Could not resolve ". $sender->host
+		   : "FQDN required in the envelope sender"));
+  
+   return DECLINED;
+
+}
+
+
+sub check_dns {
+  my $host = shift;
+
+  # for stuff where we can't even parse a hostname out of the address
+  return 0 unless $host;
+
+  return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+
+  my $res = new Net::DNS::Resolver;
+  return 1 if mx($res, $host);
+  my $query = $res->search($host);
+  if ($query) {
+    foreach my $rr ($query->answer) {
+      return 1 if $rr->type eq "A" or $rr->type eq "MX";
+    }
+  }
+  else {
+    warn "$$ query for $host failed: ", $res->errorstring, "\n"
+      unless $res->errorstring eq "NXDOMAIN";
+  }
+  return 0;
+}
+
