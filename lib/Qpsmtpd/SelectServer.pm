@@ -23,6 +23,10 @@ tie %ready, 'Tie::RefHash';
 my $server;
 my $select;
 
+our $QUIT = 0;
+
+$SIG{INT} = $SIG{TERM} = sub { $QUIT++ };
+
 sub main {
     my $class = shift;
     my %opts = (LocalPort => 25, Reuse => 1, Listen => SOMAXCONN, @_);
@@ -34,7 +38,9 @@ sub main {
     $select = IO::Select->new($server);
     my $res = Net::DNS::Resolver->new;
     
-    while (1) {
+    # TODO - make this more graceful - let all current SMTP sessions finish
+    # before quitting!
+    while (!$QUIT) {
         foreach my $client ($select->can_read(1)) {
             if ($client == $server) {
                 my $client_addr;
