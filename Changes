@@ -27,9 +27,8 @@
 
   Move relay flag to connection object (John Peacock):
     + add relay_client() method to Connection.pm
-    + change SMTP.pm to copy relay_client() flag to transaction relaying
-      flag (for compatibility purposes) - should deprecate instead
     + Update Auth.pm module to set $connection->relay_client()
+    + Remove $transaction->relaying() completely (due to popular demand)
 
   Split check_relay plugin into two plugins (John Peacock):
     + check_relay now fires on connect and sets relay_client() flag

@@ -32,12 +32,6 @@ sub recipients {
   ($self->{_recipients} ? @{$self->{_recipients}} : ());
 }
 
-sub relaying {
-  my $self = shift;
-  @_ and $self->{_relaying} = shift;
-  $self->{_relaying};
-}
-
 sub sender {
   my $self = shift;
   @_ and $self->{_sender} = shift;
