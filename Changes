@@ -5,6 +5,8 @@
   Mail::Address does RFC822 addresses, we need SMTP addresses.
   Replace Mail::Address with Peter J. Holzer's Qpsmtpd::Address module.
 
+  Add "plugin/virus/uvscan" - McAfee commandline virus scanner
+
 
 0.28 - 2004/06/05
 
