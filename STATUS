@@ -2,6 +2,10 @@
 Issues
 ======
 
+add whitelist support to the dnsbl plugin (and maybe to the rhsbl
+plugin too).  Preferably both supporting DNS based whitelists and
+filebased (CDB) ones.
+
 Use clamd so we don't have to run with a higher memory limit.  Matt
 has made a Perl module interfacing clamd; the clamav module should use
 that if available.
