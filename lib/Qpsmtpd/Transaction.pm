@@ -28,6 +28,7 @@ sub add_recipient {
 
 sub recipients {
   my $self = shift;
+  @_ and $self->{_recipients} = [@_];
   ($self->{_recipients} ? @{$self->{_recipients}} : ());
 }
 
@@ -173,6 +174,10 @@ for more details.
 This returns a list of the current recipients in the envelope.
 
 Each recipient returned is a C<Qpsmtpd::Address> object.
+
+This method is also a setter. Pass in a list of recipients to change
+the recipient list to an entirely new list. Note that the recipients
+you pass in B<MUST> be C<Qpsmtpd::Address> objects.
 
 =head2 relaying( )
 
