@@ -5,7 +5,7 @@
   Add munge_subject_threshold and reject_threshold options to the
   spamassassin plugin.  Add documentation to the spamassassin plugin.
 
-  Add -p to mkdir in log/run (Rasjid Wilcox <rasjid@openminddev.net>)
+  Add -p to mkdir in log/run (Rasjid Wilcox <rasjidw@openminddev.net>)
 
   clamav plugin, thanks to Matt Sergeant, matt@sergeant.org.
   Enabling this might require you to increase your "softlimit" in
