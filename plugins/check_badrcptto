@@ -10,8 +10,9 @@ sub check_for_badrcptto {
   my @badrcptto = $self->qp->config("badrcptto") or return (DECLINED);
   return (DECLINED) unless $recipient->host && $recipient->user;
   my $host = lc $recipient->host;
-  my $from = $recipient->user . '@' . $host;
+  my $from = lc($recipient->user) . '@' . $host;
   for my $bad (@badrcptto) {
+    $bad = lc $bad;
     $bad =~ s/^\s*(\S+)/$1/;
     return (DENY, "mail to $bad not accepted here")
       if $bad eq $from;

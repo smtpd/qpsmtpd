@@ -30,11 +30,12 @@ sub mail_handler {
 			    and $sender->host && $sender->user);
 
   my $host = lc $sender->host;
-  my $from = $sender->user . '@' . $host;
+  my $from = lc($sender->user) . '@' . $host;
 
   for my $bad (@badmailfrom) {
     $bad =~ s/^\s*(\S+).*/$1/;
     next unless $bad;
+    $bad = lc $bad;
     warn "Bad badmailfrom config: No \@ sign in $bad\n" and next unless $bad =~ m/\@/;
     $transaction->notes('badmailfrom', "Mail from $bad not accepted here")
       if ($bad eq $from)
