@@ -16,7 +16,7 @@ use strict;
 $| = 1;
 
 delete $ENV{ENV};
-$ENV{PATH} = '/var/qmail/bin';
+$ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 
 # should this be ->new ?
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
