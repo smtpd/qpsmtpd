@@ -33,7 +33,7 @@ sub mail_handler {
     or return (DECLINED);
 
   return (DECLINED) unless ($sender->format ne "<>"
-			    and $sender->host && $sender->user);
+                            and $sender->host && $sender->user);
 
   my $host = lc $sender->host;
   my $from = lc($sender->user) . '@' . $host;
@@ -43,7 +43,7 @@ sub mail_handler {
     next unless $bad;
     $bad = lc $bad;
     warn "Bad badmailfrom config: No \@ sign in $bad\n" and next unless $bad =~ m/\@/;
-    $transaction->notes('badmailfrom', "Mail from $bad not accepted here")
+    $transaction->notes('badmailfrom', "sorry, your envelope sender is in my badmailfrom list")
       if ($bad eq $from) || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
   }
   return (DECLINED);

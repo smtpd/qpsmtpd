@@ -75,7 +75,8 @@ sub queue_handler {
 
     my $msg_id = $transaction->header->get('Message-Id') || '';
     $msg_id =~ s/[\r\n].*//s;  # don't allow newlines in the Message-Id here
-    return (OK, "Queued! $msg_id");
+    $msg_id = "<$msg_id>" unless $msg_id =~ /^<.*>$/;  # surround in <>'s
+    return (OK, "Queued! " . time . " qp $child $msg_id");
   }
   elsif (defined $child) {
     # Child
@@ -100,7 +101,7 @@ sub queue_handler {
     POSIX::dup2(fileno(ENVELOPE_READER), 1) or die "Unable to dup ENVELOPE_READER: $!";
 
     my $ppid = getppid();
-    $self->log(LOGNOTICE, "(for $ppid ) Queuing to $queue_exec");
+    $self->log(LOGNOTICE, "(for $ppid ) Queuing qp $$ to $queue_exec");
 
     my $rc = exec $queue_exec;
 

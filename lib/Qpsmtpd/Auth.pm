@@ -64,6 +64,11 @@ entries or to send responses to the remote SMTP client.
 A Qpsmtpd::Transaction object which can be used to examine information
 about the current SMTP session like the remote IP address.
 
+=item $mechanism
+
+The lower-case name of the authentication mechanism requested by the
+client; either "plain", "login", or "cram-md5".
+
 =item $user
 
 Whatever the remote SMTP client sent to identify the user (may be bare
@@ -157,7 +162,6 @@ A slightly more secure method where the username and password are Base-64
 encoded before sending.  This is still an insecure method, since it is
 trivial to decode the Base-64 data.  Again, it will not normally be chosen
 by SMTP clients unless a more secure method is not available (or if it fails).
-CURRENTLY NOT SUPPORTED DUE TO LACK OF DOCUMENTATION ON FUNCTIONALITY
 
 =item * auth-cram-md5
 
@@ -309,23 +313,28 @@ sub SASL {
         $passHash, $ticket );
 
     # try running the polymorphous hooks next
-    if ( $rc == DECLINED ) {    
+    if ( !$rc || $rc == DECLINED ) {    
         ( $rc, $msg ) =
-          $session->run_hooks( "auth", $mechanism, $user, $passClear, $passHash,
-            $ticket );
+          $session->run_hooks( "auth", $mechanism, $user, $passClear,
+            $passHash, $ticket );
     }
 
     if ( $rc == OK ) {
         $msg = "Authentication successful for $user" .
-	    ( defined $msg ? " - " . $msg : "" );
+            ( defined $msg ? " - " . $msg : "" );
         $session->respond( 235, $msg );
         $session->connection->relay_client(1);
         $session->log( LOGINFO, $msg );
+
+        $session->{_auth_user} = $user;
+        $session->{_auth_mechanism} = $mechanism;
+        s/[\r\n].*//s for ($session->{_auth_user}, $session->{_auth_mechanism}); 
+
         return OK;
     }
     else {
         $msg = "Authentication failed for $user" .
-	    ( defined $msg ? " - " . $msg : "" );
+            ( defined $msg ? " - " . $msg : "" );
         $session->respond( 535, $msg );
         $session->log( LOGERROR, $msg );
         return DENY;

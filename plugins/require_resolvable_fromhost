@@ -8,13 +8,16 @@ sub register {
 sub mail_handler {
   my ($self, $transaction, $sender) = @_;
 
+  return DECLINED
+        if ($self->qp->connection->notes('whitelistclient'));
+
   $sender->format ne "<>"
     and $self->qp->config("require_resolvable_fromhost")
     and !check_dns($sender->host)
     and return (DENYSOFT, 
-		($sender->host
-		   ? "Could not resolve ". $sender->host
-		   : "FQDN required in the envelope sender"));
+                ($sender->host
+                   ? "Could not resolve ". $sender->host
+                   : "FQDN required in the envelope sender"));
   
    return DECLINED;
 

@@ -19,11 +19,11 @@ my $command = 'MAIL FROM:<ask@perl.org> SIZE=1230';
 is(($smtpd->command($command))[0], 250, $command);
 is($smtpd->transaction->sender->format, '<ask@perl.org>', 'got the right sender');
 
-$command = 'MAIL FROM:<>';
+my $command = 'MAIL FROM:<>';
 is(($smtpd->command($command))[0], 250, $command);
 is($smtpd->transaction->sender->format, '<>', 'got the right sender');
 
-$command = 'MAIL FROM:<ask@p.qpsmtpd-test.askask.com> SIZE=1230';
+my $command = 'MAIL FROM:<ask@p.qpsmtpd-test.askask.com> SIZE=1230';
 is(($smtpd->command($command))[0], 250, $command);
 is($smtpd->transaction->sender->format, '<ask@p.qpsmtpd-test.askask.com>', 'got the right sender');
 

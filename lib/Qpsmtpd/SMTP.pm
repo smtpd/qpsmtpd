@@ -35,6 +35,7 @@ sub new {
   my (%commands); @commands{@commands} = ('') x @commands;
   # this list of valid commands should probably be a method or a set of methods
   $self->{_commands} = \%commands;
+
   $self;
 }
 
@@ -104,7 +105,7 @@ sub start_conversation {
     }
     elsif ($rc != DONE) {
       $self->respond(220, $self->config('me') ." ESMTP qpsmtpd "
-		     . $self->version ." ready; send us your mail, but not your spam.");
+          . $self->version ." ready; send us your mail, but not your spam.");
       return DONE;
     }
 }
@@ -166,7 +167,7 @@ sub ehlo {
 
     my @capabilities = $self->transaction->notes('capabilities')
                         ? @{ $self->transaction->notes('capabilities') }
-			: ();  
+                        : ();  
 
     # Check for possible AUTH mechanisms
     my %auth_mechanisms;
@@ -176,7 +177,7 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
                 $auth_mechanisms{uc($1)} = 1;
             }
             else { # at least one polymorphous auth provider
-                %auth_mechanisms = map {$_,1} qw(PLAIN CRAM-MD5);
+                %auth_mechanisms = map {$_,1} qw(PLAIN CRAM-MD5 LOGIN);
                 last HOOK;
             }
         }
@@ -188,12 +189,12 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
     }
 
     $self->respond(250,
-		 $self->config("me") . " Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]",
-		 "PIPELINING",
-		 "8BITMIME",
-		 ($self->config('databytes') ? "SIZE ". ($self->config('databytes'))[0] : ()),
-		 @capabilities,  
-		);
+                 $self->config("me") . " Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]",
+                 "PIPELINING",
+                 "8BITMIME",
+                 ($self->config('databytes') ? "SIZE ". ($self->config('databytes'))[0] : ()),
+                 @capabilities,  
+                );
   }
 }
 
@@ -236,7 +237,7 @@ sub mail {
 
     $self->log(LOGWARN, "from email address : [$from]");
 
-    if ($from eq "<>" or $from =~ m/\[undefined\]/) {
+    if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
       $from = Qpsmtpd::Address->new("<>");
     } 
     else {
@@ -329,9 +330,9 @@ sub rcpt {
 sub help {
   my $self = shift;
   $self->respond(214, 
-	  "This is qpsmtpd " . $self->version,
-	  "See http://smtpd.develooper.com/",
-	  'To report bugs or send comments, mail to <ask@develooper.com>.');
+          "This is qpsmtpd " . $self->version,
+          "See http://smtpd.develooper.com/",
+          'To report bugs or send comments, mail to <ask@develooper.com>.');
 }
 
 sub noop {
@@ -443,39 +444,39 @@ sub data {
     # lot of spam that is malformed in the header.
 
     ($_ eq ".\n" or $_ eq ".\r")
-	and $self->respond(421, "See http://smtpd.develooper.com/barelf.html")
-	and return $self->disconnect;
+        and $self->respond(421, "See http://smtpd.develooper.com/barelf.html")
+        and return $self->disconnect;
 
     # add a transaction->blocked check back here when we have line by line plugin access...
     unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
       s/^\.\./\./;
       if ($in_header and m/^\s*$/) {
-	$in_header = 0;
-	my @headers = split /^/m, $buffer;
+        $in_header = 0;
+        my @headers = split /^/m, $buffer;
 
-	# ... need to check that we don't reformat any of the received lines.
-	#
-	# 3.8.2 Received Lines in Gatewaying
-	#   When forwarding a message into or out of the Internet environment, a
-	#   gateway MUST prepend a Received: line, but it MUST NOT alter in any
-	#   way a Received: line that is already in the header.
+        # ... need to check that we don't reformat any of the received lines.
+        #
+        # 3.8.2 Received Lines in Gatewaying
+        #   When forwarding a message into or out of the Internet environment, a
+        #   gateway MUST prepend a Received: line, but it MUST NOT alter in any
+        #   way a Received: line that is already in the header.
 
-	$header->extract(\@headers);
-	#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
+        $header->extract(\@headers);
+        #$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
 
-	$buffer = "";
+        $buffer = "";
 
-	# FIXME - call plugins to work on just the header here; can
-	# save us buffering the mail content.
+        # FIXME - call plugins to work on just the header here; can
+        # save us buffering the mail content.
 
       }
 
       if ($in_header) {
-	$buffer .= $_;  
+        $buffer .= $_;  
       }
       else {
-	$self->transaction->body_write($_);
+        $self->transaction->body_write($_);
       }
 
       $size += length $_;
@@ -488,15 +489,12 @@ sub data {
   $self->transaction->header($header);
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
-
-  # only true if client authenticated
-  if ( defined $self->{_auth} and $self->{_auth} == OK ) { 
-    $header->add("X-Qpsmtpd-Auth","True");
-  }
+  my $authheader = (defined $self->{_auth} and $self->{_auth} == OK) ?
+    "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n" : "";
 
   $header->add("Received", "from ".$self->connection->remote_info
                ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
-               . ")\n  by ".$self->config('me')." (qpsmtpd/".$self->version
+               . ")\n  $authheader  by ".$self->config('me')." (qpsmtpd/".$self->version
                .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
                0);
 

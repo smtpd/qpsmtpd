@@ -9,9 +9,9 @@ auth_vpopmail_sql - Authenticate to vpopmail via MySQL
 This plugin authenticates vpopmail users directly against a standard
 vpopmail MySQL database.  It makes the not-unreasonable assumption that
 both pw_name and pw_domain are lowercase only (qmail doesn't actually care).
-It also requires that vpopmail be built with the recommended 
-'--enable-clear-passwd=y' option, because there is no other way to compare
-the password with CRAM-MD5.
+If you are using CRAM-MD5, it also requires that vpopmail be built with the
+recommended '--enable-clear-passwd=y' option, because there is no way
+to compare the crypted password.
 
 =head1 CONFIGURATION
 
@@ -50,9 +50,9 @@ Please see the LICENSE file included with qpsmtpd for details.
 sub register {
     my ( $self, $qp ) = @_;
 
-    $self->register_hook( "auth-plain", "authsql" );
-
-    #  $self->register_hook("auth-cram-md5", "authsql");
+    $self->register_hook("auth-plain", "authsql" );
+    $self->register_hook("auth-login", "authsql" );
+    $self->register_hook("auth-cram-md5", "authsql");
 
 }
 
@@ -82,31 +82,37 @@ sub authsql {
 	"Authentication to vpopmail via mysql: $pw_name\@$pw_domain");
 
     my $sth = $dbh->prepare(<<SQL);
-select pw_clear_passwd
+select pw_passwd, pw_clear_passwd
 from vpopmail
 where pw_name = ? and pw_domain = ?
 SQL
 
     $sth->execute( $pw_name, $pw_domain );
 
-    my ($pw_clear_passwd) = $sth->fetchrow_array;
+    my ($pw_passwd, $pw_clear_passwd) = $sth->fetchrow_array;
 
     $sth->finish;
     $dbh->disconnect;
 
-    unless ( defined $pw_clear_passwd ) {
-
-        # if this isn't defined then the user doesn't exist here
-        # or the administrator forgot to build with --enable-clear-passwd=y
+    if ( # clear_passwd isn't defined so we cannot support CRAM-MD5
+         ( $method =~ /CRAM-MD5/i and not defined $pw_clear_passwd )
+	 or
+         # user doesn't exist in this domain
+	 ( not defined $pw_passwd )
+       ) {
         return ( DECLINED, "authsql/$method" );
     }
 
     # at this point we can assume the user name matched
     if (
-        ( defined $passClear
-            and $pw_clear_passwd eq $passClear ) or
-        ( defined $passHash
-            and $passHash eq hmac_md5_hex( $ticket, $pw_clear_passwd ) )
+        ( defined $passClear and 
+	  (
+	     ($pw_clear_passwd eq $passClear)
+	  or ($pw_passwd eq crypt( $passClear, $pw_passwd ) )
+	  )
+	) 
+        or ( defined $passHash
+             and $passHash eq hmac_md5_hex( $ticket, $pw_clear_passwd ) )
       )
     {
 

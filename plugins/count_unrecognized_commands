@@ -36,13 +36,13 @@ sub check_unrec_cmd {
   $self->log(LOGINFO, "Unrecognized command '$cmd'");
 
   my $badcmdcount = 
-    $self->qp->connection->notes('unrec_cmd_count',
-				 ($self->qp->connection->notes('unrec_cmd_count') || 0) + 1
-				);
+    $self->qp->connection->notes( 'unrec_cmd_count',
+        ($self->qp->connection->notes('unrec_cmd_count') || 0) + 1
+    );
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {
     $self->log(LOGINFO, "Closing connection. Too many unrecognized commands.");
-    return (DENY_DISCONNECT, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
+    return (DENY, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
   }
 
   return DECLINED;

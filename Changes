@@ -1,6 +1,38 @@
 
 0.29 - 
 
+  Qpsmtpd::Auth - document $mechanism option, improve fallback to generic
+  hooks, document that auth-login works now, stash auth user and method for
+  later use by Qpsmtpd::SMTP to generate authentication header.
+  (Michael Toren)
+
+  Qpsmtpd::SMTP - "MAIL FROM: <#@[]>" now works like qmail (null sender), 
+  add LOGIN to default auth mechanisms, display auth user and method in
+  Received: line instead of X-Qpsmtpd-Auth header.
+  (Michael Toren)
+
+  check_badmailfromto - NEW PLUGIN - like check_badmailfrom except matches
+  both FROM: and TO:, and effectively makes it seem like the recipient 
+  no longer exists for that sender (great for harassment cases).
+  (John Peacock)
+
+  check_earlytalker and require_resolvable_fromhost - short circuit test if
+  whitelistclient is set. (Michael Toren)
+
+  check_badmailfrom - Do not say why a given message is denied.
+  (Michael Toren)
+
+  dns_whitelist_soft - NEW PLUGIN - dns-based whitelist override for
+  other qpsmtpd plugins.  Add suuport for whitelisthost to dnsbl.
+  (John Peacock)
+
+  auth/auth_vpopmail_sql - Support CRAM-MD5 (requires clear_passwd)
+  (John Peacock)
+
+  plugins/queue/qmail-queue - Added a timestamp and the qmail-queue qp
+  identifier to the "Queued!" message, for compatibility with qmail-smtpd
+  (Michael Toren)
+
   Support qmail-smtpd's timeoutsmtpd config file
 
   Many improvements to the forking server (qpsmtpd-forkserver)

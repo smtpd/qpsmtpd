@@ -1,0 +1,64 @@
+#! perl
+=head1 NAME
+
+check_badmailfromto - checks the badmailfromto config
+
+=head1 DESCRIPTION
+
+Much like the similar check_badmailfrom, this plugin references both the
+FROM: and TO: lines, and if they both are present in the badmailfromto
+config file (a tab delimited list of FROM/TO pairs), then the message is
+blocked as if the recipient (TO) didn't exist.  This is specifically designed
+to not give the impression that the sender is blocked (good for cases of
+harassment).
+
+Based heavily on check_badmailfrom.
+
+=cut
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("mail", "mail_handler");
+  $self->register_hook("rcpt", "rcpt_handler");
+}
+
+sub mail_handler {
+  my ($self, $transaction, $sender) = @_;
+
+  my @badmailfromto = $self->qp->config("badmailfromto")
+    or return (DECLINED);
+
+  return (DECLINED) unless ($sender->format ne "<>"
+			    and $sender->host && $sender->user);
+
+  my $host = lc $sender->host;
+  my $from = lc($sender->user) . '@' . $host;
+
+  for my $bad (@badmailfromto) {
+    $bad =~ s/^\s*(\S+).*/$1/;
+    next unless $bad;
+    $bad = lc $bad;
+    warn "Bad badmailfromto config: No \@ sign in $bad\n" and next unless $bad =~ m/\@/;
+    $transaction->notes('badmailfromto', "$bad")
+      if ($bad eq $from)
+      || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
+  }
+  return (DECLINED);
+}
+
+sub rcpt_handler {
+  my ($self, $transaction, $rcpt) = @_;
+  my $recipient = lc($rcpt->user) . '@' . lc($rcpt->host);
+  my $sender = $transaction->notes('badmailfromto');
+  if ($sender) {
+    my @badmailfromto = $self->qp->config("badmailfromto")
+      or return (DECLINED);
+
+    foreach (@badmailfromto) {
+      my ($from, $to) = m/^\s*(\S+)\t(\S+).*/;
+      return (DENY, "mail to $recipient not accepted here")
+        if lc($from) eq $sender and lc($to) eq $recipient;
+    }
+  }
+  return (DECLINED);
+}
