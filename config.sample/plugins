@@ -2,9 +2,12 @@ quit_fortune
 require_resolvable_fromhost
 rhsbl
 dnsbl
+check_badmailfrom
+check_badrcptto
 
 # this plugin needs to run after all other "rcpt" plugins
 check_relay
+
 
 klez_filter
 
