@@ -15,11 +15,11 @@ It takes two required parameters - a milter name (for logging) and the port
 to connect to on the localhost. This can also contain a hostname if
 the filter is on another machine:
 
-  queue/milter Brightmail 5513
+  milter Brightmail 5513
 
 or
 
-  queue/milter Brightmail bmcluster:5513
+  milter Brightmail bmcluster:5513
 
 This plugin has so far only been tested with Brightmail's milter module.
 
