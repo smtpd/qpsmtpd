@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -Tw
 # Copyright (c) 2001 Ask Bjoern Hansen. See the LICENSE file for details.
 # The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
 #
@@ -11,6 +11,7 @@ use Qpsmtpd::TcpServer;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use Socket;
+use Getopt::Long;
 use POSIX qw(:sys_wait_h :errno_h :signal_h);
 use strict;
 $| = 1;
@@ -20,6 +21,29 @@ my $MAXCONN   = 15;				# max simultaneous connections
 my $PORT      = 25;				# port number
 my $LOCALADDR = '0.0.0.0';		# ip address to bind to
 my $USER      = 'smtpd';		# user to suid to
+
+sub usage {
+        print <<"EOT";
+usage: qpsmtpd-forkserver [ options ]
+ -l, --listen-address addr : listen on a specific address; default 0.0.0.0
+ -p, --port P              : listen on a specific port; default 25
+ -c, --limit-connections N : limit concurrent connections to N; default 15
+ -u, --user U              : run as a particular user (defualt 'smtpd')
+EOT
+        exit 0;
+}
+
+GetOptions('h|help' => \&usage,
+           'l|listen-address=s' => \$LOCALADDR,
+           'c|limit-connections=i' => \$MAXCONN,
+           'p|port=i' => \$PORT,
+           'u|user=s' => \$USER) || &usage;
+
+# detaint the commandline
+if ($PORT =~ /^(\d+)$/) { $PORT = $1 } else { &usage }
+if ($LOCALADDR =~ /^([\d\w\-.]+)$/) { $LOCALADDR = $1 } else { &usage }
+if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &usage }
+if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &usage }
 
 delete $ENV{ENV};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
@@ -51,10 +75,10 @@ my $server = IO::Socket::INET->new(LocalPort => $PORT,
                                    Proto     => 'tcp',
                                    Reuse     => 1,
                                    Listen    => SOMAXCONN )
-  or die "making socket: $@\n";
+  or die "Creating TCP socket $LOCALADDR:$PORT: $!\n";
+::log(LOGINFO,"Listening on port $PORT");
 
 # Drop priviledges
-my $user = 'mailfw';
 my (undef, undef, $quid, $qgid) = getpwnam $USER or
       die "unable to determine uid/gid for $USER\n";
 $) = "";
@@ -64,11 +88,15 @@ POSIX::setuid($quid) or
       die "unable to change uid: $!\n";
 $> = $quid;
 
+::log(LOGINFO, 'Running as user '.
+	(getpwuid($>) || $>) .
+	', group '.
+	(getgrgid($)) || $)));
+
 # Load plugins here
 my $plugin_loader = Qpsmtpd::TcpServer->new();
 $plugin_loader->load_plugins;
 
-::log(LOGINFO,"Listening on port $PORT\n");
 
 while (1) {
   my $running = scalar keys %childstatus;
