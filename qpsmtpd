@@ -18,9 +18,6 @@ $| = 1;
 delete $ENV{ENV};
 $ENV{PATH} = '/var/qmail/bin';
 
-use vars qw($TRACE);
-$TRACE = 5;
-
 # should this be ->new ?
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
 $qpsmtpd->start_connection();
@@ -140,20 +137,6 @@ sub data {
   
   return 1;
 }
-
-sub rset {
-  $state{transaction} = {};
-  respond(250, "OK");
-}
-
-sub noop {
-  respond(250, "OK");
-}
-
-sub vrfy {
-  respond(252, "Just try sending a mail and we'll see how it turns out ...");
-}
-
 
 sub check_rhsbl {
   my ($rhsbl, $host) = @_;

@@ -98,7 +98,7 @@ sub start_conversation {
 sub transaction {
   my $self = shift;
   use Data::Dumper;
-  warn Data::Dumper->Dump([\$self], [qw(self)]);
+  #warn Data::Dumper->Dump([\$self], [qw(self)]);
   return $self->{_transaction} || ($self->{_transaction} = Qpsmtpd::Transaction->new());
 }
 
@@ -238,6 +238,24 @@ sub help {
 
 sub version {
   $Qpsmtpd::VERSION;
+}
+
+sub noop {
+  my $self = shift;
+  warn Data::Dumper->Dump([\$self], [qw(self)]);
+  $self->respond(250, "OK");
+
+}
+
+sub vrfy {
+  shift->respond(252, "Just try sending a mail and we'll see how it turns out ...");
+}
+
+sub rset {
+  my $self = shift;
+  $self->{_transaction} = undef;
+  $self->transaction->start();
+  $self->respond(250, "OK");
 }
 
 sub quit {
