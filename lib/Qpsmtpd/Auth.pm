@@ -316,7 +316,7 @@ sub SASL {
     }
 
     if ( $rc == OK ) {
-        $msg = "Authentication successful" .
+        $msg = "Authentication successful for $user" .
 	    ( defined $msg ? " - " . $msg : "" );
         $session->respond( 235, $msg );
         $session->connection->relay_client(1);
@@ -324,7 +324,7 @@ sub SASL {
         return OK;
     }
     else {
-        $msg = "Authentication failed" .
+        $msg = "Authentication failed for $user" .
 	    ( defined $msg ? " - " . $msg : "" );
         $session->respond( 535, $msg );
         $session->log( LOGERROR, $msg );
