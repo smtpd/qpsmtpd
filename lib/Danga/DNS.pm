@@ -92,7 +92,7 @@ sub DESTROY {
     my Danga::DNS $self = shift;
     my $now = time;
     foreach my $host (@{$self->{hosts}}) {
-        if (!$self->{results}{$host}) {
+        if (!exists($self->{results}{$host})) {
             print STDERR "DNS timeout (presumably) looking for $host after " . ($now - $self->{start}) . " secs\n";
             $self->{callback}->("NXDOMAIN", $host);
         }
