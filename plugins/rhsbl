@@ -21,6 +21,7 @@ sub mail_handler {
 	if check_rhsbl($self, $rhsbl, $host);
     }
   }
+  return DECLINED;
 }
 
 sub rcpt_handler {
