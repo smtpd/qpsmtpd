@@ -7,12 +7,7 @@ spamassassin - SpamAssassin integration for qpsmtpd
 Plugin that checks if the mail is spam by using the "spamd" daemon
 from the SpamAssassin package.  F<http://www.spamassassin.org>
 
-SpamAssassin 2.40 or newer is required.
-
-B<WARNING>: SpamAssassin 2.50 is incompatible with qpsmtpd.
-See F<http://nntp.x.perl.org/group/perl.qpsmtpd/188>
-F<http://bugzilla.spamassassin.org/show_bug.cgi?id=1640>
-F<http://bugzilla.spamassassin.org/show_bug.cgi?id=1614>
+SpamAssassin 2.6 or newer is required.
 
 =head1 CONFIG
 
@@ -81,6 +76,7 @@ sub register {
 sub check_spam {
   my ($self, $transaction) = @_;
 
+  $self->log(6, "check_spam");
   return (DECLINED) if $transaction->body_size > 500_000;
 
   my $remote  = 'localhost';
@@ -97,12 +93,13 @@ sub check_spam {
 
   connect(SPAMD, $paddr) 
     or $self->log(1, "Could not connect to spamassassin daemon: $!") and return DECLINED;
+  $self->log(6, "check_spam: connected to spamd");
 
   SPAMD->autoflush(1);
   
   $transaction->body_resetpos;
   
-  print SPAMD "REPORT_IFSPAM SPAMC/1.0" . CRLF;
+  print SPAMD "SYMBOLS SPAMC/1.0" . CRLF;
   # or CHECK or REPORT or SYMBOLS
 
   print SPAMD join CRLF, split /\n/, $transaction->header->as_string
@@ -119,21 +116,33 @@ sub check_spam {
 
   print SPAMD CRLF;
   shutdown(SPAMD, 1);
+  $self->log(6, "check_spam: finished sending to spamd");
   my $line0 = <SPAMD>; # get the first protocol lines out
   if ($line0) {
-    $transaction->header->add("X-Spam-Check-By", $self->qp->config('me'));
+    $self->log(6, "check_spam: spamd: $line0");
+    $transaction->header->add("X-Spam-Check-By", $self->qp->config('me'), 0);
   }
 
+  my ($flag, $hits, $required);
   while (<SPAMD>) {
+    $self->log(6, "check_spam: spamd: $_");
     #warn "GOT FROM SPAMD1: $_";
-    next unless m/\S/;
-    s/\r?\n$/\n/;
-    my @h = split /: /, $_, 2;
-
-    $transaction->header->add(@h);
-    last if $h[0] eq "Spam" and $h[1] =~ m/^False/;
+    last unless m/\S/;
+    if (m{Spam: (True|False) ; (-?\d+\.\d) / (-?\d+\.\d)}) {
+	($flag, $hits, $required) = ($1, $2, $3);
+    }
 
   }
+  my $tests = <SPAMD>;
+  $flag = $flag eq 'True' ? 'Yes' : 'No';
+  $self->log(6, "check_spam: finished reading from spamd");
+
+  $transaction->header->add('X-Spam-Flag', 'YES', 0) if ($flag eq 'Yes');
+  $transaction->header->add('X-Spam-Status',
+			    "$flag, hits=$hits required=$required\n" .
+			    "\ttests=$tests", 0);
+  $self->log(5, "check_spam: $flag, hits=$hits, required=$required, " .
+			     "tests=$tests");
 
   return (DECLINED);
 }
@@ -141,11 +150,14 @@ sub check_spam {
 sub check_spam_reject {
   my ($self, $transaction) = @_;
 
+  $self->log(6, "check_spam_reject: reject_threshold=" . $self->{_args}->{reject_threshold});
   my $score = $self->get_spam_score($transaction) or return DECLINED;  
+  $self->log(6, "check_spam_reject: score=$score");
 
   return (DENY, "spam score exceeded threshold")
     if $score >= $self->{_args}->{reject_threshold};
 
+  $self->log(6, "check_spam_reject: passed");
   return DECLINED;
 }
 
@@ -165,6 +177,6 @@ sub check_spam_munge_subject {
 sub get_spam_score {
   my ($self, $transaction) = @_;
   my $status  = $transaction->header->get('X-Spam-Status') or return; 
-  my ($score) = ($status =~ m/hits=(\d+\.\d+)/)[0];
+  my ($score) = ($status =~ m/hits=(-?\d+\.\d+)/)[0];
   return $score;
 }

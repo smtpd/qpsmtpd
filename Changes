@@ -1,5 +1,11 @@
 0.27 
 
+  Made the SpamAssassin plugin work with SA 2.6+ (thanks to numerous
+  contributors, thanks everyone!). Note that for now it's not
+  including the Spam: headers with the score explained. For that use
+  the spamassassin_spamc plugin from http://projects.bluefeet.net/
+  (for now).
+
   Added Postfix queue plugin thanks to Peter J Holzer!
 
   Took out the last "exit" call from the SMTP object; the "transport"
