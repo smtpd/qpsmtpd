@@ -25,17 +25,19 @@ sub register {
     $self->{_unrec_cmd_max} = 4;
   }
 
-  $self->{_unrec_cmd_count} = 0;
+  $qp->connection->notes('unrec_cmd_count', 0);
+
 }
 
 sub check_unrec_cmd {
-  my ($self, $transaction, $cmd) = @_;
+  my ($self, $cmd) = @_[0,2];
   
   $self->log(5, "Unrecognized command '$cmd'");
 
-  $self->{_unrec_cmd_count}++;
-
-  my $badcmdcount = $self->{_unrec_cmd_count};
+  my $badcmdcount = 
+    $self->qp->connection->notes('unrec_cmd_count',
+				 $self->qp->connection->notes('unrec_cmd_count') + 1
+				);
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {
     $self->log(5, "Closing connection. Too many unrecognized commands.");

@@ -1,5 +1,8 @@
 0.27 
 
+  Bugfix to the count_unrecognized_commands plugin so it works
+  under PPerl (it wasn't resetting the count properly).
+
   reset_transaction is called after disconnect plugins are called so
   the Transaction objects DESTROY method is called. (Thanks to Robert
   James Kaes <rjkaes@flarenet.com>)
