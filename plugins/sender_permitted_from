@@ -12,6 +12,8 @@ Or if you wish to issue 5xx on SPF fail:
 
   sender_permitted_from spf_deny 1
 
+See also http://spf.pobox.com/
+
 =cut
 
 use Mail::SPF::Query;
@@ -43,42 +45,38 @@ sub mail_handler {
 
 sub rcpt_handler {
   my ($self, $transaction, $rcpt) = @_;
+  
+  # special addresses don't get SPF-tested.
+  return DECLINED if $rcpt and $rcpt->user and $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i;
+  
   my $query = $transaction->notes('spfquery');
   my ($result, $comment) = $query->result();
   
-  $self->qp->connection->notes('spf_result', $result);
+  $self->qp->connection->notes('spf_result',  $result);
   $self->qp->connection->notes('spf_comment', $comment);
+  $self->qp->connection->notes('spf_header', "$result ($comment)");
 
   if ($result eq "fail" and $self->{_args}{spf_deny}) {
-    return (DENY, "SPF forgery ($comment)");
+    my $ip = $self->qp->connection->remote_ip;
+    my $sender = $transaction->sender;
+
+    my $why = "http://spf.pobox.com/why?sender=" . _uri_escape($sender) . "&ip=$ip";
+    return (DENY, "SPF forgery ($comment; see $why)");
   }
    
-  return (DECLINED);
+  return DECLINED;
+}
+
+sub _uri_escape {
+  my $str = shift;
+  $str =~ s/([^A-Za-z0-9\-_.!~*\'()])/sprintf "%%%X", ord($1)/eg;
+  return $str;
 }
 
 sub data_handler {
     my ($self, $transaction) = @_;
     
-    my $spf = $self->qp->connection->notes('spf_result');
-
-    my $host = $self->qp->connection->remote_host;
-    my $ip = $self->qp->connection->remote_ip;
-    my $sender = $transaction->sender;
-
-    my $details = '';
-    if ($spf eq 'fail') {
-        $details = "fail (client $host[$ip] is not a designated mailer for domain of sender $sender)";
-    }
-    elsif ($spf eq 'softfail') {
-        $details = "error (temporary failure while resolving designated mailer status for domain of sender $sender)";
-    }
-    elsif ($spf eq 'pass') {
-        $details = "pass (client $host[$ip] is designated mailer for domain of sender $sender)";
-    }
-    else {
-        $details = "unknown (domain of sender $sender does not designate mailers)";
-    }
-    $transaction->header->add('Received-SPF' => $details);
+    $transaction->header->add('Received-SPF' => $self->qp->connection->notes('spf_header'), 0);
 
     return DECLINED;
 }
