@@ -51,5 +51,11 @@ sub hello_host {
   $self->{_hello_host};
 }
 
+sub notes {
+  my $self = shift;
+  my $key  = shift;
+  @_ and $self->{_notes}->{$key} = shift;
+  $self->{_notes}->{$key};
+}
 
 1;
