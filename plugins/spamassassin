@@ -3,7 +3,9 @@
 #  Requires the spamd patch attached to this spamassassin bug:
 #    http://bugzilla.spamassassin.org/show_bug.cgi?id=660    
 #
-#  ... or you can change YAREPORT to REPORT below; but the headers
+#  The patch is going to be included in SpamAssassin 2.40.
+#
+#  ... or you can change REPORT_IFSPAM to REPORT below; but the headers
 #      will be a bit different than you are used to.
 #
 #
