@@ -115,6 +115,7 @@ sub transaction {
 
 sub reset_transaction {
   my $self = shift;
+  $self->run_hooks("reset_transaction") if $self->{_transaction};
   return $self->{_transaction} = Qpsmtpd::Transaction->new();
 }
 
@@ -229,6 +230,12 @@ sub mail {
       $msg ||= $from->format . ', temporarily denied';
       $self->log(2, "denysoft mail from " . $from->format . " ($msg)");
       $self->respond(450, $msg);
+    }
+    elsif ($rc == DENYHARD) {
+      $msg ||= $from->format . ', denied';
+      $self->log(2, "deny mail from " . $from->format . " ($msg)");
+      $self->respond(550, $msg);
+      $self->disconnect;
     }
     else { # includes OK
       $self->log(2, "getting mail from ".$from->format);

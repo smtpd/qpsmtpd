@@ -2,7 +2,7 @@ package Qpsmtpd::Constants;
 use strict;
 require Exporter;
 
-my (@common) = qw(OK DECLINED DONE DENY DENYSOFT TRACE);
+my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD TRACE);
 
 use vars qw($VERSION @ISA @EXPORT);
 @ISA    = qw(Exporter);
@@ -15,6 +15,7 @@ use constant DENY     => 901;
 use constant DENYSOFT => 902;
 use constant DECLINED => 909;
 use constant DONE     => 910;
+use constant DENYHARD     => 903;
 
 
 1;
