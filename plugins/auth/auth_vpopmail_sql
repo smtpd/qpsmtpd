@@ -82,17 +82,20 @@ sub authsql {
 	"Authentication to vpopmail via mysql: $pw_name\@$pw_domain");
 
     my $sth = $dbh->prepare(<<SQL);
-select pw_passwd, pw_clear_passwd
+select *
 from vpopmail
 where pw_name = ? and pw_domain = ?
 SQL
 
     $sth->execute( $pw_name, $pw_domain );
 
-    my ($pw_passwd, $pw_clear_passwd) = $sth->fetchrow_array;
+    my $passwd_hash = $sth->fetchrow_hashref;
 
     $sth->finish;
     $dbh->disconnect;
+
+    my $pw_clear_passwd = $passwd_hash->{'pw_clear_passwd'};
+    my $pw_passwd = $passwd_hash->{'pw_passwd'};
 
     if ( # clear_passwd isn't defined so we cannot support CRAM-MD5
          ( $method =~ /CRAM-MD5/i and not defined $pw_clear_passwd )
