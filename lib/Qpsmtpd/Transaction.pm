@@ -66,6 +66,11 @@ sub notes {
   $self->{_notes}->{$key};
 }
 
+sub body_filename {
+  my $self = shift;
+  return unless $self->{_body_file};
+  return $self->{_filename};
+}
 
 sub body_write {
   my $self = shift;
@@ -200,6 +205,11 @@ use this to pass data between plugins.
 Note though that these notes will be lost when a transaction ends, for
 example on a C<RSET> or after C<DATA> completes, so you might want to
 use the notes field in the C<Qpsmtpd::Connection> object instead.
+
+=head2 body_filename ( )
+
+Returns the temporary filename used to store the message contents; useful for
+virus scanners so that an additional copy doesn't need to be made.
 
 =head2 body_write( $data )
 
