@@ -1,3 +1,4 @@
+# -*- perl -*-
 =head1 NAME
 
 count_unrecognized_commands - Count unrecognized commands and disconnect when we have too many
@@ -41,7 +42,7 @@ sub check_unrec_cmd {
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {
     $self->log(LOGINFO, "Closing connection. Too many unrecognized commands.");
-    return (DENYHARD, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
+    return (DENY_DISCONNECT, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
   }
 
   return DECLINED;
