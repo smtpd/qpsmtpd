@@ -232,14 +232,14 @@ sub run_hooks {
                        ."running the $hook hook returned undef!")
           and next;
 
-      # should we have a hook for "OK" too? 
+      # should we have a hook for "OK" too?
       if ($r[0] == DENY or $r[0] == DENYSOFT) {
-	  $r[1] = "" if not defined $r[1];
-	  $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
-	  $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+        $r[1] = "" if not defined $r[1];
+        $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
+        $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
       }
 
-      last unless $r[0] == DECLINED; 
+      last unless $r[0] == DECLINED;
     }
     $r[0] = DECLINED if not defined $r[0];
     return @r;
