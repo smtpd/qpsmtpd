@@ -158,7 +158,7 @@ This adds a new recipient (as in RCPT TO) to the envelope of the mail.
 The C<$recipient> is a C<Mail::Address> object. See L<Mail::Address>
 for more details.
 
-=head2 recipients()
+=head2 recipients( )
 
 This returns a list of the current recipients in the envelope.
 
@@ -197,11 +197,11 @@ Write data to the end of the email.
 
 C<$data> can be either a plain scalar, or a reference to a scalar.
 
-=head2 body_size()
+=head2 body_size( )
 
 Get the current size of the email.
 
-=head2 body_resetpos()
+=head2 body_resetpos( )
 
 Resets the body filehandle to the start of the file (via C<seek()>).
 
@@ -209,7 +209,7 @@ Use this function before every time you wish to process the entire
 body of the email to ensure that some other plugin has not moved the
 file pointer.
 
-=head2 body_getline()
+=head2 body_getline( )
 
 Returns a single line of data from the body of the email.
 
