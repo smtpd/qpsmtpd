@@ -289,7 +289,7 @@ sub help {
   my $self = shift;
   $self->respond(214, 
 	  "This is qpsmtpd " . $self->version,
-	  "See http://develooper.com/code/qpsmtpd/",
+	  "See http://smtpd.develooper.com/",
 	  'To report bugs or send comments, mail to <ask@develooper.com>.');
 }
 
@@ -348,16 +348,23 @@ sub data {
   while (<STDIN>) {
     $complete++, last if $_ eq ".\r\n";
     $i++;
-    $_ eq ".\n" 
-      and $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html")
-      and $self->disconnect;
+
+    # should probably use \012 and \015 in these checks instead of \r and \n ...
+
+    # Reject messages that have either bare LF or CR. rjkaes noticed a
+    # lot of spam that is malformed in the header.
+
+    ($_ eq ".\n" or $_ eq ".\r")
+	and $self->respond(421, "See http://smtpd.develooper.com/barelf.html")
+	and return $self->disconnect;
+
     # add a transaction->blocked check back here when we have line by line plugin access...
     unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
       s/^\.\./\./;
       if ($in_header and m/^\s*$/) {
 	$in_header = 0;
-	my @header = split /^/m, $buffer;
+	my @headers = split /^/m, $buffer;
 
 	# ... need to check that we don't reformat any of the received lines.
 	#
@@ -366,8 +373,8 @@ sub data {
 	#   gateway MUST prepend a Received: line, but it MUST NOT alter in any
 	#   way a Received: line that is already in the header.
 
-	$header->extract(\@header);
-	#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://develooper.com/code/qpsmtpd/");
+	$header->extract(\@headers);
+	#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
 
 	$buffer = "";
 
