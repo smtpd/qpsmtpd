@@ -1,5 +1,9 @@
 0.27 
 
+  reset_transaction is called after disconnect plugins are called so
+  the Transaction objects DESTROY method is called. (Thanks to Robert
+  James Kaes <rjkaes@flarenet.com>)
+
   Made the SpamAssassin plugin work with SA 2.6+ (thanks to numerous
   contributors, thanks everyone!). Note that for now it's not
   including the Spam: headers with the score explained. For that use

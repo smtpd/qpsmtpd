@@ -320,6 +320,7 @@ sub quit {
 sub disconnect {
   my $self = shift;
   $self->run_hooks("disconnect");
+  $self->reset_transaction;
 }
 
 sub data {
