@@ -14,7 +14,8 @@ sub start {
 
   my %args = @_;
 
-  for my $f (qw(remote_host remote_ip remote_info)) {
+  for my $f (qw(remote_host remote_ip remote_info remote_port
+               local_ip local_port)) {
     $self->$f($args{$f}) if $args{$f};
   }
 
@@ -32,6 +33,25 @@ sub remote_ip {
   @_ and $self->{_remote_ip} = shift;
   $self->{_remote_ip};
 }
+
+sub remote_port {
+  my $self = shift;
+  @_ and $self->{_remote_port} = shift;
+  $self->{_remote_port};
+}
+
+sub local_ip {
+  my $self = shift;
+  @_ and $self->{_local_ip} = shift;
+  $self->{_local_ip};
+}
+
+sub local_port {
+  my $self = shift;
+  @_ and $self->{_local_port} = shift;
+  $self->{_local_port};
+}
+
 
 sub remote_info {
   my $self = shift;
