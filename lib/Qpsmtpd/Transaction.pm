@@ -65,7 +65,6 @@ sub add_header_line {
 sub body_write {
   my $self = shift;
   my $data = shift;
-  #$self->{_body} .= shift;
   unless ($self->{_body_file}) {
     -d "tmp" or mkdir("tmp", 0700) or die "Could not create dir tmp: $!";
     $self->{_filename} = "/home/smtpd/qpsmtpd/tmp/" . join(":", time, $$, $transaction_counter++);
@@ -76,7 +75,12 @@ sub body_write {
   seek($self->{_body_file},0,2)
     unless $self->{_body_file_writing};
   $self->{_body_file_writing} = 1;
-  $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data);
+  $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data)
+    and $self->{_body_size} += length (ref $data eq "SCALAR" ? $$data : $data); 
+}
+
+sub body_size {
+  shift->{_body_size} || 0;
 }
 
 sub body_resetpos {

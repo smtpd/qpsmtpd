@@ -23,6 +23,8 @@ sub register {
 sub check_spam {
   my ($self, $transaction) = @_;
 
+  return (DECLINED) if $transaction->body_size > 500_000;
+
   my $remote  = 'localhost';
   my $port    = 783;
   if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') }
