@@ -231,9 +231,7 @@ sub help {
 
 sub noop {
   my $self = shift;
-  warn Data::Dumper->Dump([\$self], [qw(self)]);
   $self->respond(250, "OK");
-
 }
 
 sub vrfy {
