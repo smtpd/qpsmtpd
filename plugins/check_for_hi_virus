@@ -1,0 +1,44 @@
+#!/usr/bin/perl -w
+
+sub register {
+    my $self = shift;
+    $self->register_hook('data_post', 'check_for_hi_virus');
+}
+
+sub check_for_hi_virus {
+    my ($self, $transaction) = @_;
+
+    # make sure we read from the beginning;
+    $transaction->body_resetpos;
+
+    my $line_number = 0;
+    my $seen_file = 0;
+    my $ct_filename = '';
+    my $cd_filename = '';
+
+    while ($_ = $transaction->body_getline) {
+        last if $line_number++ > 40;
+        if (/^Content-Type: (.*)/) {
+            my $val = $1;
+            if ($val =~ /name="(.*)"/) {
+                $seen_file = 1;
+                $ct_filename = $1;
+            }
+        }
+        if (/^Content-Disposition: (.*)/) {
+            my $val = $1;
+            if ($val =~ /filename="(.*)"/) {
+                $seen_file = 1;
+                $cd_filename = $1;
+            }
+        }
+    }
+
+    if ($seen_file and $ct_filename and $cd_filename) {
+        if ($ct_filename ne $cd_filename) {
+            return (DENY, "Probably the 'Hi' virus");
+        }
+    }
+
+    return DECLINED;
+}
