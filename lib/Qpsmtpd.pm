@@ -99,7 +99,7 @@ sub load_plugins {
 
   for my $plugin (@plugins) {
     $self->log(7, "Loading $plugin");
-    my ($plugin, @args) = split /\s+/, $plugin;
+    ($plugin, my @args) = split /\s+/, $plugin;
 
     my $plugin_name = $plugin;
 
