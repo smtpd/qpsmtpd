@@ -1,6 +1,6 @@
-Matt Sergeant <matt@sergeant.org>: Clamav plugin.
-
-Robert Spier <robert@perl.org>: Klez filter.
+Jim Winstead <jimw@trainedmonkey.com>: the core "command dispatch"
+system in qpsmtpd is taken from his colobus nntp server.  The
+check_badmailfrom and check_mailrcptto plugins.
 
 Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
 the connection gets dropped at the wrong moment.  Support and enable
@@ -12,7 +12,9 @@ Andrew Pam <xanni@glasswings.com.au>: fixing the maximum message size
 Marius Kjeldahl <marius@kjeldahl.net>, Zukka Zitting
 <jukka.zitting@iki.fi>: Patches for supporting $ENV{RELAYCLIENT}
 
-Jim Winstead <jimw@trainedmonkey.com>: the core "command dispatch"
-system in qpsmtpd is taken from his colobus nntp server.  The
-check_badmailfrom and check_mailrcptto plugins.
+Robert Spier <robert@perl.org>: Klez filter.
 
+Matt Sergeant <matt@sergeant.org>: Clamav plugin.
+
+Rasjid Wilcox <rasjidw@openminddev.net>: Lots of patches as per the
+Changes file.
