@@ -472,7 +472,7 @@ sub data {
         # save us buffering the mail content.
 
 	# Save the start of just the body itself	
-	$self->transaction->body_start($size);
+	$self->transaction->set_body_start();
 
       }
 

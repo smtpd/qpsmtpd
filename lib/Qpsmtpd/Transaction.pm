@@ -107,10 +107,12 @@ sub body_write {
     while ($$ref =~ m/\G(.*?\n)/gc) {
       push @{ $self->{_body_array} }, $1;
       $self->{_body_size} += length($1);
+      ++$self->{_body_current_pos};
     }
     if ($$ref =~ m/\G(.+)\z/gc) {
       push @{ $self->{_body_array} }, $1;
       $self->{_body_size} += length($1);
+      ++$self->{_body_current_pos};
     }
     if ($self->{_body_size} >= $self->{_size_threshold}) {
       #warn("spooling to disk\n");
