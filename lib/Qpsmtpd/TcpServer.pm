@@ -5,6 +5,10 @@ use Qpsmtpd::Constants;
 @ISA = qw(Qpsmtpd::SMTP);
 use strict;
 
+use POSIX ();
+
+my $first_0; 
+
 sub start_connection {
     my $self = shift;
 
@@ -20,7 +24,9 @@ sub start_connection {
     # things. So to be safe, cut them out.  
     $remote_host =~ tr/a-zA-Z\.\-0-9//cd;
 
-    $0 = "$0 [$remote_ip : $remote_host]";
+    $first_0 = $0 unless $first_0;
+    my $now = POSIX::strftime("%H:%M:%S %Y-%m-%d", localtime);
+    $0 = "$first_0 [$remote_ip : $remote_host : $now]";
 
     $self->SUPER::connection->start(remote_info => $remote_info,
 				    remote_ip   => $remote_ip,

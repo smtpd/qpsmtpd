@@ -1,4 +1,8 @@
-0.28
+0.28 - 2004/06/05
+
+  Don't keep adding ip addresses to the process status line ($0) when running under PPerl.
+
+  Include the date and time the session started in the process status line.
 
   Added a "queue/maildir" plugin for writing incoming mails to a maildir.
 
