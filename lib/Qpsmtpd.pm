@@ -38,7 +38,7 @@ sub config {
 
   if (wantarray) {
       @config = $self->get_qmail_config($c, $type) unless @config;
-      @config = @{$defaults{$c}} if (!@config and $defaults{$c});
+      @config = $defaults{$c} if (!@config and $defaults{$c});
       return @config;
   } 
   else {
