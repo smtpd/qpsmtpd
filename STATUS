@@ -2,7 +2,7 @@
 New Name Suggestions
 ====================
 ignite
-flare
+flare(mta)
 quench
 pez (or pezmail)
 
@@ -10,9 +10,8 @@ pez (or pezmail)
 Near term roadmap
 =================
 
-0.29:
+0.30:
       - Add the first time denysoft plugin
-      - Support email addresses with spaces in them (done)
       - Bugfixes
 
 0.40:

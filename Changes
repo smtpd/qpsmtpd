@@ -1,6 +1,19 @@
 0.29 - 
 
-  [ many changes from cvs logs, gah ]
+  Many improvements to the forking server (qpsmtpd-forkserver)
+
+  Plugin testing framework (Matt)
+
+  Added Apache::Qpsmtpd (Apache/mod_perl 2.0 connection handler)
+
+  Allow for multiple instances of a single plugin by using plugin:0
+  notation (Robert)
+
+  Fix CDB support so the server can work without it
+
+  VRFY plugin support (Robert Spier)
+
+  Added Makefile.PL etc to make it easier to build a package (Matt).
 
   Make the rhsbl plugin do DNS lookups in the background. (Mark Powell)
 
@@ -10,13 +23,31 @@
   Improve error messages from the Postfix module (Erik I. Bolsø,
   <knan at mo.himolde.no>)
 
+  make the maildir plugin record who the message was to (with a bit of improvements 
+  this could make a decent local delivery plugin)
+
+  Pass extra "stuff" to HELO/EHLO callbacks (to make it easier to
+  support SMTP extensions)
+
+  Renamed the *HARD return codes to DENY_DISCONNECT and
+  DENYSOFT_DISCONNECT (DENYSOFT_DISCONNECT is new)
+
   Mail::Address does RFC822 addresses, we need SMTP addresses.
   Replace Mail::Address with Peter J. Holzer's Qpsmtpd::Address module.
+
+  Don't keep adding ip addresses to the process status line ($0) when
+  running under PPerl.
+
+  Include the date and time the session started in the process status line.
 
   Add "plugin/virus/uvscan" - McAfee commandline virus scanner
 
   Inbound connections logged as soon as the remote host address is known
   when running under tcpserver.
+
+  Add Qpsmtpd::Auth (authentication handlers! See plugins/auth/) (John Peacock)
+ 
+  Add a plugin hook for the DATA command
 
   check_earlytalker -
     + optionally react to an earlytalker by denying all MAIL-FROM commands
@@ -27,7 +58,6 @@
 
   Move relay flag to connection object (John Peacock):
     + add relay_client() method to Connection.pm
-    + Update Auth.pm module to set $connection->relay_client()
     + Remove $transaction->relaying() completely (due to popular demand)
 
   Split check_relay plugin into two plugins (John Peacock):

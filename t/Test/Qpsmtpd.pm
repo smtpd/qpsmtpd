@@ -67,7 +67,7 @@ sub input {
 }
 
 sub config_dir {
-    './config';
+    './config.sample';
 }
 
 sub plugin_dir {
@@ -97,7 +97,7 @@ sub run_plugin_tests {
     
     require Test::Builder;
     my $Test = Test::Builder->new();
-    
+
     $Test->plan( tests => $num_tests );
     
     # Now run them
