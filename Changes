@@ -1,3 +1,23 @@
+0.21-dev
+
+  All major changes in the this release where by Rasjid Wilcox
+  <rasjidw@openminddev.net>.
+
+  Fix error handling in queue/qmail-queue.
+
+  Add option to queue/qmail-queue to specify an alternate qmail-queue
+  location.
+
+  Add support for the QMAILQUEUE environment variable.
+
+  PPerl compatibility (yay!)
+
+  Allow mail to <abuse> and <postmaster> to go through
+
+  Add "deny" hook that gets called when another hook returns DENY or
+  DENYSOFT.
+
+
 0.20 - 2002/12/09
 
   Fix the "too many dots in the beginning of the line" bug.
