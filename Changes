@@ -1,5 +1,7 @@
 0.27 
 
+  Added Postfix queue plugin thanks to Peter J Holzer!
+
   Took out the last "exit" call from the SMTP object; the "transport"
   module ("TcpServer", "SelectServer") needs to do the right thing in
   it's disconnect method.
