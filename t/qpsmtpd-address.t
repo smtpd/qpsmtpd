@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 9;
+use Test::More tests => 11;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
@@ -34,5 +34,11 @@ $as = '<foo bar@example.com>';
 $ao = Qpsmtpd::Address->parse($as);
 ok ($ao, "parse $as");
 is ($ao->format, '<"foo\ bar"@example.com>', "format $as");
+
+
+$as = 'foo@example.com';
+$ao = Qpsmtpd::Address->new($as);
+ok ($ao, "parse $as");
+is ($ao->address, $as, "address $as");
 
 
