@@ -70,8 +70,8 @@ sub register {
 
 sub connect_handler {
   my ($self, $transaction) = @_;
-  
-  if ($self->qp->can_read($self->{_args}->{'wait'})) {
+
+  if ($self->can_read($self->{_args}->{'wait'})) {
     $self->log(LOGNOTICE, 'remote host started talking before we said hello');
     if ($self->{_args}->{'defer-reject'}) {
 	$self->connection->notes('earlytalker', 1);
