@@ -8,10 +8,15 @@ sub register {
 
 sub mail_handler {
   my ($self, $transaction, $sender) = @_;
-  return (DECLINED) unless $sender->host && $sender->user;
+  my @badmailfrom = $self->qp->config("badmailfrom")
+    or return (DECLINED);
+
+  return (DECLINED) unless ($sender->format ne "<>"
+			    and $sender->host && $sender->user);
+
   my $host = lc $sender->host;
   my $from = $sender->user . '@' . $host;
-  my @badmailfrom = $self->qp->config("badmailfrom");
+
   for my $bad (@badmailfrom) {
     $bad =~ s/^\s*(\S+)/$1/;
     $transaction->notes('badmailfrom', "Mail from $bad not accepted here")
