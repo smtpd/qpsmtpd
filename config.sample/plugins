@@ -12,6 +12,7 @@ rhsbl
 dnsbl
 check_badmailfrom
 check_badrcptto
+check_spamhelo
 
 # this plugin needs to run after all other "rcpt" plugins
 check_relay
@@ -29,6 +30,7 @@ spamassassin
 # of the score is higher than 10.  
 #
 #   spamassassin reject_threshold 20 munge_subject_threshold 10
+
 
 # run the clamav virus checking plugin
 # clamav
