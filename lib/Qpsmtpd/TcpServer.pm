@@ -18,6 +18,9 @@ sub start_connection {
 sub run {
     my $self = shift;
 
+    # should be somewhere in Qpsmtpd.pm and not here...
+    $self->load_plugins;
+
     $self->start_conversation;
 
     # this should really be the loop and read_input should just get one line; I think
@@ -27,14 +30,15 @@ sub run {
 
 sub read_input {
   my $self = shift;
-  alarm $self->config('timeout');
+  my $timeout = $self->config('timeout');
+  alarm $timeout;
   while (<STDIN>) {
     alarm 0;
     $_ =~ s/\r?\n$//s; # advanced chomp
     $self->log(1, "dispatching $_");
     defined $self->dispatch(split / +/, $_)
       or $self->respond(502, "command unrecognized: '$_'");
-    alarm $self->config('timeout');
+    alarm $timeout;
   }
 }
 

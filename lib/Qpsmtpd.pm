@@ -5,6 +5,7 @@ use Carp;
 use Qpsmtpd::Connection;
 use Qpsmtpd::Transaction;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Plugin;
 
 use Mail::Address ();
 use Mail::Header ();
@@ -100,7 +101,7 @@ sub fault {
 
 sub start_conversation {
     my $self = shift;
-    $self->respond(220, $self->config('me') ." qpsmtpd ". $self->version ." Service ready, send me all your stuff!");
+    $self->respond(220, $self->config('me') ." ESMTP qpsmtpd ". $self->version ." ready; send us your mail, but not your spam.");
 }
 
 sub transaction {
@@ -170,7 +171,7 @@ sub mail {
       and return $self->respond(450, $from->host ? "Could not resolve ". $from->host : "FQDN required in the envelope sender");
 
     $self->log(2, "getting mail from ".$from->format);
-    $self->respond(250, $from->format . ", sender OK - I always like getting mail from you!");
+    $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
 
     $self->transaction->sender($from);
   }
@@ -199,7 +200,7 @@ sub rcpt {
   return $self->respond(501, "could not parse recipient") unless $rcpt;
   return $self->respond(550, "will not relay for ". $rcpt->host) unless $self->check_relay($rcpt->host);
   $self->transaction->add_recipient($rcpt);
-  $self->respond(250, $rcpt->format . ", recipient OK");
+  $self->respond(250, $rcpt->format . ", recipient ok");
 }
 
  
@@ -208,9 +209,7 @@ sub check_relay {
   my $host = lc shift;
   my @rcpt_hosts = $self->config("rcpthosts");
   return 1 if exists $ENV{RELAYCLIENT};
-  warn "HOSTTOCHECK: $host";
   for my $allowed (@rcpt_hosts) {
-    warn "ALLOWED: $allowed";
     $allowed =~ s/^\s*(\S+)/$1/;
     return 1 if $host eq lc $allowed;
     return 1 if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
@@ -270,7 +269,9 @@ sub rset {
 
 sub quit {
   my $self = shift;
-  $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day");
+  my @fortune = `/usr/games/fortune -s`;
+  @fortune = map { chop; s/^/  \/ /; $_ } @fortune;
+  $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day.", @fortune);
   exit;
 }
 
@@ -390,7 +391,7 @@ sub queue {
     waitpid($child, 0);
     my $exit_code = $? >> 8;
     $exit_code and respond(451, "Unable to queue message ($exit_code)"), exit;
-    $self->respond(250, "Message queued; it better be worth it.");
+    $self->respond(250, "Queued.");
   }
   elsif (defined $child) {
     # Child
@@ -406,5 +407,79 @@ sub queue {
   }
 
 }
+
+
+sub load_plugins {
+  my $self = shift;
+  my @plugins = $self->config('plugins');
+
+  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+  my $dir = "$name/plugins";
+  $self->log(2, "loading plugins from $dir");
+
+  for my $plugin (@plugins) {
+    $self->log(3, "Loading $plugin");
+    my $plugin_name = $plugin;
+    # Escape everything into valid perl identifiers
+    $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
+
+    # second pass cares for slashes and words starting with a digit
+    $plugin_name =~ s{
+		      (/+)       # directory
+		      (\d?)      # package's first character
+		     }[
+		       "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
+		      ]egx;
+
+
+    my $sub;
+    open F, "$dir/$plugin" or die "could not open $dir/$plugin: $!";
+    { 
+      local $/ = undef;
+      $sub = <F>;
+    }
+    close F;
+
+    my $package = "Qpsmtpd::Plugin::$plugin_name";
+
+    warn "PLUGIN PACKAGE: $package";
+
+    my $line = "\n#line 1 $dir/$plugin\n";
+
+    my $eval = join(
+		    "\n",
+		    "package $package;",
+		    "require Qpsmtpd::Plugin;",
+		    'use vars qw(@ISA);',
+		    '@ISA = qw(Qpsmtpd::Plugin);',
+#		    $line,
+		    $sub,
+		    "\n", # last line comment without newline?
+		   );
+
+    warn "eval: $eval";
+
+    $eval =~ m/(.*)/;
+    $eval = $1;
+
+    eval $eval;
+    warn "EVAL: $@";
+    die "eval $@" if $@;
+
+    #my $package_path = $package;
+    #$package_path =~ s!::!/!g;
+    #$package_path .= ".pm";
+    #$INC{$package_path} = "$dir/$plugin";
+    #use Data::Dumper;
+    #warn Data::Dumper->Dump([\%INC, \@INC], [qw(INCh INCa)]);
+
+    my $plug = $package->new();
+    $plug->register();
+
+  }
+
+}
+
+
 
 1;

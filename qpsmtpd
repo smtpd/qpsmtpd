@@ -58,12 +58,4 @@ sub check_dns {
 }
 
 
-sub load_plugins {
-  my @plugins = get_config('plugins');
-
-  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-  my $dir = "$name/plugins";
-  warn "$$ loading plugins from $dir" if $TRACE;
-}
-
 1;

@@ -1,0 +1,14 @@
+
+sub new {}
+
+sub register {
+  my ($self, $qp) = @_;
+
+  $qp->register_hook("quit", "quit_handler");
+
+}
+
+sub quit_handler {
+  my ($self, $qp) = @_;
+
+}
