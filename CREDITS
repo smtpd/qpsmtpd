@@ -16,7 +16,8 @@ Marius Kjeldahl <marius@kjeldahl.net>, Zukka Zitting
 Robert Spier <robert@perl.org>: Klez filter.
 
 Matt Sergeant <matt@sergeant.org>: Clamav plugin.  Patch for the dnsbl
-plugin to give us all the dns results.  Resident SpamAssassin guru.  PPerl.
+plugin to give us all the dns results.  Resident SpamAssassin guru.
+PPerl. smtp-forward plugin. Documentation (yay!).
 
 Rasjid Wilcox <rasjidw@openminddev.net>: Lots of patches as per the
 Changes file.
