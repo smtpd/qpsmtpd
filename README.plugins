@@ -1,0 +1,113 @@
+#
+# read this with 'perldoc README.plugins'  ...
+#
+
+=head1 qpsmtpd plugin system; developer documentation
+
+See the examples in plugins/ and ask questions on the qpsmtpd
+mailinglist; subscribe by sending mail to qpsmtpd-subscribe@perl.org.
+
+=head1 General return codes
+
+Each plugin must return an allowed constant for the hook and (usually)
+optionally a "message".
+
+Generally all plugins for a hook are processed until one returns
+something other than "DECLINED".
+
+Plugins are run in the order they are listed in the "plugins"
+configuration.
+
+=over 4
+
+=item OK
+
+Action allowed
+
+=item DENY
+
+Action denied
+
+=item DENYSOFT
+
+Action denied; return a temporary rejection code (say 450 instead of 550).
+
+=item DECLINED
+
+Plugin declined work; proceed as usual.  This return code is _always_
+_allowed_ unless noted otherwise.
+
+=item DONE
+
+Finishing processing of the request.  Usually used when the plugin
+sent the response to the client.
+
+=back
+
+See more detailed description for each hook below.
+
+=head1 Hooks
+
+=head2 mail
+
+Called right after the envelope sender address is passed.  The plugin
+gets passed a Mail::Address object.  Default is to allow the
+recipient.
+
+Allowed return codes
+
+  OK       - sender allowed
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DONE     - skip further processing
+
+
+=head2 rcpt
+
+Hook for the "rcpt" command.  Defaults to deny the mail with a soft
+error code.
+
+Allowed return codes
+
+  OK       - recipient allowed
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DONE     - skip further processing
+
+=head2 data_post
+
+Hook after receiving all data; just before the message is queued.
+
+  DENY     - Return a hard failure code
+  DENYSOFT - Return a soft failure code
+  DONE     - skip further processing (message will not be queued)
+
+All other codes and the message will be queued normally
+
+
+=head2 connect
+
+Allowed return codes:
+
+  OK       - Stop processing plugins, give the default response
+  DECLINED - Process the next plugin
+  DONE     - Stop processing plugins and don't give the default response
+
+=head2 quit
+
+Called on the "quit" command.
+
+Allowed return codes:
+
+  DONE 
+
+Works like the "connect" hook.
+
+
+=head2 disconnect
+
+Called just before we shutdown a connection.
+
+The return code is ignored.  If a plugin returns anything but DECLINED
+the following plugins will not be run (like with all other hooks).
+

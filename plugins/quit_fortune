@@ -1,0 +1,17 @@
+
+sub register {
+  shift->register_hook("quit", "quit_handler");
+}
+
+sub quit_handler {
+  my $qp = shift->qp;
+
+  # if she talks EHLO she is probably too sophisticated to enjoy the
+  # fun, so skip it.
+  return (DECLINED) if ($qp->connection->hello || '') eq "ehlo";
+
+  my @fortune = `/usr/games/fortune -s`;
+  @fortune = map { chop; s/^/  \/ /; $_ } @fortune;
+  $qp->respond(221, $qp->config('me') . " closing connection.", @fortune);
+  return DONE;
+}

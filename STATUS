@@ -1,0 +1,37 @@
+
+Issues
+======
+
+transaction should maybe be a part of the connection object instead
+of off the main object
+
+plugin support;
+
+  support plugins for the rest of the commands.
+
+  specify a priority in register_hook. ("LAST", "FIRST", "MIDDLE", or
+  maybe a number)
+
+  plugin access to the data line by line during the DATA phase.
+
+
+TRACE in Constants.pm is not actually being used.  Should it be?
+
+
+
+Future Ideas
+============
+
+Make config() better abstracted or configured (to allow configuration
+from LDAP etc).
+
+Make queue() better abstracted or configured (to allow LMTP delivery
+instead of using qmail-queue).
+
+Methods to create a bounce message easily; partly so we can accept a
+mail for one user but bounce it right away for another RCPT'er.
+
+David Carraway has some thoughts for "user filters"
+http://nntp.perl.org/group/perl.qpsmtpd/2
+
+Make it run as a mod_perl 2.0 connection handler module ...

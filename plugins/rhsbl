@@ -1,0 +1,42 @@
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("mail", "mail_handler");
+  $self->register_hook("rcpt", "rcpt_handler");
+}
+
+sub mail_handler {
+  my ($self, $transaction, $sender) = @_;
+  # lookup the address here; but always just return DECLINED
+  # we will store the state for rejection when rcpt is being run, some
+  # MTAs gets confused when you reject mail during MAIL FROM:
+  #
+  # If we were really clever we would do the lookup in the background
+  # but that must wait for another day.  (patches welcome! :-) )
+  if ($sender->format ne "<>" and $self->qp->config('rhsbl_zones')) {
+    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
+    my $host = $sender->host;
+    for my $rhsbl (keys %rhsbl_zones) {
+      $transaction->notes('rhsbl', "Mail from $host rejected because it $rhsbl_zones{$rhsbl}")
+	if check_rhsbl($self, $rhsbl, $host);
+    }
+  }
+}
+
+sub rcpt_handler {
+  my ($self, $transaction, $rcpt) = @_;
+  my $note = $transaction->notes('rhsbl');
+  return (DENY, $note) if $note;
+  return DECLINED;
+}
+
+sub check_rhsbl {
+  my ($self, $rhsbl, $host) = @_;
+  return 0 unless $host;
+  $self->log(2, "checking $host in $rhsbl");
+  return 1 if ((gethostbyname("$host.$rhsbl"))[4]);
+  return 0;
+}
+
+
+

@@ -1,3 +1,50 @@
+
+v0.10
+  New object oriented internals
+  
+  Very flexible plugin
+
+  All functionality not core to SMTP moved to plugins
+
+  Can accept mails as large as your file system will allow (instead of
+  up to as much memory you would allow qpsmtpd to eat).
+
+2002/09/08
+  Add klez_filter plugin
+
+  Support more return codes for data_post
+
+  Document data_post
+
+  Add plugin name to the log entries when plugins use log()
+
+  Add plugin_name method to the default plugin object.
+
+  Improve error handling in the spamassassin plugin
+
+
+2002/08/06
+  Spool message bodies to a tmp file so we can support HUGE messages
+ 
+  API to read the message body (undocumented, subject to change)
+
+  data_post hook (undocumented)
+
+  SpamAssassin plugin (connects to spamd on localhost), see
+  plugins/spamassassin
+
+
+2002/07/15
+  DNS RBL and RHSBL support via plugins.
+
+  More hooks.
+
+2002/07/03
+  First (non functional) version of the new object oriented mail engine (0.10).
+ 
+
+Changes on the old v0.0x branch:
+
 2002/05/09
   Klez filter (thanks to Robert Spier)
 
