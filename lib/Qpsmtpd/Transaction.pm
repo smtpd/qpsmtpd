@@ -57,6 +57,12 @@ sub notes {
   $self->{_notes}->{$key};
 }
 
+sub body_start {
+  my $self = shift;
+  @_ and $self->{_body_start} = shift;
+  $self->{_body_start};
+}
+
 sub body_filename {
   my $self = shift;
   return unless $self->{_body_file};
@@ -86,7 +92,8 @@ sub body_size {
 sub body_resetpos {
   my $self = shift;
   return unless $self->{_body_file};
-  seek($self->{_body_file}, 0,0);
+  my $start = $self->{_body_start} || 0;
+  seek($self->{_body_file}, $start, 0);
   $self->{_body_file_writing} = 0;
   1;
 }
@@ -94,7 +101,8 @@ sub body_resetpos {
 sub body_getline {
   my $self = shift;
   return unless $self->{_body_file};
-  seek($self->{_body_file}, 0,0)
+  my $start = $self->{_body_start} || 0;
+  seek($self->{_body_file}, $start,0)
     if $self->{_body_file_writing};
   $self->{_body_file_writing} = 0;
   my $line = $self->{_body_file}->getline;

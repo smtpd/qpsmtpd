@@ -471,15 +471,19 @@ sub data {
         # FIXME - call plugins to work on just the header here; can
         # save us buffering the mail content.
 
+	# Save the start of just the body itself	
+	$self->transaction->body_start($size);
+
       }
 
+      # grab a copy of all of the header lines
       if ($in_header) {
         $buffer .= $_;  
       }
-      else {
-        $self->transaction->body_write($_);
-      }
 
+      # copy all lines into the spool file, including the headers
+      # we will create a new header later before sending onwards
+      $self->transaction->body_write($_);
       $size += length $_;
     }
     #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
