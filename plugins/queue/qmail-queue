@@ -18,6 +18,8 @@ If set the environment variable QMAILQUEUE overrides this setting.
 
 =cut
 
+use POSIX ();
+
 sub register {
   my ($self, $qp, @args) = @_;
   $self->register_hook("queue", "queue_handler");
@@ -88,13 +90,12 @@ sub queue_handler {
       exit 3;
     }
 
-    # save the original STDIN and STDOUT
+    # save the original STDIN and STDOUT in case exec() fails below
     open(SAVE_STDIN, "<&STDIN");
     open(SAVE_STDOUT, ">&STDOUT");
 
-    # what are those exit values for?  Why don't we die with a useful error message?
-    open(STDIN, "<&MESSAGE_READER") or exit 4;
-    open(STDOUT, "<&ENVELOPE_READER") or exit 5;
+    POSIX::dup2(fileno(MESSAGE_READER), 0) or die "Unable to dup MESSAGE_READER: $!";
+    POSIX::dup2(fileno(ENVELOPE_READER), 1) or die "Unable to dup ENVELOPE_READER: $!";
 
     $self->log(7, "Queuing to $queue_exec");
 
@@ -104,6 +105,8 @@ sub queue_handler {
     open(STDIN, "<&SAVE_STDIN");
     open(STDOUT, ">&SAVE_STDOUT");
 
+    # NB: The "if not $rc" is redundant since exec() won't return if it
+    # succeeds.
     exit 6 if not $rc;
   }
 }
