@@ -389,9 +389,6 @@ sub disconnect {
 
 sub data {
   my $self = shift;
-  $self->respond(503, "MAIL first"), return 1 unless $self->transaction->sender;
-  $self->respond(503, "RCPT first"), return 1 unless $self->transaction->recipients;
-  
   my ($rc, $msg) = $self->run_hooks("data");
   if ($rc == DONE) {
     return 1;
@@ -416,9 +413,9 @@ sub data {
     $self->disconnect;
     return 1;
   }
-  else {
-    $self->respond(354, "go ahead");
-  }
+  $self->respond(503, "MAIL first"), return 1 unless $self->transaction->sender;
+  $self->respond(503, "RCPT first"), return 1 unless $self->transaction->recipients;
+  $self->respond(354, "go ahead");
   
   my $buffer = '';
   my $size = 0;
