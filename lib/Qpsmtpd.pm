@@ -111,6 +111,40 @@ sub _config_from_file {
   return wantarray ? @config : $config[0];
 }
 
+sub _compile {
+    my ($plugin, $package, $file) = @_;
+    
+    my $sub;
+    open F, $file or die "could not open $file: $!";
+    { 
+      local $/ = undef;
+      $sub = <F>;
+    }
+    close F;
+
+    my $line = "\n#line 1 $file\n";
+
+    my $eval = join(
+		    "\n",
+		    "package $package;",
+		    'use Qpsmtpd::Constants;',
+		    "require Qpsmtpd::Plugin;",
+		    'use vars qw(@ISA);',
+		    '@ISA = qw(Qpsmtpd::Plugin);',
+		    "sub plugin_name { qq[$plugin] }",
+		    $line,
+		    $sub,
+		    "\n", # last line comment without newline?
+		   );
+
+    #warn "eval: $eval";
+
+    $eval =~ m/(.*)/s;
+    $eval = $1;
+
+    eval $eval;
+    die "eval $@" if $@;
+}
 
 sub load_plugins {
   my $self = shift;
@@ -174,39 +208,9 @@ sub _load_plugins {
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     # don't reload plugins if they are already loaded
-    next if defined &{"${package}::register"};
+    _compile($plugin_name, $package, "$dir/$plugin") unless
+        defined &{"${package}::register"};
     
-    my $sub;
-    open F, "$dir/$plugin" or die "could not open $dir/$plugin: $!";
-    { 
-      local $/ = undef;
-      $sub = <F>;
-    }
-    close F;
-
-    my $line = "\n#line 1 $dir/$plugin\n";
-
-    my $eval = join(
-		    "\n",
-		    "package $package;",
-		    'use Qpsmtpd::Constants;',
-		    "require Qpsmtpd::Plugin;",
-		    'use vars qw(@ISA);',
-		    '@ISA = qw(Qpsmtpd::Plugin);',
-		    "sub plugin_name { qq[$plugin_name] }",
-		    $line,
-		    $sub,
-		    "\n", # last line comment without newline?
-		   );
-
-    #warn "eval: $eval";
-
-    $eval =~ m/(.*)/s;
-    $eval = $1;
-
-    eval $eval;
-    die "eval $@" if $@;
-
     my $plug = $package->new();
     $plug->_register($self, @args);
 
