@@ -144,7 +144,7 @@ sub check_spam {
   my $line0 = <SPAMD>; # get the first protocol lines out
   if ($line0) {
     $self->log(6, "check_spam: spamd: $line0");
-    $transaction->header->add("X-Spam-Check-By", $self->qp->config('me'), 0);
+    $transaction->header->replace("X-Spam-Check-By", $self->qp->config('me'), 0);
   }
 
   my ($flag, $hits, $required);
@@ -162,8 +162,8 @@ sub check_spam {
   $flag = $flag eq 'True' ? 'Yes' : 'No';
   $self->log(6, "check_spam: finished reading from spamd");
 
-  $transaction->header->add('X-Spam-Flag', 'YES', 0) if ($flag eq 'Yes');
-  $transaction->header->add('X-Spam-Status',
+  $transaction->header->replace('X-Spam-Flag', 'YES', 0) if ($flag eq 'Yes');
+  $transaction->header->replace('X-Spam-Status',
 			    "$flag, hits=$hits required=$required\n" .
 			    "\ttests=$tests", 0);
   $self->log(5, "check_spam: $flag, hits=$hits, required=$required, " .
