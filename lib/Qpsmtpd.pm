@@ -191,8 +191,9 @@ sub _load_plugins {
       }
       next;
     }
-    
+
     my $plugin_name = $plugin;
+    $plugin =~ s/:\d+$//;       # after this point, only used for filename
 
     # Escape everything into valid perl identifiers
     $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
