@@ -282,6 +282,7 @@ sub rcpt {
 
   my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
   $rcpt = $_[1] unless $rcpt;
+  $self->log(LOGWARN, "$$ to email address : [$rcpt]");
   $rcpt = (Qpsmtpd::Address->parse($rcpt))[0];
 
   return $self->respond(501, "could not parse recipient") unless $rcpt;
