@@ -1,5 +1,10 @@
 0.28
 
+
+  Create temp files with permissions 0600 (thanks to Robert James Kaes again)
+
+  Fix warning in check_badrcptto plugin (Thanks to Robert James Kaes)
+
   Proper "Log levels" with a configuration option
 
   $Include feature in config/plugins

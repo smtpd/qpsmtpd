@@ -81,7 +81,7 @@ sub body_write {
      -d $spool_dir or mkdir($spool_dir, 0700) or die "Could not create spool_dir: $!";
      $self->{_filename} = $spool_dir . join(":", time, $$, $transaction_counter++);
      $self->{_filename} =~ tr!A-Za-z0-9:/_-!!cd;
-    $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT)    
+    $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
       or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
   }
   # go to the end of the file

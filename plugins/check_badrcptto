@@ -16,7 +16,7 @@ sub check_for_badrcptto {
     return (DENY, "mail to $bad not accepted here")
       if $bad eq $from;
     return (DENY, "mail to $bad not accepted here")
-      if substr($bad,0,1) eq '@' && $bad eq "@$host";
+      if substr($bad,0,1) eq '@' && $bad eq "\@$host";
   }
   return (DECLINED);
 }
