@@ -1,5 +1,8 @@
 0.26-dev
 
+  Fixed timeout bug when the client sent DATA and then stopped before
+  sending the next line. (Gergely Risko <risko@risko.hu>) 
+
   unrecognized_command hook and a count_unrecognized_commands
   plugin. (Rasjid Wilcox)
 

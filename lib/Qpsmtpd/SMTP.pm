@@ -320,6 +320,8 @@ sub data {
 
   my $timeout = $self->config('timeout');
 
+  alarm $timeout;
+
   while (<STDIN>) {
     $complete++, last if $_ eq ".\r\n";
     $i++;

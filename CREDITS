@@ -24,5 +24,7 @@ Changes file.
 Kee Hinckley <nazgul@somewhere.com>: Sent me the correct strftime
 format for the dates in the "Received" headers.
 
+Gergely Risko <risko@risko.hu>: Fixed timeout bug when the client sent
+DATA and then stopped before sending the next line.
 
 ... and many others per the Change file!
