@@ -1,0 +1,22 @@
+# this plugin checks the badrcptto config (like badmailfrom for rcpt address)
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("rcpt", "check_for_badrcptto");
+}
+
+sub check_for_badrcptto {
+  my ($self, $transaction, $recipient) = @_;
+  return (DECLINED) unless $recipient->host && $recipient->user;
+  my $host = lc $recipient->host;
+  my $from = $recipient->user . '@' . $host;
+  my @badrcptto = $self->qp->config("badrcptto");
+  for my $bad (@badrcptto) {
+    $bad =~ s/^\s*(\S+)/$1/;
+    return (DENY, "mail to $bad not accepted here")
+      if $bad eq $from;
+    return (DENY, "mail to $bad not accepted here")
+      if substr($bad,0,1) eq '@' && $bad eq "@$host";
+  }
+  return (DECLINED);
+}

@@ -7,3 +7,8 @@ Andrew Pam <xanni@glasswings.com.au>: fixing the maximum message size
 
 Marius Kjeldahl <marius@kjeldahl.net>, Zukka Zitting
 <jukka.zitting@iki.fi>: Patches for supporting $ENV{RELAYCLIENT}
+
+Jim Winstead <jimw@trainedmonkey.com>: the core "command dispatch"
+system in qpsmtpd is taken from his colobus nntp server.  The
+check_badmailfrom and check_mailrcptto plugins.
+
