@@ -353,7 +353,7 @@ sub data {
 	#   way a Received: line that is already in the header.
 
 	$header->extract(\@header);
-	$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://develooper.com/code/qpsmtpd/");
+	#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://develooper.com/code/qpsmtpd/");
 
 	$buffer = "";
 
@@ -380,10 +380,12 @@ sub data {
 
   $self->transaction->header($header);
 
+  my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
+
   $header->add("Received", "from ".$self->connection->remote_info 
 	       ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip 
 	       . ") by ".$self->config('me')." (qpsmtpd/".$self->version
-	       .") with SMTP; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
+	       .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
 	       0);
 
   # if we get here without seeing a terminator, the connection is

@@ -1,5 +1,13 @@
 0.27 
 
+  Say Received: ... via ESMTP instead of via SMTP when the client
+  speaks ESMTP.  (Hoping this can be a useful SpamAssassin rule).
+
+  Take out the X-SMTPD header. 
+
+  Add pod documentation and sanity checking of the config to
+  check_badmailfrom
+
   Use $ENV{QMAIL} to override /var/qmail for where to find the
   control/ directory.
 
