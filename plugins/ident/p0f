@@ -1,0 +1,100 @@
+# -*- perl -*-
+
+=pod
+
+An Identification Plugin
+
+ ./p0f -u qpsmtpd -d -q -Q /tmp/.p0f_socket 'dst port 25' -o /dev/null && \
+    chown qpsmtpd /tmp/.p0f_socket
+
+and add 
+
+ ident/p0f /tmp/.p0f_socket 
+
+to config/plugins
+
+it puts things into the 'p0f' connection notes so other plugins can do
+things based on source OS.
+
+=cut
+
+use IO::Socket;
+use Net::IP;
+
+sub register {
+  my ($self, $qp, $p0f_socket) = @_;
+  $self->register_hook("connect", "lookup_p0f");
+
+  $p0f_socket =~ /(.*)/; # untaint
+  $self->{_args}->{p0f_socket} = $1;
+}
+
+sub lookup_p0f {
+  my($self, $qp) = @_;
+
+  eval {
+    my $p0f;
+    $p0f = p0fq( $self->{_args}->{p0f_socket},
+		 $self->qp->connection->remote_ip,
+		 $self->qp->connection->remote_port,
+		 $self->qp->connection->local_ip,
+		 $self->qp->connection->local_port,
+	       );
+    $self->qp->connection->notes('p0f',$p0f);
+    $self->log(LOGNOTICE, "Results: ".$p0f->{genre}." (".$p0f->{detail}.")");
+  };
+  $self->log(LOGERROR,"error: $@") if $@;
+
+  return DECLINED;
+}
+
+
+
+=pod
+
+Heavily based on p0fq.pl from the p0f districution, and is marked as:
+ Copyright (C) 2004 by Aurelien Jacobs <aurel@gnuage.org>
+
+It says:
+# If you want to query p0f from a production application, just
+# implement the same functionality in your code. It's perhaps 10
+# lines.
+
+=cut
+
+my $QUERY_MAGIC = 0x0defaced;
+sub p0fq {
+  my ($p0f_socket,$srcip,$srcport,$destip,$destport) = @_;
+
+  # Convert the IPs and pack the request message
+  my $src = new Net::IP ($srcip) or die (Net::IP::Error());
+  my $dst = new Net::IP ($destip) or die (Net::IP::Error());
+  my $query = pack("L L N N S S", $QUERY_MAGIC, 0x12345678,
+		   $src->intip(), $dst->intip(), $srcport, $destport);
+
+  # Open the connection to p0f
+  my $sock = new IO::Socket::UNIX (Peer => $p0f_socket,
+				   Type => SOCK_STREAM);
+  die "Could not create socket: $!\n" unless $sock;
+
+  # Ask p0f
+  print $sock $query;
+  my $response = <$sock>;
+  close $sock;
+
+  # Extract the response from p0f
+  my ($magic, $id, $type, $genre, $detail, $dist, $link, $tos, $fw,
+      $nat, $real, $score, $mflags, $uptime) =
+	unpack ("L L C Z20 Z40 c Z30 Z30 C C C s S N", $response);
+  die "Bad response magic.\n" if $magic != $QUERY_MAGIC;
+  die "P0f did not honor our query.\n" if $type == 1;
+  die "This connection is not (no longer?) in the cache.\n" if $type == 2;
+  
+  return ({ genre => $genre,
+	    detail => $detail,
+	    distance => $dist,
+	    link => $link,
+	    uptime => $uptime,
+	  }
+	 );
+}

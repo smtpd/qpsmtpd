@@ -1,0 +1,36 @@
+# -*- perl -*-
+
+=pod
+
+This plugin uses MaxMind's GeoIP service and the Geo::IP perl module to
+do a lookup on incoming connections and record the country of origin.
+
+Thats all it does.
+
+It logs the country to the connection notes 'geoip_country'.  Another
+plugin can use that value to do things to the connection, like reject,
+or greylist.
+
+=cut
+
+use Geo::IP;
+
+my $geoip = Geo::IP->new(GEOIP_STANDARD);
+
+
+sub register {
+  my ($self, $qp) = @_;
+  $self->register_hook("connect", "lookup_geoip");
+}
+
+sub lookup_geoip {
+  my ($self) = @_;
+
+  my $country = 
+    $geoip->country_code_by_addr( $self->qp->connection->remote_ip );
+
+  $self->qp->connection->notes('geoip_country', $country);
+  $self->log(LOGNOTICE, "GeoIP Country: $country");
+
+  return DECLINED;
+}
