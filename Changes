@@ -1,4 +1,9 @@
-2002/09/24
+2002/10/09 - 0.11
+
+  Make a "queue" plugin hook and move the qmail-queue functionality
+  to plugins/queue/qmail-queue.  This allows you to make qpsmtpd 
+  delivery mail via smtp or lmtp or into a database or whatever you want.
+
   Reorganize most of Qpsmtpd.pm into Qpsmtpd/SMTP.pm.
 
   Add spool_dir option (thanks to Ross Mueller <ross@visual.com>)
@@ -6,25 +11,17 @@
   Add plugin name to the "hooks" data structure, so we can log plugin
   module had an error when we run a hook.
 
-
-2002/09/22
   Make klez filter run for mails bigger than 220KB; they are sometimes
   bigger than that.
 
-
-2002/09/20
   Avoid "use of uninitialized variable" warning when the "MAIL" or the
   "RCPT" command is executed without a parameter.
 
   Compatibility with perl 5.5.3.
 
-
-2002/09/12
   Fix "Could not print" error message in the TcpServer object. (Thanks
   to Ross Mueller <ross@visual.com>)
 
-
-2002/09/10
   dnsbl plugin queues lookups in the background upon connect but
   doesn't block for the results until they are needed, greatly
   speeding up connection times.  Also fix a typo in the dnsbl plugin
