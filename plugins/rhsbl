@@ -30,7 +30,7 @@ sub mail_handler {
         Danga::DNS->new(
           callback => sub { $self->process_result($host, $rhsbl_zones{$rhsbl}, @_) },
           host => "$host.$rhsbl",
-          client => $self->argh->input_sock,
+          client => $self->qp->input_sock,
         );
       }
     }

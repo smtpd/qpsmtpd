@@ -30,12 +30,12 @@ sub check_dns {
         callback => sub { $self->dns_result(@_) },
         host => $host,
         type => "MX",
-        client => $self->argh->input_sock,
+        client => $self->qp->input_sock,
     );
     Danga::DNS->new(
         callback => sub { $self->dns_result(@_) },
         host => $host,
-        client => $self->argh->input_sock,
+        client => $self->qp->input_sock,
     );
 }
 
