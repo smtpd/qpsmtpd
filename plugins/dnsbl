@@ -40,10 +40,10 @@ sub connect_handler {
   for my $dnsbl (keys %dnsbl_zones) {
     # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
     if (defined($dnsbl_zones{$dnsbl})) {
-      $self->log(7, "Checking $reversed_ip.$dnsbl for A record in the background");
+      $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
       $sel->add($res->bgsend("$reversed_ip.$dnsbl"));
     } else {
-      $self->log(7, "Checking $reversed_ip.$dnsbl for TXT record in the background");
+      $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
       $sel->add($res->bgsend("$reversed_ip.$dnsbl", "TXT"));
     }
   }
@@ -69,12 +69,12 @@ sub process_sockets {
 
   my $result; 
 
-  $self->log(8, "waiting for dnsbl dns");
+  $self->log(LOGDEBUG, "waiting for dnsbl dns");
 
   # don't wait more than 8 seconds here
   my @ready = $sel->can_read(8);
 
-  $self->log(8, "DONE waiting for dnsbl dns, got " , scalar @ready, " answers ...") ;
+  $self->log(LOGDEBUG, "DONE waiting for dnsbl dns, got " , scalar @ready, " answers ...") ;
   return '' unless @ready;
 
   for my $socket (@ready) {
@@ -91,9 +91,9 @@ sub process_sockets {
 	my $name = $rr->name;
 	($dnsbl) = ($name =~ m/(?:\d+\.){4}(.*)/) unless $dnsbl;
 	$dnsbl = $name unless $dnsbl;
-	$self->log(9, "name ", $rr->name);
+	$self->log(LOGDEBUG, "name ", $rr->name);
 	next unless $rr->type eq "TXT";
-	$self->log(10, "got txt record");
+	$self->log(LOGDEBUG, "got txt record");
 	$result = $rr->txtdata and last;
       }
       #$a_record and $result = "Blocked by $dnsbl";
@@ -110,7 +110,7 @@ sub process_sockets {
       }
     }
     else {
-      $self->log(4, "$dnsbl query failed: ", $res->errorstring)
+      $self->log(LOGERROR, "$dnsbl query failed: ", $res->errorstring)
 	unless $res->errorstring eq "NXDOMAIN";
     }
 

@@ -34,7 +34,7 @@ sub rcpt_handler {
 sub check_rhsbl {
   my ($self, $rhsbl, $host) = @_;
   return 0 unless $host;
-  $self->log(2, "checking $host in $rhsbl");
+  $self->log(LOGDEBUG, "checking $host in $rhsbl");
   return 1 if ((gethostbyname("$host.$rhsbl"))[4]);
   return 0;
 }

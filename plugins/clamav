@@ -12,10 +12,10 @@ sub register {
     if ($args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
       $self->{_clamscan_loc} = $1;
     } else {
-      $self->log(1, "FATAL ERROR: Unexpected characters in clamav argument 1");
+      $self->log(LOGERROR, "FATAL ERROR: Unexpected characters in clamav argument 1");
       exit 3;
     }
-    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
   } else {
     $self->{_clamscan_loc} = "/usr/local/bin/clamscan";
   }
@@ -35,7 +35,7 @@ sub clam_scan {
  
   # Now do the actual scanning!
   my $cmd = $self->{_clamscan_loc}." --stdout -i --max-recursion=50 --disable-summary $filename 2>&1";
-  $self->log(1, "Running: $cmd");
+  $self->log(LOGDEBUG, "Running: $cmd");
   my $output = `$cmd`;
  
   my $result = ($? >> 8);
@@ -46,20 +46,20 @@ sub clam_scan {
  
   $output =~ s/^.* (.*) FOUND$/$1 /mg;
  
-  $self->log(1, "clamscan results: $output");
+  $self->log(LOGDEBUG, "clamscan results: $output");
  
   if ($signal) {
-    $self->log(1, "clamscan exited with signal: $signal");
+    $self->log(LOGINFO, "clamscan exited with signal: $signal");
     return (DECLINED);
   }
   if ($result == 1) {
-    $self->log(1, "Virus(es) found");
+    $self->log(LOGINFO, "Virus(es) found");
     # return (DENY, "Virus Found: $output");
     $transaction->header->add('X-Virus-Found', 'Yes');
     $transaction->header->add('X-Virus-Details', $output);
   }
   elsif ($result) {
-    $self->log(1, "ClamAV error: $result\n");
+    $self->log(LOGWARN, "ClamAV error: $result\n");
   }
   $transaction->header->add('X-Virus-Checked', 'Checked');
   return (DECLINED);

@@ -68,7 +68,7 @@ sub dispatch {
 
   if (1 or $self->{_commands}->{$cmd} and $self->can($cmd)) {
     my ($result) = eval { $self->$cmd(@_) };
-    $self->log(0, "XX: $@") if $@;
+    $self->log(LOGERROR, "XX: $@") if $@;
     return $result if defined $result;
     return $self->fault("command '$cmd' failed unexpectedly");
   }
@@ -205,7 +205,7 @@ sub mail {
   }
   else {
     my $from_parameter = join " ", @_;
-    $self->log(2, "full from_parameter: $from_parameter");
+    $self->log(LOGINFO, "full from_parameter: $from_parameter");
     my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
     warn "$$ from email address : [$from]\n";
     if ($from eq "<>" or $from =~ m/\[undefined\]/) {
@@ -222,22 +222,22 @@ sub mail {
     }
     elsif ($rc == DENY) {
       $msg ||= $from->format . ', denied';
-      $self->log(2, "deny mail from " . $from->format . " ($msg)");
+      $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
       $self->respond(550, $msg);
     }
     elsif ($rc == DENYSOFT) {
       $msg ||= $from->format . ', temporarily denied';
-      $self->log(2, "denysoft mail from " . $from->format . " ($msg)");
+      $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
       $self->respond(450, $msg);
     }
     elsif ($rc == DENYHARD) {
       $msg ||= $from->format . ', denied';
-      $self->log(2, "deny mail from " . $from->format . " ($msg)");
+      $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
       $self->respond(550, $msg);
       $self->disconnect;
     }
     else { # includes OK
-      $self->log(2, "getting mail from ".$from->format);
+      $self->log(LOGINFO, "getting mail from ".$from->format);
       $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
       $self->transaction->sender($from);
     }
@@ -269,7 +269,7 @@ sub rcpt {
   }
   elsif ($rc == DENYHARD) {
       $msg ||= 'delivery denied';
-      $self->log(2, "delivery denied ($msg)");
+      $self->log(LOGINFO, "delivery denied ($msg)");
       $self->respond(550, $msg);
       $self->disconnect;
   }
@@ -337,7 +337,7 @@ sub data {
   my $in_header = 1;
   my $complete = 0;
 
-  $self->log(8, "max_size: $max_size / size: $size");
+  $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
 
   my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
 
@@ -392,12 +392,12 @@ sub data {
 
       $size += length $_;
     }
-    #$self->log(5, "size is at $size\n") unless ($i % 300);
+    #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
 
     alarm $timeout;
   }
 
-  $self->log(6, "max_size: $max_size / size: $size");
+  $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
 
   $self->transaction->header($header);
 

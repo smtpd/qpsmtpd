@@ -2,13 +2,12 @@ package Qpsmtpd::Constants;
 use strict;
 require Exporter;
 
-my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD TRACE);
+my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD);
+my (@loglevels) = qw(LOGDEBUG LOGINFO LOGNOTICE LOGWARN LOGERROR LOGCRIT LOGALERT LOGEMERG LOGRADAR);
 
 use vars qw($VERSION @ISA @EXPORT);
 @ISA    = qw(Exporter);
-@EXPORT = @common;
-
-use constant TRACE => 10;
+@EXPORT = (@common, @loglevels);
 
 use constant OK       => 900;
 use constant DENY     => 901;
@@ -17,6 +16,16 @@ use constant DECLINED => 909;
 use constant DONE     => 910;
 use constant DENYHARD     => 903;
 
+# log levels
+use constant LOGDEBUG   => 8;
+use constant LOGINFO    => 7;
+use constant LOGNOTICE  => 6;
+use constant LOGWARN    => 5;
+use constant LOGERROR   => 4;
+use constant LOGCRIT    => 3;
+use constant LOGALERT   => 2;
+use constant LOGEMERG   => 1;
+use constant LOGRADAR   => 0;
 
 1;
 

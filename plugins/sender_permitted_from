@@ -97,7 +97,7 @@ sub rcpt_handler {
   }
 
   if ($result eq 'fail' or $result eq 'softfail') {
-    $self->log(1, "result for $rcpt->address was $result: $comment");
+    $self->log(LOGDEBUG, "result for $rcpt->address was $result: $comment");
   }
    
   return DECLINED;
@@ -117,7 +117,7 @@ sub data_handler {
 
   my ($result, $smtp_comment, $comment) = $query->message_result2();
 
-  $self->log(1, "result was $result: $comment") if ($result);
+  $self->log(LOGDEBUG, "result was $result: $comment") if ($result);
 
   $transaction->header->add('Received-SPF' => "$result ($comment)", 0);
 

@@ -1,20 +1,39 @@
 package Qpsmtpd;
 use strict;
-
-$Qpsmtpd::VERSION = "0.28-dev";
-sub TRACE_LEVEL () { 6 }
+use vars qw($VERSION $LogLevel);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
-sub version { $Qpsmtpd::VERSION };
+$VERSION = "0.28-dev";
+sub TRACE_LEVEL { $LogLevel }
+
+sub version { $VERSION };
 
 $Qpsmtpd::_hooks = {};
 
+sub init_logger {
+    my $self = shift;
+    # Get the loglevel - we localise loglevel to zero while we do this
+    my $loglevel = do {
+        local $LogLevel = 0;
+        $self->config("loglevel");
+    };
+    if (defined($loglevel) and $loglevel =~ /^\d+$/) {
+        $LogLevel = $loglevel;
+    }
+    else {
+        $LogLevel = LOGWARN; # Default if no loglevel file found.
+    }
+    return $LogLevel;
+}
+
 sub log {
   my ($self, $trace, @log) = @_;
+  my $level = TRACE_LEVEL();
+  $level = $self->init_logger unless defined $level;
   warn join(" ", $$, @log), "\n"
-    if $trace <= TRACE_LEVEL;
+    if $trace <= $level;
 }
 
 
@@ -49,7 +68,7 @@ sub config {
 
 sub get_qmail_config {
   my ($self, $config, $type) = @_;
-  $self->log(8, "trying to get config for $config");
+  $self->log(LOGDEBUG, "trying to get config for $config");
   if ($self->{_config_cache}->{$config}) {
     return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
   }
@@ -64,23 +83,28 @@ sub get_qmail_config {
     eval { require CDB_File };
 
     if ($@) {
-      $self->log(0, "No $configfile.cdb support, could not load CDB_File module: $@");
+      $self->log(LOGERROR, "No $configfile.cdb support, could not load CDB_File module: $@");
     }
     my %h;
     unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
-      $self->log(0, "tie of $configfile.cdb failed: $!");
-      return DECLINED;
+      $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
+      return +{};
     }
     #warn Data::Dumper->Dump([\%h], [qw(h)]);
     # should we cache this?
     return \%h;
   }
 
+  return $self->_config_from_file($configfile, $config);
+}
+
+sub _config_from_file {
+  my ($self, $configfile, $config) = @_;
   return unless -e $configfile;
   open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!" and return;
   my @config = <CF>;
   chomp @config;
-  @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
+  @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
   close CF;
   #$self->log(10, "returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
   $self->{_config_cache}->{$config} = \@config;
@@ -94,11 +118,42 @@ sub load_plugins {
 
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
   my $dir = "$name/plugins";
-  $self->log(2, "loading plugins from $dir");
+  $self->log(LOGNOTICE, "loading plugins from $dir");
 
+  $self->_load_plugins($dir, @plugins);
+}
+
+sub _load_plugins {
+  my $self = shift;
+  my ($dir, @plugins) = @_;
+  
   for my $plugin (@plugins) {
-    $self->log(7, "Loading $plugin");
+    $self->log(LOGINFO, "Loading $plugin");
     ($plugin, my @args) = split /\s+/, $plugin;
+    
+    if (lc($plugin) eq '$include') {
+      my $inc = shift @args;
+      my $config_dir = ($ENV{QMAIL} || '/var/qmail') . '/control';
+      my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+      $config_dir = "$name/config" if (-e "$name/config/$inc");
+      if (-d "$config_dir/$inc") {
+        $self->log(LOGDEBUG, "Loading include dir: $config_dir/$inc");
+        opendir(DIR, "$config_dir/$inc") || die "opendir($config_dir/$inc): $!";
+        my @plugconf = sort grep { -f $_ } map { "$config_dir/$inc/$_" } grep { !/^\./ } readdir(DIR);
+        closedir(DIR);
+        foreach my $f (@plugconf) {
+            $self->_load_plugins($dir, $self->_config_from_file($f, "plugins"));
+        }
+      }
+      elsif (-f "$config_dir/$inc") {
+        $self->log(LOGDEBUG, "Loading include file: $config_dir/$inc");
+        $self->_load_plugins($dir, $self->_config_from_file("$config_dir/$inc", "plugins"));
+      }
+      else {
+        $self->log(LOGCRIT, "CRITICAL PLUGIN CONFIG ERROR: Include $config_dir/$inc not found");
+      }
+      next;
+    }
     
     my $plugin_name = $plugin;
 
@@ -113,8 +168,10 @@ sub load_plugins {
 		       "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
 		      ]egx;
 
+    my $package = "Qpsmtpd::Plugin::$plugin_name";
+
     # don't reload plugins if they are already loaded
-    next if defined &{"Qpsmtpd::Plugin::${plugin_name}::register"};
+    next if defined &{"${package}::register"};
     
     my $sub;
     open F, "$dir/$plugin" or die "could not open $dir/$plugin: $!";
@@ -123,8 +180,6 @@ sub load_plugins {
       $sub = <F>;
     }
     close F;
-
-    my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     my $line = "\n#line 1 $dir/$plugin\n";
 
@@ -161,18 +216,18 @@ sub run_hooks {
   if ($self->{_hooks}->{$hook}) {
     my @r;
     for my $code (@{$self->{_hooks}->{$hook}}) {
-      $self->log(5, "running plugin ", $code->{name});
+      $self->log(LOGINFO, "running plugin ", $code->{name});
       eval { (@r) = $code->{code}->($self, $self->can('transaction') ? $self->transaction : {}, @_); };
-      $@ and $self->log(0, "FATAL PLUGIN ERROR: ", $@) and next;
+      $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
       !defined $r[0] 
-	  and $self->log(1, "plugin ".$code->{name}
+	  and $self->log(LOGERROR, "plugin ".$code->{name}
 			 ."running the $hook hook returned undef!")
 	  and next;
 
       # should we have a hook for "OK" too? 
       if ($r[0] == DENY or $r[0] == DENYSOFT) {
 	  $r[1] = "" if not defined $r[1];
-	  $self->log(10, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
+	  $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
 	  $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
       }
 

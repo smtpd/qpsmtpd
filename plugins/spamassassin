@@ -70,7 +70,7 @@ sub register {
   my ($self, $qp, @args) = @_;
   $self->register_hook("data_post", "check_spam");
 
-  $self->log(0, "Bad parameters for the spamassassin plugin")
+  $self->log(LOGERROR, "Bad parameters for the spamassassin plugin")
     if @_ % 2;
 
   %{$self->{_args}} = @args;
@@ -94,7 +94,7 @@ sub check_spam {
   if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') }
   die "No port" unless $port;
   my $iaddr   = inet_aton($remote) or 
-    $self->log(1, "Could not resolve host: $remote") and return (DECLINED);
+    $self->log(LOGERROR, "Could not resolve host: $remote") and return (DECLINED);
   my $paddr   = sockaddr_in($port, $iaddr);
 
   my $proto   = getprotobyname('tcp');
@@ -102,18 +102,18 @@ sub check_spam {
     my $spamd_socket = $1;
     
     socket(SPAMD, PF_UNIX, SOCK_STREAM, 0)
-      or $self->log(1, "Could not open socket: $!") and return (DECLINED);
+      or $self->log(LOGERROR, "Could not open socket: $!") and return (DECLINED);
 
     $paddr = sockaddr_un($spamd_socket); 
   }
   else {
     socket(SPAMD, PF_INET, SOCK_STREAM, $proto)
-      or $self->log(1, "Could not open socket: $!") and return (DECLINED);
+      or $self->log(LOGERROR, "Could not open socket: $!") and return (DECLINED);
   }
 
   connect(SPAMD, $paddr) 
-    or $self->log(1, "Could not connect to spamassassin daemon: $!") and return DECLINED;
-  $self->log(6, "check_spam: connected to spamd");
+    or $self->log(LOGERROR, "Could not connect to spamassassin daemon: $!") and return DECLINED;
+  $self->log(LOGDEBUG, "check_spam: connected to spamd");
 
   SPAMD->autoflush(1);
   

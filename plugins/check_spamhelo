@@ -28,7 +28,7 @@ sub check_helo {
   
   for my $bad ($self->qp->config('badhelo')) {
     if ($host eq lc $bad) {
-      $self->log(5, "Denying HELO from host claiming to be $bad");
+      $self->log(LOGDEBUG, "Denying HELO from host claiming to be $bad");
       return (DENY, "Uh-huh.  You're $host, and I'm a boil on the bottom of the Marquess of Queensbury's great-aunt.");
     }
   }

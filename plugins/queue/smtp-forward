@@ -36,7 +36,7 @@ sub register {
     if (@args > 1 and $args[1] =~ /^(\d+)$/) {
       $self->{_smtp_port} = $1;
     }
-    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 2);
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 2);
   } else {
     die("No SMTP server specified in smtp-forward config");
   }
@@ -46,7 +46,7 @@ sub register {
 sub queue_handler {
   my ($self, $transaction) = @_;
 
-  $self->log(1, "forwarding to $self->{_smtp_server}:$self->{_smtp_port}");
+  $self->log(LOGINFO, "forwarding to $self->{_smtp_server}:$self->{_smtp_port}");
   my $smtp = Net::SMTP->new(
                             $self->{_smtp_server},
                             Port => $self->{_smtp_port},
@@ -62,6 +62,6 @@ sub queue_handler {
   }
   $smtp->dataend();
   $smtp->quit() or return(DECLINED, "Unable to queue message ($!)");
-  $self->log(1, "finished queueing");
+  $self->log(LOGINFO, "finished queueing");
   return (OK, "Queued!");
 }

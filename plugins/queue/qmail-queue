@@ -26,7 +26,7 @@ sub register {
 
   if (@args > 0) {
     $self->{_queue_exec} = $args[0];
-    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
   }
   else {
     $self->{_queue_exec} = ($ENV{QMAIL} || '/var/qmail') . "/bin/qmail-queue";
@@ -86,7 +86,8 @@ sub queue_handler {
     if ($queue_exec =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
       $queue_exec = $1;
     } else {
-      $self->log(1, "FATAL ERROR: Unexpected characters in qmail-queue plugin argument");
+      $self->log(LOGERROR, "FATAL ERROR: Unexpected characters in qmail-queue plugin argument");
+      # This exit is ok as we're exiting a forked child process.
       exit 3;
     }
 
@@ -97,7 +98,7 @@ sub queue_handler {
     POSIX::dup2(fileno(MESSAGE_READER), 0) or die "Unable to dup MESSAGE_READER: $!";
     POSIX::dup2(fileno(ENVELOPE_READER), 1) or die "Unable to dup ENVELOPE_READER: $!";
 
-    $self->log(7, "Queuing to $queue_exec");
+    $self->log(LOGNOTICE, "Queuing to $queue_exec");
 
     my $rc = exec $queue_exec;
 

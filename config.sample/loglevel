@@ -1,0 +1,11 @@
+# Log levels
+# LOGDEBUG   = 8
+# LOGINFO    = 7
+# LOGNOTICE  = 6
+# LOGWARN    = 5
+# LOGERROR   = 4
+# LOGCRIT    = 3
+# LOGALERT   = 2
+# LOGEMERG   = 1
+# LOGRADAR   = 0
+4

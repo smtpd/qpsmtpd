@@ -1,6 +1,11 @@
 package Qpsmtpd::Plugin;
 use strict;
 
+my %hooks = map { $_ => 1 } qw(
+    config  queue  data_post  quit  rcpt  mail  ehlo  helo
+    connect  reset_transaction  unrecognized_command  disconnect
+);
+
 sub new {
   my $proto = shift;
   my $class = ref($proto) || $proto;
@@ -10,6 +15,9 @@ sub new {
 
 sub register_hook {
   my ($plugin, $hook, $method) = @_;
+  
+  die $plugin->plugin_name . " : Invalid hook: $hook" unless $hooks{$hook};
+
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
   $plugin->qp->_register_hook($hook, { code => sub { local $plugin->{_qp} = shift; $plugin->$method(@_) },

@@ -36,14 +36,14 @@ sub register {
 
 sub http_config {
   my ($self, $transaction, $config) = @_; 
-  $self->log(0, "http_config called with $config");
+  $self->log(LOGNOTICE, "http_config called with $config");
   for my $url (@urls) {
-    $self->log(10, "http_config loading from $url");
+    $self->log(LOGDEBUG, "http_config loading from $url");
     my @config = split /[\r\n]+/, (get "$url$config" || "");
     chomp @config;
     @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
     close CF;
-    # $self->log(0, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
+    # $self->log(LOGNOTICE, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
     return (OK, @config) if @config;
   }
   return DECLINED;

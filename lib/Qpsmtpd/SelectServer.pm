@@ -29,8 +29,10 @@ $SIG{INT} = $SIG{TERM} = sub { $QUIT++ };
 
 sub log {
   my ($self, $trace, @log) = @_;
+  my $level = Qpsmtpd::TRACE_LEVEL();
+  $level = $self->init_logger unless defined $level;
   warn join(" ", fileno($self->client), @log), "\n"
-    if $trace <= Qpsmtpd::TRACE_LEVEL();
+    if $trace <= $level;
 }
 
 sub main {
@@ -75,7 +77,7 @@ sub main {
                 my $qp = Qpsmtpd::SelectServer->new();
                 $qp->client($qpclient);
                 $qp{$qpclient} = $qp;
-                $qp->log(1, "Connection number " . keys(%qp));
+                $qp->log(LOGINFO, "Connection number " . keys(%qp));
                 $inbuffer{$qpclient} = '';
                 $outbuffer{$qpclient} = '';
                 $ready{$qpclient} = [];
@@ -118,7 +120,7 @@ sub main {
                     $qp->data_line($req . CRLF);
                 }
                 else {
-                    $qp->log(1, "dispatching $req");
+                    $qp->log(LOGINFO, "dispatching $req");
                     defined $qp->dispatch(split / +/, $req)
                         or $qp->respond(502, "command unrecognized: '$req'");
                 }
@@ -174,7 +176,7 @@ sub start_connection {
     my $remote_ip = shift;
     my $remote_host = shift;
 
-    $self->log(1, "Connection from $remote_host [$remote_ip]");
+    $self->log(LOGNOTICE, "Connection from $remote_host [$remote_ip]");
     my $remote_info = 'NOINFO';
 
     # if the local dns resolver doesn't filter it out we might get
@@ -212,7 +214,7 @@ sub respond {
   my $client = $self->client || die "No client!";
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
-    $self->log(1, ">$line");
+    $self->log(LOGINFO, ">$line");
     $outbuffer{$client} .= "$line\r\n";
   }
   return 1;
@@ -244,7 +246,7 @@ sub data_line {
   local $_ = shift;
   
   if ($_ eq ".\r\n") {
-      $self->log(6, "max_size: $self->{__max_size} / size: $self->{__size}");
+      $self->log(LOGDEBUG, "max_size: $self->{__max_size} / size: $self->{__size}");
       delete $indata{$self->client()};
     
       my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";

@@ -121,7 +121,7 @@ sub DESTROY {
 
   undef $self->{_body_file} if $self->{_body_file};
   if ($self->{_filename} and -e $self->{_filename}) {
-    unlink $self->{_filename} or $self->log(0, "Could not unlink ", $self->{_filename}, ": $!");
+    unlink $self->{_filename} or $self->log(LOGERROR, "Could not unlink ", $self->{_filename}, ": $!");
   }
 }
 

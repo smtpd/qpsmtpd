@@ -66,7 +66,7 @@ sub check_results {
     my ($self, $transaction, $where, @results) = @_;
     foreach my $result (@results) {
         next if $result->{action} eq 'continue';
-        $self->log(1, "milter $self->{name} result action: $result->{action}");
+        $self->log(LOGINFO, "milter $self->{name} result action: $result->{action}");
         if ($result->{action} eq 'reject') {
             die("Rejected at $where by $self->{name} milter ($result->{explanation})");
         }
@@ -96,7 +96,7 @@ sub check_results {
 sub connect_handler {
     my ($self, $transaction) = @_;
     
-    $self->log(1, "milter $self->{name} opening connection to milter backend");
+    $self->log(LOGDEBUG, "milter $self->{name} opening connection to milter backend");
     my $milter = Net::Milter->new();
     $milter->open($self->{host}, $self->{port}, 'tcp');
     $milter->protocol_negotiation();
@@ -105,7 +105,7 @@ sub connect_handler {
     
     my $remote_ip = $self->qp->connection->remote_ip;
     my $remote_host = $self->qp->connection->remote_host;
-    $self->log(1, "milter $self->{name} checking connect from $remote_host\[$remote_ip\]");
+    $self->log(LOGDEBUG, "milter $self->{name} checking connect from $remote_host\[$remote_ip\]");
     
     eval {
         $self->check_results($transaction, "connection",
@@ -128,7 +128,7 @@ sub helo_handler {
     my $helo = $self->qp->connection->hello;
     my $host = $self->qp->connection->hello_host;
 
-    $self->log(1, "milter $self->{name} checking HELO $host");
+    $self->log(LOGDEBUG, "milter $self->{name} checking HELO $host");
     
     eval { $self->check_results($transaction, "HELO",
                                 $milter->send_helo($host)) };
@@ -142,7 +142,7 @@ sub mail_handler {
     
     my $milter = $self->qp->connection->notes('milter');
 
-    $self->log(1, "milter $self->{name} checking MAIL FROM " . $address->format);
+    $self->log(LOGDEBUG, "milter $self->{name} checking MAIL FROM " . $address->format);
     eval { $self->check_results($transaction, "MAIL FROM",
                                 $milter->send_mail_from($address->format)) };
     return(DENY, $@) if $@;
@@ -155,7 +155,7 @@ sub rcpt_handler {
     
     my $milter = $self->qp->connection->notes('milter');
 
-    $self->log(1, "milter $self->{name} checking RCPT TO " . $address->format);
+    $self->log(LOGDEBUG, "milter $self->{name} checking RCPT TO " . $address->format);
 
     eval { $self->check_results($transaction, "RCPT TO",
                                 $milter->send_rcpt_to($address->format)) };
@@ -169,7 +169,7 @@ sub data_handler {
 
     my $milter = $self->qp->connection->notes('milter');
 
-    $self->log(1, "milter $self->{name} checking headers");
+    $self->log(LOGDEBUG, "milter $self->{name} checking headers");
 
     my $headers = $transaction->header(); # Mail::Header object
     foreach my $h ($headers->tags) {
@@ -177,7 +177,7 @@ sub data_handler {
         $h =~ s/\b(\w)/\U$1/g;
         $h =~ s/\bid\b/ID/g;
         foreach my $val ($headers->get($h)) {
-            # $self->log(1, "milter $self->{name} checking header: $h: $val");
+            # $self->log(LOGDEBUG, "milter $self->{name} checking header: $h: $val");
             eval { $self->check_results($transaction, "header $h",
                                 $milter->send_header($h, $val)) };
             return(DENY, $@) if $@;
@@ -197,7 +197,7 @@ sub data_handler {
         last unless length($line);
     }
 
-    $self->log(1, "milter $self->{name} checking body");
+    $self->log(LOGDEBUG, "milter $self->{name} checking body");
 
     my $data = '';
     while (my $line = $transaction->body_getline) {

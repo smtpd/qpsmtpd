@@ -20,7 +20,7 @@ sub register {
 
   if (@args > 0) {
     $self->{_unrec_cmd_max} = $args[0];
-    $self->log(1, "WARNING: Ignoring additional arguments.") if (@args > 1);
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
   } else {
     $self->{_unrec_cmd_max} = 4;
   }
@@ -32,7 +32,7 @@ sub register {
 sub check_unrec_cmd {
   my ($self, $cmd) = @_[0,2];
   
-  $self->log(5, "Unrecognized command '$cmd'");
+  $self->log(LOGINFO, "Unrecognized command '$cmd'");
 
   my $badcmdcount = 
     $self->qp->connection->notes('unrec_cmd_count',
@@ -40,7 +40,7 @@ sub check_unrec_cmd {
 				);
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {
-    $self->log(5, "Closing connection. Too many unrecognized commands.");
+    $self->log(LOGINFO, "Closing connection. Too many unrecognized commands.");
     return (DENY, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
   }
 

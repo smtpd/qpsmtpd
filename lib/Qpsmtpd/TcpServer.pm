@@ -50,7 +50,7 @@ sub read_input {
   while (<STDIN>) {
     alarm 0;
     $_ =~ s/\r?\n$//s; # advanced chomp
-    $self->log(1, "dispatching $_");
+    $self->log(LOGDEBUG, "dispatching $_");
     defined $self->dispatch(split / +/, $_)
       or $self->respond(502, "command unrecognized: '$_'");
     alarm $timeout;
@@ -61,8 +61,8 @@ sub respond {
   my ($self, $code, @messages) = @_;
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
-    $self->log(1, "$line");
-    print "$line\r\n" or ($self->log(1, "Could not print [$line]: $!"), return 0);
+    $self->log(LOGDEBUG, "$line");
+    print "$line\r\n" or ($self->log(LOGERROR, "Could not print [$line]: $!"), return 0);
   }
   return 1;
 }
