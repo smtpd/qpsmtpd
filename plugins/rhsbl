@@ -20,9 +20,9 @@ sub mail_handler {
     my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
 
   if ($sender->format ne '<>' and %rhsbl_zones) {
-    my $helo = $self->qp->connection->hello_host;
     push(my @hosts, $sender->host);
-    push(@hosts, $helo) if $helo && $helo ne $sender->host;
+    #my $helo = $self->qp->connection->hello_host;
+    #push(@hosts, $helo) if $helo && $helo ne $sender->host;
     for my $host (@hosts) {
     for my $rhsbl (keys %rhsbl_zones) {
         $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record in the background");

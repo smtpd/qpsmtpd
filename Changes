@@ -1,5 +1,8 @@
 0.30 - 
 
+  Don't check the HELO host for rfc-ignorant compliance
+
+
 0.29 - 2005/03/03
 
   Store entire incoming message in spool file (so that scanners can read
