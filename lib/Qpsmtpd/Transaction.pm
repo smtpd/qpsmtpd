@@ -3,6 +3,7 @@ use Qpsmtpd;
 @ISA = qw(Qpsmtpd);
 use strict;
 use Qpsmtpd::Utils;
+use Qpsmtpd::Constants;
 
 use IO::File qw(O_RDWR O_CREAT);
 
