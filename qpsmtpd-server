@@ -1,0 +1,28 @@
+#!/usr/bin/perl -Tw
+# Copyright (c) 2001 Ask Bjoern Hansen. See the LICENSE file for details.
+# The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
+#
+# this is designed to be run under tcpserver (http://cr.yp.to/ucspi-tcp.html)
+# or inetd if you're into that sort of thing
+#
+#
+# For more information see http://develooper.com/code/qpsmtpd/
+#
+#
+
+use lib 'lib';
+use Qpsmtpd::SelectServer;
+use strict;
+$| = 1;
+
+delete $ENV{ENV};
+$ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
+
+Qpsmtpd::SelectServer->main(LocalPort => 2500);
+
+__END__
+
+
+
+
+1;
