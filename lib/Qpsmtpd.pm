@@ -1,7 +1,7 @@
 package Qpsmtpd;
 use strict;
 
-$Qpsmtpd::VERSION = "0.26-dev";
+$Qpsmtpd::VERSION = "0.25";
 sub TRACE_LEVEL { 6 }
 
 use Sys::Hostname;
