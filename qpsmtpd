@@ -12,7 +12,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.05";
+$QPsmtpd::VERSION = "0.06";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -25,7 +25,7 @@ BEGIN{$^W=1;}
 
 use vars qw($TRACE);
 
-$TRACE = 1;
+$TRACE = 0;
 
 my %config;
 $config{me} = get_config('me') || hostname;
@@ -107,7 +107,7 @@ sub ehlo {
 	  "$config{me} Hi $state{remote_info} [$state{remote_ip}].",
 	  "PIPELINING",
 	  "8BITMIME",
-	  (get_config('databytes') ? "SIZE ".get_config('databytes') : ()),
+	  (get_config('databytes') ? "SIZE ". (get_config('databytes'))[0] : ()),
 	 );
 }
 
@@ -176,10 +176,13 @@ sub data {
   my $buffer;
   my $size = 0;
   my $i = 0;
-  my $max_size = get_config('databytes') || 0;
+  my $max_size = (get_config('databytes'))[0] || 0;
   my $blocked = "";
   my %matches;
   my $header = 1;
+
+  warn "$$ max_size: $max_size / size: $size" if $TRACE > 5;
+
   while (<STDIN>) {
     last if $_ eq ".\r\n";
     $i++;
@@ -212,6 +215,8 @@ sub data {
 
     alarm $config{timeout};
   }
+
+  warn "$$ max_size: $max_size / size: $size" if $TRACE > 5;
 
   respond(550, $blocked),return 1 if $blocked;
   respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
@@ -314,7 +319,7 @@ sub check_dnsbl {
       foreach my $rr ($query->answer) {
 	$a_record = 1 if $rr->type eq "A";
 	next unless $rr->type eq "TXT";
-	warn "got txt record";
+	warn "got txt record" if $TRACE > 9
 	return $rr->txtdata;
       }
       return "Blocked by $dnsbl" if $a_record;
@@ -334,7 +339,6 @@ sub check_dns {
   my $query = $res->search($host);
   if ($query) {
     foreach my $rr ($query->answer) {
-      warn "rr->type ". $rr->type;
       return 1 if $rr->type eq "A" or $rr->type eq "MX";
     }
   }
@@ -360,15 +364,17 @@ sub check_relay {
 my %config_cache;
 sub get_config {
   my $config = shift;
-  #warn "$$ trying to get config for $config" if $TRACE;
+  warn "$$ trying to get config for $config" if $TRACE;
   return @{$config_cache{$config}} if $config_cache{$config};
   my $configdir = '/var/qmail/control';
-  $configdir = "/home/smtpd/qpsmtpd/config" if (-e "/home/smtpd/qpsmtpd/config/$config");
+  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+  $configdir = "$name/config" if (-e "$name/config/$config");
   open CF, "<$configdir/$config" or warn "$$ could not open configfile $config: $!", return;
   my @config = <CF>;
   chomp @config;
+  @config = grep { $_ } @config;
   close CF;
-  #warn "$$ returning ",Data::Dumper->Dump([\@config], [qw(config)]);
+  warn "$$ returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]) if $TRACE > 4;
   $config_cache{$config} = \@config;
   return wantarray ? @config : $config[0];
 }
