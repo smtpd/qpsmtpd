@@ -10,169 +10,23 @@
 #
 #
 
-package QPsmtpd;
-$QPsmtpd::VERSION = "0.07b";
+use lib 'lib';
+use Qpsmtpd::TcpServer;
 use strict;
 $| = 1;
-use Mail::Address ();
-use Sys::Hostname;
-use IPC::Open2;
-use Data::Dumper;
-BEGIN{$^W=0;}
-use Net::DNS;
-BEGIN{$^W=1;}
 
 delete $ENV{ENV};
 $ENV{PATH} = '/var/qmail/bin';
 
 use vars qw($TRACE);
+$TRACE = 5;
 
-$TRACE = 0;
+# should this be ->new ?
+my $qpsmtpd = Qpsmtpd::TcpServer->new();
+$qpsmtpd->start_connection();
+$qpsmtpd->run();
 
-my %config;
-$config{me} = get_config('me') || hostname;
-$config{timeout} = get_config('timeoutsmtpd') || 1200;
-
-my (@commands) = qw(ehlo helo rset mail rcpt data help vrfy noop quit);
-my (%commands); @commands{@commands} = ('') x @commands;
-
-my %state;
-
-respond(220, "$config{me} qpsmtpd $QPsmtpd::VERSION Service ready, send me all your stuff!");
-
-my $remote_host = $ENV{TCPREMOTEHOST} || "[$ENV{TCPREMOTEIP}]";
-$state{remote_info} = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
-$state{remote_ip} = $ENV{TCPREMOTEIP};
-
-$SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a timeout; I just can't wait that long..."); exit };
-
-$state{dnsbl_blocked} = check_dnsbl($state{remote_ip});
-
-my ($commands) = '';
-alarm $config{timeout};
-while (<STDIN>) {
-  alarm 0;
-  $_ =~ s/\r?\n$//s; # advanced chomp
-  warn "$$ dispatching $_\n" if $TRACE;
-  defined dispatch(split / +/, $_)
-    or respond(502, "command unrecognized: '$_'");
-  alarm $config{timeout};
-}
-
-sub dispatch {
-  my ($cmd) = lc shift;
-
-  respond(553, $state{dnsbl_blocked}), return 1
-    if $state{dnsbl_blocked} and ($cmd eq "rcpt");
-
-  respond(500, "Unrecognized command"), return 1
-    if ($cmd !~ /^(\w{1,12})$/ or !exists $commands{$1});
-  $cmd = $1;
-
-
-  if (exists $commands{$cmd}) {
-    my ($result) = eval "&$cmd";
-    warn "$$ $@" if $@;
-    return $result if defined $result;
-    return fault("command '$cmd' failed unexpectedly");
-  }
-
-  return;
-}
-
-sub respond {
-  my ($code, @messages) = @_;
-  while (my $msg = shift @messages) {
-    my $line = $code . (@messages?"-":" ").$msg;
-    print "$line\r\n";
-    warn "$$ $line\n" if $TRACE;
-  }
-  return 1;
-}
-
-sub fault {
-  my ($msg) = shift || "program fault - command not performed";
-  print STDERR "$0[$$]: $msg ($!)\n";
-  return respond(451, "Internal error - try again later - " . $msg);
-}
-
-sub helo {
-  my ($hello_host, @stuff) = @_;
-  return respond (503, "but you already said HELO ...") if $state{hello};
-  $state{hello} = "helo";
-  $state{hello_host} = $hello_host;
-  $state{transaction} = {};
-  respond(250, "$config{me} Hi $state{remote_info} [$state{remote_ip}]; I am so happy to meet you.");
-}
-
-sub ehlo {
-  my ($hello_host, @stuff) = @_;
-  return respond (503, "but you already said HELO ...") if $state{hello};
-  $state{hello} = "ehlo";
-  $state{hello_host} = $hello_host;
-  $state{transaction} = {};
-  respond(250,
-	  "$config{me} Hi $state{remote_info} [$state{remote_ip}].",
-	  "PIPELINING",
-	  "8BITMIME",
-	  (get_config('databytes') ? "SIZE ". (get_config('databytes'))[0] : ()),
-	 );
-}
-
-
-sub mail {
-  return respond(501, "syntax error in parameters") if $_[0] !~ m/^from:/i;
-  unless ($state{hello}) {
-    return respond(503, "please say hello first ...");
-  }
-  else {
-    my $from_parameter = join " ", @_;
-    warn "$$ full from_parameter: $from_parameter\n" if $TRACE;
-    my ($from) = ($from_parameter =~ m/^from:\s*(\S+)/i)[0];
-    #warn "$$ from email address : $from\n" if $TRACE;
-    if ($from eq "<>" or $from =~ m/\[undefined\]/) {
-      $from = Mail::Address->new("<>");
-    } 
-    else {
-      $from = (Mail::Address->parse($from))[0];
-    }
-    return respond(501, "could not parse your mail from command") unless $from;
-
-    $from->format ne "<>"
-      and get_config("require_resolvable_fromhost")
-      and !check_dns($from->host)
-      and return respond(450, $from->host ? "Could not resolve ". $from->host : "FQDN required in the envelope sender");
-
-    warn "$$ getting mail from ",$from->format,"\n" if $TRACE;
-    respond(250, $from->format . ", sender OK - I always like getting mail from you!");
-
-    $state{transaction} = { from => $from };
-  }
-}
-
-sub rcpt {
-  return respond(501, "syntax error in parameters") unless $_[0] =~ m/^to:/i;
-  return(503, "Use MAIL before RCPT") unless $state{transaction}->{from};
-
-  my $from = $state{transaction}->{from};
-  if ($from->format ne "<>" and get_config('rhsbl_zones')) {
-    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } get_config('rhsbl_zones');
-    my $host = $from->host;
-    for my $rhsbl (keys %rhsbl_zones) {
-      respond("550", "Mail from $host rejected because it $rhsbl_zones{$rhsbl}"), return 1
-	if check_rhsbl($rhsbl, $host);
-    }
-  }
-
-
-  my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
-  $rcpt = $_[1] unless $rcpt;
-  $rcpt = (Mail::Address->parse($rcpt))[0];
-  return respond(501, "could not parse recipient") unless $rcpt;
-  return respond(550, "will not relay for ". $rcpt->host) unless check_relay($rcpt->host);
-  push @{$state{transaction}->{rcpt}}, $rcpt;
-  respond(250, $rcpt->format . ", recipient OK");
-}
+__END__
 
 sub data {
   respond(503, "MAIL first"), return 1 unless $state{transaction}->{from};
@@ -300,17 +154,6 @@ sub vrfy {
   respond(252, "Just try sending a mail and we'll see how it turns out ...");
 }
 
-sub help {
-  respond(214, 
-	  "This is qpsmtpd $QPsmtpd::VERSION",
-	  "See http://develooper.com/code/qpsmtpd/",
-	  "To report bugs or whatnot, send mail to <ask\@perl.org>.");
-}
-
-sub quit {
-  respond(221, "$config{me} closing connection. Have a wonderful day");
-  exit;
-}
 
 sub check_rhsbl {
   my ($rhsbl, $host) = @_;
@@ -318,36 +161,6 @@ sub check_rhsbl {
   warn "$$ checking $host in $rhsbl\n" if $TRACE > 2;
   return 1 if ((gethostbyname("$host.$rhsbl"))[4]);
   return 0;
-}
-
-sub check_dnsbl {
-  my ($ip, $debug) = @_;
-  local $TRACE = 5 if $debug;
-  my %dnsbl_zones = map { (split /\s+/, $_, 2)[0,1] } get_config('dnsbl_zones');
-  return unless %dnsbl_zones;
-  
-  my $reversed_ip = join(".", reverse(split(/\./, $ip)));
-
-  my $res = new Net::DNS::Resolver;
-  for my $dnsbl (keys %dnsbl_zones) {
-    warn "$$ Checking $reversed_ip.$dnsbl ..." if $TRACE > 2;
-    my $query = $res->query("$reversed_ip.$dnsbl", "TXT");
-    if ($query) {
-      my $a_record = 0;
-      foreach my $rr ($query->answer) {
-	$a_record = 1 if $rr->type eq "A";
-	next unless $rr->type eq "TXT";
-	warn "got txt record" if $TRACE > 9;
-	return $rr->txtdata;
-      }
-      return "Blocked by $dnsbl" if $a_record;
-    }
-    else {
-      warn "$$ query for $reversed_ip.$dnsbl failed: ", $res->errorstring, "\n"
-	unless $res->errorstring eq "NXDOMAIN";
-    }
-  }
-  return "";
 }
 
 sub check_dns {
@@ -373,35 +186,13 @@ sub check_dns {
   return 0;
 }
 
- 
-sub check_relay {
-  my $host = lc shift;
-  my @rcpt_hosts = get_config("rcpthosts");
-  return 1 if exists $ENV{RELAYCLIENT};
-  for my $allowed (@rcpt_hosts) {
-    $allowed =~ s/^\s*(\S+)/$1/;
-    return 1 if $host eq lc $allowed;
-    return 1 if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
-  }
-  return 0;
-}
 
-my %config_cache;
-sub get_config {
-  my $config = shift;
-  warn "$$ trying to get config for $config" if $TRACE > 4;
-  return @{$config_cache{$config}} if $config_cache{$config};
-  my $configdir = '/var/qmail/control';
+sub load_plugins {
+  my @plugins = get_config('plugins');
+
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-  $configdir = "$name/config" if (-e "$name/config/$config");
-  open CF, "<$configdir/$config" or warn "$$ could not open configfile $config: $!", return;
-  my @config = <CF>;
-  chomp @config;
-  @config = grep { $_ and $_ !~ m/\s*#/ } @config;
-  close CF;
-  warn "$$ returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]) if $TRACE > 4;
-  $config_cache{$config} = \@config;
-  return wantarray ? @config : $config[0];
+  my $dir = "$name/plugins";
+  warn "$$ loading plugins from $dir" if $TRACE;
 }
 
 1;

@@ -3,6 +3,6 @@ QMAILDUID=`id -u smtpd`
 NOFILESGID=`id -g smtpd`
 exec /usr/local/bin/softlimit -m 10000000 \
   /usr/local/bin/tcpserver -c 10 -v -p \
-  -u $QMAILDUID -g $NOFILESGID 0 smtp \
+  -u $QMAILDUID -g $NOFILESGID 64.81.84.165 smtp \
   ./qpsmtpd 2>&1
 
