@@ -2,6 +2,10 @@
 Issues
 ======
 
+Use clamd so we don't have to run with a higher memory limit.  Matt
+has made a Perl module interfacing clamd; the clamav module should use
+that if available.
+
 plugin support;
 
   support plugins for the rest of the commands.

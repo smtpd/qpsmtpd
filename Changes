@@ -1,7 +1,7 @@
 0.20 - development
 
   clamav plugin, thanks to Matt Sergeant, matt@sergeant.org.
-  Enabling this might require you to increase your memory limits in
+  Enabling this might require you to increase your "softlimit" in
   the run file.  http://www.clamav.org/
 
   Make the spamassassin plugin not stop the next content plugins from
