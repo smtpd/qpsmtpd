@@ -1,4 +1,27 @@
 
+Near term roadmap
+=================
+
+0.27:
+      Bugfixes to 0.26 if needed
+
+0.30:
+      Add plugin API for checking if a local email address is valid
+
+0.50:
+      include check_delivery[1] functionality via the 0.30 API
+      [1] http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
+
+      Add API to reject individual recipients after the RCPT has been
+      accepted and generate individual bounce messages.
+
+0.51: bugfixes
+
+1.0bN: bugfixes (repeat until we run out of bugs to fix) 
+1.0.0: it just might happen!
+1.1.0: new development
+
+
 Issues
 ======
 
