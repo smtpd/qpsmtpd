@@ -28,5 +28,9 @@ sub check_relay {
     return (OK) if $host eq lc $allowed;
     return (OK) if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
   }
+
+  my $more_rcpt_hosts = $self->qp->config('morercpthosts', 'map');
+  return (OK) if exists $more_rcpt_hosts->{$host};
+
   return (DENY);
 }

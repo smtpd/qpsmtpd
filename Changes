@@ -1,3 +1,11 @@
+0.26-dev
+
+  Support morercpthosts.cdb
+
+  config now takes an extra "type" parameter.  If it's "map" then a
+  reference to a tied hash will be returned.
+
+
 0.25 - 2003/03/18
 
   Use the proper RFC2822 date format in the Received headers. (Somehow

@@ -1,7 +1,7 @@
 package Qpsmtpd;
 use strict;
 
-$Qpsmtpd::VERSION = "0.25";
+$Qpsmtpd::VERSION = "0.26-dev";
 sub TRACE_LEVEL { 6 }
 
 use Sys::Hostname;
@@ -24,7 +24,7 @@ sub log {
 # database or whatever.
 #
 sub config {
-  my ($self, $c) = @_;
+  my ($self, $c, $type) = @_;
 
   #warn "SELF->config($c) ", ref $self;
 
@@ -37,18 +37,18 @@ sub config {
   @config = () unless $rc == OK;
 
   if (wantarray) {
-      @config = $self->get_qmail_config($c) unless @config;
+      @config = $self->get_qmail_config($c, $type) unless @config;
       @config = @{$defaults{$c}} if (!@config and $defaults{$c});
       return @config;
   } 
   else {
-      return ($config[0] || $self->get_qmail_config($c) || $defaults{$c});
+      return ($config[0] || $self->get_qmail_config($c, $type) || $defaults{$c});
    }
 }
 
 
 sub get_qmail_config {
-  my ($self, $config) = (shift, shift);
+  my ($self, $config, $type) = @_;
   $self->log(8, "trying to get config for $config");
   if ($self->{_config_cache}->{$config}) {
     return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
@@ -56,7 +56,28 @@ sub get_qmail_config {
   my $configdir = '/var/qmail/control';
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
   $configdir = "$name/config" if (-e "$name/config/$config");
-  open CF, "<$configdir/$config" or warn "$$ could not open configfile $config: $!", return;
+
+  my $configfile = "$configdir/$config";
+
+  if ($type and $type eq "map")  {
+    warn "MAP!";
+    return +{} unless -e $configfile;
+    eval { require CDB_File };
+
+    if ($@) {
+      $self->log(0, "No $configfile.cdb support, could not load CDB_File module: $@");
+    }
+    my %h;
+    unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
+      $self->log(0, "tie of $configfile.cdb failed: $!");
+      return DECLINED;
+    }
+    #warn Data::Dumper->Dump([\%h], [qw(h)]);
+    # should we cache this?
+    return \%h;
+  }
+
+  open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!", return;
   my @config = <CF>;
   chomp @config;
   @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
