@@ -12,7 +12,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.03";
+$QPsmtpd::VERSION = "0.04";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -58,8 +58,8 @@ while (<STDIN>) {
 sub dispatch {
   my ($cmd) = lc shift;
 
-  respond(553, $state{dnsbl_blocked})
-    if $state{dnsbl_blocked} and ($cmd ne "helo" and $cmd ne "ehlo");
+  respond(553, $state{dnsbl_blocked}), return 1
+    if $state{dnsbl_blocked} and ($cmd eq "mail" or $cmd eq "rcpt");
 
   if (exists $commands{$cmd}) {
     my ($result) = eval "&$cmd";
