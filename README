@@ -2,7 +2,9 @@
 #  this file is best read with `perldoc README`
 #
 
-=head1 Qpsmtpd - qmail perl simple mail transfer protocol daemon
+=head1 NAME
+
+Qpsmtpd - qmail perl simple mail transfer protocol daemon
 
 web:
   http://develooper.com/code/qpsmtpd/
@@ -11,8 +13,9 @@ mailinglist:
   qpsmtpd-subscribe@perl.org
 
 
-=head2 What is Qpsmtpd?
+=head1 DESCRIPTION
 
+What is Qpsmtpd?
 
 Qpsmtpd is an extensible smtp engine written in Perl.  No, make that
 easily extensible!  See plugins/quit_fortune for a very useful, er,
