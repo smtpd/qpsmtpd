@@ -110,24 +110,6 @@ sub start_conversation {
     }
 }
 
-sub transaction {
-  my $self = shift;
-  return $self->{_transaction} || $self->reset_transaction();
-}
-
-sub reset_transaction {
-  my $self = shift;
-  $self->run_hooks("reset_transaction") if $self->{_transaction};
-  return $self->{_transaction} = Qpsmtpd::Transaction->new();
-}
-
-
-sub connection {
-  my $self = shift;
-  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
-}
-
-
 sub helo {
   my ($self, $hello_host, @stuff) = @_;
   return $self->respond (501,

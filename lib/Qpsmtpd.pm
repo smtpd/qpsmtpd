@@ -4,6 +4,8 @@ use vars qw($VERSION $LogLevel);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Transaction;
+use Qpsmtpd::Connection;
 
 $VERSION = "0.29";
 sub TRACE_LEVEL { $LogLevel }
@@ -196,10 +198,6 @@ sub _load_plugins {
   return @ret;
 }
 
-sub transaction {
-    return {}; # base class implements empty transaction
-}
-
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
   my $hooks = $self->{hooks};
@@ -284,6 +282,22 @@ sub spool_dir {
     }
     
   return $spool_dir;
+}
+
+sub transaction {
+    my $self = shift;
+    return $self->{_transaction} || $self->reset_transaction();
+}
+
+sub reset_transaction {
+    my $self = shift;
+    $self->run_hooks("reset_transaction") if $self->{_transaction};
+    return $self->{_transaction} = Qpsmtpd::Transaction->new();
+}
+
+sub connection {
+  my $self = shift;
+  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
 }
 
 # For unique filenames. We write to a local tmp dir so we don't need
