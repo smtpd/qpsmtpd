@@ -312,7 +312,8 @@ sub data {
     $i++;
     $self->respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
       if $_ eq ".\n";
-    unless ($self->transaction->blocked and ($max_size and $size > $max_size)) {
+    # add a transaction->blocked check back here when we have line by line plugin access...
+    unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
       if ($in_header and m/^\s*$/) {
 	$in_header = 0;
@@ -361,13 +362,24 @@ sub data {
   # probably dead.
   $self->respond(451, "Incomplete DATA"), return 1 unless $complete;
 
-  $self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
+  #$self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
   $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
 
   my ($rc, $msg) = $self->run_hooks("data_post");
-  if ($rc != DONE) {
+  if ($rc == DONE) {
+    return 1;
+  }
+  elsif ($rc == DENY) {
+    $self->respond(552, $msg || "Message denied");
+  }
+  elsif ($rc == DENYSOFT) {
+    $self->respond(452, $msg || "Message denied temporarily");
+  } 
+  else {
     return $self->queue($self->transaction);    
   }
+
+
 
 }
 
@@ -379,7 +391,7 @@ sub queue {
   pipe(ENVELOPE_READER, ENVELOPE_WRITER) or fault("Could not create envelope pipe"), exit;
 
   my $child = fork();
-  
+
   not defined $child and fault(451, "Could not fork"), exit;
 
   if ($child) {
@@ -469,6 +481,7 @@ sub load_plugins {
 		    "require Qpsmtpd::Plugin;",
 		    'use vars qw(@ISA);',
 		    '@ISA = qw(Qpsmtpd::Plugin);',
+		    "sub plugin_name { qq[$plugin_name] }",
 		    $line,
 		    $sub,
 		    "\n", # last line comment without newline?
@@ -493,7 +506,9 @@ sub run_hooks {
   if ($self->{_hooks}->{$hook}) {
     my @r;
     for my $code (@{$self->{_hooks}->{$hook}}) {
-      (@r) = &{$code}($self->transaction, @_);
+      eval { (@r) = &{$code}($self->transaction, @_); };
+      $@ and $self->log(0, "FATAL PLUGIN ERROR: ", $@) and next;
+      $self->log(1, "a $hook hook returned undef!") and next unless defined $r[0];
       last unless $r[0] == DECLINED; 
     }
     return @r;
