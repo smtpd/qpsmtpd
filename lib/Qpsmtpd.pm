@@ -252,7 +252,7 @@ sub rcpt {
 
 sub get_qmail_config {
   my ($self, $config) = (shift, shift);
-  $self->log(6, "trying to get config for $config");
+  $self->log(8, "trying to get config for $config");
   if ($self->{_config_cache}->{$config}) {
     return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
   }
@@ -264,7 +264,7 @@ sub get_qmail_config {
   chomp @config;
   @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
   close CF;
-  $self->log(8, "returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
+  $self->log(10, "returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
   $self->{_config_cache}->{$config} = \@config;
   return wantarray ? @config : $config[0];
 }
