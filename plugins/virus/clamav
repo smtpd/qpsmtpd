@@ -23,27 +23,9 @@ new installations should use the name=value form as follows:
 
 =item clamscan_path=I<path> (e.g. I<clamscan_path=/usr/bin/clamdscan>)
 
-Path to the clamav commandline scanner.  Using clamdscan is recommended
-for sake of performance.  However, in this case, the user executing clamd
-requires access to the qpsmtpd spool directory, which usually means either
-running clamd as the same user as qpsmtpd does (by far the easiest method)
-or by doing the following: 
-
-=over 2
-
-=item * Change the group ownership of the spool directory to be a group 
-of which clamav is a member or add clamav to the same group as the qpsmtpd
-user;
-
-=item * Enable the "AllowSupplementaryGroups" option in clamd.conf;
-
-=item * Change the permissions of the qpsmtpd spool directory to 0770 (this 
-will emit warning when the qpsmtpd service starts up).
-
-=back
-
-Mail will be passed to the clamav scanner in Berkeley mbox format (that is,
-with a "From " line).
+Path to the clamav commandline scanner.  Mail will be passed to the clamav
+scanner in Berkeley mbox format (that is, with a "From " line).  See the
+discussion below on which commandline scanner to use.
 
 =item action=E<lt>I<add-header> | I<reject>E<gt> (e.g. I<action=reject>)
 
@@ -72,6 +54,39 @@ If you are using a version of ClamAV prior to 0.80, you need to set this
 variable to include a couple of now deprecated options.
 
 =back
+
+=head2 CLAMAV COMMAND LINE SCANNER
+
+You can use either clamscan or clamdscan, but the latter is recommended for
+sake of performance.  However, in this case, the user executing clamd
+requires access to the qpsmtpd spool directory, which usually means either
+running clamd as the same user as qpsmtpd does (by far the easiest method)
+or by doing the following: 
+
+=over 4
+
+=item * Change the group ownership of the spool directory to be a group 
+of which clamav is a member or add clamav to the same group as the qpsmtpd
+user.
+
+=item * Enable the "AllowSupplementaryGroups" option in clamd.conf.
+
+=item * Change the permissions of the qpsmtpd spool directory to 0750 (this 
+will emit a warning when the qpsmtpd service starts up, but can be safely
+ignored).
+
+=item * Make sure that all directories above the spool directory (to the
+root) are g+x so that the group has directory traversal rights; it is not
+necessary for the group to have any read rights except to the spool
+directory itself.
+
+=back
+
+It may be helpful to temporary grant the clamav user a shell and test to
+make sure you can cd into the spool directory and read files located there.
+Remember to remove the shell from the clamav user when you are done
+testing.
+
 
 =head2 CLAMAV CONFIGURATION
 
