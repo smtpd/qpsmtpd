@@ -2,7 +2,7 @@ package Qpsmtpd::Constants;
 use strict;
 require Exporter;
 
-my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD);
+my (@common) = qw(OK DECLINED DONE DENY DENYSOFT DENYHARD DENYSOFTHARD);
 my (@loglevels) = qw(LOGDEBUG LOGINFO LOGNOTICE LOGWARN LOGERROR LOGCRIT LOGALERT LOGEMERG LOGRADAR);
 
 use vars qw($VERSION @ISA @EXPORT);
