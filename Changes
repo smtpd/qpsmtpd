@@ -1,4 +1,7 @@
+
 0.29 - 
+
+  Support qmail-smtpd's timeoutsmtpd config file
 
   Many improvements to the forking server (qpsmtpd-forkserver)
 
@@ -24,7 +27,7 @@
   Fix warning in count_unrecognized_commands plugin (thanks to spaze
   and Roger Walker)
 
-  Improve error messages from the Postfix module (Erik I. Bolsø,
+  Improve error messages from the Postfix module (Erik I. BolsÃ¸,
   <knan at mo.himolde.no>)
 
   make the maildir plugin record who the message was to (with a bit of improvements 
