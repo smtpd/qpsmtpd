@@ -18,7 +18,7 @@ use Apache::Filter ();
 use ModPerl::Util ();
 # use Apache::TieBucketBrigade;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub handler {
     my Apache::Connection $c = shift;
@@ -144,7 +144,7 @@ sub respond {
         my $bb = $self->{bb_out};
         my $line = $code . (@messages?"-":" ").$msg;
         $self->log(LOGDEBUG, $line);
-        my $bucket = APR::Bucket->new("$line\r\n");
+	my $bucket = APR::Bucket->new(($c->bucket_alloc), "$line\r\n");
         $bb->insert_tail($bucket);
         $c->output_filters->fflush($bb);
         $bucket->remove;
