@@ -40,6 +40,7 @@ plugins/content_log
 plugins/count_unrecognized_commands
 plugins/dnsbl
 plugins/dns_whitelist_soft
+plugins/greylisting
 plugins/http_config
 plugins/ident/geoip
 plugins/ident/p0f
@@ -55,8 +56,11 @@ plugins/rhsbl
 plugins/sender_permitted_from
 plugins/spamassassin
 plugins/virus/aveclient
+plugins/virus/bitdefender
 plugins/virus/check_for_hi_virus
 plugins/virus/clamav
+plugins/virus/clamdscan
+plugins/virus/hbedv
 plugins/virus/kavscanner
 plugins/virus/klez_filter
 plugins/virus/uvscan
@@ -75,4 +79,5 @@ t/plugin_tests.t
 t/plugin_tests/check_badrcptto
 t/plugin_tests/dnsbl
 t/Test/Qpsmtpd/Plugin.pm
+t/tempstuff.t
 META.yml                                 Module meta-data (added by MakeMaker)

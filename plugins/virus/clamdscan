@@ -1,0 +1,174 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+clamdscan
+
+=head1 DESCRIPTION
+
+A qpsmtpd plugin for virus scanning using the ClamAV scan daemon, clamd.
+
+=head1 RESTRICTIONS
+
+The ClamAV scan daemon, clamd, must have at least read access to the
+qpsmtpd spool directory in order to sucessfully scan the messages.  You can
+ensure this by running clamd as the same user as qpsmtpd does (by far the
+easiest method) or by doing the following: 
+
+=over 4
+
+=item * Change the group ownership of the spool directory to be a group 
+of which clamav is a member or add clamav to the same group as the qpsmtpd
+user.
+
+=item * Enable the "AllowSupplementaryGroups" option in clamd.conf.
+
+=item * Change the permissions of the qpsmtpd spool directory to 0750 (this 
+will emit a warning when the qpsmtpd service starts up, but can be safely
+ignored).
+
+=item * Make sure that all directories above the spool directory (to the
+root) are g+x so that the group has directory traversal rights; it is not
+necessary for the group to have any read rights except to the spool
+directory itself.
+
+=back
+
+It may be helpful to temporary grant the clamav user a shell and test to
+make sure you can cd into the spool directory and read files located there.
+Remember to remove the shell from the clamav user when you are done
+testing.
+
+=head1 INSTALL AND CONFIG
+
+Place this plugin in the plugin/virus directory beneath the standard
+qpsmtpd installation.  If you installed clamd with the default path, you
+can use this plugin with default options (nothing specified):
+
+=over 4
+
+=item B<clamd_socket>
+
+Full path to the clamd socket (the recommended mode); defaults to
+/tmp/clamd and is the default method.
+
+=item B<clamd_port>
+
+If present, must be the TCP port where the clamd service is running,
+typically 3310; default disabled.
+
+=item B<deny_viruses>
+
+Whether the scanner will automatically delete messages which have viruses.
+Takes either 'yes' or 'no' (defaults to 'yes').  If set to 'no' it will add
+a header to the message with the virus results.
+
+=item B<max_size>
+
+The maximum size, in kilobytes, of messages to scan; defaults to 128k.
+
+=back
+
+=head1 REQUIREMENTS
+
+This module requires the Clamd module, found on CPAN here:
+
+L<http://search.cpan.org/author/MSERGEANT/Clamd-1.04>
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2005 John Peacock
+
+Based heavily on the clamav plugin
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use Clamd;
+
+sub register {
+    my ( $self, $qp, @args ) = @_;
+    $self->register_hook( "data_post", "clamdscan" );
+
+    %{ $self->{"_clamd"} } = @args;
+
+    # Set some sensible defaults
+    $self->{"_clamd"}->{"clamd_socket"} ||= "/tmp/clamd";
+    $self->{"_clamd"}->{"deny_viruses"} ||= "yes";
+    $self->{"_clamd"}->{"max_size"}     ||= 128;
+}
+
+sub clamdscan {
+    my ( $self, $transaction ) = @_;
+    $DB::single = 1;
+
+    if ( $transaction->body_size > $self->{"_clamd"}->{"max_size"} * 1024 ) {
+        $self->log( LOGNOTICE, "Declining due to body_size" );
+        return (DECLINED);
+    }
+
+    # Ignore non-multipart emails
+    my $content_type = $transaction->header->get('Content-Type');
+    $content_type =~ s/\s/ /g if defined $content_type;
+    unless ( $content_type
+        && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
+    {
+        $self->log( LOGERROR, "non-multipart mail - skipping" );
+        return DECLINED;
+    }
+
+    my $filename = $transaction->body_filename;
+    unless ($filename) {
+        $self->log( LOGWARN, "Cannot process due to lack of filename" );
+        return (DECLINED);    # unless $filename;
+    }
+
+    my $mode = ( stat( $self->spool_dir() ) )[2];
+    if ( $mode & 07077 ) {   # must be sharing spool directory with external app
+        $self->log( LOGWARN,
+            "Changing permissions on file to permit scanner access" );
+        chmod $mode, $filename;
+    }
+
+    my $clamd;
+
+    if (    $self->{"_clamd"}->{"clamd_port"}
+        and $self->{"_clamd"}->{"clamd_port"} =~ /(\d+)/ )
+    {
+        my $port = $1;
+        $clamd = Clamd->new( port => $port );
+    }
+    else {
+        $clamd = Clamd->new();    # default unix domain socket
+    }
+
+    return (DECLINED) unless $clamd->ping();
+
+    if ( my %found = $clamd->scan($filename) ) {
+        my $viruses = join( ",", values(%found) );
+	$self->log( LOGERROR, "One or more virus(es) found: $viruses" );
+
+        if ( lc( $self->{"_clamd"}->{"deny_viruses"} ) eq "yes" ) {
+            return ( DENY,
+                    "Virus"
+                  . ( $viruses =~ /,/ ? "es " : " " )
+                  . "Found: $viruses" );
+        }
+        else {
+            $transaction->header->add( 'X-Virus-Found',   'Yes' );
+            $transaction->header->add( 'X-Virus-Details', $viruses );
+            return (DECLINED);
+        }
+    }
+
+    $transaction->header->add( 'X-Virus-Checked',
+        "Checked by ClamAV on " . $self->qp->config("me") );
+
+    return (DECLINED);
+}

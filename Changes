@@ -1,6 +1,13 @@
 
 0.29
 
+  Store entire incoming message in spool file (so that scanners can read
+  the complete message) and ignore old headers before adding lines and
+  queuing for delivery.
+
+  New anti-virus scanners: hbedv (Hanno Hecker), bitdefender, and clamdscan
+  (John Peacock).  Update clamav plugin to directly scan the spool file.
+
   New temp_file() and temp_dir() methods; when used by plugins, they create
   a filename or directory which will last only as long as the current 
   transaction.  Also created a spool_dir() method which checks/creates the
