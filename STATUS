@@ -11,7 +11,6 @@ Near term roadmap
 =================
 
 0.30:
-      - Add the first time denysoft plugin
       - Bugfixes
 
 0.40:
@@ -35,6 +34,15 @@ Near term roadmap
 
 Issues
 ======
+
+Before next release
+-------------------
+
+update clamav plugin config to support the latest version properly
+
+
+Some day...
+-----------
 
 Understand "extension parameters" to the MAIL FROM and RCPT TO
 parameters (and make the plugin hooks able to get at them).
@@ -98,4 +106,3 @@ http://nntp.perl.org/group/perl.qpsmtpd/170
 David Carraway has some thoughts for "user filters"
 http://nntp.perl.org/group/perl.qpsmtpd/2
 
-Make it run as a mod_perl 2.0 connection handler module ...
