@@ -47,8 +47,8 @@ sub process_sockets {
 
   $self->log(8, "waiting for dnsbl dns");
 
-  # don't wait more than 5 seconds here
-  my @ready = $sel->can_read(5);
+  # don't wait more than 4 seconds here
+  my @ready = $sel->can_read(4);
 
   $self->log(8, "DONE waiting for dnsbl dns, got " , scalar @ready, " answers ...") ;
   return '' unless @ready;
@@ -79,14 +79,19 @@ sub process_sockets {
 	unless $res->errorstring eq "NXDOMAIN";
     }
 
-    last if $result;
-
+    if ($result) {
+      #kill any other pending I/O
+      $conn->notes('dnsbl_sockets', undef);
+      return $conn->notes('dnsbl', $result);
+    }
   }
 
   if ($sel->count) {
     # loop around if we have dns blacklists left to see results from
     return $self->process_sockets();
   }
+
+  # er, the following code doesn't make much sense anymore...
 
   # if there was more to read; then forget it
   $conn->notes('dnsbl_sockets', undef);

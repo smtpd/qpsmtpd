@@ -1,5 +1,12 @@
 0.26-dev
 
+  Add queue/smtp-forward plugin (Matt Sergeant)
+
+  Add documentation to Qpsmtpd::Transaction (Matt Sergeant)
+
+  Fix bug in dnsbl that made it sometimes ignore "hits" (thanks to
+  James H. Thompson <jht@lava.net>)
+
   Fix bug hiding the error message when an existing configuration file
   isn't readable.
 
