@@ -83,8 +83,10 @@ sub get_qmail_config {
     eval { require CDB_File };
 
     if ($@) {
-      $self->log(LOGERROR, "No $configfile.cdb support, could not load CDB_File module: $@");
+      $self->log(LOGERROR, "No CDB Support! Did NOT read $configfile.cdb, could not load CDB_File module: $@");
+      return +{};
     }
+
     my %h;
     unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
       $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
