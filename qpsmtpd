@@ -1,4 +1,4 @@
-#!/home/perl/bin/perl -w
+#!/home/perl/bin/perl -Tw
 # Copyright (c) 2001 Ask Bjoern Hansen. See the LICENSE file for details.
 # The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
 #
@@ -22,6 +22,9 @@ use Data::Dumper;
 BEGIN{$^W=0;}
 use Net::DNS;
 BEGIN{$^W=1;}
+
+delete $ENV{ENV};
+$ENV{PATH} = '/var/qmail/bin';
 
 use vars qw($TRACE);
 
@@ -63,6 +66,11 @@ sub dispatch {
   respond(553, $state{dnsbl_blocked}), return 1
     if $state{dnsbl_blocked} and ($cmd eq "rcpt");
 
+  respond(500, "Unrecognized command"), return 1
+    if ($cmd !~ /^(\w{1,12})$/ or !exists $commands{$1});
+  $cmd = $1;
+
+
   if (exists $commands{$cmd}) {
     my ($result) = eval "&$cmd";
     warn "$$ $@" if $@;
@@ -85,7 +93,8 @@ sub respond {
 
 sub fault {
   my ($msg) = shift || "program fault - command not performed";
-  return respond(451, "Fatal error - " . $msg);
+  print STDERR "$0[$$]: $msg ($!)\n";
+  return respond(451, "Internal error - try again later - " . $msg);
 }
 
 sub helo {
@@ -130,11 +139,9 @@ sub mail {
     }
     return respond(501, "could not parse your mail from command") unless $from;
 
-    if ($from->format ne "<>") {
-      return respond(450, "Could not resolve ". $from->host) unless check_dns($from->host);
-      return respond(450, "Don't like your spam; please go away now.") if $from->host eq "6x6.net";
-
-    }
+    $from->format ne "<>"
+      and !check_dns($from->host)
+      and return respond(450, "Could not resolve ". $from->host);
 
     #warn "$$ getting mail from ",$from->format,"\n" if $TRACE;
     respond(250, $from->format . ", sender OK - I always like getting mail from you!");
@@ -163,8 +170,6 @@ sub rcpt {
   $rcpt = (Mail::Address->parse($rcpt))[0];
   return respond(501, "could not parse recipient") unless $rcpt;
   return respond(550, "will not relay for ". $rcpt->host) unless check_relay($rcpt->host);
-  return respond(550, "no such mailbox") if lc $rcpt->address eq 'unicode@perl.org';
-  return respond(550, "no such mailbox") if lc $rcpt->address eq 'porters@perl.org';
   push @{$state{transaction}->{rcpt}}, $rcpt;
   respond(250, $rcpt->format . ", recipient OK");
 }
@@ -319,7 +324,7 @@ sub check_dnsbl {
       foreach my $rr ($query->answer) {
 	$a_record = 1 if $rr->type eq "A";
 	next unless $rr->type eq "TXT";
-	warn "got txt record" if $TRACE > 9
+	warn "got txt record" if $TRACE > 9;
 	return $rr->txtdata;
       }
       return "Blocked by $dnsbl" if $a_record;
