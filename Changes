@@ -1,5 +1,10 @@
 0.27 
 
+  Update the SPF plugin (Philip Gladstone, philip@gladstonefamily.net):
+   * Integrated with Mail::SPF::Query 1.991
+   * Don't do SPF processing when you are acting as a relay system
+   * Remove the MX changes as they are now inside Mail::SPF::Query
+
   Take out Data::Dumper to save a few bytes of memory
 
   Say Received: ... via ESMTP instead of via SMTP when the client
