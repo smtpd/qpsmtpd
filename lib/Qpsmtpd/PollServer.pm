@@ -302,6 +302,7 @@ sub end_of_data {
         $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
         $self->transaction->header($header);
     }
+    
     # only true if client authenticated
     if ( defined $self->{_auth} and $self->{_auth} == OK ) { 
         $header->add("X-Qpsmtpd-Auth","True");
