@@ -33,8 +33,9 @@ sub new {
   my (%commands); @commands{@commands} = ('') x @commands;
   # this list of valid commands should probably be a method or a set of methods
   $self->{_commands} = \%commands;
-  
-  $self->load_plugins;
+
+  # TCPServer handles plugin loader
+  #$self->load_plugins;
 
   $self;
 }
