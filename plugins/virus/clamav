@@ -101,8 +101,6 @@ Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
  
-use File::Temp qw(tempfile);
-
 use strict;
 use warnings;
  
@@ -156,28 +154,18 @@ sub register {
  
 sub clam_scan {
   my ($self, $transaction) = @_;
- 
+
   if ($transaction->body_size > $self->{_max_size}) {
 	$self->log(LOGWARN, 'Mail too large to scan ('.
 		$transaction->body_size . " vs $self->{_max_size})" );
 	return (DECLINED);
   }
 
-  my ($temp_fh, $filename) = tempfile("qpsmtpd.clamav.$$.XXXXXX",
-	  DIR => $self->{_spool_dir});
-  unless ($temp_fh) {
-        $self->logerror("Couldn't open tempfile in $self->{_spool_dir}: $!");
+  my $filename = $transaction->body_filename;
+  unless (defined $filename) {
+        $self->log(LOGERROR, "didn't get a filename");
         return DECLINED;
   }
-  print $temp_fh "From ",
-    $transaction->sender->format, " " , scalar gmtime, "\n";
-  print $temp_fh $transaction->header->as_string, "\n";
-  $transaction->body_resetpos;
-  while (my $line = $transaction->body_getline) {
-    print $temp_fh $line;
-  }
-  seek($temp_fh, 0, 0);
-
   my $mode = (stat($self->{_spool_dir}))[2];
   if ( $mode & 07077  ) { # must be sharing spool directory with external app
       $self->log(LOGWARN,
@@ -195,7 +183,6 @@ sub clam_scan {
   my $result = ($? >> 8);
   my $signal = ($? & 127);
  
-  unlink($filename);
   chomp($output);
  
   $output =~ s/^.* (.*) FOUND$/$1 /mg;
