@@ -1,32 +1,140 @@
-#!/usr/bin/perl -w
-# Clam-AV plugin.
+#!/usr/bin/perl -Tw
+
+=head1 NAME
+
+clamav -- ClamAV antivirus plugin for qpsmtpd
+
+$Id$
+
+=head1 DESCRIPTION
+
+This plugin scans incoming mail with the clamav A/V scanner, and can at your
+option reject or flag infected messages.
+
+=head1 CONFIGURATION
+
+Arguments to clamav should be specified in the form of name=value pairs,
+separated by whitespace.  For sake of backwards compatibility, a single
+leading argument containing only alphanumerics, -, _, . and slashes will
+be tolerated, and interpreted as the path to clamscan/clamdscan.  All
+new installations should use the name=value form as follows:
+
+=over 4
+
+=item clamscan_path=I<path> (e.g. I<clamscan_path=/usr/bin/clamdscan>)
+
+Path to the clamav commandline scanner.  Using clamdscan is recommended
+for sake of performance.
+
+Mail will be passed to the clamav scanner in Berkeley mbox format (that is,
+with a "From " line).
+
+=item action=E<lt>I<add-header> | I<reject>E<gt> (e.g. I<action=reject>)
+
+Selects an action to take when an inbound message is found to be infected.
+Valid arguments are 'add-header' and 'reject'.  All rejections are hard
+5xx-code rejects; the SMTP error will contain an explanation of the virus
+found in the mail (for example, '552 Virus Found: Worm.SomeFool.P').
+
+The default action is 'add-header'.
+
+=item max_size=I<bytes> (e.g. I<max_size=1048576>)
+
+Specifies the maximum size, in bytes, for mail to be scanned.  Any mail
+exceeding this size will be left alone.  This is recommended, as large mail
+can take an exceedingly long time to scan.  The default is 524288, or 512k.
+
+=item tmp_dir=I<path> (e.g. I<max_size=/tmp>)
+
+Specify an alternate temporary directory.  If not specified, the qpsmtpd
+I<spool_dir> will be used.  If neither is available, I<~/tmp/> will be tried,
+and if that that fails the plugin will gracefully fail.
+
+=back
+
+=head2 CLAMAV CONFIGURATION
+
+At the least, you should have 'ScanMail' supplied in your clamav.conf file.
+It is recommended that you also have sane limits on ArchiveMaxRecursion and
+StreamMaxLength also.
+
+=head1 LICENSE
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
  
 use File::Temp qw(tempfile);
+
+use strict;
+use warnings;
  
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("data_post", "clam_scan");
+  my %args;
 
-  if (@args > 0) {
-    # Untaint scanner location
-    if ($args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
-      $self->{_clamscan_loc} = $1;
-    } else {
-      $self->log(LOGERROR, "FATAL ERROR: Unexpected characters in clamav argument 1");
-      exit 3;
-    }
-    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
-  } else {
-    $self->{_clamscan_loc} = "/usr/local/bin/clamscan";
+  if ($args[0] && $args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/ && -x $1) {
+    $self->{_clamscan_loc} = $1;
+    shift @args;
   }
+
+  for (@args) {
+    if (/^max_size=(\d+)$/) {
+        $self->{_max_size} = $1;
+    }
+    elsif (/^clamscan_path=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+        $self->{_clamscan_loc} = $1;
+    }
+    elsif (/^tmp_dir=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+        $self->{_spool_dir} = $1;
+    }
+    elsif (/^action=(add-header|reject)$/) {
+        $self->{_action} = $1;
+    }
+    else {
+        $self->log(LOGERROR, "Unrecognized argument '$_' to clamav plugin");
+        return undef;
+    }
+  }
+
+  $self->{_max_size} ||= 512 * 1024;
+  $self->{_spool_dir} ||=
+          $self->qp->config('spool_dir') ||
+	      Qpsmtpd::Utils::tildeexp('~/tmp/');
+  $self->{_spool_dir} = $1 if $self->{_spool_dir} =~ /(.*)/;
+
+  unless ($self->{_spool_dir}) {
+        $self->log(LOGERROR, "No spool dir configuration found");
+        return undef;
+  }
+  unless (-d $self->{_spool_dir}) {
+        $self->log(LOGERROR, "Spool dir $self->{_spool_dir} does not exist");
+        return undef;
+  }
+
+  $self->register_hook("data_post", "clam_scan");
+  1;
 }
  
 sub clam_scan {
   my ($self, $transaction) = @_;
  
-  my ($temp_fh, $filename) = tempfile();
-  print $temp_fh $transaction->header->as_string;
-  print $temp_fh "\n";
+  if ($transaction->body_size > $self->{_max_size}) {
+	$self->log(LOGWARN, 'Mail too large to scan ('.
+		$transaction->body_size . " vs $self->{_max_size})" );
+	return (DECLINED);
+  }
+
+  my ($temp_fh, $filename) = tempfile("qpsmtpd.clamav.$$.XXXXXX",
+	  DIR => $self->{_spool_dir});
+  unless ($temp_fh) {
+        $self->logerror("Couldn't open tempfile in $self->{_spool_dir}: $!");
+        return DECLINED;
+  }
+  print $temp_fh "From ",
+    $transaction->sender->format, " " , scalar gmtime, "\n";
+  print $temp_fh $transaction->header->as_string, "\n";
   $transaction->body_resetpos;
   while (my $line = $transaction->body_getline) {
     print $temp_fh $line;
@@ -46,21 +154,26 @@ sub clam_scan {
  
   $output =~ s/^.* (.*) FOUND$/$1 /mg;
  
-  $self->log(LOGDEBUG, "clamscan results: $output");
+  $self->log(LOGINFO, "clamscan results: $output");
  
   if ($signal) {
     $self->log(LOGINFO, "clamscan exited with signal: $signal");
     return (DECLINED);
   }
   if ($result == 1) {
-    $self->log(LOGINFO, "Virus(es) found");
-    # return (DENY, "Virus Found: $output");
-    $transaction->header->add('X-Virus-Found', 'Yes');
-    $transaction->header->add('X-Virus-Details', $output);
+    $self->log(LOGINFO, "Virus(es) found: $output");
+    if ($self->{_action} eq 'add-header') {
+        $transaction->header->add('X-Virus-Found', 'Yes');
+        $transaction->header->add('X-Virus-Details', $output);
+    } else {
+        return (DENY, "Virus Found: $output");
+    }
   }
   elsif ($result) {
-    $self->log(LOGWARN, "ClamAV error: $result\n");
+    $self->log(LOGERROR, "ClamAV error: $cmd: $result\n");
   }
-  $transaction->header->add('X-Virus-Checked', 'Checked');
   return (DECLINED);
 } 
+
+1;
+
