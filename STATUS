@@ -1,13 +1,9 @@
 
-things to do for v0.10
-----------------------
+Issues
+======
 
 transaction should maybe be a part of the connection object instead
 of off the main object
-
-get timeouts to work in "tcpserver" mode (or generally; not sure where
-it fits best)
-
 
 plugin support;
 
@@ -19,13 +15,18 @@ plugin support;
   plugin access to the data line by line during the DATA phase.
 
 
-
-TRACE in Constants.pm is not actually being used.  Should it?
+TRACE in Constants.pm is not actually being used.  Should it be?
 
 
 
 Future Ideas
 ============
+
+Make config() better abstracted or configured (to allow configuration
+from LDAP etc).
+
+Make queue() better abstracted or configured (to allow LMTP delivery
+instead of using qmail-queue).
 
 Methods to create a bounce message easily; partly so we can accept a
 mail for one user but bounce it right away for another RCPT'er.

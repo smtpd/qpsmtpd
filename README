@@ -1,3 +1,5 @@
+Qpsmtpd - qmail perl simple mail transfer protocol daemon
+---------------------------------------------------------
 
 web:
   http://develooper.com/code/qpsmtpd/
@@ -6,55 +8,116 @@ mailinglist:
   qpsmtpd-subscribe@perl.org
 
 
----- this file needs updating for version 0.10 ! ------
+What is Qpsmtpd?
+----------------
 
---
---
--- version 0.10 is a new object oriented version of qpsmtpd.  
---
--- it is meant to be an easily extensibly smtpd engine.
---
---
-
----------------------------------------------------------
-
-Problems:
-  First thing to do is to watch the log carefully.  If it doesn't
-  help you, or even if it does, please post to the maliinglist
-  (subscription instructions above).  qpsmtpd is meant to be a drop-in 
-  replacement for qmail-smtpd, so it should be very easy to get going.
+Qpsmtpd is an extensible smtp engine written in Perl.  No, make that
+easily extensible!  See plugins/quit_fortune for a very useful, er,
+cute example.
 
 
-Configuration files:
-  All configuration files goes into $DIR/config/ or /var/qmail/control/
 
-  qpsmtpd is supposed to support all the files that qmail-smtpd
-  supports and use them in the same way.  When you find that it is not
-  the case, feel free to send a patch to the mailinglist or to
-  ask@develooper.com.
+What's new in version 0.10?
+---------------------------
 
-  Extra files you can use to configure qpsmtpd:
+Version 0.10 is all rearchitected, with an object oriented plugin
+infrastructure.  Weeh, that sounds fancy!  Of course it is keeping the
+well tested core code from version 0.0x which have had more than a
+years production usage on many sites.
 
-     rhsbl_zones
+Noteworthy new features includes a SpamAssassin integration plugin,
+more documentation and support for arbitrarily large messages without
+exhausting memory (up to the size of whatever your file system
+supports).
+
+
+Installation
+------------
+
+Make a new user and a directory where you'll install qpsmtpd.  I
+usually use "smtpd" for the user and /home/smtpd/qpsmtpd/ for the
+directory.
+
+Put the files there.  If you install from CVS you can just do
+  cvs -d :pserver:anonymous@cvs.perl.org:/cvs/public co qpsmtpd
+in the /home/smtpd/ dir.
+
+Now edit the file config/IP and put the ip address you want to use for
+qpsmtpd on the first line (or use 0 to bind to all interfaces).
+
+If you use the supervise tools, then you are practically done now!
+Just symlink /home/smtpd/qpsmtpd into your /services (or /var/services
+or /var/svscan or whatever) directory.  Remember to shutdown
+qmail-smtpd if you are replacing it with qpsmtpd.
+
+If you don't use supervise, then you need to run the ./run script in
+some other way when you startup.
+
+
+Configuration
+-------------
+
+Configuration files can go into either /var/qmail/control or into the
+config subdirectory of the qpsmtpd installation.  Configuration should
+be compatible with qmail-smtpd making qpsmtpd a drop-in replacement.
+
+If there is anything missing, then please send a patch (or just
+information about what's missing) to the mailinglist or to
+ask@develooper.com.
  
-        Right hand side blocking lists, one per line. For example:
 
-           dsn.rfc-ignorant.org does not accept bounces - http://www.rfc-ignorant.org/
+Problems
+--------
 
-        See http://www.rfc-ignorant.org/ for more examples.
+First, check the logfile.  As default it goes into log/main/current.
+Qpsmtpd can log a lot of debug information.  You can get more or less
+by adjusting $TRACE_LEVEL in lib/Qpsmtpd.pm (sorry, no easy switch for
+that yet).  Something between 1 and 3 should give you just a little
+bit.  If you set it to 10 or higher you will get lots of information
+in the logs.
+
+If the logfile doesn't give away the problem, then post to the
+mailinglist (subscription instructions above).  If possibly then put
+the logfile on a webserver and include a reference to it in the mail.
 
 
-     dnsbl_zones
+Extra files you can use to configure qpsmtpd:
 
-        Normal ip based dns blocking lists ("RBLs"). For example:
+   plugins
 
-           relays.ordb.org
-	   spamsources.fabel.dk
+      List of plugins, one per line, to be loaded in the order they
+      appear in the file.  Plugins are in the plugins directory (or in
+      a subdirectory of there).
 
 
-     require_resolvable_fromhost
+   rhsbl_zones
+ 
+      Right hand side blocking lists, one per line. For example:
+
+          dsn.rfc-ignorant.org does not accept bounces - http://www.rfc-ignorant.org/
+
+      See http://www.rfc-ignorant.org/ for more examples.
+
+
+   dnsbl_zones
+
+      Normal ip based dns blocking lists ("RBLs"). For example:
+
+         relays.ordb.org
+         spamsources.fabel.dk
+
+
+   require_resolvable_fromhost
          
-        If this file contains anything but a 0 on the first line,
-        envelope senders will be checked against DNS. If an A or a MX
-        record can't be found the mail command will return a soft
-        rejection (450).
+      If this file contains anything but a 0 on the first line,
+      envelope senders will be checked against DNS. If an A or a MX
+      record can't be found the mail command will return a soft
+      rejection (450).
+
+
+  ... everything (?) that qmail-smtpd supports. 
+
+      In my test qpsmtpd installation I have a "config/me" file
+      containing the hostname I use for testing qpsmtpd (so it doesn't
+      introduce itself with the normal name of the server).
+     

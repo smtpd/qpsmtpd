@@ -17,7 +17,8 @@ BEGIN{$^W=0;}
 use Net::DNS;
 BEGIN{$^W=1;}
 
-$Qpsmtpd::VERSION = "0.10-dev";
+$Qpsmtpd::VERSION = "0.10";
+my $TRACE_LEVEL = 6;
 
 # $SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a timeout; I just can't wait that long..."); exit };
 
@@ -65,7 +66,7 @@ sub config {
 sub log {
   my ($self, $trace, @log) = @_;
   warn join(" ", $$, @log), "\n"
-    if $trace <= 10;
+    if $trace <= $TRACE_LEVEL;
 }
 
 sub dispatch {
