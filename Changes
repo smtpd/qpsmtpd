@@ -1,5 +1,12 @@
 0.20 - development
 
+  clamav plugin, thanks to Matt Sergeant, matt@sergeant.org.
+  Enabling this might require you to increase your memory limits in
+  the run file.  http://www.clamav.org/
+
+  Make the spamassassin plugin not stop the next content plugins from
+  running.
+
   Store hooks runtime config globally so they will work within the
   transaction objects too.
 
@@ -14,10 +21,6 @@
 
 
 0.12 - 2002/10/17
-
-  clamav plugin, thanks to Matt Sergeant, matt@sergeant.org.
-  Enabling this might require you to increase your memory limits in
-  the run file.  http://www.clamav.org/
 
   Better error messages when a plugin fails
   

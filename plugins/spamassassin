@@ -72,5 +72,5 @@ sub check_spam {
     last if $h[0] eq "Spam" and $h[1] =~ m/^False/;
 
   }
-  return (OK);
+  return (DECLINED);
 }
