@@ -26,9 +26,21 @@ new installations should use the name=value form as follows:
 Path to the clamav commandline scanner.  Using clamdscan is recommended
 for sake of performance.  However, in this case, the user executing clamd
 requires access to the qpsmtpd spool directory, which usually means either
-running clamd as the same user, or changing the group ownership of the
-spool directory to be the clamd group and changing the permissions to 0750
-(this will emit warning when the qpsmtpd service starts up).
+running clamd as the same user as qpsmtpd does (by far the easiest method)
+or by doing the following: 
+
+=over 2
+
+=item * Change the group ownership of the spool directory to be a group 
+of which clamav is a member or add clamav to the same group as the qpsmtpd
+user;
+
+=item * Enable the "AllowSupplementaryGroups" option in clamd.conf;
+
+=item * Change the permissions of the qpsmtpd spool directory to 0770 (this 
+will emit warning when the qpsmtpd service starts up).
+
+=back
 
 Mail will be passed to the clamav scanner in Berkeley mbox format (that is,
 with a "From " line).
@@ -150,6 +162,13 @@ sub clam_scan {
     print $temp_fh $line;
   }
   seek($temp_fh, 0, 0);
+
+  my $mode = (stat($self->{_spool_dir}))[2];
+  if ( $mode & 07077  ) { # must be sharing spool directory with external app
+      $self->log(LOGWARN,
+        "Changing permissions on file to permit scanner access");
+      chmod $mode, $filename;
+  }
  
   # Now do the actual scanning!
   my $cmd = $self->{_clamscan_loc}." --stdout "
