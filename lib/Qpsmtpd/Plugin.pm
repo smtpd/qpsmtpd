@@ -75,4 +75,49 @@ sub isa_plugin {
   push @{"${currentPackage}::ISA"}, $newPackage;
 }
 
+sub compile {
+    my ($class, $plugin, $package, $file, $test_mode) = @_;
+    
+    my $sub;
+    open F, $file or die "could not open $file: $!";
+    { 
+      local $/ = undef;
+      $sub = <F>;
+    }
+    close F;
+
+    my $line = "\n#line 1 $file\n";
+
+    if ($test_mode) {
+        if (open(F, "t/plugin_tests/$plugin")) {
+            local $/ = undef;
+            $sub .= "#line 1 t/plugin_tests/$plugin\n";
+            $sub .= <F>;
+            close F;
+        }
+    }
+
+    my $eval = join(
+		    "\n",
+		    "package $package;",
+		    'use Qpsmtpd::Constants;',
+		    "require Qpsmtpd::Plugin;",
+		    'use vars qw(@ISA);',
+		    '@ISA = qw(Qpsmtpd::Plugin);',
+		    ($test_mode ? 'use Test::More;' : ''),
+		    "sub plugin_name { qq[$plugin] }",
+		    $line,
+		    $sub,
+		    "\n", # last line comment without newline?
+		   );
+
+    #warn "eval: $eval";
+
+    $eval =~ m/(.*)/s;
+    $eval = $1;
+
+    eval $eval;
+    die "eval $@" if $@;
+}
+
 1;
