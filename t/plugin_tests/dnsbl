@@ -21,5 +21,5 @@ sub test_returnval {
     
     my ($ret, $note) = $self->rcpt_handler($self->qp->transaction, 'rcpt@example.com');
     is($ret, DENY, "Check we got a DENY");
-    diag("dnsbl result: $note");
+    print("# dnsbl result: $note\n");
 }

@@ -78,7 +78,7 @@ sub log {
     my ($self, $trace, @log) = @_;
     my $level = Qpsmtpd::TRACE_LEVEL();
     $level = $self->init_logger unless defined $level;
-    diag(join(" ", $$, @log)) if $trace <= $level;
+    print("# " . join(" ", $$, @log) . "\n") if $trace <= $level;
 }
 
 # sub run
