@@ -36,7 +36,8 @@ sub mail_handler {
   my $from = $sender->user . '@' . $host;
 
   my $ip = $self->qp->connection->remote_ip;
-  my $query = Mail::SPF::Query->new(ip => $ip, sender => $from)
+  my $helo = $self->qp->connection->hello_host;
+  my $query = Mail::SPF::Query->new(ip => $ip, sender => $from, helo => $helo)
     || die "Couldn't construct Mail::SPF::Query object";
   $transaction->notes('spfquery', $query);
                
