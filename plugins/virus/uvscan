@@ -58,9 +58,19 @@ sub uvscan {
   return (DECLINED)
     if $transaction->body_size > 250_000;
 
+  # Ignore non-multipart emails
+  my $content_type = $transaction->header->get('Content-Type');
+  $content_type =~ s/\s/ /g if defined $content_type;
+  unless ( $content_type
+      && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
+  {
+      $self->log( LOGERROR, "non-multipart mail - skipping" );
+      return DECLINED;
+  }
+
   my $filename = $transaction->body_filename;
   return (DECLINED) unless $filename;
- 
+
   # Now do the actual scanning!
   my @cmd =($self->{"_uvscan"}->{"uvscan_location"},
 	'--mime', '--unzip', '--secure', '--noboot',
