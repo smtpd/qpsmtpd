@@ -5,6 +5,11 @@
   $Include feature in config/plugins
 
 
+0.27 - 2004/03/11
+
+  SpamAssassin plugin Outlook compatibility fix (Thanks to Gergely Risko)
+
+
 0.27 - 2004/03/10
 
   Support for unix sockets in the spamassassin plugin (requires SA

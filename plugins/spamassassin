@@ -157,6 +157,7 @@ sub check_spam {
 
   }
   my $tests = <SPAMD>;
+  $tests =~ s/\015//;  # hack for outlook
   $flag = $flag eq 'True' ? 'Yes' : 'No';
   $self->log(6, "check_spam: finished reading from spamd");
 
