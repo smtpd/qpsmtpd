@@ -1,0 +1,78 @@
+=head1 NAME
+
+queue/maildir
+
+=head1 DESCRIPTION
+
+This plugin delivers mails to a maildir spool. 
+
+=head1 CONFIG
+
+It takes one required parameter, the location of the maildir.
+
+=cut
+
+use File::Path qw(mkpath);
+use Sys::Hostname qw(hostname);
+use Time::HiRes qw(gettimeofday);
+
+sub register {
+  my ($self, $qp, @args) = @_;
+
+  if (@args > 0) {
+    ($self->{_maildir}) = ($args[0] =~ m!([/\w\.]+)!);
+  }
+
+  unless ($self->{_maildir}) {
+    $self->log(1, "WARNING: maildir directory not specified");
+    return 0;
+  }
+
+  map { my $d = $self->{_maildir} . "/$_"; -e $d or mkpath $d, 0, 0700 } qw(cur tmp new); 
+
+  my $hostname = (hostname =~ m/([\w\._\-]+)/)[0];
+  $self->{_hostname} = $hostname;
+
+  $self->register_hook("queue", "queue_handler");
+
+}
+
+my $maildir_counter = 0;
+
+sub queue_handler {
+  my ($self, $transaction) = @_;
+
+  my ($time, $microseconds) = gettimeofday;
+
+  $time = ($time =~ m/(\d+)/)[0];
+  $microseconds =~ s/\D//g;
+
+  my $unique  = "P$$" . "M$microseconds" . "Q" . $maildir_counter++;
+  my $file    = join ".", $time, $unique, $self->{_hostname};
+  my $maildir = $self->{_maildir};
+
+  open (MF, ">$maildir/tmp/$file") or 
+    $self->log(LOGWARN, "could not open $maildir/tmp/$file: $!"),
+    return(DECLINED, "queue error (open)");
+
+  $transaction->header->print(\*MF);
+  $transaction->body_resetpos;
+  while (my $line = $transaction->body_getline) {
+    print MF $line;
+  }
+
+  close MF or
+    $self->log(LOGWARN, "could not close $maildir/tmp/$file: $!")
+    and return(DECLINED, "queue error (close)");
+
+  link "$maildir/tmp/$file", "$maildir/new/$file" or
+    $self->log(LOGWARN, "could not link $maildir/tmp/$file to $maildir/new/$file: $!")
+    and return(DECLINED, "queue error (link)");
+
+  unlink "$maildir/tmp/$file";
+
+  my $msg_id = $transaction->header->get('Message-Id') || '';
+  $msg_id =~ s/[\r\n].*//s;
+
+  return (OK, "Queued! $msg_id"); 
+}

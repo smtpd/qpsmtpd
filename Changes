@@ -1,5 +1,6 @@
 0.28
 
+  Added a "queue/maildir" plugin for writing incoming mails to a maildir.
 
   Create temp files with permissions 0600 (thanks to Robert James Kaes again)
 
@@ -10,7 +11,7 @@
   $Include feature in config/plugins
 
 
-0.27 - 2004/03/11
+0.27.1 - 2004/03/11
 
   SpamAssassin plugin Outlook compatibility fix (Thanks to Gergely Risko)
 
