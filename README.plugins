@@ -123,3 +123,12 @@ Called just before we shutdown a connection.
 The return code is ignored.  If a plugin returns anything but DECLINED
 the following plugins will not be run (like with all other hooks).
 
+=head2 deny
+
+Called when another hook returns DENY or DENYSOFT.  First parameter is
+the previous hook return code; the second parameter the message the
+hook returned. 
+
+Returning DONE or OK will stop the next deny hook from being run.
+DECLINED will make qpsmtpd run the remaining configured deny hooks.
+
