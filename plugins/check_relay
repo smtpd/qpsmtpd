@@ -22,7 +22,19 @@ sub check_relay {
   $host = $self->qp->config("me")
     if ($host eq "" && (lc $user eq "postmaster" || lc $user eq "abuse"));
 
+  # Check if this IP is allowed to relay
   return (OK) if exists $ENV{RELAYCLIENT};
+  my @relay_clients = $self->qp->config("relayclients");
+  my $more_relay_clients = $self->qp->config("morerelayclients", "map");
+  my %relay_clients = map { $_ => 1 } @relay_clients;
+  my $client_ip = $self->qp->connection->remote_ip;
+  while ($client_ip) {
+    return (OK) if exists $relay_clients{$client_ip};
+    return (OK) if exists $more_relay_clients->{$client_ip};
+    $client_ip =~ s/\d+\.?$//; # strip off another 8 bits
+  }
+  
+  # Check if this recipient host is allowed
   for my $allowed (@rcpt_hosts) {
     $allowed =~ s/^\s*(\S+)/$1/;
     return (OK) if $host eq lc $allowed;
