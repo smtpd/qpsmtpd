@@ -159,3 +159,14 @@ hook returned.
 Returning DONE or OK will stop the next deny hook from being run.
 DECLINED will make qpsmtpd run the remaining configured deny hooks.
 
+=head1 Return Values and Notes
+
+Insert stuff here about how:
+
+    - if we're in a transaction, the results of a callback are stored
+in
+    $self->transaction->notes( $code->{name})->{"hook_$hook"}->{return}
+
+    - if we're in a connection, store things in the connection notes instead.
+
+

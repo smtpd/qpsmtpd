@@ -232,6 +232,16 @@ sub run_hooks {
                        ."running the $hook hook returned undef!")
           and next;
 
+      if ($self->transaction) {
+        my $tnotes = $self->transaction->notes( $code->{name} );
+        $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+          if (!defined $tnotes || ref $tnotes eq "HASH");
+      } else {
+        my $cnotes = $self->connection->notes( $code->{name} );
+        $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+          if (!defined $cnotes || $cnotes eq "HASH");
+      }
+
       # should we have a hook for "OK" too?
       if ($r[0] == DENY or $r[0] == DENYSOFT) {
         $r[1] = "" if not defined $r[1];
