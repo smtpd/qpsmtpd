@@ -59,7 +59,7 @@ sub input {
   alarm $timeout;
 
   $command =~ s/\r?\n$//s; # advanced chomp
-  $self->log(LOGDEBUG, "dispatching $_");
+  $self->log(LOGDEBUG, "dispatching $command");
   defined $self->dispatch(split / +/, $command, 2)
       or $self->respond(502, "command unrecognized: '$command'");
   alarm $timeout;
