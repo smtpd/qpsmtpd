@@ -334,14 +334,15 @@ sub data {
       }
 
       if ($in_header) {
-	#. ..
+	$buffer .= $_;  
       }
-      
-      $self->transaction->body_write($_);
+      else {
+	$self->transaction->body_write($_);
+      }
 
       $size += length $_;
     }
-    $self->log(5, "size is at $size\n") unless ($i % 300);
+    #$self->log(5, "size is at $size\n") unless ($i % 300);
 
     alarm $timeout;
   }
@@ -349,6 +350,12 @@ sub data {
   $self->log(6, "max_size: $max_size / size: $size");
 
   $self->transaction->header($header);
+
+  $header->add("Received", "from ".$self->connection->remote_info 
+	       ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip 
+	       . ") by ".$self->config('me')." (qpsmtpd/".$self->version
+	       .") with SMTP; ". (strftime('%Y-%m-%d %TZ', gmtime)),
+	       0);
 
   # if we get here without seeing a terminator, the connection is
   # probably dead.
@@ -384,11 +391,7 @@ sub queue {
     close MESSAGE_READER  or fault("close msg reader fault"),exit;
     close ENVELOPE_READER or fault("close envelope reader fault"), exit;
 
-    print MESSAGE_WRITER "Received: from ".$self->connection->remote_info 
-	." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip 
-	. ")\n by ".$self->config('me')." (qpsmtpd/".$self->version
-	.") with SMTP; ". (strftime('%Y-%m-%d %TZ', gmtime)) . "\n";
-    print MESSAGE_WRITER "X-smtpd: qpsmtpd/",$self->version,", http://develooper.com/code/qpsmtpd/\n";
+    $transaction->header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://develooper.com/code/qpsmtpd/");
 
     $transaction->header->print(\*MESSAGE_WRITER);
     $transaction->body_resetpos;

@@ -43,6 +43,9 @@ sub check_spam {
   print SPAMD "YAREPORT SPAMC/1.0" . CRLF;
   # or CHECK or REPORT or SYMBOLS
 
+  print SPAMD join CRLF, split /\n/, $transaction->header->as_string;
+  print SPAMD CRLF;
+
   while (my $line = $transaction->body_getline) {
     chomp $line;
     print SPAMD $line, CRLF;
