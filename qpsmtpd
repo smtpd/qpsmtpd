@@ -12,7 +12,7 @@
 #
 
 package QPsmtpd;
-$QPsmtpd::VERSION = "0.02";
+$QPsmtpd::VERSION = "0.03";
 use strict;
 $| = 1;
 use Mail::Address ();
@@ -167,6 +167,7 @@ sub data {
     respond(451, "See http://develooper.com/code/qpsmtpd/barelf.html"), exit
       if $_ eq ".\n";
     unless ($max_size and $size > $max_size) {
+      s/\r\n$/\n/;
       $buffer .= $_;
       $size += length $_;
     }
