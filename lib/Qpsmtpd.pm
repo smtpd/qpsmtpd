@@ -255,31 +255,35 @@ sub _register_hook {
   }
 }
 
+my $spool_dir = "";
+
 sub spool_dir {
   my $self = shift;
 
-  unless ( $self->{_spool_dir} ) { # first time through
-    my $spool_dir = $self->config('spool_dir') 
-                 || Qpsmtpd::Utils::tildeexp('~/tmp/');
+  unless ( $spool_dir ) { # first time through
+    $self->log(LOGINFO, "Initializing spool_dir");
+    $spool_dir = $self->config('spool_dir') 
+               || Qpsmtpd::Utils::tildeexp('~/tmp/');
 
     $spool_dir .= "/" unless ($spool_dir =~ m!/$!);
-
+  
     $spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
     $spool_dir = $1; # cleanse the taint
-    $self->{_spool_dir} = $spool_dir;
 
     # Make sure the spool dir has appropriate rights
     if (-e $spool_dir) {
       my $mode = (stat($spool_dir))[2];
-      warn "Permissions on spool_dir $spool_dir are not 0700" if $mode & 07077;
+      $self->log(LOGWARN, 
+          "Permissions on spool_dir $spool_dir are not 0700")
+        if $mode & 07077;
     }
 
     # And finally, create it if it doesn't already exist
     -d $spool_dir or mkdir($spool_dir, 0700) 
       or die "Could not create spool_dir $spool_dir: $!";
-  }
-
-  return $self->{_spool_dir};
+    }
+    
+  return $spool_dir;
 }
 
 # For unique filenames. We write to a local tmp dir so we don't need
