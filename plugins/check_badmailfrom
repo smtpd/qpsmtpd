@@ -1,3 +1,4 @@
+# -*- perl -*-
 =head1 NAME
 
 check_badmailfrom - checks the standard badmailfrom config
@@ -11,6 +12,11 @@ qmail-smtpd docs:
 recipient address for a message if the envelope sender address is
 listed in badmailfrom.  A line in badmailfrom may be of the form
 @host, meaning every address at host."
+
+=head1 NOTES
+
+According to the SMTP protocol, we can't reject until after the RCPT
+stage, so store it until later.
 
 =cut
 
@@ -38,8 +44,7 @@ sub mail_handler {
     $bad = lc $bad;
     warn "Bad badmailfrom config: No \@ sign in $bad\n" and next unless $bad =~ m/\@/;
     $transaction->notes('badmailfrom', "Mail from $bad not accepted here")
-      if ($bad eq $from)
-      || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
+      if ($bad eq $from) || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
   }
   return (DECLINED);
 }
@@ -47,6 +52,9 @@ sub mail_handler {
 sub rcpt_handler {
   my ($self, $transaction, $rcpt) = @_;
   my $note = $transaction->notes('badmailfrom');
-  return (DENY, $note) if $note;
+  if ($note) {
+    $self->log(LOGINFO, $note);
+    return (DENY, $note);
+  }
   return (DECLINED);
 }
