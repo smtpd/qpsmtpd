@@ -17,6 +17,21 @@
 
   Added a milter plugin to allow use of sendmail milters
 
+  Don't store the Qpsmtpd object in the Plugin object any more (this
+  caused a circular reference)
+
+  Added a new qpsmtpd-server - a select() based server for qpsmtpd
+
+  Allow a config/relayclients and config/morerelayclients files to
+  define who can relay (useful with the select() server)
+
+  Fixed qpsmtpd unfolding all header lines
+
+  Speed up persistent qpsmtpd's by checking for plugin functions after
+  munging the name (the main breakage was with queue/qmail-queue)
+
+  Use dup2() instead of perl open("<&") style. POSIX seems to work better.
+
   [.. todo, fill in older changes ..] spf changes etc?
 
 0.26 - 2003/06/11
