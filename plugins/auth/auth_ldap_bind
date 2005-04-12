@@ -60,7 +60,7 @@ sub authldap {
   # find dn of user matching supplied username
   $ldh = Net::LDAP->new($ldhost, port=>$ldport, timeout=>$ldwait ) or
     $self->log(LOGALERT, "authldap/$method - error in initial conn" ) &&
-    return ( DECLINE, "authldap/$method - temporary auth error" );
+    return ( DECLINED, "authldap/$method - temporary auth error" );
 
   # find the user's DN
   $mesg = $ldh->search(
@@ -71,12 +71,12 @@ sub authldap {
     timeout=>$ldwait,
     sizelimit=>'1') or 
       $self->log(LOGALERT, "authldap/$method - err in search for user" ) &&
-      return ( DECLINE, "authldap/$method - temporary auth error" );
+      return ( DECLINED, "authldap/$method - temporary auth error" );
 
   # deal with errors if they exist
   if ( $mesg->code ) {
     $self->log(LOGALERT, "authldap/$method - err " . $mesg->code . " in search for user" );
-    return ( DECLINE, "authldap/$method - temporary auth error" );
+    return ( DECLINED, "authldap/$method - temporary auth error" );
   }
 
   # unbind, so as to allow a rebind below
@@ -86,7 +86,7 @@ sub authldap {
   if (($mesg->count) && ($lduserdn = $mesg->entry->dn)) {
     $ldh = Net::LDAP->new($ldhost, port=>$ldport, timeout=>$ldwait ) or
       $self->log(LOGALERT, "authldap/$method - err in user conn" ) &&
-        return ( DECLINE, "authldap/$method - temporary auth error" );
+        return ( DECLINED, "authldap/$method - temporary auth error" );
 	
     # here's the whole reason for the script
     $mesg = $ldh->bind($lduserdn, password=>$passClear, timeout=>$ldwait);
@@ -95,7 +95,7 @@ sub authldap {
     # deal with errors if they exist, or allow success
     if ( $mesg->code ) {
       $self->log(LOGALERT, "authldap/$method - error in user bind" );
-      return ( DENY, "authldap/$method - wrong username or password" );
+      return ( DECLINED, "authldap/$method - wrong username or password" );
     } else {
       $self->log( LOGINFO, "authldap/$method - $user auth success" );
       $self->log( LOGDEBUG, "authldap/$method - user: $user, pass: $passClear" );
@@ -105,7 +105,7 @@ sub authldap {
   # if the plugin couldn't find user's entry
   } else {
     $self->log(LOGALERT, "authldap/$method - user not found" ) &&
-      return ( DECLINE, "authldap/$method - wrong username or password" );
+      return ( DECLINED, "authldap/$method - wrong username or password" );
   }
 
   $ldh->disconnect;
