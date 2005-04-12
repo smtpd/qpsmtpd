@@ -8,8 +8,8 @@ Qpsmtpd::Auth - Authentication framework for qpsmtpd
 
 Provides support for SMTP AUTH within qpsmtpd transactions, see 
 
-  L<http://www.faqs.org/rfcs/rfc2222.html>
-  L<http://www.faqs.org/rfcs/rfc2554.html>
+L<http://www.faqs.org/rfcs/rfc2222.html>
+L<http://www.faqs.org/rfcs/rfc2554.html>
 
 for more details.
 
@@ -106,23 +106,25 @@ of the following values (taken from Qpsmtpd::Constants):
 If the authentication has succeeded, the plugin can return this value and
 all subsequently registered hooks will be skipped.
 
-=item DECLINE
+=item DECLINED
 
 If the authentication has failed, but any additional plugins should be run, 
 this value will be returned.  If none of the registered plugins succeed, the
-overall authentication will fail.
+overall authentication will fail.  Normally an auth plugin should return
+this value for all cases which do not succeed (so that another auth plugin
+can have a chance to authenticate the user).
 
 =item DENY
 
 If the authentication has failed, and the plugin wishes this to short circuit
 any further testing, it should return this value.  For example, a plugin could
 register the L<auth-plain> hook and immediately fail any connection which is
-not trusted (i.e. not in the same network).
+not trusted (e.g. not in the same network).
 
-Another reason to return DENY over DECLINE would be if the user name matched
+Another reason to return DENY over DECLINED would be if the user name matched
 an existing account but the password failed to match.  This would make a
-dictionary-based attack much harder to accomplish.  See the example authsql
-plugin for how this might be accomplished
+dictionary-based attack much harder to accomplish.  See the included
+auth_vpopmail_sql plugin for how this might be accomplished.
 
 By returning DENY, no further authentication attempts will be made using the
 current method and data.  A remote SMTP client is free to attempt a second
@@ -138,9 +140,7 @@ and this will be appended to whatever response is sent to the remote SMTP
 client.  There is no guarantee that the end user will see this information,
 though, since some prominent MTA's (produced by M$oft) I<helpfully>
 hide this information under the default configuration.  This message will
-be logged locally, if appropriate based on the configured log level.  If
-you are running multiple auth plugins, it is helpful to include at least
-the plugin name in the returned message (for debugging purposes).
+be logged locally, if appropriate, based on the configured log level.
 
 =head1 Auth Hooks
 
@@ -153,7 +153,7 @@ The currently defined authentication methods are:
 Any plugin which registers an auth-plain hook will engage in a plaintext
 prompted negotiation.  This is the least secure authentication method since
 both the user name and password are visible in plaintext.  Most SMTP clients
-will preferentially chose a more secure method if it is advertised by the
+will preferentially choose a more secure method if it is advertised by the
 server.
 
 =item * auth-login
