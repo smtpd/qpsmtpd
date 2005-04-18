@@ -356,7 +356,6 @@ sub temp_file {
   my $self = shift;
   my $filename = $self->spool_dir() 
     . join(":", time, $$, $transaction_counter++);
-  $filename =~ tr!A-Za-z0-9:/_-!!cd;
   return $filename;
 } 
 
