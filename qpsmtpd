@@ -15,6 +15,7 @@ use lib "$FindBin::Bin/lib";
 use Danga::Socket;
 use Danga::Client;
 use Qpsmtpd::PollServer;
+use Qpsmtpd::ConfigServer;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use Carp;
@@ -31,6 +32,10 @@ use Socket qw(IPPROTO_TCP SO_KEEPALIVE TCP_NODELAY SOL_SOCKET);
 $SIG{'PIPE'} = "IGNORE";  # handled manually
 
 $DEBUG          = 0;
+
+my $CONFIG_PORT      = 20025;
+my $CONFIG_LOCALADDR = '127.0.0.1';
+
 my $PORT        = 2525;
 my $LOCALADDR   = '0.0.0.0';
 my $LineMode    = 0;
@@ -93,6 +98,7 @@ my $POLL = "with " . ($Danga::Socket::HaveEpoll ? "epoll()" :
                     $Danga::Socket::HaveKQueue ? "kqueue()" : "poll()");
 
 my $server;
+my $config_server;
 
 # Code for inetd/tcpserver mode
 if ($ENV{REMOTE_HOST} or $ENV{TCPREMOTEHOST}) {
@@ -200,10 +206,22 @@ sub run_as_server {
                                     Blocking  => 0,
                                     Reuse     => 1,
                                     Listen    => 10 )
-                                           or die "Error creating server $LOCALADDR:$PORT : $@\n";
+               or die "Error creating server $LOCALADDR:$PORT : $@\n";
 
     IO::Handle::blocking($server, 0);
     binmode($server, ':raw');
+    
+    $config_server = IO::Socket::INET->new(LocalPort => $CONFIG_PORT,
+                                            LocalAddr => $CONFIG_LOCALADDR,
+                                            Type      => SOCK_STREAM,
+                                            Proto     => IPPROTO_TCP,
+                                            Blocking  => 0,
+                                            Reuse     => 1,
+                                            Listen    => 1 )
+               or die "Error creating server $CONFIG_LOCALADDR:$CONFIG_PORT : $@\n";
+    
+    IO::Handle::blocking($config_server, 0);
+    binmode($config_server, ':raw');
 
     # Drop priviledges
     my (undef, undef, $quid, $qgid) = getpwnam $USER or
@@ -240,13 +258,33 @@ sub run_as_server {
         }
         ::log(LOGDEBUG, "Listening on $PORT with single process $POLL" .
             ($LineMode ? " (forking server)" : ""));
-        Qpsmtpd::PollServer->OtherFds(fileno($server) => \&accept_handler);
+        Qpsmtpd::PollServer->OtherFds(fileno($server) => \&accept_handler,
+                                      fileno($config_server) => \&config_handler,
+                                      );
         while (1) {
             Qpsmtpd::PollServer->EventLoop();
         }
         exit;
     }
 
+}
+
+sub config_handler {
+    my $csock = $config_server->accept();
+    if (!$csock) {
+        warn("accept failed on config server: $!");
+        return;
+    }
+    binmode($csock, ':raw');
+    
+    printf("Config server connection\n") if $DEBUG;
+    
+    IO::Handle::blocking($csock, 0);
+    setsockopt($csock, IPPROTO_TCP, TCP_NODELAY, pack("l", 1)) or die;
+    
+    my $client = Qpsmtpd::ConfigServer->new($csock);
+    $client->watch_read(1);
+    return;
 }
 
 # Accept a new connection
@@ -260,8 +298,8 @@ sub accept_handler {
     my $csock = $server->accept();
     if (!$csock) {
         # warn("accept() failed: $!");
+        return;
     }
-    return unless $csock;
     binmode($csock, ':raw');
 
     printf("Listen child making a Qpsmtpd::PollServer for %d.\n", fileno($csock))

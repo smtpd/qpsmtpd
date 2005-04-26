@@ -50,6 +50,12 @@ sub new {
     return $self;
 }
 
+sub pending {
+    my Danga::DNS::Resolver $self = shift;
+    
+    return keys(%{$self->{id_to_asker}});
+}
+
 sub _query {
     my Danga::DNS::Resolver $self = shift;
     my ($asker, $host, $type, $now) = @_;
