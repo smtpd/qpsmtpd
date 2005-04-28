@@ -282,6 +282,8 @@ sub EpollEventLoop {
                 $sock->ticker;
             }
         }
+        
+        return unless PostEventLoop();
 
         print STDERR "Event loop ending; restarting.\n";
     }
