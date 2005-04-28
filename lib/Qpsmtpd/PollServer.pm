@@ -13,6 +13,7 @@ use fields qw(
     data_size
     max_size
     hooks
+    start_time
     _auth
     _commands
     _config_cache
@@ -28,6 +29,7 @@ use Danga::DNS;
 use Mail::Header;
 use POSIX qw(strftime);
 use Socket qw(inet_aton AF_INET CRLF);
+use Time::HiRes qw(time);
 use strict;
 
 sub input_sock {
@@ -41,8 +43,15 @@ sub new {
     
     $self = fields::new($self) unless ref $self;
     $self->SUPER::new( @_ );
+    $self->{start_time} = time;
     $self->load_plugins;
     return $self;
+}
+
+sub uptime {
+    my Qpsmtpd::PollServer $self = shift;
+    
+    return (time() - $self->{start_time});
 }
 
 sub reset_for_next_message {

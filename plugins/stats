@@ -1,0 +1,31 @@
+#!/usr/bin/perl -w
+
+use Qpsmtpd::Stats;
+
+sub register {
+    my ($self) = @_;
+    
+    $self->register_hook('deny', 'increment_deny');
+    $self->register_hook('queue', 'increment_mails');
+}
+
+sub increment_deny {
+    my ($self, $level) = @_;
+    
+    if ($level == DENY or $level == DENY_DISCONNECT) {
+        $Qpsmtpd::Stats::MAILS_REJECTED++;
+    }
+    elsif ($level == DENYSOFT or $level == DENYSOFT_DISCONNECT) {
+        $Qpsmtpd::Stats::MAILS_TEMPFAIL++;
+    }
+    
+    return DECLINED;
+}
+
+sub increment_mails {
+    my $self = shift;
+    
+    $Qpsmtpd::Stats::MAILS_RECEIVED++;
+    
+    return DECLINED;
+}

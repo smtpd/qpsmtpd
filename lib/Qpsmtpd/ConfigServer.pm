@@ -3,9 +3,11 @@
 package Qpsmtpd::ConfigServer;
 
 use base ('Danga::Client');
+use Qpsmtpd::Constants;
+
+use strict;
 
 use fields qw(
-    commands
     _auth
     _commands
     _config_cache
@@ -15,15 +17,18 @@ use fields qw(
     _extras
 );
 
+my $PROMPT = "Enter command: ";
+
 sub new {
     my Qpsmtpd::ConfigServer $self = shift;
     
     $self = fields::new($self) unless ref $self;
     $self->SUPER::new( @_ );
-    $self->{commands} = { help => 1, status => 1, };
-    $self->write("Enter command:\n");
+    $self->write($PROMPT);
     return $self;
 }
+
+sub max_idle_time { 3600 } # one hour
 
 sub process_line {
     my $self = shift;
@@ -55,7 +60,8 @@ sub fault {
   my $self = shift;
   my ($msg) = shift || "program fault - command not performed";
   print STDERR "$0 [$$]: $msg ($!)\n";
-  return $self->respond("Error - " . $msg, "Enter command:");
+  $self->respond("Error - " . $msg);
+  return $PROMPT;
 }
 
 sub _process_line {
@@ -64,18 +70,18 @@ sub _process_line {
 
     $line =~ s/\r?\n//;
     my ($cmd, @params) = split(/ +/, $line);
-    my $meth = lc($cmd);
-    if (my $lookup = $self->{commands}->{$meth} && $self->can($meth)) {
+    my $meth = "cmd_" . lc($cmd);
+    if (my $lookup = $self->can($meth)) {
         my $resp = eval {
             $lookup->($self, @params);
         };
         if ($@) {
             my $error = $@;
             chomp($error);
-            $self->log(LOGERROR, "Command Error: $error");
+            Qpsmtpd->log(LOGERROR, "Command Error: $error");
             return $self->fault("command '$cmd' failed unexpectedly");
         }
-        return $resp . "\nEnter command:\n";
+        return "$resp\n$PROMPT";
     }
     else {
         # No such method - i.e. unrecognized command
@@ -84,24 +90,74 @@ sub _process_line {
 }
 
 my %helptext = (
-    all => "Available Commands:\n\nSTATUS\nHELP [CMD]",
+    help => "HELP [CMD] - Get help on all commands or a specific command",
     status => "STATUS - Returns status information about current connections",
+    list => "LIST [LIMIT] - List the connections, specify limit or negative limit to shrink list",
+    kill => "KILL (\$IP | \$REF) - Disconnect all connections from \$IP or connection reference \$REF",
+    pause => "PAUSE - Stop accepting new connections",
+    continue => "CONTINUE - Resume accepting connections",
+    reload => "RELOAD - Reload all plugins and config",
+    quit => "QUIT - Exit the config server",
     );
 
-sub help {
+sub cmd_help {
     my $self = shift;
     my ($subcmd) = @_;
     
-    $subcmd ||= 'all';
+    $subcmd ||= 'help';
     $subcmd = lc($subcmd);
     
-    my $txt = $helptext{$subcmd} || "Unrecognised help option. Try 'help all'";
-    warn "help returning: $txt\n";
-    return $txt . "\n";
+    if ($subcmd eq 'help') {
+        my $txt = join("\n", map { substr($_, 0, index($_, "-")) } sort values(%helptext));
+        return "Available Commands:\n\n$txt\n";
+    }
+    my $txt = $helptext{$subcmd} || "Unrecognised help option. Try 'help' for a full list.";
+    return "$txt\n";
 }
 
-sub status {
+sub cmd_quit {
     my $self = shift;
+    $self->close;
+}
+
+sub cmd_pause {
+    my $self = shift;
+    
+    my $other_fds = $self->OtherFds;
+    
+    $self->{other_fds} = { %$other_fds };
+    %$other_fds = ();
+    return "PAUSED";
+}
+
+sub cmd_status {
+    my $self = shift;
+ 
+# Status should show:
+#  - Total time running
+#  - Total number of mails received
+#  - Total number of mails rejected (5xx)
+#  - Total number of mails tempfailed (5xx)
+#  - Avg number of mails/minute
+#  - Number of current connections
+#  - Number of outstanding DNS queries
+    
+    my $output = "Current Status as of " . gmtime() . " GMT\n\n";
+    
+    if ($INC{'Qpsmtpd/Stats.pm'}) {
+        # Stats plugin is loaded
+        my $uptime = Qpsmtpd::Stats->uptime;
+        my $recvd  = Qpsmtpd::Stats->mails_received;
+        my $reject = Qpsmtpd::Stats->mails_rejected;
+        my $soft   = Qpsmtpd::Stats->mails_tempfailed;
+        my $rate   = Qpsmtpd::Stats->mails_per_sec;
+        $output .= sprintf("          Uptime: %0.2f sec\n".
+                            "  Mails Received: % 10d\n".
+                            "             5xx: % 10d\n".
+                            "             4xx: % 10d\n".
+                            "Mails per second: %0.2f\n",
+                                            $uptime, $recvd, $reject, $soft, $rate);
+    }
     
     my $descriptors = Danga::Socket->DescriptorMap;
     
@@ -117,9 +173,99 @@ sub status {
         }
     }
     
-    return
-"  Current Connections: $current_connections
-  Current DNS Queries: $current_dns";
+    $output .= "Curr Connections: $current_connections\n".
+               "Curr DNS Queries: $current_dns";
+    
+    return $output;
+}
+
+sub cmd_list {
+    my $self = shift;
+    my ($count) = @_;
+    
+    my $descriptors = Danga::Socket->DescriptorMap;
+    
+    my $list = "Current" . ($count ? (($count > 0) ? " Oldest $count" : " Newest ".-$count) : "") . " Connections: \n\n";
+    my @all;
+    foreach my $fd (keys %$descriptors) {
+        my $pob = $descriptors->{$fd};
+        if ($pob->isa("Qpsmtpd::PollServer")) {
+            next unless $pob->connection->remote_ip; # haven't even started yet
+            push @all, [$pob+0, $pob->connection->remote_ip,
+                        $pob->connection->remote_host, $pob->uptime];
+        }
+    }
+    
+    @all = sort { $a->[3] <=> $b->[3] } @all;
+    if ($count) {
+        if ($count > 0) {
+            @all = @all[$#all-($count-1) .. $#all];
+        }
+        else {
+            @all = @all[0..(abs($count) - 1)];
+        }
+    }
+    foreach my $item (@all) {
+        $list .= sprintf("%x : %s [%s] Connected %0.2fs\n", @$item);
+    }
+    
+    return $list;
+}
+
+sub cmd_kill {
+    my $self = shift;
+    my ($match) = @_;
+    
+    return "SYNTAX: KILL (\$IP | \$REF)\n" unless $match;
+    
+    my $descriptors = Danga::Socket->DescriptorMap;
+    
+    my $killed = 0;
+    my $is_ip = (index($match, '.') >= 0);
+    foreach my $fd (keys %$descriptors) {
+        my $pob = $descriptors->{$fd};
+        if ($pob->isa("Qpsmtpd::PollServer")) {
+            if ($is_ip) {
+                next unless $pob->connection->remote_ip; # haven't even started yet
+                if ($pob->connection->remote_ip eq $match) {
+                    $pob->write("550 Your connection has been killed by an administrator\r\n");
+                    $pob->disconnect;
+                    $killed++;
+                }
+            }
+            else {
+                # match by ID
+                if ($pob+0 == hex($match)) {
+                    $pob->write("550 Your connection has been killed by an administrator\r\n");
+                    $pob->disconnect;
+                    $killed++;
+                }
+            }
+        }
+    }
+    
+    return "Killed $killed connection" . ($killed > 1 ? "s" : "") . "\n";
+}
+
+sub cmd_dump {
+    my $self = shift;
+    my ($ref) = @_;
+    
+    return "SYNTAX: DUMP \$REF\n" unless $ref;
+    require Data::Dumper;
+    $Data::Dumper::Indent=1;
+    
+    my $descriptors = Danga::Socket->DescriptorMap;
+    foreach my $fd (keys %$descriptors) {
+        my $pob = $descriptors->{$fd};
+        if ($pob->isa("Qpsmtpd::PollServer")) {
+            if ($pob+0 == hex($ref)) {
+                return Data::Dumper::Dumper($pob);
+            }
+        }
+    }
+    
+    return "Unable to find the connection: $ref. Try the LIST command\n";
 }
 
 1;

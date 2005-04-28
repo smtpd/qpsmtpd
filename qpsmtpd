@@ -43,6 +43,7 @@ my $PROCS       = 1;
 my $MAXCONN     = 15;           # max simultaneous connections
 my $USER        = 'smtpd';      # user to suid to
 my $MAXCONNIP   = 5;            # max simultaneous connections from one IP
+my $PAUSED      = 0;
 
 sub help {
     print <<EOT;
@@ -97,8 +98,8 @@ Danga::Socket::init_poller();
 my $POLL = "with " . ($Danga::Socket::HaveEpoll ? "epoll()" : 
                     $Danga::Socket::HaveKQueue ? "kqueue()" : "poll()");
 
-my $server;
-my $config_server;
+my $SERVER;
+my $CONFIG_SERVER;
 
 # Code for inetd/tcpserver mode
 if ($ENV{REMOTE_HOST} or $ENV{TCPREMOTEHOST}) {
@@ -143,7 +144,7 @@ sub spawn_child {
     
     $SIG{CHLD} = "DEFAULT";
 
-    Qpsmtpd::PollServer->OtherFds(fileno($server) => \&accept_handler);
+    Qpsmtpd::PollServer->OtherFds(fileno($SERVER) => \&accept_handler);
     Qpsmtpd::PollServer->EventLoop();
     exit;
 }
@@ -199,7 +200,7 @@ sub run_as_inetd {
 
 sub run_as_server {
     # establish SERVER socket, bind and listen.
-    $server = IO::Socket::INET->new(LocalPort => $PORT,
+    $SERVER = IO::Socket::INET->new(LocalPort => $PORT,
                                     LocalAddr => $LOCALADDR,
                                     Type      => SOCK_STREAM,
                                     Proto     => IPPROTO_TCP,
@@ -208,10 +209,10 @@ sub run_as_server {
                                     Listen    => 10 )
                or die "Error creating server $LOCALADDR:$PORT : $@\n";
 
-    IO::Handle::blocking($server, 0);
-    binmode($server, ':raw');
+    IO::Handle::blocking($SERVER, 0);
+    binmode($SERVER, ':raw');
     
-    $config_server = IO::Socket::INET->new(LocalPort => $CONFIG_PORT,
+    $CONFIG_SERVER = IO::Socket::INET->new(LocalPort => $CONFIG_PORT,
                                             LocalAddr => $CONFIG_LOCALADDR,
                                             Type      => SOCK_STREAM,
                                             Proto     => IPPROTO_TCP,
@@ -220,8 +221,8 @@ sub run_as_server {
                                             Listen    => 1 )
                or die "Error creating server $CONFIG_LOCALADDR:$CONFIG_PORT : $@\n";
     
-    IO::Handle::blocking($config_server, 0);
-    binmode($config_server, ':raw');
+    IO::Handle::blocking($CONFIG_SERVER, 0);
+    binmode($CONFIG_SERVER, ':raw');
 
     # Drop priviledges
     my (undef, undef, $quid, $qgid) = getpwnam $USER or
@@ -258,8 +259,8 @@ sub run_as_server {
         }
         ::log(LOGDEBUG, "Listening on $PORT with single process $POLL" .
             ($LineMode ? " (forking server)" : ""));
-        Qpsmtpd::PollServer->OtherFds(fileno($server) => \&accept_handler,
-                                      fileno($config_server) => \&config_handler,
+        Qpsmtpd::PollServer->OtherFds(fileno($SERVER) => \&accept_handler,
+                                      fileno($CONFIG_SERVER) => \&config_handler,
                                       );
         while (1) {
             Qpsmtpd::PollServer->EventLoop();
@@ -270,7 +271,7 @@ sub run_as_server {
 }
 
 sub config_handler {
-    my $csock = $config_server->accept();
+    my $csock = $CONFIG_SERVER->accept();
     if (!$csock) {
         warn("accept failed on config server: $!");
         return;
@@ -295,7 +296,7 @@ sub accept_handler {
         return;
     }
 
-    my $csock = $server->accept();
+    my $csock = $SERVER->accept();
     if (!$csock) {
         # warn("accept() failed: $!");
         return;
@@ -312,6 +313,12 @@ sub accept_handler {
         # multiplex mode
         my $client = Qpsmtpd::PollServer->new($csock);
         my $rem_ip = $client->peer_ip_string;
+        
+        if ($PAUSED) {
+            $client->write("451 Sorry, this server is currently paused\r\n");
+            $client->close;
+            return;
+        }
         
         if ($MAXCONNIP) {
             my $num_conn = 1; # seed with current value
@@ -370,7 +377,7 @@ sub accept_handler {
         return $csock->close();
     }
 
-    $server->close(); # make sure the child doesn't accept() new connections
+    $SERVER->close(); # make sure the child doesn't accept() new connections
     
     $SIG{$_} = 'DEFAULT' for keys %SIG;
     
@@ -406,3 +413,7 @@ sub log {
   warn("$$ $message\n");
 }
 
+sub pause {
+  my ($pause) = @_;
+  $PAUSED = $pause;
+}
