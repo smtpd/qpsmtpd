@@ -1,6 +1,35 @@
 0.30 - 
 
+  Add plugable logging support include sample plugin which replicates
+  the existing core code.  Add OK hook.
+
+  Add new logging plugin, logging/adaptive, which logs at different
+  levels depending on whether the message was accepted/rejected. 
+
+  (See README.logging for information about the new logging system by
+  John Peacock)
+
+  plugins/auth/auth_ldap_bind - New plugin to authenticate against an
+  LDAP database. Thanks to Elliot Foster <elliotf@gratuitous.net>
+
+  plugins/auth/auth_flat_file - flat file auth plugin
+
+  Revamp Qpsmtpd::Constants so it is possible to retrieve the text
+  representation from the numeric (for logging purposes).
+
+  Store mail in memory up to a certain threshold (default 10k).
+
+  Remove needless restriction on temp_file() to allow the spool
+  directory path to include dots (as in ../)
+
+  Fix off-by-one line numbers in warnings from plugins (thanks to
+  Brian Grossman).
+
   Don't check the HELO host for rfc-ignorant compliance
+  
+  body_write patches from Brian Grossman
+
+  Fix for corruption problem under Apache
 
 
 0.29 - 2005/03/03
