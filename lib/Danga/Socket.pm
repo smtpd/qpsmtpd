@@ -801,10 +801,10 @@ sub SetPostLoopCallback {
     if(ref $class) {
         my Danga::Socket $self = $class;
         if( defined $ref && ref $ref eq 'CODE' ) {
-            $self->{PostLoopCallback} = $ref;
+            $self->{post_loop_callback} = $ref;
         }
         else {
-            delete $self->{PostLoopCallback};
+            delete $self->{post_loop_callback};
         }
     }
     else {
