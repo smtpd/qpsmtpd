@@ -10,7 +10,7 @@ sub register {
 }
 
 sub increment_deny {
-    my ($self, $level) = @_;
+    my ($self, $tran, $plugin, $level) = @_;
     
     if ($level == DENY or $level == DENY_DISCONNECT) {
         $Qpsmtpd::Stats::MAILS_REJECTED++;
