@@ -44,8 +44,6 @@ and terminating the SMTP connection.
 
 =cut
 
-use Time::HiRes ();
-
 use warnings;
 use strict;
 
@@ -70,25 +68,19 @@ sub register {
 
 sub connect_handler {
   my ($self, $transaction) = @_;
-  my $qp = $self->qp;
-  my $end = Time::HiRes::time + $self->{_args}->{'wait'} ;
-  my $time;
-  for( $time = Time::HiRes::time; $time < $end && !length($qp->{line}) ; $time = Time::HiRes::time ) {
-    $qp->can_read($end-$time);
-    }
-  my $earlytalker = 0;
-  $earlytalker = 1 if $time < $end ;
-
-  if ($earlytalker) {
+  
+  if ($self->qp->can_read($self->{_args}->{'wait'})) {
     $self->log(LOGNOTICE, 'remote host started talking before we said hello');
     if ($self->{_args}->{'defer-reject'}) {
-	$self->connection->notes('earlytalker', 1);
-    } else {
+      $self->connection->notes('earlytalker', 1);
+    }
+    else {
       my $msg = 'Connecting host started transmitting before SMTP greeting';
       return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
       return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
     }
-  } else {
+  }
+  else {
     $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
   }
   return DECLINED;

@@ -15,6 +15,7 @@ use fields qw(
     _transaction
     _test_mode
     _extras
+    other_fds
 );
 
 my $PROMPT = "Enter command: ";
@@ -130,6 +131,16 @@ sub cmd_pause {
     return "PAUSED";
 }
 
+sub cmd_continue {
+    my $self = shift;
+    
+    my $other_fds = $self->{other_fds};
+    
+    $self->OtherFds( %$other_fds );
+    %$other_fds = ();
+    return "UNPAUSED";
+}
+
 sub cmd_status {
     my $self = shift;
  
@@ -173,7 +184,7 @@ sub cmd_status {
         }
     }
     
-    $output .= "Curr Connections: $current_connections\n".
+    $output .= "Curr Connections: $current_connections / $::MAXconn\n".
                "Curr DNS Queries: $current_dns";
     
     return $output;
@@ -206,7 +217,7 @@ sub cmd_list {
         }
     }
     foreach my $item (@all) {
-        $list .= sprintf("%x : %s [%s] Connected %0.2fs\n", @$item);
+        $list .= sprintf("%x : %s [%s] Connected %0.2fs\n", map { defined()?$_:'' } @$item);
     }
     
     return $list;

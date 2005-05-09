@@ -24,7 +24,7 @@ use vars qw{$VERSION};
 $VERSION = do { my @r = (q$Revision: 1.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#r, @r };
 
 use fields qw(sock fd write_buf write_buf_offset write_buf_size
-              read_push_back
+              read_push_back post_loop_callback
               closed event_watch debug_level);
 
 use Errno qw(EINPROGRESS EWOULDBLOCK EISCONN
@@ -307,9 +307,21 @@ sub PostEventLoop {
     # now we can close sockets that wanted to close during our event processing.
     # (we didn't want to close them during the loop, as we didn't want fd numbers
     #  being reused and confused during the event loop)
-    $_->close while ($_ = shift @ToClose);
+    while(my $j = shift @ToClose) {
+        $j->[1]->close();
+        $j->[0]->{closing} = 0;
+    }
 
-    # now we're at the very end, call callback if defined
+
+    # now we're at the very end, call per-connection callbacks if defined
+    for my $fd (%DescriptorMap) {
+        my $pob = $DescriptorMap{$fd};
+        if( defined $pob->{post_loop_callback} ) {
+            return unless $pob->{post_loop_callback}->(\%DescriptorMap, \%OtherFds);
+        }
+    }
+
+    # now we're at the very end, call global callback if defined
     if (defined $PostLoopCallback) {
         return $PostLoopCallback->(\%DescriptorMap, \%OtherFds);
     }
@@ -401,6 +413,7 @@ sub new {
     $self->{write_buf_size} = 0;
     $self->{closed} = 0;
     $self->{read_push_back} = [];
+    $self->{post_loop_callback} = undef;
 
     $self->{event_watch} = POLLERR|POLLHUP|POLLNVAL;
 
@@ -472,7 +485,7 @@ sub close {
 
     # defer closing the actual socket until the event loop is done
     # processing this round of events.  (otherwise we might reuse fds)
-    push @ToClose, $sock;
+    push @ToClose, [$self,$sock];
 
     return 0;
 }
@@ -785,7 +798,18 @@ sub as_string {
 ### be passed two parameters: \%DescriptorMap, \%OtherFds.
 sub SetPostLoopCallback {
     my ($class, $ref) = @_;
-    $PostLoopCallback = (defined $ref && ref $ref eq 'CODE') ? $ref : undef;
+    if(ref $class) {
+        my Danga::Socket $self = $class;
+        if( defined $ref && ref $ref eq 'CODE' ) {
+            $self->{PostLoopCallback} = $ref;
+        }
+        else {
+            delete $self->{PostLoopCallback};
+        }
+    }
+    else {
+        $PostLoopCallback = (defined $ref && ref $ref eq 'CODE') ? $ref : undef;
+    }
 }
 
 #####################################################################

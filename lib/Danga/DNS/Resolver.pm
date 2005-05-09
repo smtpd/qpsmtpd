@@ -286,6 +286,9 @@ sub event_read {
                 #$self->{timeout}{$id} = time();
         
             }
+            elsif ($err eq "NOERROR") {
+                $asker->run_callback($err, $query);
+            }
             elsif($err) {
                 print("error: $err\n");
                 $asker->run_callback($err, $query);

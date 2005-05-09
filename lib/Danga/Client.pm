@@ -6,7 +6,8 @@ use fields qw(line closing disable_read can_read_mode);
 use Time::HiRes ();
 
 # 30 seconds max timeout!
-sub max_idle_time { 30 }
+sub max_idle_time       { 30 }
+sub max_connect_time    { 1200 }
 
 sub new {
     my Danga::Client $self = shift;
@@ -45,7 +46,7 @@ sub can_read {
     my Danga::Client $self = shift;
     my ($timeout) = @_;
     my $end = Time::HiRes::time() + $timeout;
-    warn("Calling can-read\n");
+    # warn("Calling can-read\n");
     $self->{can_read_mode} = 1;
     if (!length($self->{line})) {
         my $old = $self->watch_read();
@@ -61,7 +62,7 @@ sub can_read {
     $self->SetPostLoopCallback(sub { $self->have_line ? 0 : 1 });
     return if $self->{closing};
     $self->{alive_time} = time;
-    warn("can_read returning for '$self->{line}'\n");
+    # warn("can_read returning for '$self->{line}'\n");
     return 1 if length($self->{line});
     return;
 }

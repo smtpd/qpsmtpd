@@ -108,7 +108,7 @@ sub compile {
     }
     close F;
 
-    my $line = "\n#line 1 $file\n";
+    my $line = "\n#line 0 $file\n";
 
     if ($test_mode) {
         if (open(F, "t/plugin_tests/$plugin")) {

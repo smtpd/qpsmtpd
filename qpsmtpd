@@ -199,6 +199,7 @@ sub run_as_inetd {
 }
 
 sub run_as_server {
+    local $::MAXconn = $MAXCONN;
     # establish SERVER socket, bind and listen.
     $SERVER = IO::Socket::INET->new(LocalPort => $PORT,
                                     LocalAddr => $LOCALADDR,
@@ -290,11 +291,19 @@ sub config_handler {
 
 # Accept a new connection
 sub accept_handler {
-    my $running = scalar keys %childstatus;
+	my $running;
+    if( $LineMode ) {
+        $running = scalar keys %childstatus;
+    }
+    else {
+        my $descriptors = Danga::Client->DescriptorMap;
+        $running = scalar keys %$descriptors;
+    }
     while ($running >= $MAXCONN) { 
         ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.");
         return;
     }
+    ++$running if $LineMode; # count self
 
     my $csock = $SERVER->accept();
     if (!$csock) {
@@ -341,6 +350,7 @@ sub accept_handler {
                 $client->close;
                 return;
             }
+            ::log(LOGINFO, "accepted connection $running/$MAXCONN ($num_conn/$MAXCONNIP) from $rem_ip");
         }
         
         my $rc = $client->start_conversation;

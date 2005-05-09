@@ -32,6 +32,9 @@ use Socket qw(inet_aton AF_INET CRLF);
 use Time::HiRes qw(time);
 use strict;
 
+sub max_idle_time { 60 }
+sub max_connect_time { 1200 }
+
 sub input_sock {
     my $self = shift;
     @_ and $self->{input_sock} = shift;
@@ -91,7 +94,7 @@ sub process_line {
     if ($::DEBUG > 1) { print "$$:".($self+0)."C($self->{mode}): $line"; }
     local $SIG{ALRM} = sub {
         my ($pkg, $file, $line) = caller();
-        die "ALARM: $pkg, $file, $line";
+        die "ALARM: ($self->{mode}) $pkg, $file, $line";
     };
     my $prev = alarm(2); # must process a command in < 2 seconds
     eval { $self->_process_line($line) };
@@ -169,6 +172,7 @@ sub start_conversation {
     my ($ip, $port) = split(':', $self->peer_addr_string);
     $conn->remote_ip($ip);
     $conn->remote_port($port);
+    $conn->remote_info("[$ip]");
     Danga::DNS->new(
         client     => $self,
         # NB: Setting remote_info to the same as remote_host
