@@ -73,7 +73,7 @@ our (
      %OtherFds,                  # A hash of "other" (non-Danga::Socket) file
                                  # descriptors for the event loop to track.
      $PostLoopCallback,          # subref to call at the end of each loop, if defined
-     $LocalPostLoopCallback,     # true if there is a local post loop callback in effect
+     %PLCMap,                    # fd (num) -> PostLoopCallback
      );
 
 %OtherFds = ();
@@ -375,13 +375,8 @@ sub PostEventLoop {
     @ToClose = ();
 
     # now we're at the very end, call per-connection callbacks if defined
-    if ($LocalPostLoopCallback) {
-        for my $fd (%DescriptorMap) {
-            my $pob = $DescriptorMap{$fd};
-            if( defined $pob->{post_loop_callback} ) {
-                return unless $pob->{post_loop_callback}->(\%DescriptorMap, \%OtherFds);
-            }
-        }
+    for my $plc (values %PLCMap) {
+        return unless $plc->(\%DescriptorMap, \%OtherFds);
     }
 
     # now we're at the very end, call global callback if defined
@@ -810,17 +805,20 @@ sub SetPostLoopCallback {
     if(ref $class) {
         my Danga::Socket $self = $class;
         if( defined $ref && ref $ref eq 'CODE' ) {
-            $LocalPostLoopCallback++;
-            $self->{post_loop_callback} = $ref;
+            $PLCMap{$self->{fd}} = $ref;
         }
         else {
-            $LocalPostLoopCallback--;
-            delete $self->{post_loop_callback};
+            delete $PLCMap{$self->{fd}};
         }
     }
     else {
         $PostLoopCallback = (defined $ref && ref $ref eq 'CODE') ? $ref : undef;
     }
+}
+
+sub DESTROY {
+    my Danga::Socket $self = shift;
+    delete $PLCMap{$self->{fd}};
 }
 
 #####################################################################
