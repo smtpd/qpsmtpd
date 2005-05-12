@@ -251,14 +251,14 @@ sub run_as_server {
             push @kids, spawn_child();
         }
         $SIG{INT} = $SIG{TERM} = sub { $SIG{CHLD} = "IGNORE"; kill 2 => @kids; exit };
-        ::log(LOGDEBUG, "Listening on $PORT with $PROCS children $POLL");
+        $plugin_loader->log(LOGDEBUG, "Listening on $PORT with $PROCS children $POLL");
         sleep while (1);
     }
     else {
         if ($LineMode) {
             $SIG{INT} = $SIG{TERM} = \&HUNTSMAN;
         }
-        ::log(LOGDEBUG, "Listening on $PORT with single process $POLL" .
+        $plugin_loader->log(LOGDEBUG, "Listening on $PORT with single process $POLL" .
             ($LineMode ? " (forking server)" : ""));
         Qpsmtpd::PollServer->OtherFds(fileno($SERVER) => \&accept_handler,
                                       fileno($CONFIG_SERVER) => \&config_handler,
@@ -274,7 +274,7 @@ sub run_as_server {
 sub config_handler {
     my $csock = $CONFIG_SERVER->accept();
     if (!$csock) {
-        warn("accept failed on config server: $!");
+        # warn("accept failed on config server: $!");
         return;
     }
     binmode($csock, ':raw');
@@ -289,9 +289,15 @@ sub config_handler {
     return;
 }
 
-# Accept a new connection
+# Accept all new connections
 sub accept_handler {
-	my $running;
+    for (1..10000) {
+        last unless _accept_handler();
+    }
+}
+
+sub _accept_handler {
+    my $running;
     if( $LineMode ) {
         $running = scalar keys %childstatus;
     }
@@ -299,7 +305,7 @@ sub accept_handler {
         my $descriptors = Danga::Client->DescriptorMap;
         $running = scalar keys %$descriptors;
     }
-    while ($running >= $MAXCONN) { 
+    if ($running >= $MAXCONN) { 
         ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.");
         return;
     }
@@ -326,7 +332,7 @@ sub accept_handler {
         if ($PAUSED) {
             $client->write("451 Sorry, this server is currently paused\r\n");
             $client->close;
-            return;
+            return 1;
         }
         
         if ($MAXCONNIP) {
@@ -344,22 +350,22 @@ sub accept_handler {
             }
             
             if ($num_conn > $MAXCONNIP) {
-                ::log(LOGINFO,"Too many connections from $rem_ip: "
+                $client->log(LOGINFO,"Too many connections from $rem_ip: "
                              ."$num_conn > $MAXCONNIP. Denying connection.");
                 $client->write("451 Sorry, too many connections from $rem_ip, try again later\r\n");
                 $client->close;
-                return;
+                return 1;
             }
-            ::log(LOGINFO, "accepted connection $running/$MAXCONN ($num_conn/$MAXCONNIP) from $rem_ip");
+            $client->log(LOGINFO, "accepted connection $running/$MAXCONN ($num_conn/$MAXCONNIP) from $rem_ip");
         }
         
         my $rc = $client->start_conversation;
         if ($rc != DONE) {
             $client->close;
-            return;
+            return 1;
         }
         $client->watch_read(1);
-        return;
+        return 1;
     }
 
     # fork-per-connection mode
@@ -378,7 +384,7 @@ sub accept_handler {
                          ."$num_conn > $MAXCONNIP. Denying connection.");
             print $csock "451 Sorry, too many connections from $rem_ip, try again later\r\n";
             close $csock;
-            return;
+            return 1;
         }
     }
     
@@ -408,7 +414,7 @@ sub accept_handler {
         $client->watch_read(1);
     }
 
-    ::log(LOGDEBUG, "Finished with child %d.\n", fileno($csock))
+    $client->log(LOGDEBUG, "Finished with child %d.\n", fileno($csock))
         if $DEBUG;
     $client->close();
 
