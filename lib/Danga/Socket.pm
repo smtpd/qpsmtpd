@@ -25,6 +25,7 @@ $VERSION = do { my @r = (q$Revision: 1.4 $ =~ /\d+/g); sprintf "%d."."%02d" x $#
 
 use fields qw(sock fd write_buf write_buf_offset write_buf_size
               read_push_back post_loop_callback
+			  peer_ip
               closed event_watch debug_level);
 
 use Errno qw(EINPROGRESS EWOULDBLOCK EISCONN
@@ -72,9 +73,11 @@ our (
      %OtherFds,                  # A hash of "other" (non-Danga::Socket) file
                                  # descriptors for the event loop to track.
      $PostLoopCallback,          # subref to call at the end of each loop, if defined
+     $LocalPostLoopCallback,     # true if there is a local post loop callback in effect
      );
 
 %OtherFds = ();
+$LocalPostLoopCallback = 0;
 
 #####################################################################
 ### C L A S S   M E T H O D S
@@ -290,44 +293,6 @@ sub EpollEventLoop {
     exit 0;
 }
 
-sub PostEventLoop {
-    # fire read events for objects with pushed-back read data
-    my $loop = 1;
-    while ($loop) {
-        $loop = 0;
-        foreach my $fd (keys %PushBackSet) {
-            my Danga::Socket $pob = $PushBackSet{$fd};
-            next unless (! $pob->{closed} &&
-                         $pob->{event_watch} & POLLIN);
-            $loop = 1;
-            $pob->event_read;
-        }
-    }
-
-    # now we can close sockets that wanted to close during our event processing.
-    # (we didn't want to close them during the loop, as we didn't want fd numbers
-    #  being reused and confused during the event loop)
-    while(my $j = shift @ToClose) {
-        $j->[1]->close();
-        $j->[0]->{closing} = 0;
-    }
-
-
-    # now we're at the very end, call per-connection callbacks if defined
-    for my $fd (%DescriptorMap) {
-        my $pob = $DescriptorMap{$fd};
-        if( defined $pob->{post_loop_callback} ) {
-            return unless $pob->{post_loop_callback}->(\%DescriptorMap, \%OtherFds);
-        }
-    }
-
-    # now we're at the very end, call global callback if defined
-    if (defined $PostLoopCallback) {
-        return $PostLoopCallback->(\%DescriptorMap, \%OtherFds);
-    }
-    return 1;
-}
-
 ### The fallback IO::Poll-based event loop. Gets installed as EventLoop if
 ### IO::Epoll fails to load.
 sub PollEventLoop {
@@ -383,6 +348,47 @@ sub PollEventLoop {
     }
 
     exit 0;
+}
+
+## PostEventLoop is called at the end of the event loop to process things
+#  like close() calls.
+sub PostEventLoop {
+    # fire read events for objects with pushed-back read data
+    my $loop = 1;
+    while ($loop) {
+        $loop = 0;
+        foreach my $fd (keys %PushBackSet) {
+            my Danga::Socket $pob = $PushBackSet{$fd};
+            next unless (! $pob->{closed} &&
+                         $pob->{event_watch} & POLLIN);
+            $loop = 1;
+            $pob->event_read;
+        }
+    }
+
+    # now we can close sockets that wanted to close during our event processing.
+    # (we didn't want to close them during the loop, as we didn't want fd numbers
+    #  being reused and confused during the event loop)
+    foreach my $f (@ToClose) {
+        close($f);
+    }
+    @ToClose = ();
+
+    # now we're at the very end, call per-connection callbacks if defined
+    if ($LocalPostLoopCallback) {
+        for my $fd (%DescriptorMap) {
+            my $pob = $DescriptorMap{$fd};
+            if( defined $pob->{post_loop_callback} ) {
+                return unless $pob->{post_loop_callback}->(\%DescriptorMap, \%OtherFds);
+            }
+        }
+    }
+
+    # now we're at the very end, call global callback if defined
+    if (defined $PostLoopCallback) {
+        return $PostLoopCallback->(\%DescriptorMap, \%OtherFds);
+    }
+    return 1;
 }
 
 
@@ -485,7 +491,7 @@ sub close {
 
     # defer closing the actual socket until the event loop is done
     # processing this round of events.  (otherwise we might reuse fds)
-    push @ToClose, [$self,$sock];
+    push @ToClose, $sock;
 
     return 0;
 }
@@ -764,9 +770,12 @@ sub debugmsg {
 ### Returns the string describing the peer's IP
 sub peer_ip_string {
     my Danga::Socket $self = shift;
+	return $self->{peer_ip} if defined $self->{peer_ip};
     my $pn = getpeername($self->{sock}) or return undef;
     my ($port, $iaddr) = Socket::sockaddr_in($pn);
-    return Socket::inet_ntoa($iaddr);
+    my $r = Socket::inet_ntoa($iaddr);
+	$self->{peer_ip} = $r;
+    return $r;
 }
 
 ### METHOD: peer_addr_string()
@@ -801,9 +810,11 @@ sub SetPostLoopCallback {
     if(ref $class) {
         my Danga::Socket $self = $class;
         if( defined $ref && ref $ref eq 'CODE' ) {
+            $LocalPostLoopCallback++;
             $self->{post_loop_callback} = $ref;
         }
         else {
+            $LocalPostLoopCallback--;
             delete $self->{post_loop_callback};
         }
     }
