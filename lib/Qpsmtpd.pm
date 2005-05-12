@@ -122,9 +122,15 @@ sub _config_from_file {
   return wantarray ? @config : $config[0];
 }
 
+our $HOOKS;
+
 sub load_plugins {
   my $self = shift;
-  
+
+  if ($HOOKS) {
+      return $self->{hooks} = $HOOKS;
+  }
+
   $self->log(LOGERROR, "Plugins already loaded") if $self->{hooks};
   $self->{hooks} = {};
   
@@ -134,6 +140,8 @@ sub load_plugins {
   $self->log(LOGNOTICE, "loading plugins from $dir");
 
   @plugins = $self->_load_plugins($dir, @plugins);
+  
+  $HOOKS = $self->{hooks};
   
   return @plugins;
 }
