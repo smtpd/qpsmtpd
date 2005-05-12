@@ -160,6 +160,7 @@ sub body_getline {
   }
   else {
     return unless $self->{_body_array};
+    $self->{_body_current_pos} ||= 0;
     my $line = $self->{_body_array}->[$self->{_body_current_pos}];
     $self->{_body_current_pos}++;
     return $line;
