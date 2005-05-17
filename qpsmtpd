@@ -289,10 +289,14 @@ sub config_handler {
     return;
 }
 
+# TODO:
+#  - Make number of accepts() we do dependant on whether MAXCONNIP is set
+
 # Accept all new connections
 sub accept_handler {
-    for (1..10000) {
-        last unless _accept_handler();
+    my $max = $MAXCONNIP ? 100 : 1000;
+    for (1 .. $max) {
+        last if ! _accept_handler();
     }
 }
 
@@ -359,11 +363,7 @@ sub _accept_handler {
             $client->log(LOGINFO, "accepted connection $running/$MAXCONN ($num_conn/$MAXCONNIP) from $rem_ip");
         }
         
-        my $rc = $client->start_conversation;
-        if ($rc != DONE) {
-            $client->close;
-            return 1;
-        }
+        $client->push_back_read("Connect\n");
         $client->watch_read(1);
         return 1;
     }

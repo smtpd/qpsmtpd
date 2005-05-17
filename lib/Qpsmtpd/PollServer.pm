@@ -47,6 +47,7 @@ sub new {
     $self = fields::new($self) unless ref $self;
     $self->SUPER::new( @_ );
     $self->{start_time} = time;
+    $self->{mode} = 'connect';
     $self->load_plugins;
     return $self;
 }
@@ -111,8 +112,17 @@ sub process_line {
 sub _process_line {
     my $self = shift;
     my $line = shift;
-
-    if ($self->{mode} eq 'cmd') {
+    
+    if ($self->{mode} eq 'connect') {
+        warn("Connection incoming\n");
+        my $rc = $self->start_conversation;
+        if ($rc != DONE) {
+            $self->close;
+            return;
+        }
+        $self->{mode} = 'cmd';
+    }
+    elsif ($self->{mode} eq 'cmd') {
         $line =~ s/\r?\n//;
         return $self->process_cmd($line);
     }

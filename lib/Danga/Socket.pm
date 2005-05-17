@@ -77,7 +77,6 @@ our (
      );
 
 %OtherFds = ();
-$LocalPostLoopCallback = 0;
 
 #####################################################################
 ### C L A S S   M E T H O D S
