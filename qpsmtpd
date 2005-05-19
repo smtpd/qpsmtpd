@@ -27,7 +27,7 @@ $|++;
 # For debugging
 # $SIG{USR1} = sub { Carp::confess("USR1") };
 
-use Socket qw(IPPROTO_TCP SO_KEEPALIVE TCP_NODELAY SOL_SOCKET);
+use Socket qw(SOMAXCONN IPPROTO_TCP SO_KEEPALIVE TCP_NODELAY SOL_SOCKET);
 
 $SIG{'PIPE'} = "IGNORE";  # handled manually
 
@@ -207,7 +207,7 @@ sub run_as_server {
                                     Proto     => IPPROTO_TCP,
                                     Blocking  => 0,
                                     Reuse     => 1,
-                                    Listen    => 10 )
+                                    Listen    => SOMAXCONN )
                or die "Error creating server $LOCALADDR:$PORT : $@\n";
 
     IO::Handle::blocking($SERVER, 0);
@@ -289,18 +289,8 @@ sub config_handler {
     return;
 }
 
-# TODO:
-#  - Make number of accepts() we do dependant on whether MAXCONNIP is set
-
 # Accept all new connections
 sub accept_handler {
-    my $max = $MAXCONNIP ? 100 : 1000;
-    for (1 .. $max) {
-        last if ! _accept_handler();
-    }
-}
-
-sub _accept_handler {
     my $running;
     if( $LineMode ) {
         $running = scalar keys %childstatus;
@@ -309,12 +299,22 @@ sub _accept_handler {
         my $descriptors = Danga::Client->DescriptorMap;
         $running = scalar keys %$descriptors;
     }
-    if ($running >= $MAXCONN) { 
-        ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.");
-        return;
+    
+    my $max = $MAXCONNIP ? 100 : 1000;
+    
+    for (1 .. $max) {
+        if ($running >= $MAXCONN) { 
+            ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.");
+            return;
+        }
+        $running++;
+        last if ! _accept_handler($running);
     }
-    ++$running if $LineMode; # count self
+}
 
+sub _accept_handler {
+    my $running = shift;
+    
     my $csock = $SERVER->accept();
     if (!$csock) {
         # warn("accept() failed: $!");
@@ -331,7 +331,6 @@ sub _accept_handler {
     if (!$LineMode) {
         # multiplex mode
         my $client = Qpsmtpd::PollServer->new($csock);
-        my $rem_ip = $client->peer_ip_string;
         
         if ($PAUSED) {
             $client->write("451 Sorry, this server is currently paused\r\n");
@@ -341,7 +340,8 @@ sub _accept_handler {
         
         if ($MAXCONNIP) {
             my $num_conn = 1; # seed with current value
-    
+            my $rem_ip = $client->peer_ip_string;
+            
             # If we for-loop directly over values %childstatus, a SIGCHLD
             # can call REAPER and slip $rip out from under us.  Causes
             # "Use of freed value in iteration" under perl 5.8.4.
