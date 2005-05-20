@@ -64,6 +64,17 @@ sub notes {
 sub set_body_start {
     my $self = shift;
     $self->{_body_start} = $self->body_current_pos;
+    if ($self->{_body_file}) {
+               $self->{_header_size} = $self->{_body_start};
+    }
+    else {
+        $self->{_header_size} = 0;
+        if ($self->{_body_array}) {
+            foreach my $line (@{ $self->{_body_array} }) {
+                $self->{_header_size} += length($line);
+            }
+        }
+   }
 }
 
 sub body_start {
@@ -123,6 +134,7 @@ sub body_write {
         foreach my $line (@{ $self->{_body_array} }) {
           $self->{_body_file}->print($line) or die "Cannot print to temp file: $!";
         }
+        $self->{_body_start} = $self->{_header_size};
       }
       $self->{_body_array} = undef;
     }
@@ -160,6 +172,7 @@ sub body_getline {
   }
   else {
     return unless $self->{_body_array};
+    $self->{_body_current_pos} ||= 0;
     my $line = $self->{_body_array}->[$self->{_body_current_pos}];
     $self->{_body_current_pos}++;
     return $line;
