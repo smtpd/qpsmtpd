@@ -374,15 +374,16 @@ sub PostEventLoop {
     @ToClose = ();
 
     # now we're at the very end, call per-connection callbacks if defined
+    my $ret = 1; # use $ret so's to not starve some FDs; return 0 if any PLCs return 0
     for my $plc (values %PLCMap) {
-        return unless $plc->(\%DescriptorMap, \%OtherFds);
+        $ret &&= $plc->(\%DescriptorMap, \%OtherFds);
     }
 
     # now we're at the very end, call global callback if defined
     if (defined $PostLoopCallback) {
-        return $PostLoopCallback->(\%DescriptorMap, \%OtherFds);
+        $ret &&= $PostLoopCallback->(\%DescriptorMap, \%OtherFds);
     }
-    return 1;
+    return $ret;
 }
 
 
@@ -817,7 +818,7 @@ sub SetPostLoopCallback {
 
 sub DESTROY {
     my Danga::Socket $self = shift;
-    delete $PLCMap{$self->{fd}};
+    $self->close() if !$self->{closed};
 }
 
 #####################################################################
