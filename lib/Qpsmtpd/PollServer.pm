@@ -89,6 +89,12 @@ sub respond {
     return 1;
 }
 
+sub fault {
+    my $self = shift;
+    $self->SUPER::fault(@_);
+    return;
+}
+
 sub process_line {
     my $self = shift;
     my $line = shift || return;
@@ -97,14 +103,19 @@ sub process_line {
         my ($pkg, $file, $line) = caller();
         die "ALARM: ($self->{mode}) $pkg, $file, $line";
     };
-    my $prev = alarm(2); # must process a command in < 2 seconds
-    eval { $self->_process_line($line) };
-    alarm($prev);
-    if ($@) {
-        print STDERR "Error: $@\n";
-        return $self->fault("command failed unexpectedly") if $self->{mode} eq 'cmd';
-        return $self->fault("error processing data lines") if $self->{mode} eq 'data';
-        return $self->fault("unknown error");
+    if( $self->{mode} eq 'connect' ) {
+        eval { $self->_process_line($line) }
+    }
+    else {
+        my $prev = alarm(2); # must process a command in < 2 seconds
+        eval { $self->_process_line($line) };
+        alarm($prev);
+        if ($@) {
+            print STDERR "Error: $@\n";
+            return $self->fault("command failed unexpectedly") if $self->{mode} eq 'cmd';
+            return $self->fault("error processing data lines") if $self->{mode} eq 'data';
+            return $self->fault("unknown error");
+        }
     }
     return;
 }
@@ -114,13 +125,12 @@ sub _process_line {
     my $line = shift;
     
     if ($self->{mode} eq 'connect') {
-        warn("Connection incoming\n");
+        $self->{mode} = 'cmd';
         my $rc = $self->start_conversation;
         if ($rc != DONE) {
             $self->close;
             return;
         }
-        $self->{mode} = 'cmd';
     }
     elsif ($self->{mode} eq 'cmd') {
         $line =~ s/\r?\n//;
