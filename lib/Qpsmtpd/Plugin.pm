@@ -122,6 +122,7 @@ sub compile {
 		    'use Qpsmtpd::Constants;',
 		    "require Qpsmtpd::Plugin;",
 		    'use vars qw(@ISA);',
+                    'use strict;',
 		    '@ISA = qw(Qpsmtpd::Plugin);',
 		    ($test_mode ? 'use Test::More;' : ''),
 		    "sub plugin_name { qq[$plugin] }",
