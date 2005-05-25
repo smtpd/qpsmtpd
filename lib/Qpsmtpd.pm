@@ -9,7 +9,7 @@ $VERSION = "0.30-dev";
 
 sub version { $VERSION };
 
-sub TRACE_LEVEL { trace_level(); }; # leave for plugin compatibility
+sub TRACE_LEVEL { $TraceLevel }; # leave for plugin compatibility
 
 sub load_logging {
   # need to do this differently that other plugins so as to 
@@ -36,18 +36,17 @@ sub trace_level {
 
   my $configdir = $self->config_dir("loglevel");
   my $configfile = "$configdir/loglevel";
-  my ($TraceLevel) = $self->_config_from_file($configfile,'loglevel');
+  $TraceLevel = $self->_config_from_file($configfile,'loglevel');
 
-  if (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
-    $TraceLevel = $TraceLevel;
-  }
-  else {
+  unless (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
     $TraceLevel = LOGWARN; # Default if no loglevel file found.
   }
 
-  $self->log(LOGINFO, "Loaded default logger");
-
   return $TraceLevel;
+}
+
+sub init_logger { # needed for compatibility purposes
+  shift->trace_level();
 }
 
 sub log {

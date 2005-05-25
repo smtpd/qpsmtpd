@@ -53,6 +53,21 @@ See more detailed description for each hook below.
 
 =head1 Hooks
 
+=head2 pre-connection
+
+Called by a controlling process (e.g. forkserver or Apache::Qpsmtpd) after
+accepting the remote server, but before beginning a new instance.  Useful for
+load-management and rereading large config files at some frequency less than
+once per session.  The hook doesn't have a predefined additional input value,
+but one can be passed as a hash of name/value pairs.
+
+=head2 post-connection
+
+Like pre-connection only it can be called after an instance has been
+completely finished (e.g. after the child process has ended in forkserver).  
+The hook doesn't have a predefined additional input value, but one can be
+passed as a hash of name/value pairs.
+
 =head2 mail
 
 Called right after the envelope sender address is passed.  The plugin

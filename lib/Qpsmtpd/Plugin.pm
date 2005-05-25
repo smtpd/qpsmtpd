@@ -5,7 +5,7 @@ our %hooks = map { $_ => 1 } qw(
     config  queue  data  data_post  quit  rcpt  mail  ehlo  helo
     auth auth-plain auth-login auth-cram-md5
     connect  reset_transaction  unrecognized_command  disconnect
-    deny logging ok
+    deny logging ok pre-connection post-connection
 );
 
 sub new {

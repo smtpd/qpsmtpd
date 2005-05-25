@@ -1,5 +1,14 @@
+#!perl -w
+
 sub register {
-  my ($self, $qp) = @_;
+  my ($self, $qp, $denial ) = @_;
+  if ( defined $denial and $denial =~ /^disconnect$/i ) {
+    $self->{_dnsbl}->{DENY} = DENY_DISCONNECT;
+  }
+  else {
+    $self->{_dnsbl}->{DENY} = DENY;
+  }
+		    
   $self->register_hook("connect", "connect_handler");
   $self->register_hook("rcpt", "rcpt_handler");
   $self->register_hook("disconnect", "disconnect_handler");
@@ -150,7 +159,8 @@ sub rcpt_handler {
     my $result = $ENV{'RBLSMTPD'};
     my $remote_ip = $self->qp->connection->remote_ip;
     $result =~ s/%IP%/$remote_ip/g;
-    return (DENY, join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
+    return ($self->{_dnsbl}->{DENY}, 
+	join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
   }
 
   my $note = $self->process_sockets;
@@ -163,7 +173,7 @@ sub rcpt_handler {
       $self->log(2, "Whitelist overrode blacklist: $whitelist");
     }
     else {
-      return (DENY, $note);
+      return ($self->{_dnsbl}->{DENY}, $note);
     }
   }
   return DECLINED;
@@ -188,6 +198,19 @@ dnsbl - handle DNS BlackList lookups
 
 Plugin that checks the IP address of the incoming connection against
 a configurable set of RBL services.
+
+=head1 Usage
+
+Add the following line to the config/plugins file:
+
+  dnsbl [disconnect]
+
+If you want to immediately drop the connection (since some blacklisted 
+servers attempt multiple sends per session), add the optional keyword 
+"disconnect" (case insensitive) to the config line.  In most cases, an
+IP address that is listed should not be given the opportunity to begin
+a new transaction, since even the most volatile blacklists will return
+the same answer for a short period of time (the minimum DNS cache period).
 
 =head1 Configuration files
 

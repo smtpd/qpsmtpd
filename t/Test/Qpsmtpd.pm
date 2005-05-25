@@ -81,6 +81,10 @@ sub log {
     print("# " . join(" ", $$, @log) . "\n") if $trace <= $level;
 }
 
+sub varlog {
+    shift->log(@_);
+}
+
 # sub run
 # sub disconnect
 
