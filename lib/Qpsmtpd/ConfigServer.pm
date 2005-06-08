@@ -157,17 +157,7 @@ sub cmd_status {
     
     if (defined &Qpsmtpd::Plugin::stats::register) {
         # Stats plugin is loaded
-        my $uptime = Qpsmtpd::Plugin::stats->uptime;
-        my $recvd  = Qpsmtpd::Plugin::stats->mails_received;
-        my $reject = Qpsmtpd::Plugin::stats->mails_rejected;
-        my $soft   = Qpsmtpd::Plugin::stats->mails_tempfailed;
-        my $rate   = Qpsmtpd::Plugin::stats->mails_per_sec;
-        $output .= sprintf("          Uptime: %0.2f sec\n".
-                            "  Mails Received: % 10d\n".
-                            "             5xx: % 10d\n".
-                            "             4xx: % 10d\n".
-                            "Mails per second: %0.2f\n",
-                                            $uptime, $recvd, $reject, $soft, $rate);
+        $output .= Qpsmtpd::Plugin::stats->get_stats;
     }
     
     my $descriptors = Danga::Socket->DescriptorMap;
