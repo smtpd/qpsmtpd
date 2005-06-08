@@ -155,13 +155,13 @@ sub cmd_status {
     
     my $output = "Current Status as of " . gmtime() . " GMT\n\n";
     
-    if ($INC{'Qpsmtpd/Stats.pm'}) {
+    if (defined &Qpsmtpd::Plugin::stats::register) {
         # Stats plugin is loaded
-        my $uptime = Qpsmtpd::Stats->uptime;
-        my $recvd  = Qpsmtpd::Stats->mails_received;
-        my $reject = Qpsmtpd::Stats->mails_rejected;
-        my $soft   = Qpsmtpd::Stats->mails_tempfailed;
-        my $rate   = Qpsmtpd::Stats->mails_per_sec;
+        my $uptime = Qpsmtpd::Plugin::stats->uptime;
+        my $recvd  = Qpsmtpd::Plugin::stats->mails_received;
+        my $reject = Qpsmtpd::Plugin::stats->mails_rejected;
+        my $soft   = Qpsmtpd::Plugin::stats->mails_tempfailed;
+        my $rate   = Qpsmtpd::Plugin::stats->mails_per_sec;
         $output .= sprintf("          Uptime: %0.2f sec\n".
                             "  Mails Received: % 10d\n".
                             "             5xx: % 10d\n".
