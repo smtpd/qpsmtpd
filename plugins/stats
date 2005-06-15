@@ -1,6 +1,5 @@
 #!/usr/bin/perl -w
 
-use Qpsmtpd::Stats;
 use Time::HiRes qw(time);
 
 my $START_TIME = time;
@@ -16,11 +15,12 @@ sub register {
 }
 
 sub get_stats {
-    my $uptime = Qpsmtpd::Plugin::stats->uptime;
-    my $recvd  = Qpsmtpd::Plugin::stats->mails_received;
-    my $reject = Qpsmtpd::Plugin::stats->mails_rejected;
-    my $soft   = Qpsmtpd::Plugin::stats->mails_tempfailed;
-    my $rate   = Qpsmtpd::Plugin::stats->mails_per_sec;
+    my $class = shift;
+    my $uptime = $class->uptime;
+    my $recvd  = $class->mails_received;
+    my $reject = $class->mails_rejected;
+    my $soft   = $class->mails_tempfailed;
+    my $rate   = $class->mails_per_sec;
     return sprintf("          Uptime: %0.2f sec\n".
                    "  Mails Received: % 10d\n".
                    "             5xx: % 10d\n".
@@ -67,7 +67,8 @@ sub mails_tempfailed {
 }
 
 sub mails_per_sec {
-    return ($MAILS_RECEIVED / uptime());
+    my $class = shift;
+    return ($MAILS_RECEIVED / $class->uptime());
 }
 
 
