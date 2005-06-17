@@ -6,23 +6,23 @@ use 5.006001;
 use strict;
 use warnings FATAL => 'all';
 
-use Apache::ServerUtil ();
-use Apache::Connection ();
-use Apache::Const -compile => qw(OK MODE_GETLINE);
+use Apache2::ServerUtil ();
+use Apache2::Connection ();
+use Apache2::Const -compile => qw(OK MODE_GETLINE);
 use APR::Const -compile => qw(SO_NONBLOCK EOF SUCCESS);
 use APR::Error ();
 use APR::Brigade ();
 use APR::Bucket ();
 use APR::Socket ();
-use Apache::Filter ();
+use Apache2::Filter ();
 use ModPerl::Util ();
 # use Apache::TieBucketBrigade;
 
 our $VERSION = '0.02';
 
 sub handler {
-    my Apache::Connection $c = shift;
-    $c->client_socket->opt_set(APR::SO_NONBLOCK => 0);
+    my Apache2::Connection $c = shift;
+    $c->client_socket->opt_set(APR::Const::SO_NONBLOCK => 0);
 
     my $qpsmtpd = Qpsmtpd::Apache->new();
     $qpsmtpd->start_connection(
@@ -35,7 +35,7 @@ sub handler {
     
     $qpsmtpd->run($c);
 
-    return Apache::OK;
+    return Apache2::Const::OK;
 }
 
 package Qpsmtpd::Apache;
@@ -109,16 +109,16 @@ sub getline {
     my $bb = $self->{bb_in};
     
     while (1) {
-        my $rc = $c->input_filters->get_brigade($bb, Apache::MODE_GETLINE);
-        return if $rc == APR::EOF;
-        die APR::Error::strerror($rc) unless $rc == APR::SUCCESS;
+        my $rc = $c->input_filters->get_brigade($bb, Apache2::Const::MODE_GETLINE);
+        return if $rc == APR::Const::EOF;
+        die APR::Error::strerror($rc) unless $rc == APR::Const::SUCCESS;
         my $data = '';
 
         while (!$bb->is_empty) {
             my $b = $bb->first;
-            $b->remove;
             $b->read(my $newdata);
-           $data .= $newdata;
+            $b->delete;
+            $data .= $newdata;
             return $data if index($data, "\n") >= 0;
         }
     }
