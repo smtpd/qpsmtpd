@@ -54,18 +54,9 @@ sub dispatch {
   #  if $state{dnsbl_blocked} and ($cmd eq "rcpt");
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
-    my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd);
-    if ($rc == DENY) {
-      $self->respond(521, $msg);
-      $self->disconnect;
-    }
-    elsif ($rc == DONE) {
-      1;
-    }
-    else {
-      $self->respond(500, "Unrecognized command");
-    }
-    return 1
+    my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
+    return $self->unrecognized_command_respond($rc, $msg, @_) unless $rc == CONTINUATION;
+    return 1;
   }
   $cmd = $1;
 
@@ -77,6 +68,17 @@ sub dispatch {
   }
 
   return;
+}
+
+sub unrecognized_command_respond {
+    my ($self, $rc, $msg) = @_;
+    if ($rc == DENY) {
+        $self->respond(521, $msg);
+        $self->disconnect;
+    }
+    elsif ($rc != DONE) {
+        $self->respond(500, "Unrecognized command");
+    }
 }
 
 sub fault {
@@ -92,6 +94,12 @@ sub start_conversation {
     # this should maybe be called something else than "connect", see
     # lib/Qpsmtpd/TcpServer.pm for more confusion.
     my ($rc, $msg) = $self->run_hooks("connect");
+    return $self->connect_respond($rc, $msg) unless $rc == CONTINUATION;
+    return 1;
+}
+
+sub connect_respond {
+    my ($self, $rc, $msg) = @_;
     if ($rc == DENY) {
       $self->respond(550, ($msg || 'Connection from you denied, bye bye.'));
       return $rc;
@@ -118,17 +126,25 @@ sub helo {
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
   my ($rc, $msg) = $self->run_hooks("helo", $hello_host, @stuff);
-  if ($rc == DONE) {
-    # do nothing
-  } elsif ($rc == DENY) {
+  return $self->helo_respond($rc, $msg, $hello_host, @stuff) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub helo_respond {
+  my ($self, $rc, $msg, $hello_host) = @_;
+  if ($rc == DENY) {
     $self->respond(550, $msg);
-  } elsif ($rc == DENYSOFT) {
+  }
+  elsif ($rc == DENYSOFT) {
     $self->respond(450, $msg);
-  } else {
+  }
+  elsif ($rc != DONE) {
+    my $conn = $self->connection;
     $conn->hello("helo");
     $conn->hello_host($hello_host);
     $self->transaction;
-    $self->respond(250, $self->config('me') ." Hi " . $conn->remote_info . " [" . $conn->remote_ip ."]; I am so happy to meet you.");
+    $self->respond(250, $self->config('me') ." Hi " . $conn->remote_info . 
+                        " [" . $conn->remote_ip ."]; I am so happy to meet you.");
   }
 }
 
@@ -140,13 +156,20 @@ sub ehlo {
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
   my ($rc, $msg) = $self->run_hooks("ehlo", $hello_host, @stuff);
-  if ($rc == DONE) {
-    # do nothing
-  } elsif ($rc == DENY) {
+  return $self->ehlo_respond($rc, $msg, $hello_host, @stuff) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub ehlo_respond {
+  my ($self, $rc, $msg, $hello_host) = @_;
+  if ($rc == DENY) {
     $self->respond(550, $msg);
-  } elsif ($rc == DENYSOFT) {
+  }
+  elsif ($rc == DENYSOFT) {
     $self->respond(450, $msg);
-  } else {
+  }
+  elsif ($rc != DONE) {
+    my $conn = $self->connection;
     $conn->hello("ehlo");
     $conn->hello_host($hello_host);
     $self->transaction;
@@ -211,57 +234,62 @@ sub mail {
   unless ($self->connection->hello) {
     return $self->respond(503, "please say hello first ...");
   }
+  
+  my $from_parameter = join " ", @_;
+  $self->log(LOGINFO, "full from_parameter: $from_parameter");
+
+  my ($from) = ($from_parameter =~ m/^from:\s*(<[^>]*>)/i)[0];
+
+  # support addresses without <> ... maybe we shouldn't?
+  ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
+    unless $from;
+
+  $self->log(LOGWARN, "from email address : [$from]");
+
+  if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
+    $from = Qpsmtpd::Address->new("<>");
+  } 
   else {
-    my $from_parameter = join " ", @_;
-    $self->log(LOGINFO, "full from_parameter: $from_parameter");
+    $from = (Qpsmtpd::Address->parse($from))[0];
+  }
+  return $self->respond(501, "could not parse your mail from command") unless $from;
 
-    my ($from) = ($from_parameter =~ m/^from:\s*(<[^>]*>)/i)[0];
+  my ($rc, $msg) = $self->run_hooks("mail", $from);
+  return $self->mail_respond($rc, $msg, $from) unless $rc == CONTINUATION;
+  return 1;
+}
 
-    # support addresses without <> ... maybe we shouldn't?
-    ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
-      unless $from;
-
-    $self->log(LOGWARN, "from email address : [$from]");
-
-    if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
-      $from = Qpsmtpd::Address->new("<>");
-    } 
-    else {
-      $from = (Qpsmtpd::Address->parse($from))[0];
-    }
-    return $self->respond(501, "could not parse your mail from command") unless $from;
-
-    my ($rc, $msg) = $self->run_hooks("mail", $from);
-    if ($rc == DONE) {
-      return 1;
-    }
-    elsif ($rc == DENY) {
-      $msg ||= $from->format . ', denied';
-      $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
-      $self->respond(550, $msg);
-    }
-    elsif ($rc == DENYSOFT) {
-      $msg ||= $from->format . ', temporarily denied';
-      $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
-      $self->respond(450, $msg);
-    }
-    elsif ($rc == DENY_DISCONNECT) {
-      $msg ||= $from->format . ', denied';
-      $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
-      $self->respond(550, $msg);
-      $self->disconnect;
-    }
-    elsif ($rc == DENYSOFT_DISCONNECT) {
-      $msg ||= $from->format . ', temporarily denied';
-      $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
-      $self->respond(450, $msg);
-      $self->disconnect;
-    }
-    else { # includes OK
-      $self->log(LOGINFO, "getting mail from ".$from->format);
-      $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
-      $self->transaction->sender($from);
-    }
+sub mail_respond {
+  my ($self, $rc, $msg, $from) = @_;
+  if ($rc == DONE) {
+    return 1;
+  }
+  elsif ($rc == DENY) {
+    $msg ||= $from->format . ', denied';
+    $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
+    $self->respond(550, $msg);
+  }
+  elsif ($rc == DENYSOFT) {
+    $msg ||= $from->format . ', temporarily denied';
+    $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
+    $self->respond(450, $msg);
+  }
+  elsif ($rc == DENY_DISCONNECT) {
+    $msg ||= $from->format . ', denied';
+    $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
+    $self->respond(550, $msg);
+    $self->disconnect;
+  }
+  elsif ($rc == DENYSOFT_DISCONNECT) {
+    $msg ||= $from->format . ', temporarily denied';
+    $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
+    $self->respond(450, $msg);
+    $self->disconnect;
+  }
+  else { # includes OK
+    $self->log(LOGINFO, "getting mail from ".$from->format);
+    $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
+    $self->transaction->sender($from);
   }
 }
 
@@ -278,6 +306,12 @@ sub rcpt {
   return $self->respond(501, "could not parse recipient") unless $rcpt;
 
   my ($rc, $msg) = $self->run_hooks("rcpt", $rcpt);
+  return $self->rcpt_respond($rc, $msg, $rcpt) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub rcpt_respond {
+  my ($self, $rc, $msg, $rcpt) = @_;
   if ($rc == DONE) {
     return 1;
   }
@@ -312,7 +346,6 @@ sub rcpt {
 }
 
 
-
 sub help {
   my $self = shift;
   $self->respond(214, 
@@ -334,6 +367,12 @@ sub vrfy {
   # I also don't think it provides all the proper result codes.
 
   my ($rc, $msg) = $self->run_hooks("vrfy");
+  return $self->vrfy_respond($rc, $msg) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub vrfy_respond {
+  my ($self, $rc, $msg) = @_;
   if ($rc == DONE) {
     return 1;
   }
@@ -361,6 +400,12 @@ sub rset {
 sub quit {
   my $self = shift;
   my ($rc, $msg) = $self->run_hooks("quit");
+  return $self->quit_respond($rc, $msg) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub quit_respond {
+  my ($self, $rc, $msg) = @_;
   if ($rc != DONE) {
     $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day.");
   }
@@ -373,9 +418,17 @@ sub disconnect {
   $self->reset_transaction;
 }
 
+sub disconnect_respond { }
+
 sub data {
   my $self = shift;
   my ($rc, $msg) = $self->run_hooks("data");
+  return $self->data_respond($rc, $msg) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub data_respond {
+  my ($self, $rc, $msg) = @_;
   if ($rc == DONE) {
     return 1;
   }
@@ -493,6 +546,11 @@ sub data {
   $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
 
   ($rc, $msg) = $self->run_hooks("data_post");
+  return $self->data_post_respond($rc, $msg) unless $rc == CONTINUATION;
+}
+
+sub data_post_respond {
+  my ($self, $rc, $msg) = @_;
   if ($rc == DONE) {
     return 1;
   }
@@ -508,7 +566,6 @@ sub data {
 
   # DATA is always the end of a "transaction"
   return $self->reset_transaction;
-
 }
 
 sub getline {
@@ -524,6 +581,12 @@ sub queue {
   my ($self, $transaction) = @_;
 
   my ($rc, $msg) = $self->run_hooks("queue");
+  return $self->queue_respond($rc, $msg) unless $rc == CONTINUATION;
+  return 1;
+}
+
+sub queue_respond {
+  my ($self, $rc, $msg) = @_;
   if ($rc == DONE) {
     return 1;
   }
@@ -539,8 +602,6 @@ sub queue {
   else {
     $self->respond(451, $msg || "Queuing declined or disabled; try again later" );
   }
-
-
 }
 
 

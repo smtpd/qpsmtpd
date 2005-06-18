@@ -208,44 +208,85 @@ sub _load_plugins {
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
+  if ($self->{_continuation}) {
+    die "Continuations in progress from previous hook (this is the $hook hook)";
+  }
   my $hooks = $self->{hooks};
   if ($hooks->{$hook}) {
     my @r;
-    for my $code (@{$hooks->{$hook}}) {
-      $self->log(LOGINFO, "running plugin ($hook):", $code->{name});
-      eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-      $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
-
-      !defined $r[0]
-        and $self->log(LOGERROR, "plugin ".$code->{name}
-                       ."running the $hook hook returned undef!")
-          and next;
-
-      if ($self->transaction) {
-        my $tnotes = $self->transaction->notes( $code->{name} );
-        $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $tnotes || ref $tnotes eq "HASH");
-      } else {
-        my $cnotes = $self->connection->notes( $code->{name} );
-        $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $cnotes || ref $cnotes eq "HASH");
+    my @local_hooks = @{$hooks->{$hook}};
+    while (@local_hooks) {
+      my $code = shift @local_hooks;
+      @r = $self->run_hook($hook, $code, @_);
+      next unless @r;
+      if ($r[0] == CONTINUATION) {
+        $self->{_continuation} = [$hook, [@_], @local_hooks];
       }
-
-      # should we have a hook for "OK" too?
-      if ($r[0] == DENY or $r[0] == DENYSOFT or
-          $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
-      {
-        $r[1] = "" if not defined $r[1];
-        $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
-        $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
-      }
-
       last unless $r[0] == DECLINED;
     }
     $r[0] = DECLINED if not defined $r[0];
     return @r;
   }
   return (0, '');
+}
+
+sub finish_continuation {
+  my ($self) = @_;
+  die "No continuation in progress" unless $self->{_continuation};
+  my $todo = $self->{_continuation};
+  $self->{_continuation} = undef;
+  my $hook = shift @$todo || die "No hook in the continuation";
+  my $args = shift @$todo || die "No hook args in the continuation";
+  my @r;
+  while (@$todo) {
+    my $code = shift @$todo;
+    @r = $self->run_hook($hook, $code, @$args);
+    if ($r[0] == CONTINUATION) {
+      $self->{_continuation} = [$hook, $args, @$todo];
+      return @r;
+    }
+    last unless $r[0] == DECLINED;
+  }
+  $r[0] = DECLINED if not defined $r[0];
+  my $responder = $hook . "_respond";
+  if (my $meth = $self->can($responder)) {
+    return $meth->($self, @r, @$args);
+  }
+  die "No ${hook}_respond method";
+}
+
+sub run_hook {
+  my ($self, $hook, $code, @args) = @_;
+  my @r;
+  $self->log(LOGINFO, "running plugin ($hook):", $code->{name});
+  eval { (@r) = $code->{code}->($self, $self->transaction, @args); };
+  $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and return;
+
+  !defined $r[0]
+    and $self->log(LOGERROR, "plugin ".$code->{name}
+                   ."running the $hook hook returned undef!")
+      and return;
+
+  if ($self->transaction) {
+    my $tnotes = $self->transaction->notes( $code->{name} );
+    $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+      if (!defined $tnotes || ref $tnotes eq "HASH");
+  } else {
+    my $cnotes = $self->connection->notes( $code->{name} );
+    $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+      if (!defined $cnotes || ref $cnotes eq "HASH");
+  }
+
+  # should we have a hook for "OK" too?
+  if ($r[0] == DENY or $r[0] == DENYSOFT or
+      $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
+  {
+    $r[1] = "" if not defined $r[1];
+    $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
+    $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+  }
+  
+  return @r;
 }
 
 sub _register_hook {

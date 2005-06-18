@@ -21,6 +21,7 @@ use fields qw(
     _transaction
     _test_mode
     _extras
+    _continuation
 );
 use Qpsmtpd::Constants;
 use Qpsmtpd::Auth;
@@ -95,6 +96,13 @@ sub fault {
     return;
 }
 
+sub log {
+    my ($self, $trace, @log) = @_;
+    my $fd = $self->{fd};
+    $fd ||= '?';
+    $self->SUPER::log($trace, "fd:$fd", @log);
+}
+
 sub process_line {
     my $self = shift;
     my $line = shift || return;
@@ -164,17 +172,8 @@ sub process_cmd {
     else {
         # No such method - i.e. unrecognized command
         my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd);
-        if ($rc == DENY) {
-            $self->respond(521, $msg);
-            $self->disconnect;
-            return;
-        }
-        elsif ($rc == DONE) {
-            return; # TODO - this isn't right.
-        }
-        else {
-            return $self->respond(500, "Unrecognized command");
-        }
+        return $self->unrecognized_command_respond unless $rc == CONTINUATION;
+        return 1;
     }
 }
 
@@ -201,29 +200,20 @@ sub start_conversation {
     );
     
     my ($rc, $msg) = $self->run_hooks("connect");
-    if ($rc == DENY) {
-        $self->respond(550, ($msg || 'Connection from you denied, bye bye.'));
-        return $rc;
-    }
-    elsif ($rc == DENYSOFT) {
-        $self->respond(450, ($msg || 'Connection from you temporarily denied, bye bye.'));
-        return $rc;
-    }
-    elsif ($rc == DONE) {
-        $self->respond(220, $msg);
-        return $rc;
-    }
-    else {
-        $self->respond(220, $self->config('me') ." ESMTP qpsmtpd "
-                       . $self->version ." ready; send us your mail, but not your spam.");
-        return DONE;
-    }
+    return $self->connect_respond($rc, $msg) unless $rc == CONTINUATION;
+    return DONE;
 }
 
 sub data {
     my $self = shift;
     
     my ($rc, $msg) = $self->run_hooks("data");
+    return $self->data_respond($rc, $msg) unless $rc == CONTINUATION;
+    return 1;
+}
+
+sub data_respond {
+    my ($self, $rc, $msg) = @_;
     if ($rc == DONE) {
         return;
     }
@@ -350,22 +340,8 @@ sub end_of_data {
     return $self->respond(552, "Message too big!") if $self->{max_size} and $self->{data_size} > $self->{max_size};
     
     my ($rc, $msg) = $self->run_hooks("data_post");
-    if ($rc == DONE) {
-        return;
-    }
-    elsif ($rc == DENY) {
-        $self->respond(552, $msg || "Message denied");
-    }
-    elsif ($rc == DENYSOFT) {
-        $self->respond(452, $msg || "Message denied temporarily");
-    } 
-    else {
-        $self->queue($self->transaction);    
-    }
-    
-    # DATA is always the end of a "transaction"
-    $self->reset_transaction;
-    return;
+    return $self->data_post_respond($rc, $msg) unless $rc == CONTINUATION;
+    return 1;
 }
 
 1;

@@ -5,7 +5,7 @@ use Danga::DNS;
 sub register {
   my ($self) = @_;
   $self->register_hook("connect", "connect_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
+  $self->register_hook("connect", "pickup_handler");
 }
 
 sub connect_handler {
@@ -34,12 +34,14 @@ sub connect_handler {
 
   my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
+  $self->transaction->notes('pending_dns_queries', scalar(keys(%dnsbl_zones)));
+  my $qp = $self->qp;
   for my $dnsbl (keys %dnsbl_zones) {
     # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
     if (defined($dnsbl_zones{$dnsbl})) {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
       Danga::DNS->new(
-        callback => sub { $self->process_a_result($dnsbl_zones{$dnsbl}, @_) },
+        callback => sub { process_a_result($qp, $dnsbl_zones{$dnsbl}, @_) },
         host => "$reversed_ip.$dnsbl",
         type => 'A',
         client => $self->qp->input_sock,
@@ -47,7 +49,7 @@ sub connect_handler {
     } else {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
       Danga::DNS->new(
-        callback => sub { $self->process_txt_result(@_) },
+        callback => sub { process_txt_result($qp, @_) },
         host => "$reversed_ip.$dnsbl",
         type => 'TXT',
         client => $self->qp->input_sock,
@@ -55,40 +57,48 @@ sub connect_handler {
     }
   }
 
-  return DECLINED;
+  return CONTINUATION;
 }
 
 sub process_a_result {
-    my $self = shift;
-    my ($template, $result, $query) = @_;
+    my ($qp, $template, $result, $query) = @_;
+    
+    my $pending = $qp->transaction->notes('pending_dns_queries');
+    $qp->transaction->notes('pending_dns_queries', --$pending);
     
     warn("Result for A $query: $result\n");
     if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
         # NXDOMAIN or ERROR possibly...
+        $qp->finish_continuation unless $pending;
         return;
     }
     
-    my $ip = $self->connection->remote_ip;
+    my $conn = $qp->connection;
+    my $ip = $conn->remote_ip;
     $template =~ s/%IP%/$ip/g;
-    my $conn = $self->connection;
     $conn->notes('dnsbl', $template) unless $conn->notes('dnsbl');
+    $qp->finish_continuation unless $pending;
 }
 
 sub process_txt_result {
-    my $self = shift;
-    my ($result, $query) = @_;
+    my ($qp, $result, $query) = @_;
+    
+    my $pending = $qp->transaction->notes('pending_dns_queries');
+    $qp->transaction->notes('pending_dns_queries', --$pending);
     
     warn("Result for TXT $query: $result\n");
     if ($result !~ /[a-z]/) {
         # NXDOMAIN or ERROR probably...
+        $qp->finish_continuation unless $pending;
         return;
     }
     
-    my $conn = $self->connection;
+    my $conn = $qp->connection;
     $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
+    $qp->finish_continuation unless $pending;
 }
 
-sub rcpt_handler {
+sub pickup_handler {
   my ($self, $transaction, $rcpt) = @_;
 
   # RBLSMTPD being non-empty means it contains the failure message to return
