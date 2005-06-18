@@ -117,9 +117,8 @@ sub getline {
         while (!$bb->is_empty) {
             my $b = $bb->first;
             $b->read(my $newdata);
-            $b->delete;
             $data .= $newdata;
-            return $data if index($data, "\n") >= 0;
+            return $data if index($newdata, "\n") >= 0;
         }
     }
     
