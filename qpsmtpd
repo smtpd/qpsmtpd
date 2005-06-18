@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 use lib "./lib";
 BEGIN {
@@ -44,6 +44,7 @@ my $MAXCONN     = 15;           # max simultaneous connections
 my $USER        = 'smtpd';      # user to suid to
 my $MAXCONNIP   = 5;            # max simultaneous connections from one IP
 my $PAUSED      = 0;
+my $NUMACCEPT   = 20;
 
 sub help {
     print <<EOT;
@@ -58,6 +59,7 @@ Options:
  -m, --max-from-ip M       : limit connections from a single IP; default 5
  -f, --forkmode            : fork a child for each connection
  -j, --procs J             : spawn J processes; default 1
+ -a, --accept K            : accept up to K conns per loop; default 20
  -h, --help                : this page
 
 NB: -f and -j are mutually exclusive. If -f flag is not used the server uses
@@ -77,6 +79,7 @@ GetOptions(
     'c|limit-connections=i' => \$MAXCONN,
     'm|max-from-ip=i'       => \$MAXCONNIP,
     'u|user=s'              => \$USER,
+    'a|accept=i'            => \$NUMACCEPT,
     'h|help'                => \&help,
 ) || help();
 
@@ -86,6 +89,7 @@ if ($LOCALADDR =~ /^([\d\w\-.]+)$/) { $LOCALADDR = $1 } else { &help }
 if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &help }
 if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &help }
 if ($PROCS =~ /^(\d+)$/) { $PROCS = $1 } else { &help }
+if ($NUMACCEPT =~ /^(\d+)$/) { $NUMACCEPT = $1 } else { &help }
 
 $PROCS = 1 if $LineMode;
 # This is a bit of a hack, but we get to approximate MAXCONN stuff when we
@@ -300,9 +304,7 @@ sub accept_handler {
         $running = scalar keys %$descriptors;
     }
     
-    my $max = $MAXCONNIP ? 100 : 1000;
-    
-    for (1 .. $max) {
+    for (1 .. $NUMACCEPT) {
         if ($running >= $MAXCONN) { 
             ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.");
             return;
@@ -312,13 +314,22 @@ sub accept_handler {
     }
 }
 
+use Errno qw(EAGAIN EWOULDBLOCK);
+
 sub _accept_handler {
     my $running = shift;
-    
+
     my $csock = $SERVER->accept();
     if (!$csock) {
         # warn("accept() failed: $!");
         return;
+        if ($! == EAGAIN || $! == EWOULDBLOCK) {
+            return;
+        }
+        else {
+            warn("accept() failed: $!");
+            return 1;
+        }
     }
     binmode($csock, ':raw');
 
@@ -331,6 +342,7 @@ sub _accept_handler {
     if (!$LineMode) {
         # multiplex mode
         my $client = Qpsmtpd::PollServer->new($csock);
+        my $rem_ip = $client->peer_ip_string;
         
         if ($PAUSED) {
             $client->write("451 Sorry, this server is currently paused\r\n");
@@ -340,8 +352,7 @@ sub _accept_handler {
         
         if ($MAXCONNIP) {
             my $num_conn = 1; # seed with current value
-            my $rem_ip = $client->peer_ip_string;
-            
+    
             # If we for-loop directly over values %childstatus, a SIGCHLD
             # can call REAPER and slip $rip out from under us.  Causes
             # "Use of freed value in iteration" under perl 5.8.4.
@@ -426,7 +437,7 @@ sub _accept_handler {
 sub log {
   my ($level,$message) = @_;
   # $level not used yet.  this is reimplemented from elsewhere anyway
-  warn("$$ $message\n");
+  warn("$$ fd:? $message\n");
 }
 
 sub pause {
