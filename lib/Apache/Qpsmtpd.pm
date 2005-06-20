@@ -16,7 +16,6 @@ use APR::Bucket ();
 use APR::Socket ();
 use Apache2::Filter ();
 use ModPerl::Util ();
-# use Apache::TieBucketBrigade;
 
 our $VERSION = '0.02';
 
@@ -112,14 +111,11 @@ sub getline {
         my $rc = $c->input_filters->get_brigade($bb, Apache2::Const::MODE_GETLINE);
         return if $rc == APR::Const::EOF;
         die APR::Error::strerror($rc) unless $rc == APR::Const::SUCCESS;
-        my $data = '';
-
-        while (!$bb->is_empty) {
-            my $b = $bb->first;
-            $b->read(my $newdata);
-            $data .= $newdata;
-            return $data if index($newdata, "\n") >= 0;
-        }
+        
+        next unless $bb->flatten(my $data);
+        
+        $bb->cleanup;
+        return $data;
     }
     
     return '';
@@ -145,10 +141,11 @@ sub respond {
         my $bb = $self->{bb_out};
         my $line = $code . (@messages?"-":" ").$msg;
         $self->log(LOGDEBUG, $line);
-	my $bucket = APR::Bucket->new(($c->bucket_alloc), "$line\r\n");
+        my $bucket = APR::Bucket->new(($c->bucket_alloc), "$line\r\n");
         $bb->insert_tail($bucket);
         $c->output_filters->fflush($bb);
-        $bucket->remove;
+        # $bucket->remove;
+        $bb->cleanup;
     }
     return 1;
 }
