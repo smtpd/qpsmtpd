@@ -102,10 +102,12 @@ sub connect_respond {
     my ($self, $rc, $msg) = @_;
     if ($rc == DENY) {
       $self->respond(550, ($msg || 'Connection from you denied, bye bye.'));
+      $self->disconnect;
       return $rc;
     }
     elsif ($rc == DENYSOFT) {
       $self->respond(450, ($msg || 'Connection from you temporarily denied, bye bye.'));
+      $self->disconnect;
       return $rc;
     }
     elsif ($rc == DONE) {

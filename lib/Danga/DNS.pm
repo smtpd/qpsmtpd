@@ -39,25 +39,25 @@ sub new {
     if ($options{type}) {
         if ($options{type} eq 'TXT') {
             if (!$resolver->query_txt($self, @{$self->{hosts}})) {
-                $client->watch_read(1) if $client;
+                $client->enable_read() if $client;
                 return;
             }
         }
         elsif ($options{type} eq 'A') {
             if (!$resolver->query($self, @{$self->{hosts}})) {
-                $client->watch_read(1) if $client;
+                $client->enable_read() if $client;
                 return;
             }
         }
         elsif ($options{type} eq 'PTR') {
             if (!$resolver->query($self, @{$self->{hosts}})) {
-                $client->watch_read(1) if $client;
+                $client->enable_read() if $client;
                 return;
             }
         }
         elsif ($options{type} eq 'MX') {
             if (!$resolver->query_mx($self, @{$self->{hosts}})) {
-                $client->watch_read(1) if $client;
+                $client->enable_read() if $client;
                 return;
             }
         }
@@ -67,7 +67,7 @@ sub new {
     }
     else {
         if (!$resolver->query($self, @{$self->{hosts}})) {
-            $client->watch_read(1) if $client;
+            $client->enable_read() if $client;
             return;
         }
     }

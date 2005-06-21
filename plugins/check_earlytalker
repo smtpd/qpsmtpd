@@ -44,9 +44,6 @@ and terminating the SMTP connection.
 
 =cut
 
-use warnings;
-use strict;
-
 sub register {
   my ($self, $qp, @args) = @_;
 
@@ -61,29 +58,49 @@ sub register {
 	@args,
   };
   $self->register_hook('connect', 'connect_handler');
+  $self->register_hook('connect', 'connect_post_handler');
   $self->register_hook('mail', 'mail_handler')
     if $self->{_args}->{'defer-reject'};
+  warn("check_earlytalker registered\n");
   1;
 }
 
 sub connect_handler {
   my ($self, $transaction) = @_;
   
-  if ($self->qp->can_read($self->{_args}->{'wait'})) {
-    $self->log(LOGNOTICE, 'remote host started talking before we said hello');
-    if ($self->{_args}->{'defer-reject'}) {
-      $self->connection->notes('earlytalker', 1);
-    }
-    else {
-      my $msg = 'Connecting host started transmitting before SMTP greeting';
-      return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
-      return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
+  warn("check early talker");
+  my $qp = $self->qp;
+  my $conn = $qp->connection;
+  $qp->AddTimer($self->{_args}{'wait'}, sub { read_now($qp, $conn) });
+  $qp->disable_read();
+  return CONTINUATION;
+}
+
+sub read_now {
+  my ($qp, $conn) = @_;
+  
+  warn("read now");
+  $qp->enable_read();
+  if (my $data = $qp->read(1024)) {
+    if (length($$data)) {
+      $qp->log(LOGNOTICE, 'remote host started talking before we said hello');
+      $qp->push_back_read($data);
+      $conn->notes('earlytalker', 1);
     }
   }
-  else {
-    $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
-  }
-  return DECLINED;
+  $qp->finish_continuation;
+}
+
+sub connect_post_handler {
+  my ($self, $transaction) = @_;
+  
+  my $conn = $self->qp->connection;
+  return DECLINED unless $conn->notes('earlytalker');
+  return DECLINED if $self->{'defer-reject'};
+  my $msg = 'Connecting host started transmitting before SMTP greeting';
+  return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
+  return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
+  return DECLINED; # assume action eq 'log'
 }
 
 sub mail_handler {
@@ -91,6 +108,7 @@ sub mail_handler {
   my $msg = 'Connecting host started transmitting before SMTP greeting';
 
   return DECLINED unless $self->connection->notes('earlytalker');
+  my $msg = 'Connecting host started transmitting before SMTP greeting';
   return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
   return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
   return DECLINED;

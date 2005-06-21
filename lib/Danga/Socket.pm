@@ -74,6 +74,7 @@ our (
                                  # descriptors for the event loop to track.
      $PostLoopCallback,          # subref to call at the end of each loop, if defined
      %PLCMap,                    # fd (num) -> PostLoopCallback
+     @Timers,                    # timers
      );
 
 %OtherFds = ();
@@ -110,6 +111,30 @@ sub OtherFds {
     return wantarray ? %OtherFds : \%OtherFds;
 }
 
+sub AddTimer {
+    my $class = shift;
+    my ($secs, $coderef) = @_;
+    my $timeout = time + $secs;
+    
+    use Data::Dumper; $Data::Dumper::Indent=1;
+    
+    if (!@Timers || ($timeout > $Timers[-1][0])) {
+        push @Timers, [$timeout, $coderef];
+        print STDERR Dumper(\@Timers);
+        return;
+    }
+    
+    # Now where do we insert...
+    for (my $i = 0; $i < @Timers; $i++) {
+        if ($Timers[$i][0] > $timeout) {
+            splice(@Timers, $i, 0, [$timeout, $coderef]);
+            print STDERR Dumper(\@Timers);
+            return;
+        }
+    }
+    
+    die "Shouldn't get here spank matt.";
+}
 
 ### (CLASS) METHOD: DescriptorMap()
 ### Get the hash of Danga::Socket objects keyed by the file descriptor they are
@@ -169,7 +194,16 @@ sub KQueueEventLoop {
     }
     
     while (1) {
-        my @ret = $KQueue->kevent(1000);
+        my $now = time;
+        # Run expired timers
+        while (@Timers && $Timers[0][0] <= $now) {
+            my $to_run = shift(@Timers);
+            $to_run->[1]->($now);
+        }
+        
+        # Get next timeout
+        my $timeout = @Timers ? ($Timers[0][0] - $now) : 1;
+        my @ret = $KQueue->kevent($timeout * 1000);
         
         if (!@ret) {
             foreach my $fd ( keys %DescriptorMap ) {
@@ -233,11 +267,21 @@ sub EpollEventLoop {
     }
 
     while (1) {
+        my $now = time;
+        # Run expired timers
+        while (@Timers && $Timers[0][0] <= $now) {
+            my $to_run = shift(@Timers);
+            $to_run->[1]->($now);
+        }
+        
+        # Get next timeout
+        my $timeout = @Timers ? ($Timers[0][0] - $now) : 1;
+        
         my @events;
         my $i;
         my $evcount;
         # get up to 1000 events, 1000ms timeout
-        while ($evcount = epoll_wait($Epoll, 1000, 1000, \@events)) {
+        while ($evcount = epoll_wait($Epoll, 1000, $timeout * 1000, \@events)) {
             my @objs;
           EVENT:
             for ($i=0; $i<$evcount; $i++) {
@@ -300,6 +344,16 @@ sub PollEventLoop {
     my Danga::Socket $pob;
 
     while (1) {
+        my $now = time;
+        # Run expired timers
+        while (@Timers && $Timers[0][0] <= $now) {
+            my $to_run = shift(@Timers);
+            $to_run->[1]->($now);
+        }
+        
+        # Get next timeout
+        my $timeout = @Timers ? ($Timers[0][0] - $now) : 1;
+        
         # the following sets up @poll as a series of ($poll,$event_mask)
         # items, then uses IO::Poll::_poll, implemented in XS, which
         # modifies the array in place with the even elements being
@@ -314,7 +368,7 @@ sub PollEventLoop {
         }
         return 0 unless @poll;
 
-        my $count = IO::Poll::_poll(1000, @poll);
+        my $count = IO::Poll::_poll($timeout * 1000, @poll);
         if (!$count) {
             foreach my $fd ( keys %DescriptorMap ) {
                 my Danga::Socket $sock = $DescriptorMap{$fd};
@@ -481,6 +535,7 @@ sub close {
         }
     }
 
+    delete $PLCMap{$fd};
     delete $DescriptorMap{$fd};
     delete $PushBackSet{$fd};
 

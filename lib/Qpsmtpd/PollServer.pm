@@ -135,10 +135,7 @@ sub _process_line {
     if ($self->{mode} eq 'connect') {
         $self->{mode} = 'cmd';
         my $rc = $self->start_conversation;
-        if ($rc != DONE) {
-            $self->close;
-            return;
-        }
+        return;
     }
     elsif ($self->{mode} eq 'cmd') {
         $line =~ s/\r?\n//;

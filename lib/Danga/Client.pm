@@ -33,7 +33,7 @@ sub get_line {
         #warn("get_line PRE\n");
         $self->EventLoop();
         #warn("get_line POST\n");
-        $self->watch_read(0);
+        $self->disable_read();
     }
     return if $self->{closing};
     # now have a line.
@@ -49,8 +49,7 @@ sub can_read {
     # warn("Calling can-read\n");
     $self->{can_read_mode} = 1;
     if (!length($self->{line})) {
-        my $old = $self->watch_read();
-        $self->watch_read(1);
+        $self->disable_read();
         # loop because any callback, not just ours, can make EventLoop return
         while( !(length($self->{line}) || (Time::HiRes::time > $end)) ) {
             $self->SetPostLoopCallback(sub { (length($self->{line}) || 
@@ -58,8 +57,8 @@ sub can_read {
             #warn("get_line PRE\n");
             $self->EventLoop();
             #warn("get_line POST\n");
-        }        
-        $self->watch_read($old);
+        }
+        $self->enable_read();
     }
     $self->{can_read_mode} = 0;
     $self->SetPostLoopCallback(undef);
