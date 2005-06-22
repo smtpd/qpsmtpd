@@ -61,26 +61,21 @@ sub register {
   $self->register_hook('connect', 'connect_post_handler');
   $self->register_hook('mail', 'mail_handler')
     if $self->{_args}->{'defer-reject'};
-  warn("check_earlytalker registered\n");
   1;
 }
 
 sub connect_handler {
   my ($self, $transaction) = @_;
   
-  warn("check early talker");
   my $qp = $self->qp;
   my $conn = $qp->connection;
   $qp->AddTimer($self->{_args}{'wait'}, sub { read_now($qp, $conn) });
-  $qp->disable_read();
   return CONTINUATION;
 }
 
 sub read_now {
   my ($qp, $conn) = @_;
   
-  warn("read now");
-  $qp->enable_read();
   if (my $data = $qp->read(1024)) {
     if (length($$data)) {
       $qp->log(LOGNOTICE, 'remote host started talking before we said hello');
