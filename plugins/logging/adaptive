@@ -3,101 +3,103 @@
 # one level for DENY'd messages
 
 sub register {
-  my ($self, $qp, %args) = @_;
+    my ( $self, $qp, %args ) = @_;
 
-  $self->{_minlevel} = LOGERROR;
-  if ( defined( $args{accept} ) ) {
-      if ( $args{accept} =~ /^\d+$/ ) {
-	  $self->{_minlevel} = $args{accept};
-      }
-      else {
-	  $self->{_minlevel} = log_level( $args{accept} );
-      }
-  }
+    $self->{_minlevel} = LOGERROR;
+    if ( defined( $args{accept} ) ) {
+        if ( $args{accept} =~ /^\d+$/ ) {
+            $self->{_minlevel} = $args{accept};
+        }
+        else {
+            $self->{_minlevel} = log_level( $args{accept} );
+        }
+    }
 
-  $self->{_maxlevel} = LOGWARN;
-  if ( defined( $args{reject} ) ) {
-      if ( $args{reject} =~ /^\d+$/ ) {
-	  $self->{_maxlevel} = $args{reject};
-      }
-      else {
-	  $self->{_maxlevel} = log_level( $args{reject} );
-      }
-  }
+    $self->{_maxlevel} = LOGWARN;
+    if ( defined( $args{reject} ) ) {
+        if ( $args{reject} =~ /^\d+$/ ) {
+            $self->{_maxlevel} = $args{reject};
+        }
+        else {
+            $self->{_maxlevel} = log_level( $args{reject} );
+        }
+    }
 
-  $self->{_prefix} = '!';
-  if ( defined $args{prefix} and $args{prefix} =~ /^(.+)$/ ) {
-      $self->{_prefix} = $1;
-  }
+    $self->{_prefix} = '`';
+    if ( defined $args{prefix} and $args{prefix} =~ /^(.+)$/ ) {
+        $self->{_prefix} = $1;
+    }
 
-  $self->register_hook('logging', 'wlog');
-  $self->register_hook('deny', 'dlog');
-  $self->register_hook('reset_transaction', 'slog');
+    $self->register_hook( 'logging',           'wlog' );
+    $self->register_hook( 'deny',              'dlog' );
+    $self->register_hook( 'reset_transaction', 'slog' );
 
-  # If you want to capture this log entry with this plugin, you need to
-  # wait until after you register the plugin
-  $self->log(LOGINFO,'Initializing logging::adaptive plugin');
+    # If you want to capture this log entry with this plugin, you need to
+    # wait until after you register the plugin
+    $self->log( LOGINFO, 'Initializing logging::adaptive plugin' );
 }
 
 sub wlog {
-  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+    my ( $self, $transaction, $trace, $hook, $plugin, @log ) = @_;
 
-  # Don't log your own log entries!  If this is the only logging plugin
-  # then these lines will not be logged at all.  You can safely comment
-  # out this line and it will not cause an infinite loop.
-  return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
+    # Don't log your own log entries!  If this is the only logging plugin
+    # then these lines will not be logged at all.  You can safely comment
+    # out this line and it will not cause an infinite loop.
+    return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
 
-  push @{$transaction->{_log}}, [$trace, $hook, $plugin, @log];
+    if ( $trace <= $self->{_maxlevel} ) {
+        warn join(
+            " ", $$.
+            (
+                  defined $plugin ? " $plugin plugin:"
+                : defined $hook   ? " running plugin ($hook):"
+                : ""
+            ),
+            @log
+          ),
+          "\n"
+          unless $log[0] =~ /logging::adaptive/;
+        push @{ $transaction->{_log} }, [ $trace, $hook, $plugin, @log ]
+          if ( $trace <= $self->{_minlevel} );
+    }
 
-  return DECLINED;
+    return DECLINED;
 }
 
 sub dlog {
-  # fires when a message is denied
-  my ($self, $transaction, $prev_hook, $return, $return_text) = @_;
-  warn join(" ", $$, $self->{_prefix},
-    "Plugin $prev_hook returned",
-    return_code($return).
-    ": '$return_text'"), "\n";
-
-  foreach my $row ( @{$transaction->{_log}} ) {
-      next unless scalar @$row; # skip over empty log lines
-      my ($trace, $hook, $plugin, @log) = @$row;
-      if ($trace <= $self->{_maxlevel}) {
-	  warn 
-	    join(" ", $$, $self->{_prefix}.
-		 (defined $plugin ? " $plugin plugin:" :
-		  defined $hook   ? " running plugin ($hook):"  : ""),
-		 @log), "\n"
-	    unless $log[0] =~ /logging::adaptive/;
-	  # consume any lines you print so that they don't also
-	  # show up as OK lines
-	  $row = []; 
-      }
-  }
-
-  return DECLINED;
+    my ( $self, $transaction, $prev_hook, $return, $return_text ) = @_;
+    $self->{_denied} = 1;
 }
 
 sub slog {
-  # fires when a message is accepted
-  my ($self, $transaction, @args) = @_;
 
-  foreach my $row ( @{$transaction->{_log}} ) {
-      next unless scalar @$row; # skip over empty log lines
-      my ($trace, $hook, $plugin, @log) = @$row;
-	warn 
-	    join(" ", $$ .
-		 (defined $plugin ? " $plugin plugin:" :
-		  defined $hook   ? " running plugin ($hook):"  : ""),
-		 @log), "\n"
-	  if ($trace <= $self->{_minlevel});
-  }
+    # fires when a message is accepted
+    my ( $self, $transaction, @args ) = @_;
 
-  return DECLINED;
+    return DECLINED if $self->{_denied};
+
+    foreach my $row ( @{ $transaction->{_log} } ) {
+        next unless scalar @$row;    # skip over empty log lines
+        my ( $trace, $hook, $plugin, @log ) = @$row;
+        warn join(
+            " ", $$,
+            $self->{_prefix}.
+            (
+                  defined $plugin ? " $plugin plugin:"
+                : defined $hook   ? " running plugin ($hook):"
+                : ""
+            ),
+            @log
+          ),
+          "\n"
+          if ( $trace <= $self->{_minlevel} );
+    }
+
+    return DECLINED;
 }
 
 =cut
+
 
 =head1 NAME
 
@@ -138,13 +140,41 @@ is probably not high enough for most sites.
 =item B<prefix>
 
 In order to visually distinguish the accepted from rejected lines, all
-log lines from a rejected message will be prefixed with the character
+log lines from a accepted message will be prefixed with the character
 listed here (directly after the PID).  You can use anything you want as
 a prefix, but it is recommended that it be short (preferably just a single
 character) to minimize the amount of bloat in the log file.  If absent, the
-prefix defaults to the exclamation point (!).
+prefix defaults to the left single quote (`).
 
 =back
+
+=head1 TYPICAL USAGE
+
+If you are using multilog to handle your logging, you can replace the system
+provided log/run file with something like this:
+
+  #! /bin/sh
+  export LOGDIR=./main
+  mkdir -p $LOGDIR/failed
+  exec multilog t n10 \
+         '-*` *' $LOGDIR/detailed \
+    '-*' '+*` *' $LOGDIR/accepted
+
+which will have the following effects:
+
+=over 4
+
+=item 1. All lines will be logged into the ./mail/detailed folder
+
+=item 2. Log lines for messages that are accepted will go to ./main/accepted
+
+=back
+
+You may want to use the s####### option to multilog to ensure that the log
+files are large enough to maintain a proper amount of history.  Depending on
+your site load, it is useful to have at least a week and preferrably three
+weeks of accepted messages.  You can also use the n## option to have more
+log history files maintained.
 
 =head1 AUTHOR
 
