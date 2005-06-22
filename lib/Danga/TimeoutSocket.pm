@@ -7,6 +7,8 @@ use fields qw(alive_time create_time);
 
 our $last_cleanup = 0;
 
+Danga::Socket->AddTimer(15, \&_do_cleanup);
+
 sub new {
     my Danga::TimeoutSocket $self = shift;
     my $sock = shift;
@@ -16,23 +18,7 @@ sub new {
     my $now = time;
     $self->{alive_time} = $self->{create_time} = $now;
 
-    if ($now - 15 > $last_cleanup) {
-        $last_cleanup = $now;
-        _do_cleanup($now);
-    }
-
     return $self;
-}
-
-sub ticker {
-    my Danga::TimeoutSocket $self = shift;
-    
-    my $now = time;
-    
-    if ($now - 15 > $last_cleanup) {
-        $last_cleanup = $now;
-        _do_cleanup($now);
-    }
 }
 
 # overload these in a subclass
@@ -40,7 +26,10 @@ sub max_idle_time       { 0 }
 sub max_connect_time    { 0 }
 
 sub _do_cleanup {
-    my $now = shift;
+    my $now = time;
+    
+    Danga::Socket->AddTimer(15, \&_do_cleanup);
+    
     my $sf = __PACKAGE__->get_sock_ref;
 
     my %max_age;  # classname -> max age (0 means forever)

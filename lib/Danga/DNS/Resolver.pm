@@ -47,6 +47,8 @@ sub new {
     
     $self->watch_read(1);
     
+    $self->AddTimer(5, sub { $self->_do_cleanup });
+    
     return $self;
 }
 
@@ -101,12 +103,6 @@ sub query_txt {
         $self->_query($asker, $host, 'TXT', $now) || return;
     }
     
-    # run cleanup every 5 seconds
-    if ($now - 5 > $last_cleanup) {
-        $last_cleanup = $now;
-        $self->_do_cleanup($now);
-    }
-    
     #print "+Pending queries: " . keys(%{$self->{id_to_asker}}) .
     #    " / Cache Size: " . keys(%{$self->{cache}}) . "\n";
     
@@ -123,12 +119,6 @@ sub query_mx {
 
     foreach my $host (@hosts) {
         $self->_query($asker, $host, 'MX', $now) || return;
-    }
-    
-    # run cleanup every 5 seconds
-    if ($now - 5 > $last_cleanup) {
-        $last_cleanup = $now;
-        $self->_do_cleanup($now);
     }
     
     #print "+Pending queries: " . keys(%{$self->{id_to_asker}}) .
@@ -149,31 +139,17 @@ sub query {
         $self->_query($asker, $host, 'A', $now) || return;
     }
     
-    # run cleanup every 5 seconds
-    if ($now - 5 > $last_cleanup) {
-        $last_cleanup = $now;
-        $self->_do_cleanup($now);
-    }
-    
     #print "+Pending queries: " . keys(%{$self->{id_to_asker}}) .
     #    " / Cache Size: " . keys(%{$self->{cache}}) . "\n";
     
     return 1;
 }
 
-sub ticker {
-    my Danga::DNS::Resolver $self = shift;
-    my $now = time;
-    # run cleanup every 5 seconds
-    if ($now - 5 > $last_cleanup) {
-        $last_cleanup = $now;
-        $self->_do_cleanup($now);
-    }
-}
-
 sub _do_cleanup {
     my Danga::DNS::Resolver $self = shift;
-    my $now = shift;
+    my $now = time;
+    
+    $self->AddTimer(5, sub { $self->_do_cleanup });
     
     my $idle = $self->max_idle_time;
     

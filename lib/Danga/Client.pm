@@ -113,6 +113,7 @@ sub enable_read {
     my Danga::Client $self = shift;
     $self->{disable_read}--;
     if ($self->{disable_read} <= 0) {
+        warn("read back on\n");
         $self->{disable_read} = 0;
         $self->watch_read(1);
     }

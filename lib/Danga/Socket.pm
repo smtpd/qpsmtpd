@@ -201,17 +201,6 @@ sub KQueueEventLoop {
         my $timeout = @Timers ? ($Timers[0][0] - $now) : 1;
         my @ret = $KQueue->kevent($timeout * 1000);
         
-        if (!@ret) {
-            foreach my $fd ( keys %DescriptorMap ) {
-                my Danga::Socket $sock = $DescriptorMap{$fd};
-                if ($sock->can('ticker')) {
-                    $sock->ticker;
-                }
-            }
-        }
-        
-        my @objs;
-        
         foreach my $kev (@ret) {
             my ($fd, $filter, $flags, $fflags) = @$kev;
             
@@ -222,19 +211,15 @@ sub KQueueEventLoop {
                 if (my $code = $OtherFds{$fd}) {
                     $code->($filter);
                 }
+                else {
+                    print STDERR "kevent() returned fd $fd for which we have no mapping.  removing.\n";
+                    POSIX::close($fd); # close deletes the kevent entry
+                }
                 next;
             }
             
             DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), flags=%d \@ %s\n",
                                                         $fd, ref($pob), $flags, time);
-            
-            push @objs, [$pob, $filter, $flags, $fflags];
-        }
-        
-        # TODO - prioritize the objects
-        
-        foreach (@objs) {
-            my ($pob, $filter, $flags, $fflags) = @$_;
             
             $pob->event_read  if $filter == IO::KQueue::EVFILT_READ()  && !$pob->{closed};
             $pob->event_write if $filter == IO::KQueue::EVFILT_WRITE() && !$pob->{closed};
@@ -277,17 +262,6 @@ sub EpollEventLoop {
         my $i;
         my $evcount = epoll_wait($Epoll, 1000, $timeout * 1000, \@events);
         
-        if (!$evcount) {
-            foreach my $fd ( keys %DescriptorMap ) {
-                my Danga::Socket $sock = $DescriptorMap{$fd};
-                if ($sock->can('ticker')) {
-                    $sock->ticker;
-                }
-            }
-            next;
-        }
-        
-        my @objs;
       EVENT:
         for ($i=0; $i<$evcount; $i++) {
             my $ev = $events[$i];
@@ -306,17 +280,18 @@ sub EpollEventLoop {
                 if (my $code = $OtherFds{$ev->[0]}) {
                     $code->($state);
                 }
+                else {
+                    my $fd = $ev->[0];
+                    print STDERR "epoll() returned fd $fd w/ state $state for which we have no mapping.  removing.\n";
+                    POSIX::close($fd);
+                    epoll_ctl($Epoll, EPOLL_CTL_DEL, $fd, 0);
+                }
                 next;
             }
 
             DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), state=%d \@ %s\n",
                                                 $ev->[0], ref($pob), $ev->[1], time);
 
-            push @objs, [$pob, $state];
-        }
-        
-        foreach (@objs) {
-            my ($pob, $state) = @$_;
             $pob->event_read   if $state & EPOLLIN && ! $pob->{closed};
             $pob->event_write  if $state & EPOLLOUT && ! $pob->{closed};
             $pob->event_err    if $state & EPOLLERR && ! $pob->{closed};
@@ -361,15 +336,6 @@ sub PollEventLoop {
         return 0 unless @poll;
 
         my $count = IO::Poll::_poll($timeout * 1000, @poll);
-        if (!$count) {
-            foreach my $fd ( keys %DescriptorMap ) {
-                my Danga::Socket $sock = $DescriptorMap{$fd};
-                if ($sock->can('ticker')) {
-                    $sock->ticker;
-                }
-            }
-            next;
-        }
 
         # Fetch handles with read events
         while (@poll) {
