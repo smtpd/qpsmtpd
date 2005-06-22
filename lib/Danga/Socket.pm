@@ -116,7 +116,7 @@ sub AddTimer {
     my ($secs, $coderef) = @_;
     my $timeout = time + $secs;
     
-    if (!@Timers || ($timeout > $Timers[-1][0])) {
+    if (!@Timers || ($timeout >= $Timers[-1][0])) {
         push @Timers, [$timeout, $coderef];
         return;
     }
@@ -275,59 +275,55 @@ sub EpollEventLoop {
         
         my @events;
         my $i;
-        my $evcount;
-        # get up to 1000 events, 1000ms timeout
-        while ($evcount = epoll_wait($Epoll, 1000, $timeout * 1000, \@events)) {
-            my @objs;
-          EVENT:
-            for ($i=0; $i<$evcount; $i++) {
-                my $ev = $events[$i];
-
-                # it's possible epoll_wait returned many events, including some at the end
-                # that ones in the front triggered unregister-interest actions.  if we
-                # can't find the %sock entry, it's because we're no longer interested
-                # in that event.
-                my Danga::Socket $pob = $DescriptorMap{$ev->[0]};
-                my $code;
-                my $state = $ev->[1];
-
-                # if we didn't find a Perlbal::Socket subclass for that fd, try other
-                # pseudo-registered (above) fds.
-                if (! $pob) {
-                    if (my $code = $OtherFds{$ev->[0]}) {
-                        $code->($state);
-                    }
-                    next;
+        my $evcount = epoll_wait($Epoll, 1000, $timeout * 1000, \@events);
+        
+        if (!$evcount) {
+            foreach my $fd ( keys %DescriptorMap ) {
+                my Danga::Socket $sock = $DescriptorMap{$fd};
+                if ($sock->can('ticker')) {
+                    $sock->ticker;
                 }
-
-                DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), state=%d \@ %s\n",
-                                                    $ev->[0], ref($pob), $ev->[1], time);
-
-                push @objs, [$pob, $state];
             }
-            
-            foreach (@objs) {
-                my ($pob, $state) = @$_;
-                $pob->event_read   if $state & EPOLLIN && ! $pob->{closed};
-                $pob->event_write  if $state & EPOLLOUT && ! $pob->{closed};
-                $pob->event_err    if $state & EPOLLERR && ! $pob->{closed};
-                $pob->event_hup    if $state & EPOLLHUP && ! $pob->{closed};
-            }
-            
-            return unless PostEventLoop();
-
+            next;
         }
         
-        foreach my $fd ( keys %DescriptorMap ) {
-            my Danga::Socket $sock = $DescriptorMap{$fd};
-            if ($sock->can('ticker')) {
-                $sock->ticker;
+        my @objs;
+      EVENT:
+        for ($i=0; $i<$evcount; $i++) {
+            my $ev = $events[$i];
+
+            # it's possible epoll_wait returned many events, including some at the end
+            # that ones in the front triggered unregister-interest actions.  if we
+            # can't find the %sock entry, it's because we're no longer interested
+            # in that event.
+            my Danga::Socket $pob = $DescriptorMap{$ev->[0]};
+            my $code;
+            my $state = $ev->[1];
+
+            # if we didn't find a Perlbal::Socket subclass for that fd, try other
+            # pseudo-registered (above) fds.
+            if (! $pob) {
+                if (my $code = $OtherFds{$ev->[0]}) {
+                    $code->($state);
+                }
+                next;
             }
+
+            DebugLevel >= 1 && $class->DebugMsg("Event: fd=%d (%s), state=%d \@ %s\n",
+                                                $ev->[0], ref($pob), $ev->[1], time);
+
+            push @objs, [$pob, $state];
         }
         
+        foreach (@objs) {
+            my ($pob, $state) = @$_;
+            $pob->event_read   if $state & EPOLLIN && ! $pob->{closed};
+            $pob->event_write  if $state & EPOLLOUT && ! $pob->{closed};
+            $pob->event_err    if $state & EPOLLERR && ! $pob->{closed};
+            $pob->event_hup    if $state & EPOLLHUP && ! $pob->{closed};
+        }
+                
         return unless PostEventLoop();
-
-        print STDERR "Event loop ending; restarting.\n";
     }
     exit 0;
 }
