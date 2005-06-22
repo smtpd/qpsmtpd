@@ -116,11 +116,8 @@ sub AddTimer {
     my ($secs, $coderef) = @_;
     my $timeout = time + $secs;
     
-    use Data::Dumper; $Data::Dumper::Indent=1;
-    
     if (!@Timers || ($timeout > $Timers[-1][0])) {
         push @Timers, [$timeout, $coderef];
-        print STDERR Dumper(\@Timers);
         return;
     }
     
@@ -128,7 +125,6 @@ sub AddTimer {
     for (my $i = 0; $i < @Timers; $i++) {
         if ($Timers[$i][0] > $timeout) {
             splice(@Timers, $i, 0, [$timeout, $coderef]);
-            print STDERR Dumper(\@Timers);
             return;
         }
     }
