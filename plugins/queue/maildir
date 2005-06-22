@@ -26,7 +26,7 @@ sub register {
   }
 
   unless ($self->{_maildir}) {
-    $self->log(1, "WARNING: maildir directory not specified");
+    $self->log(LOGWARN, "WARNING: maildir directory not specified");
     return 0;
   }
 

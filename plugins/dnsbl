@@ -153,24 +153,28 @@ sub process_sockets {
 
 sub rcpt_handler {
   my ($self, $transaction, $rcpt) = @_;
+  my $connection = $self->qp->connection;
 
   # RBLSMTPD being non-empty means it contains the failure message to return
   if (defined ($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
     my $result = $ENV{'RBLSMTPD'};
-    my $remote_ip = $self->qp->connection->remote_ip;
+    my $remote_ip = $connection->remote_ip;
     $result =~ s/%IP%/$remote_ip/g;
     return ($self->{_dnsbl}->{DENY}, 
 	join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
   }
 
   my $note = $self->process_sockets;
-  my $whitelist = $self->qp->connection->notes('whitelisthost');
+  my $whitelist = $connection->notes('whitelisthost');
   if ( $note ) {
     if ( $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i ) {
-      $self->log(2, "Don't blacklist special account: ".$rcpt->user);
+      $self->log(LOGWARN, "Don't blacklist special account: ".$rcpt->user);
     }
     elsif ( $whitelist ) {
-      $self->log(2, "Whitelist overrode blacklist: $whitelist");
+      $self->log(LOGWARN, "Whitelist overrode blacklist: $whitelist");
+    }
+    elsif ( $connection->relay_client() ) {
+      $self->log(LOGWARN, "Don't blacklist relay/auth clients");
     }
     else {
       return ($self->{_dnsbl}->{DENY}, $note);

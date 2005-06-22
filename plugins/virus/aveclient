@@ -117,7 +117,7 @@ sub register {
 	if (exists $self->{_avclient_bin} && $self->{_avclient_bin} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
 		$self->{_avclient_bin} = $1;
 	} else {
-		$self->log(1, "FATAL ERROR: No binary aveclient found: '".$self->{_avclient_bin}."'");
+		$self->log(LOGALERT, "FATAL ERROR: No binary aveclient found: '".$self->{_avclient_bin}."'");
 		exit 3;
 	}
 }
@@ -153,7 +153,7 @@ sub avscan {
 	
 	# check if something went wrong
 	if ($signal) {
-		$self->log(1, "kavscanner exited with signal: $signal");
+		$self->log(LOGERROR, "kavscanner exited with signal: $signal");
 		return (DECLINED);
 	}
 	
@@ -164,20 +164,20 @@ sub avscan {
 			# ok a somewhat virus was found
 			shift @output;
 			$description = "REPORT: ".join(", ",@output);
-			$self->log(1, "Virus found! ($description)");
+			$self->log(LOGWARN, "Virus found! ($description)");
 			
 			# we don't want to be disturbed be these, so block mail and DENY connection
 			return(DENY, "Virus found: $description");
 			
 		} else {
-			$self->log(0, "aveserver: no viruses have been detected.") if($result =~ /^0$/);
-			$self->log(0, "aveserver: system error launching the application (file not found, unable to read the file).") if($result =~ /^0$/);
-			$self->log(0, "aveserver: some of the required parameters are missing from the command line.") if($result =~ /^9$/);
+			$self->log(LOGCRIT, "aveserver: no viruses have been detected.") if($result =~ /^0$/);
+			$self->log(LOGCRIT, "aveserver: system error launching the application (file not found, unable to read the file).") if($result =~ /^0$/);
+			$self->log(LOGCRIT, "aveserver: some of the required parameters are missing from the command line.") if($result =~ /^9$/);
 			return(DENY, "Unable to scan for virus, please contact admin of ".$self->qp->config("me").", if you feel this is an error!") if $self->{_blockonerror};
 		}
 	}
 	
-	$self->log(1, "kavscanner results: $description");
+	$self->log(LOGINFO, "kavscanner results: $description");
 	$transaction->header->add('X-Virus-Checked', 'Checked by Kaspersky on '.$self->qp->config("me"));
 	return (DECLINED);
 } 

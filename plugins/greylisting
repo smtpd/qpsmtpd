@@ -129,7 +129,7 @@ sub register {
     map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'), 
     %arg };
   if (my @bad = grep { ! exists $ARGS{$_} } sort keys %$config) {
-    $self->log(1, "invalid parameter(s): " . join(',',@bad));
+    $self->log(LOGALERT, "invalid parameter(s): " . join(',',@bad));
   }
   $self->{_greylist_config} = $config;
   unless ($config->{recipient} || $config->{per_recipient}) {
@@ -173,7 +173,7 @@ sub data_handler {
   return DECLINED unless $note;
   # Decline if ALL recipients are whitelisted
   if (($transaction->notes('whitelistrcpt')||0) == scalar($transaction->recipients)) {
-    $self->log(4,"all recipients whitelisted - skipping");
+    $self->log(LOGWARN,"all recipients whitelisted - skipping");
     return DECLINED;
   }
   return DENYSOFT, $note;
@@ -182,7 +182,7 @@ sub data_handler {
 sub denysoft_greylist {
   my ($self, $transaction, $sender, $rcpt, $config) = @_;
   $config ||= $self->{_greylist_config};
-  $self->log(7, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
+  $self->log(LOGDEBUG, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
   # Always allow relayclients and whitelisted hosts/senders
   return DECLINED if exists $ENV{RELAYCLIENT};
@@ -194,24 +194,24 @@ sub denysoft_greylist {
     if $config->{per_recipient_db};
   $dbdir ||= -d "$QPHOME/var/db" ? "$QPHOME/var/db" : "$QPHOME/config";
   my $db = "$dbdir/$DB";
-  $self->log(6,"using $db as greylisting database");
+  $self->log(LOGINFO,"using $db as greylisting database");
 
   my $remote_ip = $self->qp->connection->remote_ip;
   my $fmt = "%s:%d:%d:%d";
 
   # Check denysoft db
   unless (open LOCK, ">$db.lock") {
-    $self->log(2, "opening lockfile failed: $!");
+    $self->log(LOGCRIT, "opening lockfile failed: $!");
     return DECLINED;
   }
   unless (flock LOCK, LOCK_EX) {
-    $self->log(2, "flock of lockfile failed: $!");
+    $self->log(LOGCRIT, "flock of lockfile failed: $!");
     close LOCK;
     return DECLINED;
   }
   my %db = ();
   unless (tie %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) {
-    $self->log(2, "tie to database $db failed: $!");
+    $self->log(LOGCRIT, "tie to database $db failed: $!");
     close LOCK;
     return DECLINED;
   }
@@ -223,12 +223,12 @@ sub denysoft_greylist {
   my ($ts, $new, $black, $white) = (0,0,0,0);
   if ($db{$key}) {
     ($ts, $new, $black, $white) = split /:/, $db{$key};
-    $self->log(3, "ts: " . localtime($ts) . ", now: " . localtime);
+    $self->log(LOGERROR, "ts: " . localtime($ts) . ", now: " . localtime);
     if (! $white) {
       # Black IP - deny, but don't update timestamp
       if (time - $ts < $config->{black_timeout}) {
         $db{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
-        $self->log(2, "key $key black DENYSOFT - $black failed connections");
+        $self->log(LOGCRIT, "key $key black DENYSOFT - $black failed connections");
         untie %db;
         close LOCK;
         return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
@@ -236,33 +236,33 @@ sub denysoft_greylist {
       # Grey IP - accept unless timed out
       elsif (time - $ts < $config->{grey_timeout}) {
         $db{$key} = sprintf $fmt, time, $new, $black, 1;
-        $self->log(2, "key $key updated grey->white");
+        $self->log(LOGCRIT, "key $key updated grey->white");
         untie %db;
         close LOCK;
         return DECLINED;
       }
       else {
-        $self->log(3, "key $key has timed out (grey)");
+        $self->log(LOGERROR, "key $key has timed out (grey)");
       }
     }
     # White IP - accept unless timed out
     else {
       if (time - $ts < $config->{white_timeout}) {
         $db{$key} = sprintf $fmt, time, $new, $black, ++$white;
-        $self->log(2, "key $key is white, $white deliveries");
+        $self->log(LOGCRIT, "key $key is white, $white deliveries");
         untie %db;
         close LOCK;
         return DECLINED;
       }
       else {
-        $self->log(3, "key $key has timed out (white)");
+        $self->log(LOGERROR, "key $key has timed out (white)");
       }
     }
   }
 
   # New ip or entry timed out - record new and return DENYSOFT
   $db{$key} = sprintf $fmt, time, ++$new, $black, 0;
-  $self->log(2, "key $key initial DENYSOFT, unknown");
+  $self->log(LOGCRIT, "key $key initial DENYSOFT, unknown");
   untie %db;
   close LOCK;
   return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;

@@ -213,7 +213,7 @@ sub check_spam {
   $transaction->header->add('X-Spam-Status',
 			    "$flag, hits=$hits required=$required\n" .
 			    "\ttests=$tests", 0);
-  $self->log(5, "check_spam: $flag, hits=$hits, required=$required, " .
+  $self->log(LOGNOTICE, "check_spam: $flag, hits=$hits, required=$required, " .
 			     "tests=$tests");
 
   return (DECLINED);

@@ -74,7 +74,7 @@ sub register {
         $self->{_kavscanner_bin} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
       $self->{_kavscanner_bin} = $1;
     } else {
-      $self->log(1, "FATAL ERROR: Unexpected characters in kavscanner argument");
+      $self->log(LOGALERT, "FATAL ERROR: Unexpected characters in kavscanner argument");
       exit 3;
     }
   } 
@@ -94,7 +94,7 @@ sub kav_scan {
  
   # Now do the actual scanning!
   my $cmd = $self->{_kavscanner_bin}." -Y -P -B -MP -MD -* $filename 2>&1";
-  $self->log(1, "Running: $cmd");
+  $self->log(LOGNOTICE, "Running: $cmd");
   my @output = `$cmd`;
   chomp(@output);
  
@@ -105,7 +105,7 @@ sub kav_scan {
   close $temp_fh;
 
   if ($signal) {
-    $self->log(1, "kavscanner exited with signal: $signal");
+    $self->log(LOGWARN, "kavscanner exited with signal: $signal");
     return (DECLINED);
   }
 
@@ -127,7 +127,7 @@ sub kav_scan {
                     ."suspicions: ".join(", ", @suspicious);
       # else we may get a veeeery long X-Virus-Details: line or log entry
       $description = substr($description,0,60); 
-      $self->log(1, "There be a virus! ($description)");
+      $self->log(LOGWARN, "There be a virus! ($description)");
       ### Untested by now, need volunteers ;-)
       #if ($self->qp->config("kav_deny")) {
       #  foreach my $d (keys %{$self->qp->config("kav_deny", "map")}) {
@@ -165,11 +165,11 @@ sub kav_scan {
         }
       }
     } else {
-      $self->log(0, "corrupt or unknown Kaspersky scanner/resource problems - exit status $result");
+      $self->log(LOGEMERG, "corrupt or unknown Kaspersky scanner/resource problems - exit status $result");
     }
   }
   
-  $self->log(1, "kavscanner results: $description");
+  $self->log(LOGINFO, "kavscanner results: $description");
  
   $transaction->header->add('X-Virus-Checked', 'Checked by '.$self->qp->config("me"));
   return (DECLINED);
