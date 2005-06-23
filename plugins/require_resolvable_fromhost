@@ -11,9 +11,9 @@ sub register {
 sub mail_handler {
     my ($self, $transaction, $sender) = @_;
     
-    $sender->format ne "<>" and $self->check_dns($sender->host);
-    
-    return DECLINED;
+    $self->transaction->notes('resolvable', 1);
+    return DECLINED if $sender->format eq "<>";
+    return $self->check_dns($sender->host);
 }
 
 
@@ -21,42 +21,56 @@ sub check_dns {
     my ($self, $host) = @_;
     
     # for stuff where we can't even parse a hostname out of the address
-    return unless $host;
+    return DECLINED unless $host;
     
-    return $self->transaction->notes('resolvable', 1)
-        if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
-    
+    if( $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/ ) {
+        $self->transaction->notes('resolvable', 1);
+        return DECLINED;
+    }
+
+    $self->transaction->notes('pending_dns_queries', 2);
+    my $qp = $self->qp;
+    $self->log(LOGDEBUG, "Checking $host for MX record in the background");
     Danga::DNS->new(
-        callback => sub { $self->dns_result(@_) },
+        callback => sub { dns_result($qp, @_) },
         host => $host,
         type => "MX",
-        client => $self->qp->input_sock,
+        client => $qp->input_sock,
     );
+    $self->log(LOGDEBUG, "Checking $host for A record in the background");
     Danga::DNS->new(
-        callback => sub { $self->dns_result(@_) },
+        callback => sub { dns_result($qp, @_) },
         host => $host,
-        client => $self->qp->input_sock,
+        client => $qp->input_sock,
     );
+    return CONTINUATION;
 }
 
+
 sub dns_result {
-    my ($self, $result, $query) = @_;
+    my ($qp, $result, $query) = @_;
     
+    my $pending = $qp->transaction->notes('pending_dns_queries');
+    $qp->transaction->notes('pending_dns_queries', --$pending);
+
     if ($result =~ /^[A-Z]+$/) {
         # probably an error
-        $self->log(LOGDEBUG, "DNS error: $result looking up $query");
-        return;
+        $qp->log(LOGDEBUG, "DNS error: $result looking up $query");
+    } else {
+        $qp->transaction->notes('resolvable', 1);
+        $qp->log(LOGDEBUG, "DNS lookup $query returned: $result");
     }
-    
-    $self->log(LOGDEBUG, "DNS lookup $query returned: $result");
-    $self->transaction->notes('resolvable', 1);
+
+    $qp->finish_continuation unless $pending;
 }
+
 
 sub rcpt_handler {
     my ($self, $transaction) = @_;
     
     if (!$transaction->notes('resolvable')) {
         my $sender = $transaction->sender;
+        $self->log(LOGDEBUG, "Could not resolve " .$sender->host) if $sender->host;
         return (DENYSOFT, 
 		      ($sender->host
     		   ? "Could not resolve ". $sender->host
