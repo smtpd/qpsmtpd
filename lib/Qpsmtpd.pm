@@ -254,7 +254,7 @@ sub finish_continuation {
   my $responder = $hook . "_respond";
   if (my $meth = $self->can($responder)) {
     warn("continuation finished on $self\n");
-    return $meth->($self, @r, @$args);
+    return $meth->($self, $r[0], $r[1], @$args);
   }
   die "No ${hook}_respond method";
 }
