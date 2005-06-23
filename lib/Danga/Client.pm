@@ -90,7 +90,7 @@ sub process_read_buf {
     my Danga::Client $self = shift;
     my $bref = shift;
     $self->{line} .= $$bref;
-    return if $self->{can_read_mode};
+    return if ! $self->readable();
     return if $::LineMode;
     
     while ($self->{line} =~ s/^(.*?\n)//) {
@@ -100,7 +100,18 @@ sub process_read_buf {
         if ($::DEBUG > 1 and $resp) { print "$$:".($self+0)."S: $_\n" for split(/\n/, $resp) }
         $self->write($resp) if $resp;
         $self->watch_read(0) if $self->{disable_read};
+        last if ! $self->readable();
     }
+    if($self->have_line) {
+        $self->shift_back_read($self->{line});
+        $self->{line} = '';
+    }
+}
+
+sub readable {
+    my Danga::Client $self = shift;
+    return 0 if $self->{disable_read} > 0;
+    return 1;
 }
 
 sub disable_read {

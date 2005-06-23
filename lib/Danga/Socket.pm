@@ -636,6 +636,17 @@ sub push_back_read {
     $PushBackSet{$self->{fd}} = $self;
 }
 
+### METHOD: shift_back_read( $buf )
+### Shift back I<buf> (a scalar or scalarref) into the read stream
+### Use this instead of push_back_read() when you need to unread
+### something you just read.
+sub shift_back_read {
+    my Danga::Socket $self = shift;
+    my $buf = shift;
+    unshift @{$self->{read_push_back}}, ref $buf ? $buf : \$buf;
+    $PushBackSet{$self->{fd}} = $self;
+}
+
 ### METHOD: read( $bytecount )
 ### Read at most I<bytecount> bytes from the underlying handle; returns scalar
 ### ref on read, or undef on connection closed.
