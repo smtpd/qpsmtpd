@@ -90,6 +90,7 @@ if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &help }
 if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &help }
 if ($PROCS =~ /^(\d+)$/) { $PROCS = $1 } else { &help }
 if ($NUMACCEPT =~ /^(\d+)$/) { $NUMACCEPT = $1 } else { &help }
+my $_NUMACCEPT = $NUMACCEPT;
 
 $PROCS = 1 if $LineMode;
 # This is a bit of a hack, but we get to approximate MAXCONN stuff when we
@@ -310,8 +311,16 @@ sub accept_handler {
             return;
         }
         $running++;
-        last if ! _accept_handler($running);
+        if (! _accept_handler($running)) {
+            # got here because we have too many accepts.
+            $NUMACCEPT = $_NUMACCEPT;
+            return;
+        }
     }
+    
+    # got here because we have accept's left.
+    # So double the number we accept next time.
+    $NUMACCEPT *= 2;
 }
 
 use Errno qw(EAGAIN EWOULDBLOCK);
