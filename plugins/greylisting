@@ -185,7 +185,7 @@ sub denysoft_greylist {
   $self->log(LOGDEBUG, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
   # Always allow relayclients and whitelisted hosts/senders
-  return DECLINED if exists $ENV{RELAYCLIENT};
+  return DECLINED if exists $self->qp->connection->relay_client();
   return DECLINED if $self->qp->connection->notes('whitelisthost');
   return DECLINED if $transaction->notes('whitelistsender');
 
