@@ -29,7 +29,7 @@ usage: qpsmtpd-forkserver [ options ]
  -l, --listen-address addr : listen on a specific address; default 0.0.0.0
  -p, --port P              : listen on a specific port; default 2525
  -c, --limit-connections N : limit concurrent connections to N; default 15
- -u, --user U              : run as a particular user (defualt 'smtpd')
+ -u, --user U              : run as a particular user (default 'smtpd')
  -m, --max-from-ip M       : limit connections from a single IP; default 5
 EOT
         exit 0;
