@@ -1,4 +1,4 @@
-0.30 - 
+0.30 - 2005/07/05
 
   Add plugable logging support include sample plugin which replicates
   the existing core code.  Add OK hook.
@@ -12,10 +12,23 @@
   plugins/auth/auth_ldap_bind - New plugin to authenticate against an
   LDAP database. Thanks to Elliot Foster <elliotf@gratuitous.net>
 
-  plugins/auth/auth_flat_file - flat file auth plugin
+  new plugin: plugins/auth/auth_flat_file - flat file auth plugin
+
+  new plugin: plugins/auth/auth_cvm_unix_local - Only DENY if the
+  credentials were accepted but incorrect (bad password?). Interfaces
+  with Bruce Guenther's Credential Validation Module (CVM)
 
   Revamp Qpsmtpd::Constants so it is possible to retrieve the text
   representation from the numeric (for logging purposes).
+
+  new plugin: plugins/check_badrcptto_patterns - Match bad RCPTO
+  address with regex (Gordon Rowell)
+
+  new plugin: plugins/check_norelay - Carve out holes from larger
+  relay blocks (Also Gordon Rowell)
+
+  new plugin: plugins/virus/sophie - Uses SOPHOS Antivirus via Sophie
+  resident daemon.
 
   Store mail in memory up to a certain threshold (default 10k).
 
@@ -30,6 +43,11 @@
   body_write patches from Brian Grossman
 
   Fix for corruption problem under Apache
+
+  Update Apache::Qpsmtpd to work with the latest Apache/mod_perl 2.0
+  API.  Fix various bucket issues.
+
+  Replace $ENV{RELAYCLIENT} with $connection->relay_client in last plugin.
 
   Fix typo in qpsmtpd-forkserver commandline help
 

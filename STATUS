@@ -10,7 +10,7 @@ pez (or pezmail)
 Near term roadmap
 =================
 
-0.30:
+0.31:
       - Bugfixes
 
 0.40:
@@ -26,6 +26,8 @@ Near term roadmap
       accepted and generate individual bounce messages.
 
 0.51: bugfixes
+
+0.60: merge with the highperf branch?
 
 1.0bN: bugfixes (repeat until we run out of bugs to fix) 
 1.0.0: it just might happen!

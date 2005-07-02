@@ -5,7 +5,7 @@ use vars qw($VERSION $Logger $TraceLevel $Spool_dir);
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
-$VERSION = "0.30-dev";
+$VERSION = "0.30";
 
 sub version { $VERSION };
 
