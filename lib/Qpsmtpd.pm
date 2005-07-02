@@ -368,3 +368,22 @@ sub temp_dir {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Qpsmtpd
+
+=head1 DESCRIPTION
+
+This is the base class for the qpsmtpd mail server.  See
+L<http://smtpd.develooper.com/> and the I<README> file for more information.
+
+=head1 COPYRIGHT
+
+Copyright 2001-2005 Ask Bjoern Hansen, Develooper LLC.  See the
+LICENSE file for more information.
+
+
+

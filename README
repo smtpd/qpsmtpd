@@ -7,7 +7,7 @@
 Qpsmtpd - qmail perl simple mail transfer protocol daemon
 
 web:
-  http://develooper.com/code/qpsmtpd/
+  http://smtpd.develooper.com/
 
 mailinglist:
   qpsmtpd-subscribe@perl.org
@@ -63,10 +63,18 @@ Make a new user and a directory where you'll install qpsmtpd.  I
 usually use "smtpd" for the user and /home/smtpd/qpsmtpd/ for the
 directory.
 
-Put the files there.  If you install from CVS you can just do run the
-following command in the /home/smtpd/ directory.
+Put the files there.  If you install from Subversion you can just do
+run the following command in the /home/smtpd/ directory.
 
-   cvs C<-d> :pserver:anonymous@cvs.perl.org:/cvs/public co qpsmtpd
+   svn co http://svn.perl.org/qpsmtpd/trunk .
+
+Or if you want a specific release, use for example
+
+   svn co http://svn.perl.org/qpsmtpd/tags/0.30 .
+
+In the branch L<http://svn.perl.org/qpsmtpd/branches/high_perf/> we
+have an experimental event based version of qpsmtpd that can handle
+thousands of simultaneous connections with very little overhead.
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
