@@ -272,7 +272,7 @@ sub mail {
     elsif ($rc == DENYSOFT_DISCONNECT) {
       $msg ||= $from->format . ', temporarily denied';
       $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
-      $self->respond(450, $msg);
+      $self->respond(421, $msg);
       $self->disconnect;
     }
     else { # includes OK
@@ -316,7 +316,7 @@ sub rcpt {
   elsif ($rc == DENYSOFT_DISCONNECT) {
     $msg ||= 'relaying denied';
     $self->log(LOGINFO, "delivery denied ($msg)");
-    $self->respond(450, $msg);
+    $self->respond(421, $msg);
     $self->disconnect;
   }
   elsif ($rc == OK) {
@@ -413,7 +413,7 @@ sub data {
     return 1;
   }
   elsif ($rc == DENYSOFT_DISCONNECT) {
-    $self->respond(451, $msg || "Message denied temporarily");
+    $self->respond(421, $msg || "Message denied temporarily");
     $self->disconnect;
     return 1;
   }
