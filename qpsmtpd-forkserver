@@ -22,6 +22,7 @@ my $PORT      = 2525;				# port number
 my $LOCALADDR = '0.0.0.0';		# ip address to bind to
 my $USER      = 'smtpd';		# user to suid to
 my $MAXCONNIP = 5;              # max simultaneous connections from one IP
+my $PID_FILE   = '/var/run/qpsmtpd.pid';
 
 sub usage {
         print <<"EOT";
@@ -31,6 +32,7 @@ usage: qpsmtpd-forkserver [ options ]
  -c, --limit-connections N : limit concurrent connections to N; default 15
  -u, --user U              : run as a particular user (default 'smtpd')
  -m, --max-from-ip M       : limit connections from a single IP; default 5
+     --pid-file P          : print main servers PID to file P
 EOT
         exit 0;
 }
@@ -40,13 +42,16 @@ GetOptions('h|help' => \&usage,
            'c|limit-connections=i' => \$MAXCONN,
            'm|max-from-ip=i' => \$MAXCONNIP,
            'p|port=i' => \$PORT,
-           'u|user=s' => \$USER) || &usage;
+           'u|user=s' => \$USER,
+	   'pid-file=s' => \$PID_FILE,
+	  ) || &usage;
 
 # detaint the commandline
 if ($PORT =~ /^(\d+)$/) { $PORT = $1 } else { &usage }
 if ($LOCALADDR =~ /^([\d\w\-.]+)$/) { $LOCALADDR = $1 } else { &usage }
 if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &usage }
 if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &usage }
+if ($PID_FILE =~ m#^(/[\w\d/\-.]+)$#) { $PID_FILE = $1 } else { &usage }
 
 delete $ENV{ENV};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
@@ -80,10 +85,37 @@ my $server = IO::Socket::INET->new(LocalPort => $PORT,
                                    Listen    => SOMAXCONN )
   or die "Creating TCP socket $LOCALADDR:$PORT: $!\n";
 
-# Drop priviledges
+if (-e $PID_FILE) {
+  open PID, "+<$PID_FILE"
+    or die "open pid_file: $!\n";
+  my $running_pid = <PID>; chomp $running_pid;
+  if ($running_pid =~ /(\d+)/) {
+    $running_pid = $1;
+    if (kill 0, $running_pid) {
+      die "Found an already running qpsmtpd with pid $running_pid.\n";
+    }
+  }
+  seek PID, 0, 0
+    or die "Could not seek back to beginning of $PID_FILE: $!\n";
+} else {
+  open PID, ">$PID_FILE"
+    or die "open pid_file: $!\n";
+}
+print PID $$,"\n";
+close PID;
+
+# Drop privileges
 my (undef, undef, $quid, $qgid) = getpwnam $USER or
       die "unable to determine uid/gid for $USER\n";
-$) = "";
+my $groups = "$qgid $qgid";
+while (my ($name,$passwd,$gid,$members) = getgrent()) {
+    my @m = split(/ /, $members);
+    if (grep {$_ eq $USER} @m) {
+	::log(LOGINFO,"$USER is member of group $name($gid)");
+	$groups .= " $gid";
+    }
+}
+$) = $groups;
 POSIX::setgid($qgid) or
       die "unable to change gid: $!\n";
 POSIX::setuid($quid) or

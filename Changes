@@ -1,5 +1,11 @@
 0.31 -
 
+  qpsmtpd-forkserver: add an option for writing a PID file (pjh)
+
+  qpsmtpd-forkserver: set auxiliary groups (this is needed for the
+  postfix backend, which expects to have write permission to a fifo
+  which usually belongs to group postdrop). (pjh)
+
   when disconncting with a temporary failure, return 421 rather than
   450 or 451. (Peter J. Holzer)
 
