@@ -140,11 +140,10 @@ $> = $quid;
 while (1) {
   REAPER();
   my $running = scalar keys %childstatus;
-  while ($running >= $MAXCONN) { 
+  if ($running >= $MAXCONN) { 
     ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.  Waiting one second.");
-    sleep(1) ;
-    REAPER();
-    $running = scalar keys %childstatus;
+    sleep(1);
+    next;
   }
   if (!$sel->can_read(1)) {
     next;
