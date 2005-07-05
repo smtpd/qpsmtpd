@@ -140,14 +140,12 @@ $> = $quid;
 while (1) {
   REAPER();
   my $running = scalar keys %childstatus;
-  if ($running >= $MAXCONN) { 
+  if ($running >= $MAXCONN) {
     ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.  Waiting one second.");
     sleep(1);
     next;
   }
-  if (!$sel->can_read(1)) {
-    next;
-  }
+  next unless $sel->can_read(1);
     my $hisaddr = accept(my $client, $server);
     if (!$hisaddr) {
         # possible something condition...
