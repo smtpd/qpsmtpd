@@ -18,11 +18,11 @@ use strict;
 $| = 1;
 
 # Configuration
-my $MAXCONN   = 15;				# max simultaneous connections
-my $PORT      = 2525;				# port number
-my @LOCALADDR;                                  # ip address to bind to
-my $USER      = 'smtpd';		# user to suid to
-my $MAXCONNIP = 5;              # max simultaneous connections from one IP
+my $MAXCONN   = 15;                  # max simultaneous connections
+my $PORT      = 2525;                # port number
+my @LOCALADDR;                       # ip address(es) to bind to
+my $USER      = 'smtpd';             # user to suid to
+my $MAXCONNIP = 5;                   # max simultaneous connections from one IP
 my $PID_FILE   = '';
 
 sub usage {
@@ -163,77 +163,77 @@ while (1) {
 
   my ($client, $hisaddr) = $server->accept;
 
-    if (!$hisaddr) {
-        # possible something condition...
-        next;
+  if (!$hisaddr) {
+    # possible something condition...
+    next;
+  }
+  IO::Handle::blocking($client, 1);
+  my ($port, $iaddr) = sockaddr_in($hisaddr);
+  if ($MAXCONNIP) {
+    my $num_conn = 1; # seed with current value
+
+    foreach my $rip (values %childstatus) {
+      ++$num_conn if (defined $rip && $rip eq $iaddr);
     }
-    IO::Handle::blocking($client, 1);
-    my ($port, $iaddr) = sockaddr_in($hisaddr);
-    if ($MAXCONNIP) {
-        my $num_conn = 1; # seed with current value
 
-        foreach my $rip (values %childstatus) {
-          ++$num_conn if (defined $rip && $rip eq $iaddr);
-        }
-
-        if ($num_conn > $MAXCONNIP) {
-            my $rem_ip = inet_ntoa($iaddr);
-            ::log(LOGINFO,"Too many connections from $rem_ip: "
-                         ."$num_conn > $MAXCONNIP. Denying connection.");
-            $client->autoflush(1);
-            print $client "451 Sorry, too many connections from $rem_ip, try again later\r\n";
-            close $client;
-            next;
-        }
+    if ($num_conn > $MAXCONNIP) {
+      my $rem_ip = inet_ntoa($iaddr);
+      ::log(LOGINFO,"Too many connections from $rem_ip: "
+                   ."$num_conn > $MAXCONNIP. Denying connection.");
+      $client->autoflush(1);
+      print $client "451 Sorry, too many connections from $rem_ip, try again later\r\n";
+      close $client;
+      next;
     }
-    my $pid = safe_fork();
-    if ($pid) {
-        # parent
-        $childstatus{$pid} = $iaddr;	# add to table
-        # $childstatus{$pid} = 1;	# add to table
-        $running++;
-        close($client);
-        next;
-    }
-    # otherwise child
+  }
+  my $pid = safe_fork();
+  if ($pid) {
+    # parent
+    $childstatus{$pid} = $iaddr;	# add to table
+    # $childstatus{$pid} = 1;	# add to table
+    $running++;
+    close($client);
+    next;
+  }
+  # otherwise child
 
-    # all children should have different seeds, to prevent conflicts
-    srand( time ^ ($$ + ($$ << 15)) );
+  # all children should have different seeds, to prevent conflicts
+  srand( time ^ ($$ + ($$ << 15)) );
 
-    close($server);
+  close($server);
 
-    $SIG{$_} = 'DEFAULT' for keys %SIG;
-    $SIG{ALRM} = sub { 
-       print $client "421 Connection Timed Out\n";
-       ::log(LOGINFO, "Connection Timed Out"); 
-       exit; };
+  $SIG{$_} = 'DEFAULT' for keys %SIG;
+  $SIG{ALRM} = sub { 
+     print $client "421 Connection Timed Out\n";
+     ::log(LOGINFO, "Connection Timed Out"); 
+     exit; };
 
-    my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) = sockaddr_in($localsockaddr);
-    $ENV{TCPLOCALIP} = inet_ntoa($laddr);
-    # my ($port, $iaddr) = sockaddr_in($hisaddr);
-    $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
-    $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
+  my $localsockaddr = getsockname($client);
+  my ($lport, $laddr) = sockaddr_in($localsockaddr);
+  $ENV{TCPLOCALIP} = inet_ntoa($laddr);
+  # my ($port, $iaddr) = sockaddr_in($hisaddr);
+  $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
+  $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
 
-    # don't do this!
-    #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
+  # don't do this!
+  #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
 
-    ::log(LOGINFO, "Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}");
-    
-    # dup to STDIN/STDOUT
-    POSIX::dup2(fileno($client), 0);
-    POSIX::dup2(fileno($client), 1);
-    
-    $qpsmtpd->start_connection
-      (
-       local_ip    => $ENV{TCPLOCALIP},
-       local_port  => $lport,
-       remote_ip   => $ENV{TCPREMOTEIP},
-       remote_port => $port,
-      );
-    $qpsmtpd->run();
-    
-    exit;                                   # child leaves
+  ::log(LOGINFO, "Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}");
+  
+  # dup to STDIN/STDOUT
+  POSIX::dup2(fileno($client), 0);
+  POSIX::dup2(fileno($client), 1);
+  
+  $qpsmtpd->start_connection
+    (
+     local_ip    => $ENV{TCPLOCALIP},
+     local_port  => $lport,
+     remote_ip   => $ENV{TCPREMOTEIP},
+     remote_port => $port,
+    );
+  $qpsmtpd->run();
+  
+  exit;                                   # child leaves
 }
 
 sub log {
