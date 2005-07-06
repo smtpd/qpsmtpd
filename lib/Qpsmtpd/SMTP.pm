@@ -142,6 +142,12 @@ sub helo {
     $self->respond(550, $msg);
   } elsif ($rc == DENYSOFT) {
     $self->respond(450, $msg);
+  } elsif ($rc == DENY_DISCONNECT) {
+      $self->respond(550, $msg);
+      $self->disconnect;
+  } elsif ($rc == DENYSOFT_DISCONNECT) {
+      $self->respond(450, $msg);
+      $self->disconnect;
   } else {
     $conn->hello("helo");
     $conn->hello_host($hello_host);
@@ -164,6 +170,12 @@ sub ehlo {
     $self->respond(550, $msg);
   } elsif ($rc == DENYSOFT) {
     $self->respond(450, $msg);
+  } elsif ($rc == DENY_DISCONNECT) {
+      $self->respond(550, $msg);
+      $self->disconnect;
+  } elsif ($rc == DENYSOFT_DISCONNECT) {
+      $self->respond(450, $msg);
+      $self->disconnect;
   } else {
     $conn->hello("ehlo");
     $conn->hello_host($hello_host);
