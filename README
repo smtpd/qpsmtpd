@@ -27,30 +27,19 @@ cute example.
 See the Changes file! :-)
 
 
-=head2 What's new in version 0.1x from 0.0x?
-
-Version 0.1x is all rearchitected, with an object oriented plugin
-infrastructure.  Weeh, that sounds fancy!  Of course it is keeping the
-well tested core code from version 0.0x which have had more than a
-years production usage on many sites.
-
-Noteworthy new features includes a SpamAssassin integration plugin,
-more documentation and support for arbitrarily large messages without
-exhausting memory (up to the size of whatever your file system
-supports).
-
-
 =head1 Installation
 
 =head2 Required Perl Modules
 
 The following Perl modules are required:
    Net::DNS
-   Mail::Address
+   MIME::Base64
+   Mail::Header (part of the MailTools distribution)
 
 If you use a version of Perl older than 5.8.0 you will also need
    Data::Dumper
    File::Temp
+   Time::HiRes
 
 The easiest way to install modules from CPAN is with the CPAN shell.
 Run it with
@@ -127,6 +116,10 @@ the following command:
 
   pperl -Tw -- --prefork=$MAXCLIENTS --maxclients=$MAXCLIENTS \
     --no-cleanup ./qpsmtpd 2>&1
+
+As an alternative to PPerl (some users find PPerl unstable) we recommend using
+the forkserver. This forks for every connection, but pre-loads all the plugins
+to reduce the overhead.
 
 =head1 Plugins
 
