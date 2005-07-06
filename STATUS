@@ -12,6 +12,7 @@ Near term roadmap
 
 0.31:
       - Bugfixes
+      - add module requirements to the META.yml file
 
 0.40:
       - Add user configuration plugin

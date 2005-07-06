@@ -4,7 +4,7 @@ use strict;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME           => 'Qpsmtpd',
+    NAME           => 'qpsmtpd',
     VERSION_FROM   => 'lib/Qpsmtpd.pm',
     PREREQ_PM      => { },
     ABSTRACT_FROM  => 'README',
