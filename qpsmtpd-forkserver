@@ -20,7 +20,7 @@ $| = 1;
 # Configuration
 my $MAXCONN   = 15;				# max simultaneous connections
 my $PORT      = 2525;				# port number
-my $LOCALADDR = '0.0.0.0';		# ip address to bind to
+my @LOCALADDR;                                  # ip address to bind to
 my $USER      = 'smtpd';		# user to suid to
 my $MAXCONNIP = 5;              # max simultaneous connections from one IP
 my $PID_FILE   = '';
@@ -28,7 +28,9 @@ my $PID_FILE   = '';
 sub usage {
         print <<"EOT";
 usage: qpsmtpd-forkserver [ options ]
- -l, --listen-address addr : listen on a specific address; default 0.0.0.0
+ -l, --listen-address addr : listen on specific address(es); can be specified
+                             multiple times for multiple bindings.  Default is
+			     0.0.0.0 (all interfaces).
  -p, --port P              : listen on a specific port; default 2525
  -c, --limit-connections N : limit concurrent connections to N; default 15
  -u, --user U              : run as a particular user (default 'smtpd')
@@ -39,7 +41,7 @@ EOT
 }
 
 GetOptions('h|help' => \&usage,
-           'l|listen-address=s' => \$LOCALADDR,
+           'l|listen-address=s' => \@LOCALADDR,
            'c|limit-connections=i' => \$MAXCONN,
            'm|max-from-ip=i' => \$MAXCONNIP,
            'p|port=i' => \$PORT,
@@ -49,7 +51,14 @@ GetOptions('h|help' => \&usage,
 
 # detaint the commandline
 if ($PORT =~ /^(\d+)$/) { $PORT = $1 } else { &usage }
-if ($LOCALADDR =~ /^([\d\w\-.]+)$/) { $LOCALADDR = $1 } else { &usage }
+@LOCALADDR = ( '0.0.0.0' ) if !@LOCALADDR;
+for (0..$#LOCALADDR) {
+  if ($LOCALADDR[$_] =~ /^([\d\w\-.]+)$/) {
+    $LOCALADDR[$_] = $1;
+  } else {
+    &usage;
+  }
+}
 if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &usage }
 if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &usage }
 
@@ -75,17 +84,20 @@ sub HUNTSMAN {
 $SIG{INT} = \&HUNTSMAN;
 $SIG{TERM} = \&HUNTSMAN;
 
-# establish SERVER socket, bind and listen.
-my $server = IO::Socket::INET->new(LocalPort => $PORT,
-				   LocalAddr => $LOCALADDR,
-                                   Proto     => 'tcp',
-                                   Reuse     => 1,
-                                   Blocking  => 0,
-                                   Listen    => SOMAXCONN )
-  or die "Creating TCP socket $LOCALADDR:$PORT: $!\n";
-IO::Handle::blocking($server, 0);
-my $sel = IO::Select->new();
-$sel->add($server);
+my $select = new IO::Select;
+
+# establish SERVER socket(s), bind and listen.
+for my $listen_addr (@LOCALADDR) {
+  my $server = IO::Socket::INET->new(LocalPort => $PORT,
+                                     LocalAddr => $listen_addr,
+                                     Proto     => 'tcp',
+                                     Reuse     => 1,
+                                     Blocking  => 0,
+                                     Listen    => SOMAXCONN )
+    or die "Creating TCP socket $listen_addr:$PORT: $!\n";
+  IO::Handle::blocking($server, 0);
+  $select->add($server);
+}
 
 if ($PID_FILE) {
   if ($PID_FILE =~ m#^(/[\w\d/\-.]+)$#) { $PID_FILE = $1 } else { &usage }
@@ -145,8 +157,12 @@ while (1) {
     sleep(1);
     next;
   }
-  next unless $sel->can_read(1);
-    my $hisaddr = accept(my $client, $server);
+  my @ready = $select->can_read(1);
+  next if !@ready;
+  my $server = shift @ready;
+
+  my ($client, $hisaddr) = $server->accept;
+
     if (!$hisaddr) {
         # possible something condition...
         next;

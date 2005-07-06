@@ -1,5 +1,8 @@
 0.31 -
 
+  qpsmtpd-forkserver: --listen-address may now be given more than once, to
+  request listening on multiple local addresses (Devin Carraway)
+
   qpsmtpd-forkserver: add an option for writing a PID file (pjh)
 
   qpsmtpd-forkserver: set auxiliary groups (this is needed for the
