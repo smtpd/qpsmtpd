@@ -52,7 +52,9 @@ sub dispatch {
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd);
-    if ($rc == DENY) {
+    if ($rc == DENY_DISCONNECT or $rc == DENY) {
+      $self->log(LOGWARN, "Returning DENY for the unrecognized_command hook is deprecated; use DENY_DISCONNECT")
+	if $rc == DENY;
       $self->respond(521, $msg);
       $self->disconnect;
     }

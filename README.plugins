@@ -189,7 +189,7 @@ Works like the "connect" hook.
 
 Called when we get a command that isn't recognized.
 
-  DENY - Return 521 and disconnect the client
+  DENY_DISCONNECT - Return 521 and disconnect the client
   DONE - Qpsmtpd won't do anything; the plugin responded 
   Anything else - Return '500 Unrecognized command'
 

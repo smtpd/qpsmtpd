@@ -2,6 +2,8 @@
 
   qpsmtpd-forkserver: --listen-address may now be given more than once, to
   request listening on multiple local addresses (Devin Carraway)
+  (also: no more signal problems making qpsmtpd-forkserver crash/loop
+  when forking).
 
   qpsmtpd-forkserver: add an option for writing a PID file (pjh)
 
@@ -11,6 +13,11 @@
 
   when disconncting with a temporary failure, return 421 rather than
   450 or 451. (Peter J. Holzer)
+
+  The unrecognized_command hook now understands the DENY_DISCONNECT return
+  and the DENY return is deprecated.
+
+  Updated documentation
 
 
 0.30 - 2005/07/05
