@@ -50,9 +50,6 @@ sub dispatch {
 
   $self->{_counter}++; 
 
-  #$self->respond(553, $state{dnsbl_blocked}), return 1
-  #  if $state{dnsbl_blocked} and ($cmd eq "rcpt");
-
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd);
     if ($rc == DENY) {
