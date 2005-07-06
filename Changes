@@ -14,8 +14,8 @@
   when disconncting with a temporary failure, return 421 rather than
   450 or 451. (Peter J. Holzer)
 
-  The unrecognized_command hook now understands the DENY_DISCONNECT return
-  and the DENY return is deprecated.
+  The unrecognized_command hook now uses DENY_DISCONNECT return
+  for disconnecting the user.
 
   Updated documentation
 

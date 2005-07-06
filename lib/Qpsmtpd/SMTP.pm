@@ -57,7 +57,7 @@ sub dispatch {
       $self->disconnect;
     }
     elsif ($rc == DENY) {
-      $self->respond(521, $msg);
+      $self->respond(500, $msg);
     }
     elsif ($rc == DONE) {
       1;
