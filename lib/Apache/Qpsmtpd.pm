@@ -16,7 +16,6 @@ use APR::Bucket ();
 use APR::Socket ();
 use Apache2::Filter ();
 use ModPerl::Util ();
-use Apache::Scoreboard;
 
 our $VERSION = '0.02';
 
@@ -56,7 +55,7 @@ sub start_connection {
     my $remote_host = $opts{host} || ( $opts{ip} ? "[$opts{ip}]" : "[noip!]");
     my $remote_info = $opts{info} ? "$opts{info}\@$remote_host" : $remote_host;
     my $remote_ip = $opts{ip};
-    
+
     $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
 
     $self->SUPER::connection->start(
