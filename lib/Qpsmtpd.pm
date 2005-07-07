@@ -4,6 +4,8 @@ use vars qw($VERSION $Logger $TraceLevel $Spool_dir);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Transaction;
+use Qpsmtpd::Connection;
 
 $VERSION = "0.31-dev";
 
@@ -114,17 +116,25 @@ sub config_dir {
   my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
   $configdir = "$name/config" if (-e "$name/config/$config");
+  if (exists $ENV{QPSMTPD_CONFIG}) {
+    $configdir = $ENV{QPSMTPD_CONFIG} if (-e "$ENV{QPSMTPD_CONFIG}/$config");
+  }
   return $configdir;
 }
 
 sub plugin_dir {
-    my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-    my $dir = "$name/plugins";
+    my $self = shift;
+    my $plugin_dir = $self->config('plugin_dir', "NOLOG");
+    unless (defined($plugin_dir)) {
+      my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+      $plugin_dir = "$name/plugins";
+    }
+    return $plugin_dir;
 }
 
 sub get_qmail_config {
   my ($self, $config, $type) = @_;
-  $self->log(LOGDEBUG, "trying to get config for $config");
+  $self->log(LOGDEBUG, "trying to get config for $config") unless $type and $type eq "NOLOG";
   if ($self->{_config_cache}->{$config}) {
     return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
   }
@@ -246,10 +256,6 @@ sub _load_plugins {
   return @ret;
 }
 
-sub transaction {
-    return {}; # base class implements empty transaction
-}
-
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
   my $hooks = $self->{hooks};
@@ -345,6 +351,22 @@ sub spool_dir {
   }
     
   return $Spool_dir;
+}
+
+sub transaction {
+    my $self = shift;
+    return $self->{_transaction} || $self->reset_transaction();
+}
+
+sub reset_transaction {
+    my $self = shift;
+    $self->run_hooks("reset_transaction") if $self->{_transaction};
+    return $self->{_transaction} = Qpsmtpd::Transaction->new();
+}
+
+sub connection {
+  my $self = shift;
+  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
 }
 
 # For unique filenames. We write to a local tmp dir so we don't need
