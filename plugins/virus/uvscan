@@ -44,7 +44,6 @@ Please see the LICENSE file included with qpsmtpd for details.
 
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("data_post", "uvscan");
 
   while (@args) {
   	$self->{"_uvscan"}->{pop @args}=pop @args;
@@ -52,7 +51,7 @@ sub register {
   $self->{"_uvscan"}->{"uvscan_location"}||="/usr/local/bin/uvscan";
 }
  
-sub uvscan {
+sub hook_data_post {
   my ($self, $transaction) = @_;
  
   return (DECLINED)

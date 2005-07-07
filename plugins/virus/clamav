@@ -148,11 +148,9 @@ sub register {
         return undef;
   }
 
-  $self->register_hook("data_post", "clam_scan");
-  1;
 }
  
-sub clam_scan {
+sub hook_data_post {
   my ($self, $transaction) = @_;
 
   if ($transaction->body_size > $self->{_max_size}) {

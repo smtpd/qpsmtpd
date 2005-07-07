@@ -6,12 +6,7 @@
 
 use POSIX qw:strftime:;
 
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("data_post", "mail_handler");
-}
-
-sub mail_handler {
+sub hook_data_post {
   my ($self, $transaction) = @_;
 
   # as a decent default, log on a per-day-basis

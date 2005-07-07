@@ -1,11 +1,6 @@
 #!/usr/bin/perl -w
 
-sub register {
-    my $self = shift;
-    $self->register_hook('data_post', 'check_for_hi_virus');
-}
-
-sub check_for_hi_virus {
+sub hook_data_post {
     my ($self, $transaction) = @_;
 
     # make sure we read from the beginning;

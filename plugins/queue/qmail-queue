@@ -23,7 +23,6 @@ use POSIX ();
 
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("queue", "queue_handler");
 
   if (@args > 0) {
     $self->{_queue_exec} = $args[0];
@@ -36,7 +35,7 @@ sub register {
   $self->{_queue_exec} = $ENV{QMAILQUEUE} if $ENV{QMAILQUEUE};
 }
 
-sub queue_handler {
+sub hook_queue {
   my ($self, $transaction) = @_;
 
   # these bits inspired by Peter Samuels "qmail-queue wrapper"

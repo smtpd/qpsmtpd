@@ -34,12 +34,7 @@ terms as Perl itself.
 
 =cut
 
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("connect", "check_norelay");
-}
-
-sub check_norelay {
+sub hook_connect {
   my ($self, $transaction) = @_;
   my $connection = $self->qp->connection;
 

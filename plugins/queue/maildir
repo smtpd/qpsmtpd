@@ -35,13 +35,11 @@ sub register {
   my $hostname = (hostname =~ m/([\w\._\-]+)/)[0];
   $self->{_hostname} = $hostname;
 
-  $self->register_hook("queue", "queue_handler");
-
 }
 
 my $maildir_counter = 0;
 
-sub queue_handler {
+sub hook_queue {
   my ($self, $transaction) = @_;
 
   my ($time, $microseconds) = gettimeofday;

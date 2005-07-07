@@ -1,4 +1,5 @@
 package Qpsmtpd::Plugin;
+use Qpsmtpd::Constants;
 use strict;
 
 our %hooks = map { $_ => 1 } qw(
@@ -16,8 +17,10 @@ sub new {
 
 sub register_hook {
   my ($plugin, $hook, $method, $unshift) = @_;
-  
+
   die $plugin->plugin_name . " : Invalid hook: $hook" unless $hooks{$hook};
+
+  $plugin->{_qp}->varlog(LOGDEBUG, $plugin->plugin_name, " hooking ", $hook);
 
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
@@ -32,7 +35,9 @@ sub _register {
   my $self = shift;
   my $qp = shift;
   local $self->{_qp} = $qp;
-  $self->register($qp, @_);
+  $self->init($qp, @_)     if $self->can('init');
+  $self->_register_standard_hooks($qp, @_);
+  $self->register($qp, @_) if $self->can('register');
 }
 
 sub qp {
@@ -74,7 +79,7 @@ sub temp_dir {
 
 # plugin inheritance:
 # usage:
-#  sub register {
+#  sub init {
 #    my $self = shift;
 #    $self->isa_plugin("rhsbl");
 #    $self->SUPER::register(@_);
@@ -82,18 +87,23 @@ sub temp_dir {
 sub isa_plugin {
   my ($self, $parent) = @_;
   my ($currentPackage) = caller;
-  my $newPackage = $currentPackage."::_isa_";
+
+  my $cleanParent = $parent;
+  $cleanParent =~ s/\W/_/g;
+  my $newPackage = $currentPackage."::_isa_$cleanParent";
+
 
   return if defined &{"${newPackage}::register"};
 
-  Qpsmtpd::_compile($self->plugin_name . "_isa",
+  $self->compile($self->plugin_name . "_isa_$cleanParent",
                     $newPackage,
                     "plugins/$parent"); # assumes Cwd is qpsmtpd root
-
+  warn "---- $newPackage\n";
   no strict 'refs';
   push @{"${currentPackage}::ISA"}, $newPackage;
 }
 
+# why isn't compile private?  it's only called from Plugin and Qpsmtpd.
 sub compile {
     my ($class, $plugin, $package, $file, $test_mode) = @_;
     
@@ -140,5 +150,17 @@ sub compile {
     eval $eval;
     die "eval $@" if $@;
 }
+
+sub _register_standard_hooks {
+  my ($plugin, $qp) = @_;
+
+  for my $hook (keys %hooks) {
+    my $hooksub = "hook_$hook";
+    $hooksub  =~ s/\W/_/g;
+    $plugin->register_hook( $hook, $hooksub )
+      if ($plugin->can($hooksub));
+  }
+}
+
 
 1;

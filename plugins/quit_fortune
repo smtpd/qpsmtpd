@@ -1,9 +1,5 @@
 
-sub register {
-  shift->register_hook("quit", "quit_handler");
-}
-
-sub quit_handler {
+sub hook_quit {
   my $qp = shift->qp;
 
   # if she talks EHLO she is probably too sophisticated to enjoy the

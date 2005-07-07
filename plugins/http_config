@@ -31,10 +31,9 @@ my @urls;
 sub register {
   my ($self, $qp, @args) = @_;
   @urls = @args;
-  $self->register_hook("config", "http_config");
 }
 
-sub http_config {
+sub hook_config {
   my ($self, $transaction, $config) = @_; 
   $self->log(LOGNOTICE, "http_config called with $config");
   for my $url (@urls) {

@@ -96,9 +96,6 @@ use Mail::Address;
 sub register {
 	my ($self, $qp, @args) = @_;
 	
-	# where to be called
-	$self->register_hook("data_post", "avscan");
-	
 	# defaults to be used
 	$self->{_avclient_bin} 	= "/opt/kav/bin/aveclient";
 	$self->{_avdaemon_sock} = "/var/run/aveserver";
@@ -122,7 +119,7 @@ sub register {
 	}
 }
  
-sub avscan {
+sub hook_data_post {
 	my ($self, $transaction) = @_;
 	my ($temp_fh, $filename) = tempfile();
 	my $description = 'clean';

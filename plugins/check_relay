@@ -2,12 +2,7 @@
 # $ENV{RELAYCLIENT} to see if relaying is allowed.
 #
 
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("connect", "check_relay");
-}
-
-sub check_relay {
+sub hook_connect {
   my ($self, $transaction) = @_;
   my $connection = $self->qp->connection;
 

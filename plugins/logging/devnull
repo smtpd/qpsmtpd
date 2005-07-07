@@ -1,13 +1,7 @@
 #!/usr/bin/perl
 # this is a simple 'drop packets on the floor' plugin
 
-sub register {
-  my $self = shift;
-
-  $self->register_hook('logging', 'wlog');
-}
-
-sub wlog {
+sub hook_logging {
   return DECLINED;
 }
 

@@ -94,7 +94,6 @@ use Clamd;
 
 sub register {
     my ( $self, $qp, @args ) = @_;
-    $self->register_hook( "data_post", "clamdscan" );
 
     %{ $self->{"_clamd"} } = @args;
 
@@ -104,7 +103,7 @@ sub register {
     $self->{"_clamd"}->{"max_size"}     ||= 128;
 }
 
-sub clamdscan {
+sub hook_data_post {
     my ( $self, $transaction ) = @_;
     $DB::single = 1;
 

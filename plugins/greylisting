@@ -137,7 +137,6 @@ sub register {
   } else {
     $self->register_hook("rcpt", "rcpt_handler");
   }
-  $self->register_hook("data_post", "data_handler");
 }
 
 sub mail_handler {
@@ -167,7 +166,7 @@ sub rcpt_handler {
   return DECLINED;
 }
 
-sub data_handler {
+sub hook_data {
   my ($self, $transaction) = @_;
   my $note = $transaction->notes('denysoft_greylist');
   return DECLINED unless $note;

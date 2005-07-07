@@ -1,9 +1,5 @@
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("data_post", "check_klez");
-}
 
-sub check_klez {
+sub hook_data_post {
   my ($self, $transaction) = @_;
 
   # klez files are always sorta big .. how big?  Dunno. 

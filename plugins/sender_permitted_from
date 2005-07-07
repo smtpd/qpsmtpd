@@ -31,12 +31,9 @@ use Mail::SPF::Query 1.991;
 sub register {
   my ($self, $qp, @args) = @_;
   %{$self->{_args}} = @args;
-  $self->register_hook("mail", "mail_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
-  $self->register_hook("data_post", "data_handler");
 }
 
-sub mail_handler {
+sub hook_mail {
   my ($self, $transaction, $sender) = @_;
 
   return (DECLINED) unless ($sender->format ne "<>"
@@ -73,7 +70,7 @@ sub mail_handler {
   return (DECLINED);
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
   
   # special addresses don't get SPF-tested.
@@ -109,7 +106,7 @@ sub _uri_escape {
   return $str;
 }
 
-sub data_handler {
+sub hook_data {
   my ($self, $transaction) = @_;
 
   my $query = $transaction->notes('spfquery');

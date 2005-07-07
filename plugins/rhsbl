@@ -1,12 +1,5 @@
-sub register {
-  my ($self, $qp) = @_;
 
-  $self->register_hook('mail', 'mail_handler');
-  $self->register_hook('rcpt', 'rcpt_handler');
-  $self->register_hook('disconnect', 'disconnect_handler');
-}
-
-sub mail_handler {
+sub hook_mail {
   my ($self, $transaction, $sender) = @_;
 
   my $res = new Net::DNS::Resolver;
@@ -40,7 +33,7 @@ sub mail_handler {
   return DECLINED;
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
   my $host = $transaction->sender->host;
   my $hello = $self->qp->connection->hello_host;
@@ -111,7 +104,7 @@ sub process_sockets {
   return $trans->notes('rhsbl', $result);
 }
 
-sub disconnect_handler {
+sub hook_disconnect {
   my ($self, $transaction) = @_;
 
   $transaction->notes('rhsbl_sockets', undef);

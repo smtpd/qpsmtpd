@@ -16,13 +16,7 @@ per line.
 
 =cut
 
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("helo", "check_helo");
-  $self->register_hook("ehlo", "check_helo");
-}
-
-sub check_helo {
+sub hook_helo {
   my ($self, $transaction, $host) = @_;
   ($host = lc $host) or return DECLINED;
   
@@ -35,3 +29,5 @@ sub check_helo {
   return DECLINED;
 }
 
+# also support EHLO
+*hook_ehlo = \&hook_helo;

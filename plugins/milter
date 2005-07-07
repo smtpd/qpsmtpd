@@ -42,15 +42,9 @@ sub register {
   $self->{host} = $host;
   $self->{port} = $port;
   
-  $self->register_hook("connect", "connect_handler");
-  $self->register_hook("helo", "helo_handler");
-  $self->register_hook("mail", "mail_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
-  $self->register_hook("data_post", "data_handler");
-  $self->register_hook("disconnect", "disconnect_handler");
 }
 
-sub disconnect_handler {
+sub hook_disconnect {
     my ($self) = @_;
 
     my $milter = $self->qp->connection->notes('milter') || return DECLINED;
@@ -93,7 +87,7 @@ sub check_results {
     }
 }
 
-sub connect_handler {
+sub hook_connect {
     my ($self, $transaction) = @_;
     
     $self->log(LOGDEBUG, "milter $self->{name} opening connection to milter backend");
@@ -119,7 +113,7 @@ sub connect_handler {
     return DECLINED;
 }
 
-sub helo_handler {
+sub hook_helo {
     my ($self, $transaction) = @_;
 
     if (my $txt = $self->qp->connection->notes('spam')) {
@@ -140,7 +134,7 @@ sub helo_handler {
     return DECLINED;
 }
 
-sub mail_handler {
+sub hook_mail {
     my ($self, $transaction, $address) = @_;
     
     my $milter = $self->qp->connection->notes('milter');
@@ -153,7 +147,7 @@ sub mail_handler {
     return DECLINED;
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
     my ($self, $transaction, $address) = @_;
     
     my $milter = $self->qp->connection->notes('milter');
@@ -167,7 +161,7 @@ sub rcpt_handler {
     return DECLINED;
 }
 
-sub data_handler {
+sub hook_data {
     my ($self, $transaction) = @_;
 
     my $milter = $self->qp->connection->notes('milter');

@@ -20,13 +20,7 @@ stage, so store it until later.
 
 =cut
 
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("mail", "mail_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
-}
-
-sub mail_handler {
+sub hook_mail {
   my ($self, $transaction, $sender) = @_;
 
   my @badmailfrom = $self->qp->config("badmailfrom")
@@ -49,7 +43,7 @@ sub mail_handler {
   return (DECLINED);
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
   my $note = $transaction->notes('badmailfrom');
   if ($note) {

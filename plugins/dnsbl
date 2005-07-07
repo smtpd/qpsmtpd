@@ -8,13 +8,10 @@ sub register {
   else {
     $self->{_dnsbl}->{DENY} = DENY;
   }
-		    
-  $self->register_hook("connect", "connect_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
-  $self->register_hook("disconnect", "disconnect_handler");
+
 }
 
-sub connect_handler {
+sub hook_connect {
   my ($self, $transaction) = @_;
 
   my $remote_ip = $self->qp->connection->remote_ip;
@@ -151,7 +148,7 @@ sub process_sockets {
 
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
   my $connection = $self->qp->connection;
 
@@ -184,7 +181,7 @@ sub rcpt_handler {
 
 }
 
-sub disconnect_handler {
+sub hook_disconnect {
   my ($self, $transaction) = @_;
 
   $self->qp->connection->notes('dnsbl_sockets', undef);

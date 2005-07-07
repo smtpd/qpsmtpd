@@ -3,7 +3,6 @@ use IO::Socket;
 
 sub register {
     my ( $self, $qp, @args ) = @_;
-    $self->register_hook( "data_post", "sophiescan" );
 
     %{ $self->{"_sophie"} } = @args;
 
@@ -13,7 +12,7 @@ sub register {
     $self->{"_sophie"}->{"max_size"}      ||= 128;
 }
 
-sub sophiescan {
+sub hook_data_post {
     my ( $self, $transaction ) = @_;
     $DB::single = 1;
 

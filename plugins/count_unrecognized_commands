@@ -17,7 +17,6 @@ before we disconnect the client.  Defaults to 4.
 
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("unrecognized_command", "check_unrec_cmd");
 
   if (@args > 0) {
     $self->{_unrec_cmd_max} = $args[0];
@@ -30,7 +29,7 @@ sub register {
 
 }
 
-sub check_unrec_cmd {
+sub hook_unrecognized_command {
   my ($self, $cmd) = @_[0,2];
   
   $self->log(LOGINFO, "Unrecognized command '$cmd'");

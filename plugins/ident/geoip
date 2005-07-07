@@ -17,13 +17,7 @@ use Geo::IP;
 
 my $geoip = Geo::IP->new(GEOIP_STANDARD);
 
-
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("connect", "lookup_geoip");
-}
-
-sub lookup_geoip {
+sub hook_connect {
   my ($self) = @_;
 
   my $country = 

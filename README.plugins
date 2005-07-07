@@ -270,3 +270,82 @@ ended.
 Returns the configured system-wide spool directory.
 
 =back
+
+=head1 Naming Conventions
+
+Plugins should be written using standard named hook subroutines.  This
+allows them to be overloaded and extended easily.
+
+Because some of our callback names have characters invalid in
+subroutine names, they must be translated.  The current translation
+routine is: C< s/\W/_/g; >
+
+=head2 Naming Map
+
+ hook                          method
+ ----------                    ------------
+ config                        hook_config                      
+ queue                         hook_queue                       
+ data                          hook_data                        
+ data_post                     hook_data_post                   
+ quit                          hook_quit                        
+ rcpt                          hook_rcpt                        
+ mail                          hook_mail                        
+ ehlo                          hook_ehlo                        
+ helo                          hook_helo                        
+ auth                          hook_auth                        
+ auth-plain                    hook_auth_plain                  
+ auth-login                    hook_auth_login                  
+ auth-cram-md5                 hook_auth_cram_md5               
+ connect                       hook_connect                     
+ reset_transaction             hook_reset_transaction           
+ unrecognized_command          hook_unrecognized_command        
+                                                           
+=head1 Register
+
+If you choose not to use the default naming convention, you need to
+register the hooks in your plugin.  You do this with the C< register >
+method call on the plugin object.
+
+  sub register {
+    my ($self, $qp) = @_;
+
+    $self->register_hook('mail', 'mail_handler');
+    $self->register_hook('rcpt', 'rcpt_handler');
+    $self->register_hook('disconnect', 'disconnect_handler');
+  }
+
+  sub mail_handler { ... }
+  sub rcpt_handler { ... }
+  sub disconnect_handler { ... }
+
+A single plugin can register as many hooks as it wants, and can
+register a hook multiple times.
+
+The C< register > method is also often used for initialization and
+reading configuration.
+
+=head1 Init
+
+The 'init' method is the first method called after a plugin is
+loaded.  It's mostly for inheritance, below.
+
+=head1 Inheritance
+
+Instead of modifying @ISA directly in your plugin, use the 
+C< plugin_isa > method from the init subroutine.
+
+  # rcpt_ok_child
+  sub init {
+    my ($self, $qp) = @_;
+    $self->isa_plugin('rcpt_ok');
+  }
+
+  sub hook_rcpt {
+    my ($self, $transaction, $recipient) = @_;
+    # do something special here...
+    $self->SUPER::hook_rcpt( $transaction, $recipient );
+  }
+
+
+

@@ -23,13 +23,12 @@ use Net::IP;
 
 sub register {
   my ($self, $qp, $p0f_socket) = @_;
-  $self->register_hook("connect", "lookup_p0f");
 
   $p0f_socket =~ /(.*)/; # untaint
   $self->{_args}->{p0f_socket} = $1;
 }
 
-sub lookup_p0f {
+sub hook_connect {
   my($self, $qp) = @_;
 
   eval {

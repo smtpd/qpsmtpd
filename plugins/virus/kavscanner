@@ -57,7 +57,6 @@ use Mail::Address;
  
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("data_post", "kav_scan");
 
   if (@args % 2) {
     $self->log(LOGWARN, "kavscanner: Wrong number of arguments");
@@ -80,7 +79,7 @@ sub register {
   } 
 }
  
-sub kav_scan {
+sub hook_data_post {
   my ($self, $transaction) = @_;
  
   my ($temp_fh, $filename) = tempfile();

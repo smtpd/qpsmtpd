@@ -5,12 +5,7 @@
 #  the Qpsmtpd::Auth module.  Don't run this in production!!!
 #
 
-sub register {
-    my ( $self, $qp ) = @_;
-    $self->register_hook( "auth", "authdeny" );
-}
-
-sub authdeny {
+sub hook_auth {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 

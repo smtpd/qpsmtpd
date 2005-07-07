@@ -30,16 +30,12 @@ sub register {
         $self->{_prefix} = $1;
     }
 
-    $self->register_hook( 'logging',           'wlog' );
-    $self->register_hook( 'deny',              'dlog' );
-    $self->register_hook( 'reset_transaction', 'slog' );
-
     # If you want to capture this log entry with this plugin, you need to
     # wait until after you register the plugin
     $self->log( LOGINFO, 'Initializing logging::adaptive plugin' );
 }
 
-sub wlog {
+sub hook_logging { # wlog
     my ( $self, $transaction, $trace, $hook, $plugin, @log ) = @_;
 
     # Don't log your own log entries!  If this is the only logging plugin
@@ -66,12 +62,12 @@ sub wlog {
     return DECLINED;
 }
 
-sub dlog {
+sub hook_deny { # dlog
     my ( $self, $transaction, $prev_hook, $return, $return_text ) = @_;
     $self->{_denied} = 1;
 }
 
-sub slog {
+sub hook_reset_transaction { # slog
 
     # fires when a message is accepted
     my ( $self, $transaction, @args ) = @_;

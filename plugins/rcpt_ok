@@ -3,12 +3,7 @@
 # It should be configured to be run _LAST_!
 #
 
-sub register {
-  my ($self, $qp) = @_;
-  $self->register_hook("rcpt", "rcpt_ok");
-}
-
-sub rcpt_ok {
+sub hook_rcpt {
   my ($self, $transaction, $recipient) = @_;
   my $host = lc $recipient->host;
 

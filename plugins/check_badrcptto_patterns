@@ -26,13 +26,7 @@ terms as Perl itself.
 
 =cut
 
-sub register
-{
-  my ($self, $qp) = @_;
-  $self->register_hook("rcpt", "check_for_badrcptto_patterns");
-}
-
-sub check_for_badrcptto_patterns
+sub hook_rcpt
 {
   my ($self, $transaction, $recipient) = @_;
 

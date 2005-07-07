@@ -18,7 +18,6 @@ use Qpsmtpd::Postfix;
 
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("queue", "queue_handler");
 
   if (@args > 0) {
     $self->{_queue_socket} = $args[0];
@@ -31,7 +30,7 @@ sub register {
 
 }
 
-sub queue_handler {
+sub hook_queue {
   my ($self, $transaction) = @_;
 
   my ($status, $qid, $reason) = Qpsmtpd::Postfix->inject_mail($transaction);

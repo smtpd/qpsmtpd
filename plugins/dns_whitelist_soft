@@ -41,14 +41,7 @@ based on the 'whitelist' plugin by Devin Carraway <qpsmtpd@devin.com>.
 
 =cut
 
-sub register {
-  my ($self, $qp) = @_;
-
-  $self->register_hook("connect", "connect_handler");
-  $self->register_hook("rcpt", "rcpt_handler");
-}
-
-sub connect_handler {
+sub hook_connect {
   my ($self, $transaction) = @_;
 
   my $remote_ip = $self->qp->connection->remote_ip;
@@ -145,7 +138,7 @@ sub process_sockets {
 
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
   my $ip = $self->qp->connection->remote_ip || return (DECLINED);
   my $note = $self->process_sockets;
@@ -154,14 +147,5 @@ sub rcpt_handler {
   }
   return DECLINED;
 }
-
-sub disconnect_handler {
-  my ($self, $transaction) = @_;
-
-  $self->qp->connection->notes('whitelist_sockets', undef);
-
-  return DECLINED;
-}
-
 
 1;

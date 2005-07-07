@@ -33,7 +33,6 @@ use Date::Parse qw(str2time);
 
 sub register {
   my ($self, $qp, @args) = @_;
-  $self->register_hook("data_post", "check_basic_headers");
 
   if (@args > 0) {
     $self->{_days} = $args[0];
@@ -41,7 +40,7 @@ sub register {
   }
 }
 
-sub check_basic_headers {
+sub hook_data_post {
   my ($self, $transaction) = @_;
 
   return (DENY, "You have to send some data first")
