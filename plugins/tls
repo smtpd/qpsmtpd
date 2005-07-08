@@ -1,0 +1,135 @@
+#!perl -w
+
+=head1 NAME
+
+tls - plugin to support STARTTLS
+
+=head1 SYNOPSIS
+
+# in config/plugins
+
+  tls ssl/cert.pem ssl/privkey.pem
+
+=head1 DESCRIPTION
+
+This plugin implements basic TLS support.
+
+If TLS is successfully negotiated then the C<tls_enabled> field in the
+Connection notes is set. If you wish to make TLS mandatory you should check
+that field and take appropriate action. Note that you can only do that from
+MAIL FROM onwards.
+
+=cut
+
+use IO::Socket::SSL qw(debug1 debug2 debug3 debug4);
+
+sub init {
+    my ($self, $qp, $cert, $key) = @_;
+    $cert ||= 'ssl/cert.pem';
+    $key  ||= 'ssl/privkey.pem';
+    $self->tls_cert($cert);
+    $self->tls_key($key);
+    
+    local $^W; # this bit is very noisy...
+    my $ssl_ctx = IO::Socket::SSL::SSL_Context->new(
+        SSL_use_cert => 1,
+        SSL_cert_file => $self->tls_cert,
+        SSL_key_file => $self->tls_key,
+        SSL_cipher_list => 'HIGH',
+        SSL_server => 1
+    ) or die "Could not create SSL context: $!";
+    # now extract the password...
+    
+    $self->ssl_context($ssl_ctx);
+}
+
+sub hook_ehlo {
+    my ($self, $transaction) = @_;
+    return DECLINED unless $self->can_do_tls;
+    return DECLINED if $self->connection->notes('tls_enabled');
+    return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
+    my $cap = $transaction->notes('capabilities');
+    $cap ||= [];
+    push @$cap, 'STARTTLS';
+    $transaction->notes('tls_enabled', 1);
+    $transaction->notes('capabilities', $cap);
+    return DECLINED;
+}
+
+sub hook_unrecognized_command {
+    my ($self, $transaction, $cmd, @args) = @_;
+    return DECLINED unless $cmd eq 'starttls';
+    return DECLINED unless $transaction->notes('tls_enabled');
+    return DENY, "Syntax error (no parameters allowed)" if @args;
+    
+    # OK, now we setup TLS
+    $self->qp->respond (220, "Go ahead with TLS");
+    
+    eval {
+        my $tlssocket = IO::Socket::SSL->new_from_fd(
+            fileno(STDIN), '+>',
+            SSL_use_cert => 1,
+            SSL_cert_file => $self->tls_cert,
+            SSL_key_file => $self->tls_key,
+            SSL_cipher_list => 'HIGH',
+            SSL_server => 1,
+            SSL_reuse_ctx => $self->ssl_context,
+        ) or die "Could not create SSL socket: $!";
+    
+        my $conn = $self->connection;
+        # Create a new connection object with subset of information collected thus far
+        $self->qp->connection(Qpsmtpd::Connection->new(
+           map { $_ => $conn->$_ }
+                qw(
+                    local_ip
+                    local_port
+                    remote_ip
+                    remote_port
+                    remote_host
+                    remote_info
+                ),
+            ));
+        $self->qp->reset_transaction;
+        *STDIN = *STDOUT = $self->connection->notes('tls_socket', $tlssocket);
+        $self->connection->notes('tls_enabled', 1);
+    };
+    if ($@) {
+        # SSL setup failed. Now we must respond to every command with 5XX
+        warn("TLS failed: $@\n");
+        $transaction->notes('ssl_failed', 1);
+        return DENY, "TLS Negotiation Failed";
+    }
+    
+    warn("TLS setup returning\n");
+    return DONE;
+}
+
+sub can_do_tls {
+    my ($self) = @_;
+    $self->tls_cert && -r $self->tls_cert;
+}
+
+sub tls_cert {
+    my $self = shift;
+    @_ and $self->{_tls_cert} = shift;
+    $self->{_tls_cert};
+}
+
+sub tls_key {
+    my $self = shift;
+    @_ and $self->{_tls_key} = shift;
+    $self->{_tls_key};
+}
+
+sub ssl_context {
+    my $self = shift;
+    @_ and $self->{_ssl_ctx} = shift;
+    $self->{_ssl_ctx};
+}
+
+# Fulfill RFC 2487 secn 5.1
+sub bad_ssl_hook {
+    my ($self, $transaction) = @_;
+    return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
+}
+*hook_helo = *hook_data = *hook_rcpt = *hook_mail = *hook_auth = \&bad_ssl_hook;
