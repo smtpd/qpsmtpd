@@ -333,7 +333,7 @@ loaded.  It's mostly for inheritance, below.
 =head1 Inheritance
 
 Instead of modifying @ISA directly in your plugin, use the 
-C< plugin_isa > method from the init subroutine.
+C< isa_plugin > method from the C< init > subroutine.
 
   # rcpt_ok_child
   sub init {
