@@ -20,7 +20,8 @@ sub register_hook {
 
   die $plugin->plugin_name . " : Invalid hook: $hook" unless $hooks{$hook};
 
-  $plugin->{_qp}->varlog(LOGDEBUG, $plugin->plugin_name, " hooking ", $hook);
+  $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, "hooking", $hook)
+      unless $hook =~ /logging/; # can't log during load_logging()
 
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
