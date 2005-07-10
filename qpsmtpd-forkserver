@@ -23,7 +23,7 @@ my $PORT      = 2525;                # port number
 my @LOCALADDR;                       # ip address(es) to bind to
 my $USER      = 'smtpd';             # user to suid to
 my $MAXCONNIP = 5;                   # max simultaneous connections from one IP
-my $PID_FILE   = '';
+my $PID_FILE   = '';                 # file to which server PID will be written
 
 sub usage {
         print <<"EOT";
@@ -78,6 +78,9 @@ sub REAPER {
 sub HUNTSMAN {
   $SIG{CHLD} = 'DEFAULT';
   kill 'INT' => keys %childstatus;
+  if ($PID_FILE && -e $PID_FILE) {
+    unlink $PID_FILE or ::log(LOGERROR, "unlink: $PID_FILE: $!");
+  }
   exit(0);
 }
 
