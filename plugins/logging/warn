@@ -16,14 +16,13 @@ sub register {
 	  $self->{_level} = log_level($loglevel);
       }
   }
-  $self->register_hook('logging', 'wlog');
 
   # If you want to capture this log entry with this plugin, you need to
   # wait until after you register the plugin
   $self->log(LOGINFO,'Initializing logging::warn plugin');
 }
 
-sub wlog {
+sub hook_logging {
   my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
   # Don't log your own log entries!  If this is the only logging plugin
