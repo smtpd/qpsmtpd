@@ -51,7 +51,7 @@ sub dispatch {
   $self->{_counter}++; 
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
-    my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd);
+    my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
     if ($rc == DENY_DISCONNECT) {
       $self->respond(521, $msg);
       $self->disconnect;
