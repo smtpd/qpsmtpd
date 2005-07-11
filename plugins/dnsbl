@@ -1,20 +1,17 @@
-#!perl -w
+#!/usr/bin/perl -w
+
+use Danga::DNS;
 
 sub register {
-  my ($self, $qp, $denial ) = @_;
-  if ( defined $denial and $denial =~ /^disconnect$/i ) {
-    $self->{_dnsbl}->{DENY} = DENY_DISCONNECT;
-  }
-  else {
-    $self->{_dnsbl}->{DENY} = DENY;
-  }
-
+  my ($self) = @_;
+  $self->register_hook("connect", "connect_handler");
+  $self->register_hook("connect", "pickup_handler");
 }
 
-sub hook_connect {
+sub connect_handler {
   my ($self, $transaction) = @_;
 
-  my $remote_ip = $self->qp->connection->remote_ip;
+  my $remote_ip = $self->connection->remote_ip;
 
   # perform RBLSMTPD checks to mimic Dan Bernstein's rblsmtpd
   if (defined($ENV{'RBLSMTPD'})) {
@@ -29,163 +26,91 @@ sub hook_connect {
     $self->log(LOGDEBUG, "RBLSMTPD not set for $remote_ip");
   }
 
-  my $allow = grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) } $self->qp->config('dnsbl_allow');
+  my $allow = grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) } $self->config('dnsbl_allow');
   return DECLINED if $allow;
 
-  my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
+  my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->config('dnsbl_zones');
   return DECLINED unless %dnsbl_zones;
 
   my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
-  # we should queue these lookups in the background and just fetch the
-  # results in the first rcpt handler ... oh well.
-
-  my $res = new Net::DNS::Resolver;
-  $res->tcp_timeout(30);
-  $res->udp_timeout(30);
-
-  my $sel = IO::Select->new();
-
+  $self->transaction->notes('pending_dns_queries', scalar(keys(%dnsbl_zones)));
+  my $qp = $self->qp;
   for my $dnsbl (keys %dnsbl_zones) {
     # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
     if (defined($dnsbl_zones{$dnsbl})) {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
-      $sel->add($res->bgsend("$reversed_ip.$dnsbl"));
+      Danga::DNS->new(
+        callback => sub { process_a_result($qp, $dnsbl_zones{$dnsbl}, @_) },
+        host => "$reversed_ip.$dnsbl",
+        type => 'A',
+        client => $self->qp->input_sock,
+      );
     } else {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
-      $sel->add($res->bgsend("$reversed_ip.$dnsbl", "TXT"));
+      Danga::DNS->new(
+        callback => sub { process_txt_result($qp, @_) },
+        host => "$reversed_ip.$dnsbl",
+        type => 'TXT',
+        client => $self->qp->input_sock,
+      );
     }
   }
 
-  $self->qp->connection->notes('dnsbl_sockets', $sel);
-
-  return DECLINED;
+  return CONTINUATION;
 }
 
-sub process_sockets {
-  my ($self) = @_;
-
-  my $conn = $self->qp->connection;
-
-  return $conn->notes('dnsbl') 
-    if $conn->notes('dnsbl');
-
-  my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
-
-  my $res = new Net::DNS::Resolver;
-  $res->tcp_timeout(30);
-  $res->udp_timeout(30);
-
-  my $sel = $conn->notes('dnsbl_sockets') or return "";
-  my $remote_ip = $self->qp->connection->remote_ip;
-
-  my $result; 
-
-  $self->log(LOGDEBUG, "waiting for dnsbl dns");
-
-  # don't wait more than 8 seconds here
-  my @ready = $sel->can_read(8);
-
-  $self->log(LOGDEBUG, "DONE waiting for dnsbl dns, got " , scalar @ready, " answers ...") ;
-  return '' unless @ready;
-
-  for my $socket (@ready) {
-    my $query = $res->bgread($socket);
-    $sel->remove($socket);
-    undef $socket;
-
-    my $dnsbl;
-
-    if ($query) {
-      my $a_record = 0;
-      foreach my $rr ($query->answer) {
-	$a_record = 1 if $rr->type eq "A";
-	my $name = $rr->name;
-	($dnsbl) = ($name =~ m/(?:\d+\.){4}(.*)/) unless $dnsbl;
-	$dnsbl = $name unless $dnsbl;
-	$self->log(LOGDEBUG, "name ", $rr->name);
-	next unless $rr->type eq "TXT";
-	$self->log(LOGDEBUG, "got txt record");
-	$result = $rr->txtdata and last;
-      }
-      #$a_record and $result = "Blocked by $dnsbl";
-
-      if ($a_record) {
-        if (defined $dnsbl_zones{$dnsbl}) {
-          $result = $dnsbl_zones{$dnsbl};
-          #$result =~ s/%IP%/$ENV{'TCPREMOTEIP'}/g;
-          $result =~ s/%IP%/$remote_ip/g;
-        } else {
-          # shouldn't get here?
-          $result = "Blocked by $dnsbl";
-        }
-      }
+sub process_a_result {
+    my ($qp, $template, $result, $query) = @_;
+    
+    my $pending = $qp->transaction->notes('pending_dns_queries');
+    $qp->transaction->notes('pending_dns_queries', --$pending);
+    
+    warn("Result for A $query: $result\n");
+    if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
+        # NXDOMAIN or ERROR possibly...
+        $qp->finish_continuation unless $pending;
+        return;
     }
-    else {
-      $self->log(LOGERROR, "$dnsbl query failed: ", $res->errorstring)
-	unless $res->errorstring eq "NXDOMAIN";
-    }
-
-    if ($result) {
-      #kill any other pending I/O
-      $conn->notes('dnsbl_sockets', undef);
-      $result = join("\n", $self->qp->config('dnsbl_rejectmsg'), $result);
-      return $conn->notes('dnsbl', $result);
-    }
-  }
-
-  if ($sel->count) {
-    # loop around if we have dns blacklists left to see results from
-    return $self->process_sockets();
-  }
-
-  # er, the following code doesn't make much sense anymore...
-
-  # if there was more to read; then forget it
-  $conn->notes('dnsbl_sockets', undef);
-
-  return $conn->notes('dnsbl', $result);
-
+    
+    my $conn = $qp->connection;
+    my $ip = $conn->remote_ip;
+    $template =~ s/%IP%/$ip/g;
+    $conn->notes('dnsbl', $template) unless $conn->notes('dnsbl');
+    $qp->finish_continuation unless $pending;
 }
 
-sub hook_rcpt {
+sub process_txt_result {
+    my ($qp, $result, $query) = @_;
+    
+    my $pending = $qp->transaction->notes('pending_dns_queries');
+    $qp->transaction->notes('pending_dns_queries', --$pending);
+    
+    warn("Result for TXT $query: $result\n");
+    if ($result !~ /[a-z]/) {
+        # NXDOMAIN or ERROR probably...
+        $qp->finish_continuation unless $pending;
+        return;
+    }
+    
+    my $conn = $qp->connection;
+    $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
+    $qp->finish_continuation unless $pending;
+}
+
+sub pickup_handler {
   my ($self, $transaction, $rcpt) = @_;
-  my $connection = $self->qp->connection;
 
   # RBLSMTPD being non-empty means it contains the failure message to return
   if (defined ($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
     my $result = $ENV{'RBLSMTPD'};
-    my $remote_ip = $connection->remote_ip;
+    my $remote_ip = $self->connection->remote_ip;
     $result =~ s/%IP%/$remote_ip/g;
-    return ($self->{_dnsbl}->{DENY}, 
-	join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
+    return (DENY, join(" ", $self->config('dnsbl_rejectmsg'), $result));
   }
 
-  my $note = $self->process_sockets;
-  my $whitelist = $connection->notes('whitelisthost');
-  if ( $note ) {
-    if ( $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i ) {
-      $self->log(LOGWARN, "Don't blacklist special account: ".$rcpt->user);
-    }
-    elsif ( $whitelist ) {
-      $self->log(LOGWARN, "Whitelist overrode blacklist: $whitelist");
-    }
-    elsif ( $connection->relay_client() ) {
-      $self->log(LOGWARN, "Don't blacklist relay/auth clients");
-    }
-    else {
-      return ($self->{_dnsbl}->{DENY}, $note);
-    }
-  }
-  return DECLINED;
-
-}
-
-sub hook_disconnect {
-  my ($self, $transaction) = @_;
-
-  $self->qp->connection->notes('dnsbl_sockets', undef);
-
+  my $note = $self->connection->notes('dnsbl');
+  return (DENY, $note) if $note;
   return DECLINED;
 }
 
@@ -199,19 +124,6 @@ dnsbl - handle DNS BlackList lookups
 
 Plugin that checks the IP address of the incoming connection against
 a configurable set of RBL services.
-
-=head1 Usage
-
-Add the following line to the config/plugins file:
-
-  dnsbl [disconnect]
-
-If you want to immediately drop the connection (since some blacklisted 
-servers attempt multiple sends per session), add the optional keyword 
-"disconnect" (case insensitive) to the config line.  In most cases, an
-IP address that is listed should not be given the opportunity to begin
-a new transaction, since even the most volatile blacklists will return
-the same answer for a short period of time (the minimum DNS cache period).
 
 =head1 Configuration files
 

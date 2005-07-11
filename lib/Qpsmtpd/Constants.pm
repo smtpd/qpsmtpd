@@ -4,27 +4,28 @@ require Exporter;
 
 # log levels
 my %log_levels = (
-	LOGDEBUG   => 7,
-	LOGINFO    => 6,
-	LOGNOTICE  => 5,
-	LOGWARN    => 4,
-	LOGERROR   => 3,
-	LOGCRIT    => 2,
-	LOGALERT   => 1,
-	LOGEMERG   => 0,
-	LOGRADAR   => 0,
+        LOGDEBUG   => 7,
+        LOGINFO    => 6,
+        LOGNOTICE  => 5,
+        LOGWARN    => 4,
+        LOGERROR   => 3,
+        LOGCRIT    => 2,
+        LOGALERT   => 1,
+        LOGEMERG   => 0,
+        LOGRADAR   => 0,
 );
 
 # return codes
 my %return_codes = (
-	OK       => 900,
-	DENY     => 901,   # 550
-	DENYSOFT => 902,   # 450
-	DENYHARD => 903,   # 550 + disconnect  (deprecated in 0.29)
-	DENY_DISCONNECT     => 903, # 550 + disconnect
-	DENYSOFT_DISCONNECT => 904, # 450 + disconnect
-	DECLINED => 909,
-	DONE     => 910,
+        OK                     => 900,
+        DENY                   => 901,   # 550
+        DENYSOFT               => 902,   # 450
+        DENYHARD               => 903,   # 550 + disconnect  (deprecated in 0.29)
+        DENY_DISCONNECT        => 903,   # 550 + disconnect
+        DENYSOFT_DISCONNECT    => 904,   # 450 + disconnect
+        DECLINED               => 909,
+        DONE                   => 910,
+        CONTINUATION           => 911,
 );
 
 use vars qw(@ISA @EXPORT);
@@ -42,24 +43,24 @@ foreach (keys %log_levels ) {
 sub return_code {
     my $test = shift;
     if ( $test =~ /^\d+$/ ) { # need to return the textural form
-	foreach ( keys %return_codes ) {
-	    return $_ if $return_codes{$_} =~ /$test/;
-	}
+        foreach ( keys %return_codes ) {
+            return $_ if $return_codes{$_} =~ /$test/;
+        }
     }
     else { # just return the numeric value
-	return $return_codes{$test};
+        return $return_codes{$test};
     }
 }
 
 sub log_level {
     my $test = shift;
     if ( $test =~ /^\d+$/ ) { # need to return the textural form
-	foreach ( keys %log_levels ) {
-	    return $_ if $log_levels{$_} =~ /$test/;
-	}
+        foreach ( keys %log_levels ) {
+            return $_ if $log_levels{$_} =~ /$test/;
+        }
     }
     else { # just return the numeric value
-	return $log_levels{$test};
+        return $log_levels{$test};
     }
 }
 

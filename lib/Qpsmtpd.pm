@@ -167,9 +167,15 @@ sub _config_from_file {
   return wantarray ? @config : $config[0];
 }
 
+our $HOOKS;
+
 sub load_plugins {
   my $self = shift;
-  
+
+  if ($HOOKS) {
+      return $self->{hooks} = $HOOKS;
+  }
+
   $self->log(LOGWARN, "Plugins already loaded") if $self->{hooks};
   $self->{hooks} = {};
   
@@ -179,6 +185,8 @@ sub load_plugins {
   $self->log(LOGNOTICE, "loading plugins from $dir");
 
   @plugins = $self->_load_plugins($dir, @plugins);
+  
+  $HOOKS = $self->{hooks};
   
   return @plugins;
 }
@@ -252,57 +260,98 @@ sub transaction {
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
+  if ($self->{_continuation} && $hook ne "logging") {
+    die "Continuations in progress from previous hook (this is the $hook hook)";
+  }
   my $hooks = $self->{hooks};
   if ($hooks->{$hook}) {
     my @r;
-    for my $code (@{$hooks->{$hook}}) {
-      if ( $hook eq 'logging' ) { # without calling $self->log()
-        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-        $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
+    my @local_hooks = @{$hooks->{$hook}};
+    while (@local_hooks) {
+      my $code = shift @local_hooks;
+      @r = $self->run_hook($hook, $code, @_);
+      next unless @r;
+      if ($r[0] == CONTINUATION) {
+        $self->disable_read() if $self->isa('Danga::Client');
+        $self->{_continuation} = [$hook, [@_], @local_hooks];
       }
-      else {
-        $self->varlog(LOGINFO, $hook, $code->{name});
-        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-        $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
-
-        !defined $r[0]
-          and $self->log(LOGERROR, "plugin ".$code->{name}
-                         ." running the $hook hook returned undef!")
-          and next;
-
-        if ($self->transaction) {
-          my $tnotes = $self->transaction->notes( $code->{name} );
-          $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-            if (!defined $tnotes || ref $tnotes eq "HASH");
-        } else {
-          my $cnotes = $self->connection->notes( $code->{name} );
-          $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-            if (!defined $cnotes || ref $cnotes eq "HASH");
-        }
-
-        # should we have a hook for "OK" too?
-        if ($r[0] == DENY or $r[0] == DENYSOFT or
-            $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
-        {
-          $r[1] = "" if not defined $r[1];
-          $self->log(LOGDEBUG, "Plugin ".$code->{name}.
-	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-          $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
-        } else {
-          $r[1] = "" if not defined $r[1];
-          $self->log(LOGDEBUG, "Plugin ".$code->{name}.
-	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-          $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
-	}
-
-      }
-
       last unless $r[0] == DECLINED;
     }
     $r[0] = DECLINED if not defined $r[0];
     return @r;
   }
   return (0, '');
+}
+
+sub finish_continuation {
+  my ($self) = @_;
+  die "No continuation in progress" unless $self->{_continuation};
+  $self->enable_read() if $self->isa('Danga::Client');
+  my $todo = $self->{_continuation};
+  $self->{_continuation} = undef;
+  my $hook = shift @$todo || die "No hook in the continuation";
+  my $args = shift @$todo || die "No hook args in the continuation";
+  my @r;
+  while (@$todo) {
+    my $code = shift @$todo;
+    @r = $self->run_hook($hook, $code, @$args);
+    if ($r[0] == CONTINUATION) {
+      $self->disable_read() if $self->isa('Danga::Client');
+      $self->{_continuation} = [$hook, $args, @$todo];
+      return @r;
+    }
+    last unless $r[0] == DECLINED;
+  }
+  $r[0] = DECLINED if not defined $r[0];
+  my $responder = $hook . "_respond";
+  if (my $meth = $self->can($responder)) {
+    warn("continuation finished on $self\n");
+    return $meth->($self, $r[0], $r[1], @$args);
+  }
+  die "No ${hook}_respond method";
+}
+
+sub run_hook {
+  my ($self, $hook, $code, @args) = @_;
+  my @r;
+  if ( $hook eq 'logging' ) { # without calling $self->log()
+    eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
+    $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
+  }
+  else {
+    $self->varlog(LOGINFO, $hook, $code->{name});
+    print STDERR "plugin $hook $code->{name} 1\n";
+    eval { (@r) = $code->{code}->($self, $self->transaction, @args); };
+    print STDERR "plugin $hook $code->{name} 2\n";
+    
+    $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and return;
+  
+    !defined $r[0]
+      and $self->log(LOGERROR, "plugin ".$code->{name}
+                     ."running the $hook hook returned undef!")
+        and return;
+  
+    if ($self->transaction) {
+      my $tnotes = $self->transaction->notes( $code->{name} );
+      $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+        if (!defined $tnotes || ref $tnotes eq "HASH");
+    } else {
+      my $cnotes = $self->connection->notes( $code->{name} );
+      $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+        if (!defined $cnotes || ref $cnotes eq "HASH");
+    }
+  
+    # should we have a hook for "OK" too?
+    if ($r[0] == DENY or $r[0] == DENYSOFT or
+        $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
+    {
+      $r[1] = "" if not defined $r[1];
+      $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
+      $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+    }
+  
+  }
+  return @r;
 }
 
 sub _register_hook {

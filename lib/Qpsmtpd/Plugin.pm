@@ -37,10 +37,14 @@ sub _register {
   my $self = shift;
   my $qp = shift;
   local $self->{_qp} = $qp;
-  $self->init($qp, @_)     if $self->can('init');
+  $self->init($qp, @_);
   $self->_register_standard_hooks($qp, @_);
-  $self->register($qp, @_) if $self->can('register');
+  $self->register($qp, @_);
 }
+
+# Designed to be overloaded
+sub init {}
+sub register {}
 
 sub qp {
   shift->{_qp};
@@ -59,6 +63,10 @@ sub transaction {
 
 sub connection {
   shift->qp->connection;
+}
+
+sub config {
+  shift->qp->config(@_);
 }
 
 sub spool_dir {

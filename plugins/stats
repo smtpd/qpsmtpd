@@ -1,0 +1,74 @@
+#!/usr/bin/perl -w
+
+use Time::HiRes qw(time);
+
+my $START_TIME = time;
+our $MAILS_RECEIVED = 0;
+our $MAILS_REJECTED = 0;
+our $MAILS_TEMPFAIL = 0;
+
+sub register {
+    my ($self) = @_;
+    
+    $self->register_hook('deny', 'increment_deny');
+    $self->register_hook('queue', 'increment_mails');
+}
+
+sub get_stats {
+    my $class = shift;
+    my $uptime = $class->uptime;
+    my $recvd  = $class->mails_received;
+    my $reject = $class->mails_rejected;
+    my $soft   = $class->mails_tempfailed;
+    my $rate   = $class->mails_per_sec;
+    return sprintf("          Uptime: %0.2f sec\n".
+                   "  Mails Received: % 10d\n".
+                   "             5xx: % 10d\n".
+                   "             4xx: % 10d\n".
+                   "Mails per second: %0.2f\n",
+                                   $uptime, $recvd, $reject, $soft, $rate);
+}
+
+sub increment_deny {
+    my ($self, $tran, $plugin, $level) = @_;
+    
+    if ($level == DENY or $level == DENY_DISCONNECT) {
+        $MAILS_REJECTED++;
+    }
+    elsif ($level == DENYSOFT or $level == DENYSOFT_DISCONNECT) {
+        $MAILS_TEMPFAIL++;
+    }
+    
+    return DECLINED;
+}
+
+sub increment_mails {
+    my $self = shift;
+    
+    $MAILS_RECEIVED++;
+    
+    return DECLINED;
+}
+
+sub uptime {
+    return (time() - $START_TIME);
+}
+
+sub mails_received {
+    return $MAILS_RECEIVED;
+}
+
+sub mails_rejected {
+    return $MAILS_REJECTED;
+}
+
+sub mails_tempfailed {
+    return $MAILS_TEMPFAIL;
+}
+
+sub mails_per_sec {
+    my $class = shift;
+    return ($MAILS_RECEIVED / $class->uptime());
+}
+
+

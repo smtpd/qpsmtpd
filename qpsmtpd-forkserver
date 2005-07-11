@@ -11,6 +11,7 @@ use Qpsmtpd::TcpServer;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use IO::Select;
+use Qpsmtpd::PollServer;
 use Socket;
 use Getopt::Long;
 use POSIX qw(:sys_wait_h :errno_h :signal_h);
@@ -24,6 +25,7 @@ my @LOCALADDR;                       # ip address(es) to bind to
 my $USER      = 'smtpd';             # user to suid to
 my $MAXCONNIP = 5;                   # max simultaneous connections from one IP
 my $PID_FILE   = '';                 # file to which server PID will be written
+our $DEBUG = 0;
 
 sub usage {
         print <<"EOT";
@@ -47,6 +49,7 @@ GetOptions('h|help' => \&usage,
            'p|port=i' => \$PORT,
            'u|user=s' => \$USER,
            'pid-file=s' => \$PID_FILE,
+           'd|debug+' => \$DEBUG,
 	  ) || &usage;
 
 # detaint the commandline
@@ -68,6 +71,12 @@ $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 my %childstatus = ();
 
 sub REAPER {
+#  foreach my $chld (keys %childstatus) {
+#    if (defined(waitpid($chld, WNOHANG))) {
+#      ::log(LOGINFO,"cleaning up after $chld");
+#      delete $childstatus{$chld};
+#    }
+#  }
   while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
     last unless $chld > 0;
     ::log(LOGINFO,"cleaning up after $chld");
@@ -212,30 +221,22 @@ while (1) {
        ::log(LOGINFO, "Connection Timed Out"); 
        exit; };
   
-    my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) = sockaddr_in($localsockaddr);
-    $ENV{TCPLOCALIP} = inet_ntoa($laddr);
-    # my ($port, $iaddr) = sockaddr_in($hisaddr);
-    $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
-    $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
-  
-    # don't do this!
-    #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
-  
-    ::log(LOGINFO, "Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}");
+    ::log(LOGINFO, "Accepted connection $running/$MAXCONN");
     
-    # dup to STDIN/STDOUT
-    POSIX::dup2(fileno($client), 0);
-    POSIX::dup2(fileno($client), 1);
+    $::LineMode = 1;
     
-    $qpsmtpd->start_connection
-      (
-       local_ip    => $ENV{TCPLOCALIP},
-       local_port  => $lport,
-       remote_ip   => $ENV{TCPREMOTEIP},
-       remote_port => $port,
-      );
-    $qpsmtpd->run();
+    my $qp = Qpsmtpd::PollServer->new($client);
+    $qp->load_plugins;
+    $qp->init_logger;
+    $qp->push_back_read("Connect\n");
+    Qpsmtpd::PollServer->AddTimer(0.1, sub { });
+    while (1) {
+        $qp->enable_read;
+        my $line = $qp->get_line;
+        last if !defined($line);
+        my $output = $qp->process_line($line);
+        $qp->write($output) if $output;
+    }
     
     exit;                                   # child leaves
   }

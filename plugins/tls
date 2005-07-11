@@ -21,7 +21,7 @@ MAIL FROM onwards.
 
 =cut
 
-use IO::Socket::SSL qw(debug1 debug2 debug3 debug4);
+use IO::Socket::SSL; # qw(debug1 debug2 debug3 debug4);
 
 sub init {
     my ($self, $qp, $cert, $key) = @_;
@@ -38,7 +38,6 @@ sub init {
         SSL_cipher_list => 'HIGH',
         SSL_server => 1
     ) or die "Could not create SSL context: $!";
-    # now extract the password...
     
     $self->ssl_context($ssl_ctx);
 }
@@ -66,31 +65,44 @@ sub hook_unrecognized_command {
     $self->qp->respond (220, "Go ahead with TLS");
     
     eval {
-        my $tlssocket = IO::Socket::SSL->new_from_fd(
-            fileno(STDIN), '+>',
-            SSL_use_cert => 1,
-            SSL_cert_file => $self->tls_cert,
-            SSL_key_file => $self->tls_key,
-            SSL_cipher_list => 'HIGH',
-            SSL_server => 1,
-            SSL_reuse_ctx => $self->ssl_context,
-        ) or die "Could not create SSL socket: $!";
-    
+        my $tlssocket;
+        if ($self->qp->isa('Danga::Socket')) {
+            # high_perf
+            $tlssocket = IO::Socket::SSL->start_SSL($self->qp->sock,
+                SSL_use_cert => 1,
+                SSL_cert_file => $self->tls_cert,
+                SSL_key_file => $self->tls_key,
+                SSL_cipher_list => 'HIGH',
+                SSL_server => 1,
+                SSL_reuse_ctx => $self->ssl_context,
+            ) or die "Could not convert SSL socket: $!";
+        }
+        else {
+            $tlssocket = IO::Socket::SSL->new_from_fd(
+                fileno(STDIN), '+>',
+                SSL_use_cert => 1,
+                SSL_cert_file => $self->tls_cert,
+                SSL_key_file => $self->tls_key,
+                SSL_cipher_list => 'HIGH',
+                SSL_server => 1,
+                SSL_reuse_ctx => $self->ssl_context,
+            ) or die "Could not create SSL socket: $!";
+        }
+        
         my $conn = $self->connection;
         # Create a new connection object with subset of information collected thus far
-        $self->qp->connection(Qpsmtpd::Connection->new(
-           map { $_ => $conn->$_ }
-                qw(
-                    local_ip
-                    local_port
-                    remote_ip
-                    remote_port
-                    remote_host
-                    remote_info
-                ),
-            ));
+        my $newconn = Qpsmtpd::Connection->new();
+        for (qw(local_ip local_port remote_ip remote_port remote_host remote_info)) {
+            $newconn->$_($conn->$_());
+        }
+        $self->qp->connection($newconn);
         $self->qp->reset_transaction;
-        *STDIN = *STDOUT = $self->connection->notes('tls_socket', $tlssocket);
+        if ($self->qp->isa('Danga::Socket')) {
+            $self->connection->notes('tls_socket', $tlssocket);
+        }
+        else {
+            *STDIN = *STDOUT = $self->connection->notes('tls_socket', $tlssocket);
+        }
         $self->connection->notes('tls_enabled', 1);
     };
     if ($@) {
@@ -131,5 +143,6 @@ sub ssl_context {
 sub bad_ssl_hook {
     my ($self, $transaction) = @_;
     return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
+    return DECLINED;
 }
 *hook_helo = *hook_data = *hook_rcpt = *hook_mail = *hook_auth = \&bad_ssl_hook;
