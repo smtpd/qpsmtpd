@@ -107,7 +107,7 @@ sub ToClose { return @ToClose; }
 ### the registered Danga::Socket objects.
 sub OtherFds {
     my $class = shift;
-    if ( @_ ) { %OtherFds = @_ }
+    if ( @_ ) { %OtherFds = (%OtherFds, @_) }
     return wantarray ? %OtherFds : \%OtherFds;
 }
 
