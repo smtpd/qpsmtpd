@@ -41,7 +41,8 @@ sub hook_queue {
   # these bits inspired by Peter Samuels "qmail-queue wrapper"
   pipe(MESSAGE_READER, MESSAGE_WRITER) or die("Could not create message pipe");
   pipe(ENVELOPE_READER, ENVELOPE_WRITER) or die("Could not create envelope pipe");
-
+  
+  local $SIG{PIPE} = sub { die "SIGPIPE" };
   my $child = fork();
 
   not defined $child and die("Could not fork");
@@ -55,10 +56,6 @@ sub hook_queue {
     close MESSAGE_READER  or die("close msg reader fault");
     close ENVELOPE_READER or die("close envelope reader fault");
 
-    # Note - technically there's a race here because if the exec() below
-    # fails and the writes to MESSAGE_WRITER block we get a deadlocked process.
-    # This check to see if(eof(PIPE)) will catch "most" of these problems.
-    die "Message pipe has been closed" if eof(MESSAGE_WRITER);
     $transaction->header->print(\*MESSAGE_WRITER);
     $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) {
@@ -68,7 +65,6 @@ sub hook_queue {
 
     my @rcpt = map { "T" . $_->address } $transaction->recipients;
     my $from = "F".($transaction->sender->address|| "" );
-    die "Envelope pipe has been closed" if eof(ENVELOPE_WRITER);
     print ENVELOPE_WRITER "$from\0", join("\0",@rcpt), "\0\0"
       or return(DECLINED,"Could not print addresses to queue");
     
