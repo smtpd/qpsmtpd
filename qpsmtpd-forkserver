@@ -71,12 +71,6 @@ $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 my %childstatus = ();
 
 sub REAPER {
-#  foreach my $chld (keys %childstatus) {
-#    if (defined(waitpid($chld, WNOHANG))) {
-#      ::log(LOGINFO,"cleaning up after $chld");
-#      delete $childstatus{$chld};
-#    }
-#  }
   while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
     last unless $chld > 0;
     ::log(LOGINFO,"cleaning up after $chld");
@@ -180,6 +174,9 @@ while (1) {
       # possible something condition...
       next;
     }
+    
+    # Make this client blocking while we figure out if we actually want to
+    # do something with it.
     IO::Handle::blocking($client, 1);
     my ($port, $iaddr) = sockaddr_in($hisaddr);
     if ($MAXCONNIP) {
@@ -225,6 +222,8 @@ while (1) {
     
     $::LineMode = 1;
     
+    # Make this client non-blocking so it works with the Danga framework
+    IO::Handle::blocking($client, 0);
     my $qp = Qpsmtpd::PollServer->new($client);
     $qp->load_plugins;
     $qp->init_logger;
