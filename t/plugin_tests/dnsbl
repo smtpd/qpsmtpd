@@ -11,7 +11,7 @@ sub test_local {
     my $connection = $self->qp->connection;
     $connection->remote_ip('127.0.0.2'); # standard dnsbl test value
     
-    $self->connect_handler($self->qp->transaction);
+    $self->hook_connect($self->qp->transaction);
     
     ok($self->qp->connection->notes('dnsbl_sockets'));
 }
@@ -20,7 +20,7 @@ sub test_returnval {
     my $self = shift;
 
     my $address = Qpsmtpd::Address->parse('<rcpt@example.com>');
-    my ($ret, $note) = $self->rcpt_handler($self->qp->transaction,
+    my ($ret, $note) = $self->hook_rcpt($self->qp->transaction,
       $address);
     is($ret, DENY, "Check we got a DENY");
     print("# dnsbl result: $note\n");

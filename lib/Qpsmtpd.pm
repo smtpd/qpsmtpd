@@ -238,7 +238,7 @@ sub _load_plugins {
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     # don't reload plugins if they are already loaded
-    unless ( defined &{"${package}::register"} ) {
+    unless ( defined &{"${package}::plugin_name"} ) {
       Qpsmtpd::Plugin->compile($plugin_name,
         $package, "$dir/$plugin", $self->{_test_mode});
       $self->log(LOGDEBUG, "Loading $plugin_line") 
@@ -320,9 +320,7 @@ sub run_hook {
   }
   else {
     $self->varlog(LOGINFO, $hook, $code->{name});
-    print STDERR "plugin $hook $code->{name} 1\n";
     eval { (@r) = $code->{code}->($self, $self->transaction, @args); };
-    print STDERR "plugin $hook $code->{name} 2\n";
     
     $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and return;
   
