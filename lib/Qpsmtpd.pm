@@ -230,7 +230,7 @@ sub _load_plugins {
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     # don't reload plugins if they are already loaded
-    unless ( defined &{"${package}::register"} ) {
+    unless ( defined &{"${package}::plugin_name"} ) {
       Qpsmtpd::Plugin->compile($plugin_name,
         $package, "$dir/$plugin", $self->{_test_mode});
       $self->log(LOGDEBUG, "Loading $plugin_line") 

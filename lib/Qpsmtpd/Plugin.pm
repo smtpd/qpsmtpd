@@ -94,8 +94,8 @@ sub isa_plugin {
   $cleanParent =~ s/\W/_/g;
   my $newPackage = $currentPackage."::_isa_$cleanParent";
 
-
-  return if defined &{"${newPackage}::register"};
+  # don't reload plugins if they are already loaded
+  return if defined &{"${newPackage}::plugin_name"};
 
   $self->compile($self->plugin_name . "_isa_$cleanParent",
                     $newPackage,
