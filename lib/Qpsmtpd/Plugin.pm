@@ -2,12 +2,13 @@ package Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
 use strict;
 
-our %hooks = map { $_ => 1 } qw(
-    config  queue  data  data_post  quit  rcpt  mail  ehlo  helo
+our @hooks = qw(
+    logging config  queue  data  data_post  quit  rcpt  mail  ehlo  helo
     auth auth-plain auth-login auth-cram-md5
     connect  reset_transaction  unrecognized_command  disconnect
-    deny logging ok pre-connection post-connection
+    deny ok pre-connection post-connection
 );
+our %hooks = map { $_ => 1 } @hooks;
 
 sub new {
   my $proto = shift;
@@ -20,7 +21,8 @@ sub register_hook {
 
   die $plugin->plugin_name . " : Invalid hook: $hook" unless $hooks{$hook};
 
-  $plugin->{_qp}->varlog(LOGDEBUG, $plugin->plugin_name, " hooking ", $hook);
+  $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, "hooking", $hook)
+      unless $hook =~ /logging/; # can't log during load_logging()
 
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
@@ -154,7 +156,7 @@ sub compile {
 sub _register_standard_hooks {
   my ($plugin, $qp) = @_;
 
-  for my $hook (keys %hooks) {
+  for my $hook (@hooks) {
     my $hooksub = "hook_$hook";
     $hooksub  =~ s/\W/_/g;
     $plugin->register_hook( $hook, $hooksub )
