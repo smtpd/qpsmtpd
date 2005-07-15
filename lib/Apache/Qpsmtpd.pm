@@ -90,9 +90,12 @@ sub run {
 }
 
 sub config_dir {
-    my $self = shift;
-    return "$self->{qpdir}/config";
+    my ($self, $config) = @_;
+    -e "$_/$config" and return $_
+        for "$self->{qpdir}/config";
+    return "/var/qmail/control";
 }
+
 
 sub plugin_dir {
     my $self = shift;
