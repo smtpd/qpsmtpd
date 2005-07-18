@@ -59,7 +59,7 @@ sub register {
 	'defer-reject' => 0,
 	@args,
   };
-  if ($qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
+  if ($qp->isa('Qpsmtpd::Apache')) {
       require APR::Const;
       APR::Const->import(qw(POLLIN SUCCESS));
       $self->register_hook('connect', 'hook_connect_apr');
