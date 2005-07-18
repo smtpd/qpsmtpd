@@ -114,9 +114,18 @@ sub connect_respond {
       return $rc;
     }
     elsif ($rc != DONE) {
-      $self->respond(220, $self->config('smtpgreeting') ." ESMTP" ||
-       ($self->config('me') ." ESMTP qpsmtpd " . $self->version .
-        " ready; send us your mail, but not your spam."));
+      my $greets = $self->config('smtpgreeting');
+      if ( $greets ) {
+	  $greets .= " ESMTP";
+      }
+      else {
+	  $greets = $self->config('me') 
+	    . " ESMTP qpsmtpd " 
+	    . $self->version 
+	    . " ready; send us your mail, but not your spam.";
+      }
+
+      $self->respond(220, $greets);
       return DONE;
     }
 }
