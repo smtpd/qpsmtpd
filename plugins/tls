@@ -131,5 +131,6 @@ sub ssl_context {
 sub bad_ssl_hook {
     my ($self, $transaction) = @_;
     return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
+    return DECLINED;
 }
 *hook_helo = *hook_data = *hook_rcpt = *hook_mail = *hook_auth = \&bad_ssl_hook;
