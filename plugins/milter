@@ -161,7 +161,7 @@ sub hook_rcpt {
     return DECLINED;
 }
 
-sub hook_data {
+sub hook_data_post {
     my ($self, $transaction) = @_;
 
     my $milter = $self->qp->connection->notes('milter');
