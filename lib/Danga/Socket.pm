@@ -33,6 +33,7 @@ use Errno qw(EINPROGRESS EWOULDBLOCK EISCONN
 
 use Socket qw(IPPROTO_TCP);
 use Carp qw{croak confess};
+use POSIX ();
 
 use constant TCP_CORK => 3; # FIXME: not hard-coded (Linux-specific too)
 
@@ -63,6 +64,8 @@ use constant POLLNVAL      => 32;
 
 # keep track of active clients
 our (
+     $DoneInit,                  # if we've done the one-time module init yet
+     $TryEpoll,                  # Whether epoll should be attempted to be used.
      $HaveEpoll,                 # Flag -- is epoll available?  initially undefined.
      $HaveKQueue,
      %DescriptorMap,             # fd (num) -> Danga::Socket object
@@ -77,11 +80,23 @@ our (
      @Timers,                    # timers
      );
 
-%OtherFds = ();
+Reset();
 
 #####################################################################
 ### C L A S S   M E T H O D S
 #####################################################################
+
+### (CLASS) METHOD: Reset()
+### Reset all state
+sub Reset {
+    %DescriptorMap = ();
+    %PushBackSet = ();
+    @ToClose = ();
+    %OtherFds = ();
+    $PostLoopCallback = undef;
+    %PLCMap = ();
+    @Timers = ();
+}
 
 ### (CLASS) METHOD: HaveEpoll()
 ### Returns a true value if this class will use IO::Epoll for async IO.
@@ -143,7 +158,8 @@ sub DescriptorMap {
 
 sub init_poller
 {
-    return if defined $HaveEpoll || $HaveKQueue;
+    return if $DoneInit;
+    $DoneInit = 1;
     
     if ($HAVE_KQUEUE) {
         $KQueue = IO::KQueue->new();
@@ -152,9 +168,9 @@ sub init_poller
             *EventLoop = *KQueueEventLoop;
         }
     }
-    else {
+    elsif ($TryEpoll) {
         $Epoll = eval { epoll_create(1024); };
-        $HaveEpoll = $Epoll >= 0;
+        $HaveEpoll = defined $Epoll && $Epoll >= 0;
         if ($HaveEpoll) {
             *EventLoop = *EpollEventLoop;
         }
@@ -175,6 +191,8 @@ sub EventLoop {
 
     if ($HaveEpoll) {
         EpollEventLoop($class);
+    } elsif ($HaveKQueue) {
+        KQueueEventLoop($class);
     } else {
         PollEventLoop($class);
     }
@@ -851,7 +869,54 @@ sub DESTROY {
 ### U T I L I T Y   F U N C T I O N S
 #####################################################################
 
-our $SYS_epoll_create = eval { &SYS_epoll_create } || 254; # linux-ix86 default
+our ($SYS_epoll_create, $SYS_epoll_ctl, $SYS_epoll_wait);
+
+if ($^O eq "linux") {
+    my ($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
+
+    # whether the machine requires 64-bit numbers to be on 8-byte
+    # boundaries.
+    my $u64_mod_8 = 0;
+
+    if ($machine =~ m/^i[3456]86$/) {
+        $SYS_epoll_create = 254;
+        $SYS_epoll_ctl    = 255;
+        $SYS_epoll_wait   = 256;
+    } elsif ($machine eq "x86_64") {
+        $SYS_epoll_create = 213;
+        $SYS_epoll_ctl    = 233;
+        $SYS_epoll_wait   = 232;
+    } elsif ($machine eq "ppc64") {
+        $SYS_epoll_create = 236;
+        $SYS_epoll_ctl    = 237;
+        $SYS_epoll_wait   = 238;
+        $u64_mod_8        = 1;
+    } elsif ($machine eq "ppc") {
+        $SYS_epoll_create = 236;
+        $SYS_epoll_ctl    = 237;
+        $SYS_epoll_wait   = 238;
+        $u64_mod_8        = 1;
+    } elsif ($machine eq "ia64") {
+        $SYS_epoll_create = 1243;
+        $SYS_epoll_ctl    = 1244;
+        $SYS_epoll_wait   = 1245;
+        $u64_mod_8        = 1;
+    }
+
+    if ($u64_mod_8) {
+        *epoll_wait = \&epoll_wait_mod8;
+        *epoll_ctl = \&epoll_ctl_mod8;
+    } else {
+        *epoll_wait = \&epoll_wait_mod4;
+        *epoll_ctl = \&epoll_ctl_mod4;
+    }
+
+    # if syscall numbers have been defined (and this module has been
+    # tested on) the arch above, then try to use it.  try means see if
+    # the syscall is implemented.  it may well be that this is Linux
+    # 2.4 and we don't even have it available.
+    $TryEpoll = 1 if $SYS_epoll_create;
+}
 
 # epoll_create wrapper
 # ARGS: (size)
@@ -862,23 +927,24 @@ sub epoll_create {
 }
 
 # epoll_ctl wrapper
-# ARGS: (epfd, op, fd, events)
-our $SYS_epoll_ctl = eval { &SYS_epoll_ctl } || 255; # linux-ix86 default
-sub epoll_ctl {
-    syscall($SYS_epoll_ctl, $_[0]+0, $_[1]+0, $_[2]+0, pack("LLL", $_[3], $_[2]));
+# ARGS: (epfd, op, fd, events_mask)
+sub epoll_ctl_mod4 {
+    syscall($SYS_epoll_ctl, $_[0]+0, $_[1]+0, $_[2]+0, pack("LLL", $_[3], $_[2], 0));
+}
+sub epoll_ctl_mod8 {
+    syscall($SYS_epoll_ctl, $_[0]+0, $_[1]+0, $_[2]+0, pack("LLLL", $_[3], 0, $_[2], 0));
 }
 
 # epoll_wait wrapper
-# ARGS: (epfd, maxevents, timeout, arrayref)
+# ARGS: (epfd, maxevents, timeout (milliseconds), arrayref)
 #  arrayref: values modified to be [$fd, $event]
 our $epoll_wait_events;
 our $epoll_wait_size = 0;
-our $SYS_epoll_wait = eval { &SYS_epoll_wait } || 256; # linux-ix86 default
-sub epoll_wait {
+sub epoll_wait_mod4 {
     # resize our static buffer if requested size is bigger than we've ever done
     if ($_[1] > $epoll_wait_size) {
         $epoll_wait_size = $_[1];
-        $epoll_wait_events = pack("LLL") x $epoll_wait_size;
+        $epoll_wait_events = "\0" x 12 x $epoll_wait_size;
     }
     my $ct = syscall($SYS_epoll_wait, $_[0]+0, $epoll_wait_events, $_[1]+0, $_[2]+0);
     for ($_ = 0; $_ < $ct; $_++) {
@@ -887,7 +953,22 @@ sub epoll_wait {
     return $ct;
 }
 
-
+sub epoll_wait_mod8 {
+    # resize our static buffer if requested size is bigger than we've ever done
+    if ($_[1] > $epoll_wait_size) {
+        $epoll_wait_size = $_[1];
+        $epoll_wait_events = "\0" x 16 x $epoll_wait_size;
+    }
+    my $ct = syscall($SYS_epoll_wait, $_[0]+0, $epoll_wait_events, $_[1]+0, $_[2]+0);
+    for ($_ = 0; $_ < $ct; $_++) {
+        # 16 byte epoll_event structs, with format:
+        #    4 byte mask [idx 1]
+        #    4 byte padding (we put it into idx 2, useless)
+        #    8 byte data (first 4 bytes are fd, into idx 0)
+        @{$_[3]->[$_]}[1,2,0] = unpack("LLL", substr($epoll_wait_events, 16*$_, 12));
+    }
+    return $ct;
+}
 
 1;
 
