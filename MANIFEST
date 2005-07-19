@@ -17,7 +17,6 @@ lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
 lib/Qpsmtpd/Plugin.pm
 lib/Qpsmtpd/Postfix.pm
-lib/Qpsmtpd/SelectServer.pm
 lib/Qpsmtpd/SMTP.pm
 lib/Qpsmtpd/TcpServer.pm
 lib/Qpsmtpd/Transaction.pm
@@ -78,7 +77,6 @@ plugins/virus/sophie
 plugins/virus/uvscan
 qpsmtpd
 qpsmtpd-forkserver
-qpsmtpd-server
 README
 README.logging
 README.plugins
