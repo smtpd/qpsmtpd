@@ -104,8 +104,18 @@ sub start_conversation {
       return $rc;
     }
     elsif ($rc != DONE) {
-      $self->respond(220, $self->config('me') ." ESMTP qpsmtpd "
-          . $self->version ." ready; send us your mail, but not your spam.");
+      my $greets = $self->config('smtpgreeting');
+      if ( $greets ) {
+	  $greets .= " ESMTP";
+      }
+      else {
+	  $greets = $self->config('me') 
+	    . " ESMTP qpsmtpd " 
+	    . $self->version 
+	    . " ready; send us your mail, but not your spam.";
+      }
+
+      $self->respond(220, $greets);
       return DONE;
     }
 }
@@ -347,7 +357,8 @@ sub rcpt {
 sub help {
   my $self = shift;
   $self->respond(214, 
-          "This is qpsmtpd " . $self->version,
+          "This is qpsmtpd " . 
+          $self->config('smtpgreeting') ? '' : $self->version,
           "See http://smtpd.develooper.com/",
           'To report bugs or send comments, mail to <ask@develooper.com>.');
 }
