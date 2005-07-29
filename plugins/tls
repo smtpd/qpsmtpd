@@ -48,10 +48,8 @@ sub hook_ehlo {
     return DECLINED if $self->connection->notes('tls_enabled');
     return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
     my $cap = $transaction->notes('capabilities');
-    $cap ||= [];
     push @$cap, 'STARTTLS';
     $transaction->notes('tls_enabled', 1);
-    $transaction->notes('capabilities', $cap);
     return DECLINED;
 }
 
@@ -92,7 +90,7 @@ sub hook_unrecognized_command {
         my $conn = $self->connection;
         # Create a new connection object with subset of information collected thus far
         my $newconn = Qpsmtpd::Connection->new();
-        for (qw(local_ip local_port remote_ip remote_port remote_host remote_info)) {
+        for (qw(local_ip local_port remote_ip remote_port remote_host remote_info relay_client)) {
             $newconn->$_($conn->$_());
         }
         $self->qp->connection($newconn);

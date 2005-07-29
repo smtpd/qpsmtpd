@@ -13,7 +13,7 @@ sub start {
   my $proto = shift;
   my $class = ref($proto) || $proto;
   my %args = @_;
-  my $self = { _rcpt => [], started => time };
+  my $self = { _notes => { capabilities => [] }, _rcpt => [], started => time };
   bless ($self, $class);
   my $sz = $self->config('memory_threshold');
   $sz = 10_000 unless defined($sz);
