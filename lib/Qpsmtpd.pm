@@ -4,6 +4,8 @@ use vars qw($VERSION $Logger $TraceLevel $Spool_dir);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Transaction;
+use Qpsmtpd::Connection;
 
 $VERSION = "0.31-dev";
 
@@ -255,7 +257,21 @@ sub _load_plugins {
 }
 
 sub transaction {
-    return {}; # base class implements empty transaction
+  my $self = shift;
+  return $self->{_transaction} || $self->reset_transaction();
+}
+
+sub reset_transaction {
+  my $self = shift;
+  $self->run_hooks("reset_transaction") if $self->{_transaction};
+  return $self->{_transaction} = Qpsmtpd::Transaction->new();
+}
+
+
+sub connection {
+  my $self = shift;
+  @_ and $self->{_connection} = shift;
+  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
 }
 
 sub run_hooks {

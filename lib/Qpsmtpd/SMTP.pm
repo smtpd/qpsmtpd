@@ -6,8 +6,6 @@ package Qpsmtpd::SMTP;
 use strict;
 use Carp;
 
-use Qpsmtpd::Connection;
-use Qpsmtpd::Transaction;
 use Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Auth;
@@ -32,7 +30,7 @@ sub new {
   my $self = bless ({ args => \%args }, $class);
 
   my (@commands) = qw(ehlo helo rset mail rcpt data help vrfy noop quit);
-  my (%commands); @commands{@commands} = ('') x @commands;
+  my (%commands); @commands{@commands} = (1) x @commands;
   # this list of valid commands should probably be a method or a set of methods
   $self->{_commands} = \%commands;
 
@@ -130,25 +128,6 @@ sub connect_respond {
     }
 }
 
-sub transaction {
-  my $self = shift;
-  return $self->{_transaction} || $self->reset_transaction();
-}
-
-sub reset_transaction {
-  my $self = shift;
-  $self->run_hooks("reset_transaction") if $self->{_transaction};
-  return $self->{_transaction} = Qpsmtpd::Transaction->new();
-}
-
-
-sub connection {
-  my $self = shift;
-  @_ and $self->{_connection} = shift;
-  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
-}
-
-
 sub helo {
   my ($self, $hello_host, @stuff) = @_;
   return $self->respond (501,
@@ -217,9 +196,7 @@ sub ehlo_respond {
     $conn->hello_host($hello_host);
     $self->transaction;
 
-    my @capabilities = $self->transaction->notes('capabilities')
-                        ? @{ $self->transaction->notes('capabilities') }
-                        : ();  
+    my @capabilities = @{ $self->transaction->notes('capabilities') };
 
     # Check for possible AUTH mechanisms
     my %auth_mechanisms;
@@ -237,7 +214,7 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
 
     if ( %auth_mechanisms ) {
         push @capabilities, 'AUTH '.join(" ",keys(%auth_mechanisms));    
-        $self->{_commands}->{'auth'} = "";
+        $self->{_commands}->{'auth'} = "1";
     }
 
     $self->respond(250,
