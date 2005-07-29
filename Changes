@@ -25,6 +25,9 @@
   for its config files in the directory given therein, in addition to (and
   in preference to) other locations. (Peter J. Holzer)
 
+  Added queue/exim-bsmtp plugin to spool accepted mail into an Exim
+  backend via BSMTP. (Devin Carraway)
+
   Updated documentation
 
 
