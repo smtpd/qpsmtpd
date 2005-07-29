@@ -113,6 +113,8 @@ if ($PID_FILE) {
     }
     seek PID, 0, 0
       or die "Could not seek back to beginning of $PID_FILE: $!\n";
+    truncate PID, 0
+      or die "Could not truncate $PID_FILE at 0: $!";
   } else {
     open PID, ">$PID_FILE"
       or die "open pid_file: $!\n";
