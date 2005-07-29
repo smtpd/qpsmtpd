@@ -17,6 +17,10 @@
   The unrecognized_command hook now uses DENY_DISCONNECT return
   for disconnecting the user.
 
+  If the environment variable $QPSMTPD_CONFIG is set, qpsmtpd will look
+  for its config files in the directory given therein, in addition to (and
+  in preference to) other locations. (Peter J. Holzer)
+
   Updated documentation
 
 
