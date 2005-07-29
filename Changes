@@ -11,6 +11,10 @@
   postfix backend, which expects to have write permission to a fifo
   which usually belongs to group postdrop). (pjh)
 
+  qpsmtpd-forkserver: if -d or --detach is given on the commandline,
+  forkserver will detach from the controlling terminal and daemonize
+  itself (Devin Carraway)
+
   when disconncting with a temporary failure, return 421 rather than
   450 or 451. (Peter J. Holzer)
 
