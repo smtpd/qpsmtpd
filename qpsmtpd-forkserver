@@ -81,6 +81,9 @@ sub REAPER {
 sub HUNTSMAN {
   $SIG{CHLD} = 'DEFAULT';
   kill 'INT' => keys %childstatus;
+  if ($PID_FILE && -e $PID_FILE) {
+  	unlink $PID_FILE or ::log(LOGERROR, "unlink: $PID_FILE: $!");
+  }
   exit(0);
 }
 
