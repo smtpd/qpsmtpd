@@ -110,7 +110,7 @@ if ($PID_FILE) {
   if (-e $PID_FILE) {
     open PID, "+<$PID_FILE"
       or die "open pid_file: $!\n";
-    my $running_pid = <PID>; chomp $running_pid;
+    my $running_pid = <PID> || ''; chomp $running_pid;
     if ($running_pid =~ /(\d+)/) {
       $running_pid = $1;
       if (kill 0, $running_pid) {
