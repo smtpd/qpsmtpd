@@ -20,7 +20,11 @@ on all mail/rcpt commands in the transaction.
 =item wait [integer]
 
 The number of seconds to delay the initial greeting to see if the connecting
-host speaks first.  The default is 1.
+host speaks first.  The default is 1.  Do not select a value that is too high,
+or you may be unable to receive mail from MTAs with short SMTP connect or
+greeting timeouts -- these are known to range as low as 30 seconds, and may
+in some cases be configured lower by mailserver admins.  Network transit time
+must also be allowed for.
 
 =item action [string: deny, denysoft, log]
 
