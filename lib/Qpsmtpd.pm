@@ -116,6 +116,10 @@ sub config_dir {
   my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
   my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
   $configdir = "$name/config" if (-e "$name/config/$config");
+  if (exists $ENV{QPSMTPD_CONFIG}) {
+    $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/; # detaint
+    $configdir = $1 if -e "$1/$config";
+  }
   return $configdir;
 }
 
