@@ -25,6 +25,7 @@ my @LOCALADDR;                       # ip address(es) to bind to
 my $USER      = 'smtpd';             # user to suid to
 my $MAXCONNIP = 5;                   # max simultaneous connections from one IP
 my $PID_FILE   = '';                 # file to which server PID will be written
+my $DETACH;                          # daemonize on startup
 our $DEBUG = 0;
 
 sub usage {
@@ -38,6 +39,7 @@ usage: qpsmtpd-forkserver [ options ]
  -u, --user U              : run as a particular user (default 'smtpd')
  -m, --max-from-ip M       : limit connections from a single IP; default 5
      --pid-file P          : print main servers PID to file P
+     --detach              : detach from controlling terminal (daemonize)
 EOT
         exit 0;
 }
@@ -50,6 +52,7 @@ GetOptions('h|help' => \&usage,
            'u|user=s' => \$USER,
            'pid-file=s' => \$PID_FILE,
            'd|debug+' => \$DEBUG,
+           'detach' => \$DETACH,
 	  ) || &usage;
 
 # detaint the commandline
@@ -125,8 +128,6 @@ if ($PID_FILE) {
     open PID, ">$PID_FILE"
       or die "open pid_file: $!\n";
   }
-  print PID $$,"\n";
-  close PID;
 }
 
 # Load plugins here
@@ -156,6 +157,20 @@ $> = $quid;
 	(getpwuid($>) || $>) .
 	', group '.
 	(getgrgid($)) || $)));
+
+if ($DETACH) {
+  open STDIN, '/dev/null' or die "/dev/null: $!";
+  open STDOUT, '>/dev/null' or die "/dev/null: $!";
+  open STDERR, '>&STDOUT' or die "open(stderr): $!";
+  defined (my $pid = fork) or die "fork: $!";
+  exit 0 if $pid;
+  POSIX::setsid or die "setsid: $!";
+}
+
+if ($PID_FILE) {
+  print PID $$,"\n";
+  close PID;
+}
 
 while (1) {
   REAPER();
