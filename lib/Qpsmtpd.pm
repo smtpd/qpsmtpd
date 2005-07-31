@@ -159,17 +159,83 @@ sub get_qmail_config {
 }
 
 sub _config_from_file {
-  my ($self, $configfile, $config) = @_;
+  my ($self, $configfile, $config, $visited) = @_;
   return unless -e $configfile;
+
+  $visited ||= [];
+  push @{$visited}, $configfile;
+
   open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!" and return;
   my @config = <CF>;
   chomp @config;
   @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
   close CF;
-  #$self->log(10, "returning get_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
+
+  my $pos = 0;
+  while ($pos < @config) {
+    # recursively pursue an $include reference, if found.  An inclusion which
+    # begins with a leading slash is interpreted as a path to a file and will
+    # supercede the usual config path resolution.  Otherwise, the normal
+    # config_dir() lookup is employed (the location in which the inclusion
+    # appeared receives no special precedence; possibly it should, but it'd
+    # be complicated beyond justifiability for so simple a config system.
+    if ($config[$pos] =~ /^\s*\$include\s+(\S+)\s*$/) {
+      my ($includedir, $inclusion) = ('', $1);
+
+      splice @config, $pos, 1; # remove the $include line
+      if ($inclusion !~ /^\//) {
+        $includedir = $self->config_dir($inclusion);
+        $inclusion = "$includedir/$inclusion";
+      }
+
+      if (grep($_ eq $inclusion, @{$visited})) {
+        $self->log(LOGERROR, "Circular \$include reference in config $config:");
+        $self->log(LOGERROR, "From $visited->[0]:");
+        $self->log(LOGERROR, "  includes $_")
+          for (@{$visited}[1..$#{$visited}], $inclusion);
+        return wantarray ? () : undef;
+      }
+      push @{$visited}, $inclusion;
+
+      for my $inc ($self->expand_inclusion_($inclusion, $configfile)) {
+        my @insertion = $self->_config_from_file($inc, $config, $visited);
+        splice @config, $pos, 0, @insertion;   # insert the inclusion
+        $pos += @insertion;
+      }
+    } else {
+      $pos++;
+    }
+  }
+
   $self->{_config_cache}->{$config} = \@config;
+
   return wantarray ? @config : $config[0];
 }
+
+sub expand_inclusion_ {
+  my $self = shift;
+  my $inclusion = shift;
+  my $context = shift;
+  my @includes;
+
+  if (-d $inclusion) {
+    $self->log(LOGDEBUG, "inclusion of directory $inclusion from $context");
+
+    if (opendir(INCD, $inclusion)) {
+      @includes = map { "$inclusion/$_" }
+        (grep { -f "$inclusion/$_" and !/^\./ } readdir INCD);
+      closedir INCD;
+    } else {
+      $self->log(LOGERROR, "Couldn't open directory $inclusion,".
+                           " referenced from $context ($!)");
+    }
+  } else {
+    $self->log(LOGDEBUG, "inclusion of file $inclusion from $context");
+    @includes = ( $inclusion );
+  }
+  return @includes;
+}
+
 
 sub load_plugins {
   my $self = shift;
@@ -195,28 +261,6 @@ sub _load_plugins {
   for my $plugin_line (@plugins) {
     my ($plugin, @args) = split ' ', $plugin_line;
     
-    if (lc($plugin) eq '$include') {
-      my $inc = shift @args;
-      my $config_dir = $self->config_dir($inc);
-      if (-d "$config_dir/$inc") {
-        $self->log(LOGDEBUG, "Loading include dir: $config_dir/$inc");
-        opendir(DIR, "$config_dir/$inc") || die "opendir($config_dir/$inc): $!";
-        my @plugconf = sort grep { -f $_ } map { "$config_dir/$inc/$_" } grep { !/^\./ } readdir(DIR);
-        closedir(DIR);
-        foreach my $f (@plugconf) {
-            push @ret, $self->_load_plugins($dir, $self->_config_from_file($f, "plugins"));
-        }
-      }
-      elsif (-f "$config_dir/$inc") {
-        $self->log(LOGDEBUG, "Loading include file: $config_dir/$inc");
-        push @ret, $self->_load_plugins($dir, $self->_config_from_file("$config_dir/$inc", "plugins"));
-      }
-      else {
-        $self->log(LOGCRIT, "CRITICAL PLUGIN CONFIG ERROR: Include $config_dir/$inc not found");
-      }
-      next;
-    }
-
     my $plugin_name = $plugin;
     $plugin =~ s/:\d+$//;       # after this point, only used for filename
 
