@@ -41,6 +41,21 @@ sub init {
     # now extract the password...
     
     $self->ssl_context($ssl_ctx);
+    
+    # Check for possible AUTH mechanisms
+HOOK: foreach my $hook ( keys %{$qp->{hooks}} ) {
+        if ( $hook =~ m/^auth-?(.+)?$/ ) {
+            if ( defined $1 ) {
+                my $hooksub = "hook_$hook";
+                $hooksub =~ s/\W/_/g;
+                *$hooksub = \&bad_ssl_hook;
+            }
+            else { # at least one polymorphous auth provider
+                *hook_auth = \&bad_ssl_hook;
+            }
+        }
+    }
+    
 }
 
 sub hook_ehlo {
@@ -133,4 +148,4 @@ sub bad_ssl_hook {
     return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
     return DECLINED;
 }
-*hook_helo = *hook_data = *hook_rcpt = *hook_mail = *hook_auth = \&bad_ssl_hook;
+*hook_helo = *hook_data = *hook_rcpt = *hook_mail = \&bad_ssl_hook;
