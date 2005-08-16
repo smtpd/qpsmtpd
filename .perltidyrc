@@ -1,5 +1,5 @@
 
--i=2    # 2 space indentation (considering changing this to 4)
+-i=4    # 4 space indentation (we used to use 2; in the future we'll use 4)
 -ci=2   # continuation indention
 
 -pt=2   # tight parens
