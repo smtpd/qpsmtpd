@@ -68,7 +68,7 @@ for (0..$#LOCALADDR) {
 if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &usage }
 if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &usage }
 
-delete $ENV{ENV};
+delete @ENV{'ENV','CDPATH','IFS','BASH_ENV'};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 
 my %childstatus = ();
