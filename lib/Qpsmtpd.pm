@@ -418,7 +418,7 @@ sub temp_dir {
 sub size_threshold {
   my $self = shift;
   unless ( defined $Size_threshold ) {
-    $Size_threshold = $self->config('memory_threshold') || 10_000;
+    $Size_threshold = $self->config('size_threshold') || 10_000;
     $self->log(LOGNOTICE, "size_threshold set to $Size_threshold");
   }
   return $Size_threshold;
