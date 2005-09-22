@@ -39,7 +39,7 @@ sub run {
     my $self = shift;
 
     # should be somewhere in Qpsmtpd.pm and not here...
-    $self->load_plugins;
+    $self->load_plugins unless $self->{hooks};
 
     my $rc = $self->start_conversation;
     return if $rc != DONE;

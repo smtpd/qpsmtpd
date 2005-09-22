@@ -1,6 +1,6 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $Logger $TraceLevel $Spool_dir);
+use vars qw($VERSION $Logger $TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
@@ -415,6 +415,15 @@ sub temp_dir {
   return $dirname;
 }
 
+sub size_threshold {
+  my $self = shift;
+  unless ( defined $Size_threshold ) {
+    $Size_threshold = $self->config('memory_threshold') || 10_000;
+    $self->log(LOGNOTICE, "size_threshold set to $Size_threshold");
+  }
+  return $Size_threshold;
+}
+  
 1;
 
 __END__

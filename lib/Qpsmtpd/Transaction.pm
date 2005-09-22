@@ -15,9 +15,6 @@ sub start {
   my %args = @_;
   my $self = { _rcpt => [], started => time };
   bless ($self, $class);
-  my $sz = $self->config('memory_threshold');
-  $sz = 10_000 unless defined($sz);
-  $self->{_size_threshold} = $sz;
   return $self;
 }
 
@@ -91,11 +88,25 @@ sub body_current_pos {
     return $self->{_body_current_pos} || 0;
 }
 
-# TODO - should we create the file here if we're storing as an array?
 sub body_filename {
   my $self = shift;
-  return unless $self->{_body_file};
+  $self->body_spool() unless $self->{_body_file};
   return $self->{_filename};
+}
+
+sub body_spool {
+  my $self = shift;
+  $self->log(LOGWARN, "spooling to disk");
+  $self->{_filename} = $self->temp_file();
+  $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
+    or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
+  if ($self->{_body_array}) {
+    foreach my $line (@{ $self->{_body_array} }) {
+      $self->{_body_file}->print($line) or die "Cannot print to temp file: $!";
+    }
+    $self->{_body_start} = $self->{_header_size};
+  }
+  $self->{_body_array} = undef;
 }
 
 sub body_write {
@@ -125,19 +136,7 @@ sub body_write {
       $self->{_body_size} += length($1);
       ++$self->{_body_current_pos};
     }
-    if ($self->{_body_size} >= $self->{_size_threshold}) {
-      #warn("spooling to disk\n");
-      $self->{_filename} = $self->temp_file();
-      $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
-        or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
-      if ($self->{_body_array}) {
-        foreach my $line (@{ $self->{_body_array} }) {
-          $self->{_body_file}->print($line) or die "Cannot print to temp file: $!";
-        }
-        $self->{_body_start} = $self->{_header_size};
-      }
-      $self->{_body_array} = undef;
-    }
+    $self->body_spool if ( $self->{_body_size} >= $self->size_threshold() );
   }
 }
 

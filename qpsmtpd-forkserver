@@ -169,6 +169,10 @@ if ($PID_FILE) {
   close PID;
 }
 
+# Populate class cached variables
+$qpsmtpd->spool_dir;
+$qpsmtpd->size_threshold;
+
 while (1) {
   REAPER();
   my $running = scalar keys %childstatus;
