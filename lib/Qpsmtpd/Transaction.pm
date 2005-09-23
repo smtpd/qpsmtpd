@@ -90,13 +90,13 @@ sub body_current_pos {
 
 sub body_filename {
   my $self = shift;
-  $self->body_spool() unless $self->{_body_file};
+  $self->body_spool() unless $self->{_filename};
   return $self->{_filename};
 }
 
 sub body_spool {
   my $self = shift;
-  $self->log(LOGWARN, "spooling to disk");
+  $self->log(LOGINFO, "spooling message to disk");
   $self->{_filename} = $self->temp_file();
   $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
     or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
@@ -107,6 +107,7 @@ sub body_spool {
     $self->{_body_start} = $self->{_header_size};
   }
   $self->{_body_array} = undef;
+  $self->{_body_file}->close();
 }
 
 sub body_write {
