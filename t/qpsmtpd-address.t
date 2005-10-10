@@ -2,7 +2,7 @@
 use strict;
 $^W = 1;
 
-use Test::More tests => 28;
+use Test::More tests => 25;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
@@ -38,21 +38,6 @@ $ao = Qpsmtpd::Address->parse($as);
 ok ($ao, "parse $as");
 is ($ao->format, '<"foo\ bar"@example.com>', "format $as");
 
-
-$as = 'foo@example.com';
-$ao = Qpsmtpd::Address->parse($as);
-is ($ao, undef, "can't parse $as");
-
-$as = '<@example.com>';
-is (Qpsmtpd::Address->parse($as), undef, "can't parse $as");
-
-$as = '<@123>';
-is (Qpsmtpd::Address->parse($as), undef, "can't parse $as");
-
-$as = '<user>';
-is (Qpsmtpd::Address->parse($as), undef, "can't parse $as");
-
-
 $as = 'foo@example.com';
 $ao = Qpsmtpd::Address->new($as);
 ok ($ao, "new $as");
@@ -79,10 +64,10 @@ $as = '<foo@foo.x.example.com>';
 $ao = Qpsmtpd::Address->new($as);
 ok ($ao, "new $as");
 is ($ao->format, $as, "format $as");
+is ("$ao", $as, "overloaded stringify $as");
 
 $as = 'foo@foo.x.example.com';
 ok ($ao = Qpsmtpd::Address->parse("<$as>"), "parse <$as>");
 is ($ao && $ao->address, $as, "address $as");
-
 
 

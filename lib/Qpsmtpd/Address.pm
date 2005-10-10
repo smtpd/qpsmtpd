@@ -1,16 +1,23 @@
 package Qpsmtpd::Address;
 use strict;
 
+use overload (
+    '""' => \&format,
+);
+
 sub new {
-    my ($class, $address) = @_;
-    my $self = [ ];
-    if ($address =~ /^<(.*)>$/) {
-        $self->[0] = $1;
-      } else {
-        $self->[0] = $address;
+    my ($class, $user, $host) = @_;
+    my $self = {};
+    if ($user =~ /^<(.*)>$/ ) {
+	($user, $host) = $class->canonify($user)
     }
-    bless ($self, $class);
-    return $self;
+    elsif ( not defined $host ) {
+	my $address = $user;
+	($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
+    }
+    $self->{_user} = $user;
+    $self->{_host} = $host;
+    return bless $self, $class;
 }
 
 # Definition of an address ("path") from RFC 2821:
@@ -133,58 +140,55 @@ sub canonify {
 
     # 
     my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
-    return undef unless defined $localpart;
+    return (undef) unless defined $localpart;
 
     if ($localpart =~ /^$atom(\.$atom)*/) {
         # simple case, we are done
-        return $path;
+        return ($localpart, $domainpart);
       }
     if ($localpart =~ /^"(($qtext|\\$text)*)"$/) {
         $localpart = $1;
         $localpart =~ s/\\($text)/$1/g;
-        return "$localpart\@$domainpart";
+        return ($localpart, $domainpart);
       }
-    return undef;
+    return (undef);
 }
 
-
-
-sub parse {
-    my ($class, $line) = @_;
-    my $a = $class->canonify($line);
-    return ($class->new($a)) if (defined $a);
-    return undef;
+sub parse { # retain for compatibility only
+    return shift->new(shift);
 }
 
 sub address {
     my ($self, $val) = @_;
-    my $oldval = $self->[0];
-    return $self->[0] = $val if (defined($val));
-    return $oldval;
+    if ( defined($val) ) {
+	$val = "<$val>" unless $val =~ /^<.+>$/;
+	my ($user, $host) = $self->canonify($val);
+	$self->{_user} = $user;
+	$self->{_host} = $host;
+    }
+    return ( defined $self->{_user} ?     $self->{_user} : '' )
+         . ( defined $self->{_host} ? '@'.$self->{_host} : '' );
 }
 
 sub format {
     my ($self) = @_;
     my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
-    my $s = $self->[0];
-    return '<>' unless $s;
-    my ($user, $host) = $s =~ m/(.*)\@(.*)/;
-    if ($user =~ s/($qchar)/\\$1/g) {
-        return qq{<"$user"\@$host>};
+    return '<>' unless defined $self->{_user};
+    if ( ( my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
+        return qq(<"$user")
+	. ( defined $self->{_host} ? '@'.$self->{_host} : '' ). ">";
       }
-    return "<$s>";
+    return "<".$self->address().">";
 }
 
 sub user {
     my ($self) = @_;
-    my ($user, $host) = $self->[0] =~ m/(.*)\@(.*)/;
-    return $user;
+    return $self->{_user};
 }
 
 sub host {
     my ($self) = @_;
-    my ($user, $host) = $self->[0] =~ m/(.*)\@(.*)/;
-    return $host;
+    return $self->{_host};
 }
 
 1;
