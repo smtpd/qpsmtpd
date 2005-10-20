@@ -91,6 +91,7 @@ sub body_current_pos {
 sub body_filename {
   my $self = shift;
   $self->body_spool() unless $self->{_filename};
+  $self->{_body_file}->close(); # so contents won't be cached
   return $self->{_filename};
 }
 
@@ -107,7 +108,6 @@ sub body_spool {
     $self->{_body_start} = $self->{_header_size};
   }
   $self->{_body_array} = undef;
-  $self->{_body_file}->close();
 }
 
 sub body_write {
