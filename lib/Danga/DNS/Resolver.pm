@@ -3,7 +3,7 @@
 package Danga::DNS::Resolver;
 use base qw(Danga::Socket);
 
-use fields qw(res dst id_to_asker id_to_query timeout cache cache_timeout);
+use fields qw(res dst cache cache_timeout queries);
 
 use Net::DNS;
 use Socket;
@@ -30,16 +30,16 @@ sub new {
     ) || die "Cannot create socket: $!";
     IO::Handle::blocking($sock, 0);
     
-    trace(2, "Using nameserver $res->{nameservers}->[0]:$res->{port}\n");
-    my $dst_sockaddr = sockaddr_in($res->{'port'}, inet_aton($res->{'nameservers'}->[0]));
-    #my $dst_sockaddr = sockaddr_in($res->{'port'}, inet_aton('127.0.0.1'));
-    #my $dst_sockaddr = sockaddr_in($res->{'port'}, inet_aton('10.2.1.20'));
+    $self->{dst} = [];
+    
+    foreach my $ns (@{ $res->{nameservers} }) {
+        trace(2, "Using nameserver $ns:$res->{port}\n");
+        my $dst_sockaddr = sockaddr_in($res->{'port'}, inet_aton($ns));
+        push @{$self->{dst}}, $dst_sockaddr;
+    }
     
     $self->{res} = $res;
-    $self->{dst} = $dst_sockaddr;
-    $self->{id_to_asker} = {};
-    $self->{id_to_query} = {};
-    $self->{timeout} = {};
+    $self->{queries} = {};
     $self->{cache} = {};
     $self->{cache_timeout} = {};
     
@@ -52,10 +52,17 @@ sub new {
     return $self;
 }
 
+sub ns {
+    my Danga::DNS::Resolver $self = shift;
+    my $index = shift;
+    return if $index > $#{$self->{dst}};
+    return $self->{dst}->[$index];
+}
+
 sub pending {
     my Danga::DNS::Resolver $self = shift;
     
-    return keys(%{$self->{id_to_asker}});
+    return keys(%{$self->{queries}});
 }
 
 sub _query {
@@ -73,20 +80,14 @@ sub _query {
     }
     
     my $packet = $self->{res}->make_query_packet($host, $type);
+    
     my $packet_data = $packet->data;
+    my $id = $packet->header->id;
     
-    my $h = $packet->header;
-    my $id = $h->id;
-    
-    if (!$self->sock->send($packet_data, 0, $self->{dst})) {
-        return;
-    }
-    
-    trace(2, "Query: $host ($id)\n");
-
-    $self->{id_to_asker}->{$id} = $asker;
-    $self->{id_to_query}->{$id} = $host;
-    $self->{timeout}->{$id} = $now;
+    my $query = Danga::DNS::Resolver::Query->new(
+        $self, $asker, $host, $type, $now, $id, $packet_data,
+        ) or return;
+    $self->{queries}->{$id} = $query;
     
     return 1;
 }
@@ -97,14 +98,11 @@ sub query_txt {
     
     my $now = time();
     
-    trace(2, "[" . keys(%{$self->{id_to_asker}}) . "] trying to resolve TXT: @hosts\n");
+    trace(2, "trying to resolve TXT: @hosts\n");
 
     foreach my $host (@hosts) {
         $self->_query($asker, $host, 'TXT', $now) || return;
     }
-    
-    #print "+Pending queries: " . keys(%{$self->{id_to_asker}}) .
-    #    " / Cache Size: " . keys(%{$self->{cache}}) . "\n";
     
     return 1;
 }
@@ -115,14 +113,11 @@ sub query_mx {
     
     my $now = time();
     
-    trace(2, "[" . keys(%{$self->{id_to_asker}}) . "] trying to resolve MX: @hosts\n");
+    trace(2, "trying to resolve MX: @hosts\n");
 
     foreach my $host (@hosts) {
         $self->_query($asker, $host, 'MX', $now) || return;
     }
-    
-    #print "+Pending queries: " . keys(%{$self->{id_to_asker}}) .
-    #    " / Cache Size: " . keys(%{$self->{cache}}) . "\n";
     
     return 1;
 }
@@ -133,14 +128,11 @@ sub query {
     
     my $now = time();
     
-    trace(2, "[" . keys(%{$self->{id_to_asker}}) . "] trying to resolve A/PTR: @hosts\n");
+    trace(2, "trying to resolve A/PTR: @hosts\n");
 
     foreach my $host (@hosts) {
         $self->_query($asker, $host, 'A', $now) || return;
     }
-    
-    #print "+Pending queries: " . keys(%{$self->{id_to_asker}}) .
-    #    " / Cache Size: " . keys(%{$self->{cache}}) . "\n";
     
     return 1;
 }
@@ -154,20 +146,20 @@ sub _do_cleanup {
     my $idle = $self->max_idle_time;
     
     my @to_delete;
-    while (my ($id, $t) = each(%{$self->{timeout}})) {
-        if ($t < ($now - $idle)) {
+    while (my ($id, $obj) = each(%{$self->{queries}})) {
+        if ($obj->{timeout} < ($now - $idle)) {
             push @to_delete, $id;
         }
     }
     
     foreach my $id (@to_delete) {
-        delete $self->{timeout}{$id};
-        my $asker = delete $self->{id_to_asker}{$id};
-        my $query = delete $self->{id_to_query}{$id};
-        $asker->run_callback("NXDOMAIN", $query);
+        my $query = delete $self->{queries}{$id};
+        $query->timeout() and next;
+        # add back in if timeout caused us to loop to next server
+        $self->{queries}->{$id} = $query;
     }
     
-    foreach my $type ('A', 'TXT') {
+    foreach my $type ('A', 'TXT', 'MX') {
         @to_delete = ();
         
         while (my ($query, $t) = each(%{$self->{cache_timeout}{$type}})) {
@@ -199,16 +191,13 @@ sub event_read {
         my $header = $packet->header;
         my $id = $header->id;
         
-        my $asker = delete $self->{id_to_asker}->{$id};
-        my $query = delete $self->{id_to_query}->{$id};
-        delete $self->{timeout}{$id};
-                
-        #print "-Pending queries: " . keys(%{$self->{id_to_asker}}) .
-        #    " / Cache Size: " . keys(%{$self->{cache}}) . "\n";
-        if (!$asker) {
-            trace(1, "No asker for id: $id\n");
+        my $qobj = delete $self->{queries}->{$id};
+        if (!$qobj) {
+            trace(1, "No query for id: $id\n");
             return;
         }
+        
+        my $query = $qobj->{host};
         
         my $now = time();
         my @questions = $packet->question;
@@ -217,61 +206,64 @@ sub event_read {
             # my $q = shift @questions;
             if ($rr->type eq "PTR") {
                 my $rdns = $rr->ptrdname;
-                if ($query) {
-                    # NB: Cached as an "A" lookup as there's no overlap and they
-                    # go through the same query() function above
-                    $self->{cache}{A}{$query} = $rdns;
-                    $self->{cache_timeout}{A}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
-                }
-                $asker->run_callback($rdns, $query);
+                # NB: Cached as an "A" lookup as there's no overlap and they
+                # go through the same query() function above
+                $self->{cache}{A}{$query} = $rdns;
+                # $self->{cache_timeout}{A}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
+                $self->{cache_timeout}{A}{$query} = $now + $rr->ttl;
+                $qobj->run_callback($rdns);
             }
             elsif ($rr->type eq "A") {
                 my $ip = $rr->address;
-                if ($query) {
-                    $self->{cache}{A}{$query} = $ip;
-                    $self->{cache_timeout}{A}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
-                }
-                $asker->run_callback($ip, $query);
+                $self->{cache}{A}{$query} = $ip;
+                # $self->{cache_timeout}{A}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
+                $self->{cache_timeout}{A}{$query} = $now + $rr->ttl;
+                $qobj->run_callback($ip);
             }
             elsif ($rr->type eq "TXT") {
                 my $txt = $rr->txtdata;
-                if ($query) {
-                    $self->{cache}{TXT}{$query} = $txt;
-                    $self->{cache_timeout}{TXT}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
-                }
-                $asker->run_callback($txt, $query);
+                $self->{cache}{TXT}{$query} = $txt;
+                # $self->{cache_timeout}{TXT}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
+                $self->{cache_timeout}{TXT}{$query} = $now + $rr->ttl;
+                $qobj->run_callback($txt);
+            }
+            elsif ($rr->type eq "MX") {
+                my $host = $rr->exchange;
+                my $preference = $rr->preference;
+                $self->{cache}{MX}{$query} = [$host, $preference];
+                $self->{cache_timeout}{MX}{$query} = $now + $rr->ttl;
+                $qobj->run_callback([$host, $preference]);
             }
             else {
                 # came back, but not a PTR or A record
-                $asker->run_callback("unknown", $query);
+                $qobj->run_callback("UNKNOWN");
             }
             $answers++;
         }
         if (!$answers) {
             if ($err eq "NXDOMAIN") {
                 # trace("found => NXDOMAIN\n");
-                $asker->run_callback("NXDOMAIN", $query);
+                $qobj->run_callback("NXDOMAIN");
             }
             elsif ($err eq "SERVFAIL") {
                 # try again???
-                print "SERVFAIL looking for $query (Pending: " . keys(%{$self->{id_to_asker}}) . ")\n";
+                print "SERVFAIL looking for $query\n";
                 #$self->query($asker, $query);
-                $asker->run_callback($err, $query);
-                #$self->{id_to_asker}->{$id} = $asker;
-                #$self->{id_to_query}->{$id} = $query;
-                #$self->{timeout}{$id} = time();
-        
+                $qobj->error($err) and next;
+                # add back in if error() resulted in query being re-issued
+                $self->{queries}->{$id} = $qobj;
             }
             elsif ($err eq "NOERROR") {
-                $asker->run_callback($err, $query);
+                $qobj->run_callback($err);
             }
             elsif($err) {
                 print("error: $err\n");
-                $asker->run_callback($err, $query);
+                $qobj->error($err) and next;
+                $self->{queries}->{$id} = $qobj;
             }
             else {
                 # trace("no answers\n");
-                $asker->run_callback("NXDOMAIN", $query);
+                $qobj->run_callback("NOANSWER");
             }
         }
     }
@@ -284,6 +276,116 @@ sub close {
     
     $self->SUPER::close(shift);
     # confess "Danga::DNS::Resolver socket should never be closed!";
+}
+
+package Danga::DNS::Resolver::Query;
+
+use constant MAX_QUERIES => 10;
+
+sub trace {
+    my $level = shift;
+    print ("$::DEBUG/$level [$$] dns lookup: @_") if $::DEBUG >= $level;
+}
+
+sub new {
+    my ($class, $res, $asker, $host, $type, $now, $id, $data) = @_;
+    
+    my $self = {
+        resolver    => $res,
+        asker       => $asker,
+        host        => $host,
+        type        => $type,
+        timeout     => $now,
+        id          => $id,
+        data        => $data,
+        repeat      => 2, # number of retries
+        ns          => 0,
+        nqueries    => 0,
+    };
+    
+    trace(2, "NS Query: $host ($id)\n");
+
+    bless $self, $class;
+    
+    $self->send_query || return;
+    
+    return $self;
+}
+
+#sub DESTROY {
+#    my $self = shift;
+#    trace(2, "DESTROY $self\n");
+#}
+
+sub timeout {
+    my $self = shift;
+    
+    trace(2, "NS Query timeout. Trying next host\n");
+    if ($self->send_query) {
+        # had another NS to send to, reset timeout
+        $self->{timeout} = time();
+        return;
+    }
+    
+    # can we loop/repeat?
+    if (($self->{nqueries} <= MAX_QUERIES) &&
+        ($self->{repeat} > 1))
+    {
+        trace(2, "NS Query timeout. Next host failed. Trying loop\n");
+        $self->{repeat}--;
+        $self->{ns} = 0;
+        return $self->timeout();
+    }
+    
+    trace(2, "NS Query timeout. All failed. Running callback(TIMEOUT)\n");
+    # otherwise we really must timeout.
+    $self->run_callback("TIMEOUT");
+    return 1;
+}
+
+sub error {
+    my ($self, $error) = @_;
+    
+    trace(2, "NS Query error. Trying next host\n");
+    if ($self->send_query) {
+        # had another NS to send to, reset timeout
+        $self->{timeout} = time();
+        return;
+    }
+    
+    # can we loop/repeat?
+    if (($self->{nqueries} <= MAX_QUERIES) &&
+        ($self->{repeat} > 1))
+    {
+        trace(2, "NS Query error. Next host failed. Trying loop\n");
+        $self->{repeat}--;
+        $self->{ns} = 0;
+        return $self->error($error);
+    }
+    
+    trace(2, "NS Query error. All failed. Running callback($error)\n");
+    # otherwise we really must timeout.
+    $self->run_callback($error);
+    return 1;
+}
+
+sub run_callback {
+    my ($self, $response) = @_;
+    trace(2, "NS Query callback($self->{host} = $response\n");
+    $self->{asker}->run_callback($response, $self->{host});
+}
+
+sub send_query {
+    my ($self) = @_;
+    
+    my $dst = $self->{resolver}->ns($self->{ns}++);
+    return unless defined $dst;
+    if (!$self->{resolver}->sock->send($self->{data}, 0, $dst)) {
+        return;
+    }
+    
+    $self->{nqueries}++;
+    return 1;
 }
 
 1;
