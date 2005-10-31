@@ -2,7 +2,9 @@ package Qpsmtpd::Address;
 use strict;
 
 use overload (
-    '""' => \&format,
+    '""'   => \&format,
+    'cmp'  => \&spaceship,
+    '<=>'  => \&spaceship,
 );
 
 sub new {
@@ -191,4 +193,20 @@ sub host {
     return $self->{_host};
 }
 
+sub spaceship {
+    require UNIVERSAL;
+    my ($left, $right, $swap) = @_;
+    my $class = ref($left);
+
+    unless ( UNIVERSAL::isa($right, $class) ) {
+	$right = $class->new($right);
+    }
+    
+    if ( $swap ) {
+	($right, $left) = ($left, $right);
+    }
+
+    return lc($left->format) cmp lc($right->format);
+}
+	
 1;
