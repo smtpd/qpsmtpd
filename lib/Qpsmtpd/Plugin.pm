@@ -65,6 +65,14 @@ sub spool_dir {
   shift->qp->spool_dir;
 }
 
+sub auth_user {
+    shift->qp->auth_user;
+}
+
+sub auth_mechanism {
+    shift->qp->auth_mechanism;
+}
+
 sub temp_file {
   my $self = shift;
   my $tempfile = $self->qp->temp_file;

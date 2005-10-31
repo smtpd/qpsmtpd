@@ -225,6 +225,19 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
   }
 }
 
+sub auth {
+    my ( $self, $arg, @stuff ) = @_;
+
+    #they AUTH'd once already
+    return $self->respond( 503, "but you already said AUTH ..." )
+      if ( defined $self->{_auth}
+        and $self->{_auth} == OK );
+    return $self->respond( 503, "AUTH not defined for HELO" )
+      if ( $self->connection->hello eq "helo" );
+
+    return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $arg, @stuff );
+}
+
 sub mail {
   my $self = shift;
   return $self->respond(501, "syntax error in parameters") if !$_[0] or $_[0] !~ m/^from:/i;
