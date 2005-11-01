@@ -3,8 +3,7 @@ use strict;
 
 use overload (
     '""'   => \&format,
-    'cmp'  => \&spaceship,
-    '<=>'  => \&spaceship,
+    'cmp'  => \&addr_cmp,
 );
 
 sub new {
@@ -193,7 +192,7 @@ sub host {
     return $self->{_host};
 }
 
-sub spaceship {
+sub addr_cmp {
     require UNIVERSAL;
     my ($left, $right, $swap) = @_;
     my $class = ref($left);
@@ -201,12 +200,16 @@ sub spaceship {
     unless ( UNIVERSAL::isa($right, $class) ) {
 	$right = $class->new($right);
     }
-    
+
+    #invert the address so we can sort by domain then user    
+    $left = lc($left->host.'='.$left->user);
+    $right = lc($right->host.'='.$right->user);
+
     if ( $swap ) {
 	($right, $left) = ($left, $right);
     }
 
-    return lc($left->format) cmp lc($right->format);
+    return ($left cmp $right);
 }
 	
 1;
