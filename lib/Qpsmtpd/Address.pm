@@ -1,10 +1,60 @@
+#!/usr/bin/perl -w
 package Qpsmtpd::Address;
 use strict;
 
+=head1 NAME
+
+Qpsmtpd::Address - Lightweight E-Mail address objects
+
+=head1 DESCRIPTION
+
+Based originally on cut and paste from Mail::Address and including 
+every jot and tittle from RFC-2821/2822 on what is a legal e-mail 
+address for use during the SMTP transaction.
+
+=head1 USAGE
+
+  my $rcpt = Qpsmtpd::Address->new('<email.address@example.com>');
+
+The objects created can be used as is, since they automatically 
+stringify to a standard form, and they have an overloaded comparison 
+for easy testing of values.
+
+=head1 METHODS
+
+=cut
+
 use overload (
     '""'   => \&format,
-    'cmp'  => \&addr_cmp,
+    'cmp'  => \&_addr_cmp,
 );
+
+=head2 new()
+
+Can be called two ways:
+
+=over 4 
+
+=item * Qpsmtpd::Address->new('<full_address@example.com>')
+
+The normal mode of operation is to pass the entire contents of the 
+RCPT TO: command from the SMTP transaction.  The value will be fully 
+parsed via the L<canonify> method, using the full RFC 2821 rules.
+
+=item * Qpsmtpd::Address->new("user", "host")
+
+If the caller has already split the address from the domain/host,
+this mode will not L<canonify> the input values.  This is not 
+recommended in cases of user-generated input for that reason.  This 
+can be used to generate Qpsmtpd::Address objects for accounts like 
+"<postmaster>" or indeed for the bounce address "<>".
+
+=back
+
+The resulting objects can be stored in arrays or used in plugins to 
+test for equality (like in badmailfrom).
+
+=cut
 
 sub new {
     my ($class, $user, $host) = @_;
@@ -118,6 +168,15 @@ sub new {
 #
 # (We ignore all obs forms)
 
+=head2 canonify()
+
+Primarily an internal method, it is used only on the path portion of
+an e-mail message, as defined in RFC-2821 (this is the part inside the
+angle brackets and does not include the "human readable" portion of an
+address).  It returns a list of (local-part, domain).
+
+=cut
+
 sub canonify {
     my ($dummy, $path) = @_;
     my $atom = '[a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~]+';
@@ -155,9 +214,28 @@ sub canonify {
     return (undef);
 }
 
+=head2 parse()
+
+Retained as a compatibility method, it is completely equivalent
+to new() called with a single parameter.
+
+=cut
+
 sub parse { # retain for compatibility only
     return shift->new(shift);
 }
+
+=head2 address()
+
+Can be used to reset the value of an existing Q::A object, in which
+case it takes a parameter with or without the angle brackets.
+
+Returns the stringified representation of the address.  NOTE: does
+not escape any of the characters that need escaping, nor does it
+include the surrounding angle brackets.  For that purpose, see
+L<format>.
+
+=cut
 
 sub address {
     my ($self, $val) = @_;
@@ -171,6 +249,18 @@ sub address {
          . ( defined $self->{_host} ? '@'.$self->{_host} : '' );
 }
 
+=head2 format()
+
+Returns the canonical stringified representation of the address.  It
+does escape any characters requiring it (per RFC-2821/2822) and it
+does include the surrounding angle brackets.  It is also the default
+stringification operator, so the following are equivalent:
+
+  print $rcpt->format();
+  print $rcpt;
+
+=cut
+
 sub format {
     my ($self) = @_;
     my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
@@ -182,17 +272,31 @@ sub format {
     return "<".$self->address().">";
 }
 
+=head2 user()
+
+Returns the "localpart" of the address, per RFC-2821, or the portion
+before the '@' sign.
+
+=cut
+
 sub user {
     my ($self) = @_;
     return $self->{_user};
 }
+
+=head2 host()
+
+Returns the "domain" part of the address, per RFC-2821, or the portion
+after the '@' sign.
+
+=cut
 
 sub host {
     my ($self) = @_;
     return $self->{_host};
 }
 
-sub addr_cmp {
+sub _addr_cmp {
     require UNIVERSAL;
     my ($left, $right, $swap) = @_;
     my $class = ref($left);
@@ -211,5 +315,12 @@ sub addr_cmp {
 
     return ($left cmp $right);
 }
-	
+
+=head1 COPYRIGHT
+
+Copyright 2004-2005 Peter J. Holzer.  See the LICENSE file for more 
+information.
+
+=cut
+
 1;
