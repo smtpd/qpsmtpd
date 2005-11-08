@@ -2,7 +2,7 @@
 use strict;
 $^W = 1;
 
-use Test::More tests => 27;
+use Test::More tests => 29;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
@@ -12,6 +12,11 @@ my $as;
 my $ao;
 
 $as = '<>';
+$ao = Qpsmtpd::Address->parse($as);
+ok ($ao, "parse $as");
+is ($ao->format, $as, "format $as");
+
+$as = '<postmaster>';
 $ao = Qpsmtpd::Address->parse($as);
 ok ($ao, "parse $as");
 is ($ao->format, $as, "format $as");
