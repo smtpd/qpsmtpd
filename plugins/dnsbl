@@ -34,7 +34,6 @@ sub connect_handler {
 
   my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
-  $self->transaction->notes('pending_dns_queries', scalar(keys(%dnsbl_zones)));
   my $qp = $self->qp;
   for my $dnsbl (keys %dnsbl_zones) {
     # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
@@ -63,13 +62,10 @@ sub connect_handler {
 sub process_a_result {
     my ($qp, $template, $result, $query) = @_;
     
-    my $pending = $qp->transaction->notes('pending_dns_queries');
-    $qp->transaction->notes('pending_dns_queries', --$pending);
-    
     warn("Result for A $query: $result\n");
     if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
         # NXDOMAIN or ERROR possibly...
-        $qp->finish_continuation unless $pending;
+        $qp->finish_continuation if $qp->input_sock->readable;
         return;
     }
     
@@ -77,29 +73,26 @@ sub process_a_result {
     my $ip = $conn->remote_ip;
     $template =~ s/%IP%/$ip/g;
     $conn->notes('dnsbl', $template) unless $conn->notes('dnsbl');
-    $qp->finish_continuation unless $pending;
+    $qp->finish_continuation if $qp->input_sock->readable;
 }
 
 sub process_txt_result {
     my ($qp, $result, $query) = @_;
     
-    my $pending = $qp->transaction->notes('pending_dns_queries');
-    $qp->transaction->notes('pending_dns_queries', --$pending);
-    
     warn("Result for TXT $query: $result\n");
     if ($result !~ /[a-z]/) {
         # NXDOMAIN or ERROR probably...
-        $qp->finish_continuation unless $pending;
+        $qp->finish_continuation if $qp->input_sock->readable;
         return;
     }
     
     my $conn = $qp->connection;
     $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
-    $qp->finish_continuation unless $pending;
+    $qp->finish_continuation if $qp->input_sock->readable;
 }
 
 sub pickup_handler {
-  my ($self, $transaction, $rcpt) = @_;
+  my ($self, $transaction) = @_;
 
   # RBLSMTPD being non-empty means it contains the failure message to return
   if (defined ($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
