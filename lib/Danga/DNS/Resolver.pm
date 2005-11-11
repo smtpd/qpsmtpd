@@ -92,6 +92,21 @@ sub _query {
     return 1;
 }
 
+sub query_type {
+    my Danga::DNS::Resolver $self = shift;
+    my ($asker, $type, @hosts) = @_;
+    
+    my $now = time();
+    
+    trace(2, "[" . keys(%{$self->{id_to_asker}}) . "] trying to resolve $type: @hosts\n");
+
+    foreach my $host (@hosts) {
+        $self->_query($asker, $host, $type, $now) || return;
+    }
+    
+    return 1;
+}
+
 sub query_txt {
     my Danga::DNS::Resolver $self = shift;
     my ($asker, @hosts) = @_;
@@ -182,6 +197,15 @@ sub max_idle_time { 30 }
 sub event_err { shift->close("dns socket error") }
 sub event_hup { shift->close("dns socket error") }
 
+my %type_to_host = (
+    PTR   => 'ptrdname',
+    A     => 'address',
+    AAAA  => 'address',
+    TXT   => 'txtdata',
+    NS    => 'nsdname',
+    CNAME => 'cname',
+);
+
 sub event_read {
     my Danga::DNS::Resolver $self = shift;
 
@@ -200,32 +224,12 @@ sub event_read {
         my $query = $qobj->{host};
         
         my $now = time();
-        my @questions = $packet->question;
-        #print STDERR "response to ", $questions[0]->string, "\n";
         foreach my $rr ($packet->answer) {
-            # my $q = shift @questions;
-            if ($rr->type eq "PTR") {
-                my $rdns = $rr->ptrdname;
-                # NB: Cached as an "A" lookup as there's no overlap and they
-                # go through the same query() function above
-                $self->{cache}{A}{$query} = $rdns;
-                # $self->{cache_timeout}{A}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
-                $self->{cache_timeout}{A}{$query} = $now + $rr->ttl;
-                $qobj->run_callback($rdns);
-            }
-            elsif ($rr->type eq "A") {
-                my $ip = $rr->address;
-                $self->{cache}{A}{$query} = $ip;
-                # $self->{cache_timeout}{A}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
-                $self->{cache_timeout}{A}{$query} = $now + $rr->ttl;
-                $qobj->run_callback($ip);
-            }
-            elsif ($rr->type eq "TXT") {
-                my $txt = $rr->txtdata;
-                $self->{cache}{TXT}{$query} = $txt;
-                # $self->{cache_timeout}{TXT}{$query} = $now + 60; # should use $rr->ttl but that would cache for too long
-                $self->{cache_timeout}{TXT}{$query} = $now + $rr->ttl;
-                $qobj->run_callback($txt);
+            if (my $host_method = $type_to_host{$rr->type}) {
+                my $host = $rr->$host_method;
+                $self->{cache}{$rr->type}{$query} = $host;
+                $self->{cache_timeout}{$rr->type}{$query} = $now + $rr->ttl;
+                $qobj->run_callback($host);
             }
             elsif ($rr->type eq "MX") {
                 my $host = $rr->exchange;

@@ -62,7 +62,11 @@ sub new {
             }
         }
         else {
-            die "Unsupported DNS query type: $options{type}";
+            if (!$resolver->query_type($self, $options{type}, @{$self->{hosts}})) {
+                $client->enable_read() if $client;
+                return;
+            }
+            # die "Unsupported DNS query type: $options{type}";
         }
     }
     else {
