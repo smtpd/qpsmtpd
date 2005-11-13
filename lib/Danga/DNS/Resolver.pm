@@ -98,7 +98,7 @@ sub query_type {
     
     my $now = time();
     
-    trace(2, "[" . keys(%{$self->{id_to_asker}}) . "] trying to resolve $type: @hosts\n");
+    trace(2, "Trying to resolve $type: @hosts\n");
 
     foreach my $host (@hosts) {
         $self->_query($asker, $host, $type, $now) || return;
@@ -110,31 +110,13 @@ sub query_type {
 sub query_txt {
     my Danga::DNS::Resolver $self = shift;
     my ($asker, @hosts) = @_;
-    
-    my $now = time();
-    
-    trace(2, "trying to resolve TXT: @hosts\n");
-
-    foreach my $host (@hosts) {
-        $self->_query($asker, $host, 'TXT', $now) || return;
-    }
-    
-    return 1;
+    return $self->query_type($asker, "TXT", @hosts);
 }
 
 sub query_mx {
     my Danga::DNS::Resolver $self = shift;
     my ($asker, @hosts) = @_;
-    
-    my $now = time();
-    
-    trace(2, "trying to resolve MX: @hosts\n");
-
-    foreach my $host (@hosts) {
-        $self->_query($asker, $host, 'MX', $now) || return;
-    }
-    
-    return 1;
+    return $self->query_type($asker, "MX", @hosts);
 }
 
 sub query {
