@@ -10,13 +10,15 @@ pez (or pezmail)
 Near term roadmap
 =================
 
-0.31:
+0.32:
       - Bugfixes
       - add module requirements to the META.yml file
 
 0.40:
       - Add user configuration plugin
       - Add plugin API for checking if a local email address is valid
+      - use keyword "ESMTPA" in Received header in case of authentication to comply with RFC 3848.
+
 
 0.50:
       Include the popular check_delivery[1] functionality via the 0.30 API
