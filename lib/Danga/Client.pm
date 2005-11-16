@@ -111,6 +111,7 @@ sub process_read_buf {
 sub readable {
     my Danga::Client $self = shift;
     return 0 if $self->{disable_read} > 0;
+    return 0 if $self->{closed} > 0;
     return 1;
 }
 
