@@ -57,13 +57,9 @@ run the following command in the /home/smtpd/ directory.
 
    svn co http://svn.perl.org/qpsmtpd/trunk .
 
-Or if you want a specific release, use for example
+Beware that the trunk might be unstable and unsuitable for anything but development, so you might want to get a specific release, for example:
 
-   svn co http://svn.perl.org/qpsmtpd/tags/0.30 .
-
-In the branch L<http://svn.perl.org/qpsmtpd/branches/high_perf/> we
-have an experimental event based version of qpsmtpd that can handle
-thousands of simultaneous connections with very little overhead.
+   svn co http://svn.perl.org/qpsmtpd/tags/0.31 .
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
