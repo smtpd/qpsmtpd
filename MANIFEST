@@ -1,6 +1,8 @@
 Changes
 config.sample/badhelo
+config.sample/badrcptto_patterns
 config.sample/dnsbl_zones
+config.sample/invalid_resolvable_fromhost
 config.sample/IP
 config.sample/logging
 config.sample/loglevel
@@ -8,6 +10,7 @@ config.sample/plugins
 config.sample/relayclients
 config.sample/require_resolvable_fromhost
 config.sample/rhsbl_zones
+config.sample/size_threshold
 CREDITS
 lib/Apache/Qpsmtpd.pm
 lib/Qpsmtpd.pm
@@ -56,6 +59,7 @@ plugins/logging/adaptive
 plugins/logging/devnull
 plugins/logging/warn
 plugins/milter
+plugins/queue/exim-bsmtp
 plugins/queue/maildir
 plugins/queue/postfix-queue
 plugins/queue/qmail-queue
@@ -66,6 +70,7 @@ plugins/require_resolvable_fromhost
 plugins/rhsbl
 plugins/sender_permitted_from
 plugins/spamassassin
+plugins/tls
 plugins/virus/aveclient
 plugins/virus/bitdefender
 plugins/virus/check_for_hi_virus
