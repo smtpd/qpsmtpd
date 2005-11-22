@@ -6,7 +6,7 @@ package Danga::DNS;
 # hosts you want to query, plus the callback. All the hard work is done
 # in Danga::DNS::Resolver.
 
-use fields qw(client hosts num_hosts callback results start);
+use fields qw(client hosts num_hosts callback finished results start);
 use strict;
 
 use Danga::DNS::Resolver;
