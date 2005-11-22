@@ -280,7 +280,7 @@ sub connection {
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
-  if ($self->{_continuation} && $hook ne "logging") {
+  if ($self->{_continuation} && $hook ne "logging" && $hook ne "config") {
     die "Continuations in progress from previous hook (this is the $hook hook)";
   }
   my $hooks = $self->{hooks};
