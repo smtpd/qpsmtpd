@@ -33,30 +33,13 @@ sub new {
     $self->{num_hosts} = scalar(@{$self->{hosts}}) || "No hosts supplied";
     $self->{client} = $client;
     $self->{callback} = $options{callback} || die "No callback given";
+    $self->{finished} = $options{finished};
     $self->{results} = {};
     $self->{start} = time;
 
     if ($options{type}) {
-        if ($options{type} eq 'TXT') {
-            if (!$resolver->query_txt($self, @{$self->{hosts}})) {
-                $client->enable_read() if $client;
-                return;
-            }
-        }
-        elsif ($options{type} eq 'A') {
+        if ( ($options{type} eq 'A') || ($options{type} eq 'PTR') ) {
             if (!$resolver->query($self, @{$self->{hosts}})) {
-                $client->enable_read() if $client;
-                return;
-            }
-        }
-        elsif ($options{type} eq 'PTR') {
-            if (!$resolver->query($self, @{$self->{hosts}})) {
-                $client->enable_read() if $client;
-                return;
-            }
-        }
-        elsif ($options{type} eq 'MX') {
-            if (!$resolver->query_mx($self, @{$self->{hosts}})) {
                 $client->enable_read() if $client;
                 return;
             }
@@ -102,6 +85,9 @@ sub DESTROY {
         }
     }
     $self->{client}->enable_read if $self->{client};
+    if ($self->{finished}) {
+        $self->{finished}->();
+    }
 }
 
 1;

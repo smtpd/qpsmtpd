@@ -41,6 +41,7 @@ sub connect_handler {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
       Danga::DNS->new(
         callback => sub { process_a_result($qp, $dnsbl_zones{$dnsbl}, @_) },
+        finished => sub { finished($qp) },
         host => "$reversed_ip.$dnsbl",
         type => 'A',
         client => $self->qp->input_sock,
@@ -49,6 +50,7 @@ sub connect_handler {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
       Danga::DNS->new(
         callback => sub { process_txt_result($qp, @_) },
+        finished => sub { finished($qp) },
         host => "$reversed_ip.$dnsbl",
         type => 'TXT',
         client => $self->qp->input_sock,
@@ -59,13 +61,18 @@ sub connect_handler {
   return CONTINUATION;
 }
 
+sub finished {
+    my ($qp) = @_;
+    $qp->finish_continuation;
+}
+
 sub process_a_result {
     my ($qp, $template, $result, $query) = @_;
     
     warn("Result for A $query: $result\n");
     if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
         # NXDOMAIN or ERROR possibly...
-        $qp->finish_continuation if $qp->input_sock->readable;
+        # $qp->finish_continuation if $qp->input_sock->readable;
         return;
     }
     
@@ -73,7 +80,7 @@ sub process_a_result {
     my $ip = $conn->remote_ip;
     $template =~ s/%IP%/$ip/g;
     $conn->notes('dnsbl', $template) unless $conn->notes('dnsbl');
-    $qp->finish_continuation if $qp->input_sock->readable;
+    # $qp->finish_continuation if $qp->input_sock->readable;
 }
 
 sub process_txt_result {
@@ -82,13 +89,13 @@ sub process_txt_result {
     warn("Result for TXT $query: $result\n");
     if ($result !~ /[a-z]/) {
         # NXDOMAIN or ERROR probably...
-        $qp->finish_continuation if $qp->input_sock->readable;
+        # $qp->finish_continuation if $qp->input_sock->readable;
         return;
     }
     
     my $conn = $qp->connection;
     $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
-    $qp->finish_continuation if $qp->input_sock->readable;
+    # $qp->finish_continuation if $qp->input_sock->readable;
 }
 
 sub pickup_handler {
