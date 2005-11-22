@@ -34,6 +34,7 @@ sub connect_handler {
 
   my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
+  my $total_zones = keys %dnsbl_zones;
   my $qp = $self->qp;
   for my $dnsbl (keys %dnsbl_zones) {
     # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
@@ -41,7 +42,7 @@ sub connect_handler {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
       Danga::DNS->new(
         callback => sub { process_a_result($qp, $dnsbl_zones{$dnsbl}, @_) },
-        finished => sub { finished($qp) },
+        finished => sub { $total_zones--; finished($qp, $total_zones) },
         host => "$reversed_ip.$dnsbl",
         type => 'A',
         client => $self->qp->input_sock,
@@ -50,7 +51,7 @@ sub connect_handler {
       $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
       Danga::DNS->new(
         callback => sub { process_txt_result($qp, @_) },
-        finished => sub { finished($qp) },
+        finished => sub { $total_zones--; finished($qp, $total_zones) },
         host => "$reversed_ip.$dnsbl",
         type => 'TXT',
         client => $self->qp->input_sock,
@@ -62,8 +63,8 @@ sub connect_handler {
 }
 
 sub finished {
-    my ($qp) = @_;
-    $qp->finish_continuation;
+    my ($qp, $total_zones) = @_;
+    $qp->finish_continuation unless $total_zones;
 }
 
 sub process_a_result {
