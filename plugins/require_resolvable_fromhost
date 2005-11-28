@@ -28,11 +28,12 @@ sub check_dns {
         return DECLINED;
     }
 
-    $self->transaction->notes('pending_dns_queries', 2);
+    my $total_queries = 2;
     my $qp = $self->qp;
     $self->log(LOGDEBUG, "Checking $host for MX record in the background");
     Danga::DNS->new(
         callback => sub { dns_result($qp, @_) },
+        finished => sub { $total_queries--; finished($qp, $total_queries) },
         host => $host,
         type => "MX",
         client => $qp->input_sock,
@@ -40,19 +41,21 @@ sub check_dns {
     $self->log(LOGDEBUG, "Checking $host for A record in the background");
     Danga::DNS->new(
         callback => sub { dns_result($qp, @_) },
+        finished => sub { $total_queries--; finished($qp, $total_queries) },
         host => $host,
         client => $qp->input_sock,
     );
     return CONTINUATION;
 }
 
+sub finished {
+    my ($qp, $total_zones) = @_;
+    $qp->finish_continuation unless $total_zones;
+}
 
 sub dns_result {
     my ($qp, $result, $query) = @_;
     
-    my $pending = $qp->transaction->notes('pending_dns_queries');
-    $qp->transaction->notes('pending_dns_queries', --$pending);
-
     if ($result =~ /^[A-Z]+$/) {
         # probably an error
         $qp->log(LOGDEBUG, "DNS error: $result looking up $query");
@@ -60,8 +63,6 @@ sub dns_result {
         $qp->transaction->notes('resolvable', 1);
         $qp->log(LOGDEBUG, "DNS lookup $query returned: $result");
     }
-
-    $qp->finish_continuation unless $pending;
 }
 
 
