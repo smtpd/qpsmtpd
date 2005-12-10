@@ -118,7 +118,7 @@ sub hook_data_post {
     unless ( $content_type
         && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
     {
-        $self->log( LOGERROR, "non-multipart mail - skipping" );
+        $self->log( LOGNOTICE, "non-multipart mail - skipping" );
         return DECLINED;
     }
 
@@ -153,7 +153,10 @@ sub hook_data_post {
         $clamd = Clamd->new();    # default unix domain socket
     }
 
-    return (DECLINED) unless $clamd->ping();
+    unless ( $clamd->ping() ) {
+    $self->log( LOGERROR, "Cannot ping clamd server - did you provide the correct clamd port or socket?" );
+    return DECLINED;
+    }
 
     if ( my %found = $clamd->scan($filename) ) {
         my $viruses = join( ",", values(%found) );
