@@ -129,7 +129,6 @@ if ($PID_FILE) {
 
 # Load plugins here
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
-$qpsmtpd->load_plugins;
 
 # Drop privileges
 my (undef, undef, $quid, $qgid) = getpwnam $USER or
@@ -138,7 +137,6 @@ my $groups = "$qgid $qgid";
 while (my ($name,$passwd,$gid,$members) = getgrent()) {
     my @m = split(/ /, $members);
     if (grep {$_ eq $USER} @m) {
-	::log(LOGINFO,"$USER is member of group $name($gid)");
 	$groups .= " $gid";
     }
 }
@@ -148,6 +146,8 @@ POSIX::setgid($qgid) or
 POSIX::setuid($quid) or
       die "unable to change uid: $!\n";
 $> = $quid;
+
+$qpsmtpd->load_plugins;
 
 ::log(LOGINFO,"Listening on port $PORT");
 ::log(LOGINFO, 'Running as user '.
