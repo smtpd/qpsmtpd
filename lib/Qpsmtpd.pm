@@ -382,7 +382,7 @@ sub run_hook {
   my ($self, $hook, $code, @args) = @_;
   my @r;
   if ( $hook eq 'logging' ) { # without calling $self->log()
-    eval { (@r) = $code->{code}->($self, $self->{_transaction}, @_); };
+    eval { (@r) = $code->{code}->($self, $self->{_transaction}, @args); };
     $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
   }
   else {
