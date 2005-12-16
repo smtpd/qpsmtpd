@@ -153,7 +153,7 @@ sub hook_data_post {
         $clamd = Clamd->new();    # default unix domain socket
     }
 
-    return (DECLINED) unless $clamd->ping();
+    return (DENYSOFT) unless $clamd->ping();
 
     if ( my %found = $clamd->scan($filename) ) {
         my $viruses = join( ",", values(%found) );
