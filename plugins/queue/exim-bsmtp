@@ -1,0 +1,138 @@
+=head1 NAME
+
+exim-bsmtp
+
+$Id$
+
+=head1 DESCRIPTION
+
+This plugin enqueues mail from qpsmtpd into Exim via BSMTP
+
+=head1 INSTALLATION
+
+The qpsmtpd user B<must> be configured in the I<trusted_users> setting
+in your Exim configuration.  If it is not, queueing will still work,
+but sender addresses will not be honored by exim, which will make all
+mail appear to originate from the smtpd user itself.
+
+=head1 CONFIGURATION
+
+The plugin accepts configuration settings in space-delimited name/value
+pairs.  For example:
+
+ queue/exim-bsmtp exim_path /usr/sbin/exim4
+
+=over 4
+
+=item exim_path I<path>
+
+The path to use to execute the Exim BSMTP receiver; by default this is
+I</usr/sbin/rsmtp>.  The commandline switch '-bS' will be added (this is
+actually redundant with rsmtp, but harmless).
+
+=cut
+
+=head1 LICENSE
+
+Copyright (c) 2004 by Devin Carraway <qpsmtpd@devin.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+=cut
+
+use strict;
+use warnings;
+
+use IO::File;
+use Sys::Hostname qw(hostname);
+use File::Temp qw(tempfile);
+
+sub register {
+    my ($self, $qp, %args) = @_;
+
+    $self->{_exim_path} = $args{exim_path} || '/usr/sbin/rsmtp';
+    $self->{_exim_path} = $1 if $self->{_exim_path} =~ /(.*)/;
+    unless (-x $self->{_exim_path}) {
+        $self->log(LOGERROR, "Could not find exim at $self->{_exim_path};".
+                             " please set exim_path in config/plugins");
+        return undef;
+    }
+}
+
+sub hook_queue {
+    my ($self, $txn) = @_;
+
+    my $tmp_dir = $self->qp->config('spool_dir') || '/tmp';
+    $tmp_dir = $1 if ($tmp_dir =~ /(.*)/);
+    my ($tmp, $tmpfn) = tempfile("exim-bsmtp.$$.XXXXXX", DIR => $tmp_dir);
+    unless ($tmp && $tmpfn) {
+	$self->log(LOGERROR, "Couldn't create tempfile: $!");
+	return (DECLINED, 'Internal error enqueueing mail');
+    }
+
+    print $tmp "HELO ", hostname(), "\n",
+               "MAIL FROM:<", ($txn->sender->address || ''), ">\n";
+    print $tmp "RCPT TO:<", ($_->address || ''), ">\n"
+      for $txn->recipients;
+    print $tmp "DATA\n",
+               $txn->header->as_string, "\n";
+    $txn->body_resetpos;
+    while (my $line = $txn->body_getline) {
+      $line =~ s/^\./../;
+      print $tmp $line;
+    }
+    print $tmp ".\nQUIT\n";
+    close $tmp;
+
+    my $cmd = "$self->{_exim_path} -bS < $tmpfn";
+    $self->log(LOGDEBUG, "executing cmd $cmd");
+    my $exim = new IO::File "$cmd|";
+    unless ($exim) {
+        $self->log(LOGERROR, "Could not execute $self->{_exim_path}: $!");
+        unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
+        return (DECLINED, "Internal error enqueuing mail"); 
+    }
+    # Normally exim produces no output in BSMTP mode; anything that
+    # does come out is an error worth logging.
+    my $start = time;
+    while (<$exim>) {
+    	chomp;
+	$self->log(LOGERROR, "exim: $_");
+    }
+    $self->log(LOGDEBUG, "BSMTP finished (".(time - $start)." sec)");
+    $exim->close;
+    my $exit = $?;
+    unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
+
+    $self->log(LOGDEBUG, "Exitcode from exim: $exit");
+    if (($exit >> 8) != 0) {
+        $self->log(LOGERROR, 'BSMTP enqueue failed; exitcode '.($exit >> 8).
+                             " from $self->{_exim_path} -bS");
+        return (DECLINED, 'Internal error enqueuing mail');
+    }
+
+    $self->log(LOGINFO, "Enqueued to exim via BSMTP");
+    return (OK, "Queued!");
+}
+
+
+1;
+
+# vi: ts=4 sw=4 expandtab syn=perl
+

@@ -15,6 +15,8 @@ use fields qw(
     hooks
     start_time
     _auth
+    _auth_user
+    _auth_mechanism
     _commands
     _config_cache
     _connection

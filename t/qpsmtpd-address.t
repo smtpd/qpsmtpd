@@ -2,7 +2,7 @@
 use strict;
 $^W = 1;
 
-use Test::More tests => 28;
+use Test::More tests => 29;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
@@ -12,6 +12,11 @@ my $as;
 my $ao;
 
 $as = '<>';
+$ao = Qpsmtpd::Address->parse($as);
+ok ($ao, "parse $as");
+is ($ao->format, $as, "format $as");
+
+$as = '<postmaster>';
 $ao = Qpsmtpd::Address->parse($as);
 ok ($ao, "parse $as");
 is ($ao->format, $as, "format $as");
@@ -37,21 +42,6 @@ $as = '<foo bar@example.com>';
 $ao = Qpsmtpd::Address->parse($as);
 ok ($ao, "parse $as");
 is ($ao->format, '<"foo\ bar"@example.com>', "format $as");
-
-
-$as = 'foo@example.com';
-$ao = Qpsmtpd::Address->parse($as);
-is ($ao, undef, "can't parse $as");
-
-$as = '<@example.com>';
-is (Qpsmtpd::Address->parse($as), undef, "can't parse $as");
-
-$as = '<@123>';
-is (Qpsmtpd::Address->parse($as), undef, "can't parse $as");
-
-$as = '<user>';
-is (Qpsmtpd::Address->parse($as), undef, "can't parse $as");
-
 
 $as = 'foo@example.com';
 $ao = Qpsmtpd::Address->new($as);
@@ -79,10 +69,35 @@ $as = '<foo@foo.x.example.com>';
 $ao = Qpsmtpd::Address->new($as);
 ok ($ao, "new $as");
 is ($ao->format, $as, "format $as");
+is ("$ao", $as, "overloaded stringify $as");
 
 $as = 'foo@foo.x.example.com';
 ok ($ao = Qpsmtpd::Address->parse("<$as>"), "parse <$as>");
 is ($ao && $ao->address, $as, "address $as");
+ok ($ao eq $as, "overloaded 'cmp' operator");
 
+my @unsorted_list = map { Qpsmtpd::Address->new($_) }
+	qw(
+	    "musa_ibrah@caramail.comandrea.luger"@wifo.ac.at
+	    foo@example.com
+	    ask@perl.org
+	    foo@foo.x.example.com
+	    jpeacock@cpan.org
+	    test@example.com
+	);
 
+# NOTE that this is sorted by _host_ not by _domain_
+my @sorted_list = map { Qpsmtpd::Address->new($_) }
+	qw(
+	    jpeacock@cpan.org
+	    foo@example.com
+	    test@example.com
+	    foo@foo.x.example.com
+	    ask@perl.org
+	    "musa_ibrah@caramail.comandrea.luger"@wifo.ac.at
+	);
+
+my @test_list = sort @unsorted_list;
+
+is_deeply( \@test_list, \@sorted_list, "sort via overloaded 'cmp' operator");
 

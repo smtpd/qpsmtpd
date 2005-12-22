@@ -2,14 +2,7 @@
 
 use Danga::DNS;
 
-sub register {
-  my ($self) = @_;
-
-  $self->register_hook('mail', 'mail_handler');
-  $self->register_hook('rcpt', 'rcpt_handler');
-}
-
-sub mail_handler {
+sub hook_mail {
   my ($self, $transaction, $sender) = @_;
 
   my %rhsbl_zones_map = ();
@@ -59,7 +52,7 @@ sub process_result {
     }
 }
 
-sub rcpt_handler {
+sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
 
   my $result = $transaction->notes('rhsbl');

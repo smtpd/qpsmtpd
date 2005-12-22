@@ -37,9 +37,9 @@ sub _register {
   my $self = shift;
   my $qp = shift;
   local $self->{_qp} = $qp;
-  $self->init($qp, @_);
+  $self->init($qp, @_)     if $self->can('init');
   $self->_register_standard_hooks($qp, @_);
-  $self->register($qp, @_);
+  $self->register($qp, @_) if $self->can('register');
 }
 
 # Designed to be overloaded
@@ -71,6 +71,14 @@ sub config {
 
 sub spool_dir {
   shift->qp->spool_dir;
+}
+
+sub auth_user {
+    shift->qp->auth_user(@_);
+}
+
+sub auth_mechanism {
+    shift->qp->auth_mechanism(@_);
 }
 
 sub temp_file {

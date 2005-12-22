@@ -24,9 +24,6 @@ use Getopt::Long;
 
 $|++;
 
-# For debugging
-# $SIG{USR1} = sub { Carp::confess("USR1") };
-
 use Socket qw(SOMAXCONN IPPROTO_TCP SO_KEEPALIVE TCP_NODELAY SOL_SOCKET);
 
 $SIG{'PIPE'} = "IGNORE";  # handled manually

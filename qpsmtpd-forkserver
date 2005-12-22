@@ -39,7 +39,7 @@ usage: qpsmtpd-forkserver [ options ]
  -u, --user U              : run as a particular user (default 'smtpd')
  -m, --max-from-ip M       : limit connections from a single IP; default 5
      --pid-file P          : print main servers PID to file P
-     --detach              : detach from controlling terminal (daemonize)
+ -d, --detach              : detach from controlling terminal (daemonize)
 EOT
         exit 0;
 }
@@ -51,8 +51,8 @@ GetOptions('h|help' => \&usage,
            'p|port=i' => \$PORT,
            'u|user=s' => \$USER,
            'pid-file=s' => \$PID_FILE,
-           'd|debug+' => \$DEBUG,
-           'detach' => \$DETACH,
+           'debug+' => \$DEBUG,
+           'd|detach' => \$DETACH,
 	  ) || &usage;
 
 # detaint the commandline
@@ -172,6 +172,10 @@ if ($PID_FILE) {
   close PID;
 }
 
+# Populate class cached variables
+$qpsmtpd->spool_dir;
+$qpsmtpd->size_threshold;
+
 while (1) {
   REAPER();
   my $running = scalar keys %childstatus;
@@ -189,7 +193,6 @@ while (1) {
       # possible something condition...
       next;
     }
-    
     # Make this client blocking while we figure out if we actually want to
     # do something with it.
     IO::Handle::blocking($client, 1);
@@ -233,7 +236,17 @@ while (1) {
        ::log(LOGINFO, "Connection Timed Out"); 
        exit; };
   
-    ::log(LOGINFO, "Accepted connection $running/$MAXCONN");
+    my $localsockaddr = getsockname($client);
+    my ($lport, $laddr) = sockaddr_in($localsockaddr);
+    $ENV{TCPLOCALIP} = inet_ntoa($laddr);
+    # my ($port, $iaddr) = sockaddr_in($hisaddr);
+    $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
+    $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
+  
+    # don't do this!
+    #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
+  
+    ::log(LOGINFO, "Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}");
     
     $::LineMode = 1;
     
@@ -245,11 +258,11 @@ while (1) {
     $qp->push_back_read("Connect\n");
     Qpsmtpd::PollServer->AddTimer(0.1, sub { });
     while (1) {
-        $qp->enable_read;
-        my $line = $qp->get_line;
-        last if !defined($line);
-        my $output = $qp->process_line($line);
-        $qp->write($output) if $output;
+	$qp->enable_read;
+	my $line = $qp->get_line;
+	last if !defined($line);
+	my $output = $qp->process_line($line);
+	$qp->write($output) if $output;
     }
     
     exit;                                   # child leaves

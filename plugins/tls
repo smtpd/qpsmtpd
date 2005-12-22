@@ -39,6 +39,7 @@ sub init {
         SSL_server => 1
     ) or die "Could not create SSL context: $!";
     
+    # now extract the password...
     $self->ssl_context($ssl_ctx);
     
     # Check for possible AUTH mechanisms
@@ -104,10 +105,18 @@ sub hook_unrecognized_command {
         
         my $conn = $self->connection;
         # Create a new connection object with subset of information collected thus far
-        my $newconn = Qpsmtpd::Connection->new();
-        for (qw(local_ip local_port remote_ip remote_port remote_host remote_info relay_client)) {
-            $newconn->$_($conn->$_());
-        }
+        my $newconn = Qpsmtpd::Connection->new(
+	    map { $_ => $conn->$_ }
+		qw(
+	           local_ip
+		   local_port
+		   remote_ip
+		   remote_port
+		   remote_host
+		   remote_info
+		   relay_client
+		),
+	);
         $self->qp->connection($newconn);
         $self->qp->reset_transaction;
         if ($self->qp->isa('Danga::Socket')) {

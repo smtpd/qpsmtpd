@@ -196,7 +196,9 @@ sub ehlo_respond {
     $conn->hello_host($hello_host);
     $self->transaction;
 
-    my @capabilities = @{ $self->transaction->notes('capabilities') };
+    my @capabilities = $self->transaction->notes('capabilities')
+    			? @{ $self->transaction->notes('capabilities') }
+			: ();
 
     # Check for possible AUTH mechanisms
     my %auth_mechanisms;
@@ -225,6 +227,19 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
                  @capabilities,  
                 );
   }
+}
+
+sub auth {
+    my ( $self, $arg, @stuff ) = @_;
+    
+    #they AUTH'd once already
+    return $self->respond( 503, "but you already said AUTH ..." )
+      if ( defined $self->{_auth}
+        and $self->{_auth} == OK );
+    return $self->respond( 503, "AUTH not defined for HELO" )
+      if ( $self->connection->hello eq "helo" );
+
+    return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $arg, @stuff );
 }
 
 sub mail {
@@ -364,7 +379,6 @@ sub rcpt_respond {
   }
   return 0;
 }
-
 
 sub help {
   my $self = shift;

@@ -1,21 +1,28 @@
 #!/usr/bin/perl
-
 use Danga::DNS;
 
-sub register {
-    my ($self) = @_;
-    $self->register_hook("mail", "mail_handler");
-    $self->register_hook("rcpt", "rcpt_handler");
+my %invalid = ();
+
+sub init {
+    my ($self, $qp) = @_;
+    foreach my $i ($qp->config("invalid_resolvable_fromhost")) {
+	$i =~ s/^\s*//;
+	$i =~ s/\s*$//;
+	if ($i =~ m#^((\d{1,3}\.){3}\d{1,3})/(\d\d?)#) {
+	    $invalid{$1} = $3;
+	}
+    }
 }
 
-sub mail_handler {
+sub hook_mail {
     my ($self, $transaction, $sender) = @_;
+    return DECLINED
+    	if ($self->qp->connection->notes('whitelistclient'));
     
     $self->transaction->notes('resolvable', 1);
     return DECLINED if $sender->format eq "<>";
     return $self->check_dns($sender->host);
 }
-
 
 sub check_dns {
     my ($self, $host) = @_;
@@ -66,7 +73,7 @@ sub dns_result {
 }
 
 
-sub rcpt_handler {
+sub hook_rcpt {
     my ($self, $transaction) = @_;
     
     if (!$transaction->notes('resolvable')) {

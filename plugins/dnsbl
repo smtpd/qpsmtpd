@@ -2,13 +2,18 @@
 
 use Danga::DNS;
 
-sub register {
-  my ($self) = @_;
-  $self->register_hook("connect", "connect_handler");
-  $self->register_hook("connect", "pickup_handler");
+sub init {
+  my ($self, $qp, $denial ) = @_;
+  if ( defined $denial and $denial =~ /^disconnect$/i ) {
+    $self->{_dnsbl}->{DENY} = DENY_DISCONNECT;
+  }
+  else {
+    $self->{_dnsbl}->{DENY} = DENY;
+  }
+
 }
 
-sub connect_handler {
+sub hook_connect {
   my ($self, $transaction) = @_;
 
   my $remote_ip = $self->connection->remote_ip;
@@ -99,8 +104,9 @@ sub process_txt_result {
     # $qp->finish_continuation if $qp->input_sock->readable;
 }
 
-sub pickup_handler {
-  my ($self, $transaction) = @_;
+sub hook_rcpt {
+  my ($self, $transaction, $rcpt) = @_;
+  my $connection = $self->qp->connection;
 
   # RBLSMTPD being non-empty means it contains the failure message to return
   if (defined ($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
@@ -112,6 +118,14 @@ sub pickup_handler {
 
   my $note = $self->connection->notes('dnsbl');
   return (DENY, $note) if $note;
+  return DECLINED;
+}
+
+sub hook_disconnect {
+  my ($self, $transaction) = @_;
+
+  $self->qp->connection->notes('dnsbl_sockets', undef);
+
   return DECLINED;
 }
 

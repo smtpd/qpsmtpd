@@ -1,13 +1,13 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $Logger $TraceLevel $Spool_dir);
+use vars qw($VERSION $Logger $TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Transaction;
 use Qpsmtpd::Connection;
 
-$VERSION = "0.31-dev";
+$VERSION = "0.40-dev";
 
 sub version { $VERSION };
 
@@ -241,8 +241,6 @@ sub expand_inclusion_ {
   return @includes;
 }
 
-
-#our $HOOKS;
 
 sub load_plugins {
   my $self = shift;
@@ -480,6 +478,29 @@ sub temp_dir {
   return $dirname;
 }
 
+sub size_threshold {
+  my $self = shift;
+  unless ( defined $Size_threshold ) {
+    $Size_threshold = $self->config('size_threshold') || 0;
+    $self->log(LOGNOTICE, "size_threshold set to $Size_threshold");
+  }
+  return $Size_threshold;
+}
+
+sub auth_user {
+  my ($self, $user) = @_;
+  $user =~ s/[\r\n].*//s;
+  $self->{_auth_user} = $user if $user;    
+  return (defined $self->{_auth_user} ? $self->{_auth_user} : "" );
+}
+
+sub auth_mechanism {
+  my ($self, $mechanism) = @_;
+  $mechanism =~ s/[\r\n].*//s;
+  $self->{_auth_mechanism} = $mechanism if $mechanism;    
+  return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "" );
+}
+  
 1;
 
 __END__
