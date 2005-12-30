@@ -73,9 +73,12 @@ sub _query {
         $asker->run_callback("NXDNS", $host);
         return 1;
     }
-    if (exists $self->{cache}{$type}{$host}) {
+    if (exists($self->{cache}{$type}{$host}) &&
+        $self->{cache_timeout}{$type}{$host} >= $now) {
         # print "CACHE HIT!\n";
-        $asker->run_callback($self->{cache}{$type}{$host}, $host);
+        $self->AddTimer(0, sub {
+            $asker->run_callback($self->{cache}{$type}{$host}, $host);
+            });
         return 1;
     }
     
@@ -209,8 +212,11 @@ sub event_read {
         foreach my $rr ($packet->answer) {
             if (my $host_method = $type_to_host{$rr->type}) {
                 my $host = $rr->$host_method;
-                $self->{cache}{$rr->type}{$query} = $host;
-                $self->{cache_timeout}{$rr->type}{$query} = $now + $rr->ttl;
+                my $type = $rr->type;
+                $type = 'A' if $type eq 'PTR';
+                # print "DNS Lookup $type $query = $host; TTL = ", $rr->ttl, "\n";
+                $self->{cache}{$type}{$query} = $host;
+                $self->{cache_timeout}{$type}{$query} = $now + $rr->ttl;
                 $qobj->run_callback($host);
             }
             elsif ($rr->type eq "MX") {
