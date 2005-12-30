@@ -58,6 +58,7 @@ Options:
  -j, --procs J             : spawn J processes; default 1
  -a, --accept K            : accept up to K conns per loop; default 20
  -h, --help                : this page
+     --use-poll            : force use of poll() instead of epoll()/kqueue()
 
 NB: -f and -j are mutually exclusive. If -f flag is not used the server uses
 poll() style loops running inside J child processes. Set J to the number of
