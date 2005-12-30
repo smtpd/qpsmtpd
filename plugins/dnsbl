@@ -75,7 +75,7 @@ sub finished {
 sub process_a_result {
     my ($qp, $template, $result, $query) = @_;
     
-    warn("Result for A $query: $result\n");
+    $qp->log(LOGINFO, "Result for A $query: $result\n");
     if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
         # NXDOMAIN or ERROR possibly...
         # $qp->finish_continuation if $qp->input_sock->readable;
@@ -92,7 +92,7 @@ sub process_a_result {
 sub process_txt_result {
     my ($qp, $result, $query) = @_;
     
-    warn("Result for TXT $query: $result\n");
+    $qp->log(LOGINFO, "Result for TXT $query: $result\n");
     if ($result !~ /[a-z]/) {
         # NXDOMAIN or ERROR probably...
         # $qp->finish_continuation if $qp->input_sock->readable;

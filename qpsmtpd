@@ -189,7 +189,6 @@ sub run_as_inetd {
 
     my $out = Qpsmtpd::PollServer->new($outsock);
     $out->load_plugins;
-    $out->init_logger;
     $out->input_sock($client);
     $client->push_back_read("Connect\n");
     # Cause poll/kevent/epoll to end quickly in first iteration
@@ -241,15 +240,15 @@ sub run_as_server {
           die "unable to change uid: $!\n";
     $> = $quid;
     
-    ::log(LOGINFO, 'Running as user '.
-        (getpwuid($>) || $>) .
-        ', group '.
-        (getgrgid($)) || $)));
-
     # Load plugins here
     my $plugin_loader = Qpsmtpd::SMTP->new();
     $plugin_loader->load_plugins;
     
+    $plugin_loader->log(LOGINFO, 'Running as user '.
+        (getpwuid($>) || $>) .
+        ', group '.
+        (getgrgid($)) || $)));
+
     if ($PROCS > 1) {
         $SIG{'CHLD'} = \&sig_chld;
         my @kids;

@@ -98,13 +98,6 @@ sub fault {
     return;
 }
 
-sub log {
-    my ($self, $trace, @log) = @_;
-    my $fd = $self->{fd};
-    $fd ||= '?';
-    $self->SUPER::log($trace, "fd:$fd", @log);
-}
-
 sub process_line {
     my $self = shift;
     my $line = shift || return;

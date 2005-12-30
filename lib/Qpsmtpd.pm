@@ -76,7 +76,7 @@ sub varlog {
 
   unless ( $rc and $rc == DECLINED or $rc == OK ) {
     # no logging plugins registered so fall back to STDERR
-    my $fd = $self->{fd};
+    my $fd = $self->fd();
     warn join(" ", $$ .
       (defined $fd ? " fd:$fd" : "") .
       (defined $plugin ? " $plugin plugin:" : 
@@ -370,7 +370,7 @@ sub finish_continuation {
   $r[0] = DECLINED if not defined $r[0];
   my $responder = $hook . "_respond";
   if (my $meth = $self->can($responder)) {
-    warn("continuation finished on $self\n");
+    $self->log(LOGNOTICE, "continuation finished on $self\n");
     return $meth->($self, $r[0], $r[1], @$args);
   }
   die "No ${hook}_respond method";
@@ -501,6 +501,10 @@ sub auth_mechanism {
   return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "" );
 }
   
+sub fd {
+    return shift->{fd};
+}
+
 1;
 
 __END__

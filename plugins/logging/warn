@@ -29,11 +29,13 @@ sub hook_logging {
   # then these lines will not be logged at all.  You can safely comment
   # out this line and it will not cause an infinite loop.
   return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
+  my $fd = $self->fd();
 
   warn 
     join(" ", $$ .
-         (defined $plugin ? " $plugin plugin:" :
-          defined $hook   ? " running plugin ($hook):"  : ""),
+    	(defined $fd ? " fd:$fd" : "") .
+        (defined $plugin ? " $plugin plugin:" :
+         defined $hook   ? " running plugin ($hook):"  : ""),
          @log), "\n"
     if ($trace <= $self->{_level});
 

@@ -50,6 +50,10 @@ sub qp {
   shift->{_qp};
 }
 
+sub fd {
+  shift->qp->fd();
+}
+
 sub log {
   my $self = shift;
   $self->qp->varlog(shift, $self->hook_name, $self->plugin_name, @_)
@@ -116,7 +120,7 @@ sub isa_plugin {
   $self->compile($self->plugin_name . "_isa_$cleanParent",
                     $newPackage,
                     "plugins/$parent"); # assumes Cwd is qpsmtpd root
-  warn "---- $newPackage\n";
+  $self->log(LOGDEBUG,"---- $newPackage\n");
   no strict 'refs';
   push @{"${currentPackage}::ISA"}, $newPackage;
 }
