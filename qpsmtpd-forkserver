@@ -7,7 +7,6 @@
 #
 
 use lib 'lib';
-use Qpsmtpd::TcpServer;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use IO::Select;
@@ -39,21 +38,30 @@ usage: qpsmtpd-forkserver [ options ]
  -u, --user U              : run as a particular user (default 'smtpd')
  -m, --max-from-ip M       : limit connections from a single IP; default 5
      --pid-file P          : print main servers PID to file P
+ -h, --help                : this page
+     --use-poll            : force use of poll() instead of epoll()/kqueue()
  -d, --detach              : detach from controlling terminal (daemonize)
 EOT
         exit 0;
 }
 
 GetOptions('h|help' => \&usage,
-           'l|listen-address=s' => \@LOCALADDR,
-           'c|limit-connections=i' => \$MAXCONN,
-           'm|max-from-ip=i' => \$MAXCONNIP,
-           'p|port=i' => \$PORT,
-           'u|user=s' => \$USER,
-           'pid-file=s' => \$PID_FILE,
-           'debug+' => \$DEBUG,
-           'd|detach' => \$DETACH,
+           'l|listen-address=s'     => \@LOCALADDR,
+           'c|limit-connections=i'  => \$MAXCONN,
+           'm|max-from-ip=i'        => \$MAXCONNIP,
+           'p|port=i'               => \$PORT,
+           'u|user=s'               => \$USER,
+           'pid-file=s'             => \$PID_FILE,
+           'debug+'                 => \$DEBUG,
+           'use-poll'               => \&force_poll,
+           'h|help'                 => \&usage,
+           'd|detach'               => \$DETACH,
 	  ) || &usage;
+
+sub force_poll {
+    $Danga::Socket::HaveEpoll = 0;
+    $Danga::Socket::HaveKQueue = 0;
+}
 
 # detaint the commandline
 if ($PORT =~ /^(\d+)$/) { $PORT = $1 } else { &usage }
@@ -131,7 +139,7 @@ if ($PID_FILE) {
 }
 
 # Load plugins here
-my $qpsmtpd = Qpsmtpd::TcpServer->new();
+my $qpsmtpd = Qpsmtpd::PollServer->new();
 
 # Drop privileges
 my (undef, undef, $quid, $qgid) = getpwnam $USER or
