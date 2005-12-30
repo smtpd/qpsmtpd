@@ -45,8 +45,7 @@ EOT
         exit 0;
 }
 
-GetOptions('h|help' => \&usage,
-           'l|listen-address=s'     => \@LOCALADDR,
+GetOptions('l|listen-address=s'     => \@LOCALADDR,
            'c|limit-connections=i'  => \$MAXCONN,
            'm|max-from-ip=i'        => \$MAXCONNIP,
            'p|port=i'               => \$PORT,
@@ -139,7 +138,7 @@ if ($PID_FILE) {
 }
 
 # Load plugins here
-my $qpsmtpd = Qpsmtpd::PollServer->new();
+my $qpsmtpd = bless {},'Qpsmtpd'; # ugh - probably should have new() in Qpsmtpd.pm
 
 # Drop privileges
 my (undef, undef, $quid, $qgid) = getpwnam $USER or
