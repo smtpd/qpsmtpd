@@ -93,7 +93,7 @@ sub start_conversation {
     # lib/Qpsmtpd/TcpServer.pm for more confusion.
     my ($rc, $msg) = $self->run_hooks("connect");
     return $self->connect_respond($rc, $msg) unless $rc == CONTINUATION;
-    return 1;
+    return DONE;
 }
 
 sub connect_respond {
