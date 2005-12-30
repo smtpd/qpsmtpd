@@ -14,6 +14,7 @@ use fields qw(
     max_size
     hooks
     start_time
+    cmd_timeout
     _auth
     _auth_user
     _auth_mechanism
@@ -49,6 +50,7 @@ sub new {
     
     $self = fields::new($self) unless ref $self;
     $self->SUPER::new( @_ );
+    $self->{cmd_timeout} = 5;
     $self->{start_time} = time;
     $self->{mode} = 'connect';
     $self->load_plugins;
@@ -106,7 +108,7 @@ sub process_line {
         my ($pkg, $file, $line) = caller();
         die "ALARM: ($self->{mode}) $pkg, $file, $line";
     };
-    my $prev = alarm(2); # must process a command in < 2 seconds
+    my $prev = alarm($self->{cmd_timeout}); # must process a command in < N seconds
     eval { $self->_process_line($line) };
     alarm($prev);
     if ($@) {
