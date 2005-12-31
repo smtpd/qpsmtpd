@@ -76,8 +76,9 @@ sub _query {
     if (exists($self->{cache}{$type}{$host}) &&
         $self->{cache_timeout}{$type}{$host} >= $now) {
         # print "CACHE HIT!\n";
+        my $result = $self->{cache}{$type}{$host};
         $self->AddTimer(0, sub {
-            $asker->run_callback($self->{cache}{$type}{$host}, $host);
+            $asker->run_callback($result, $host);
             });
         return 1;
     }
