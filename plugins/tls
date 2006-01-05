@@ -25,8 +25,12 @@ use IO::Socket::SSL; # qw(debug1 debug2 debug3 debug4);
 
 sub init {
     my ($self, $qp, $cert, $key) = @_;
-    $cert ||= 'ssl/cert.pem';
-    $key  ||= 'ssl/privkey.pem';
+    $cert ||= 'ssl/qpsmtpd-server.crt';
+    $key  ||= 'ssl/qpsmtpd-server.key';
+    unless ( -f $cert && -f $key ) {
+	$self->log(LOGERROR, "Cannot locate cert/key!  Run plugins/tls_cert to generate");
+	return;
+    }
     $self->tls_cert($cert);
     $self->tls_key($key);
     
@@ -103,21 +107,8 @@ sub hook_unrecognized_command {
             ) or die "Could not create SSL socket: $!";
         }
         
-        my $conn = $self->connection;
-        # Create a new connection object with subset of information collected thus far
-        my $newconn = Qpsmtpd::Connection->new(
-	    map { $_ => $conn->$_ }
-		qw(
-	           local_ip
-		   local_port
-		   remote_ip
-		   remote_port
-		   remote_host
-		   remote_info
-		   relay_client
-		),
-	);
-        $self->qp->connection($newconn);
+        # Clone connection object (without data received from client)
+        $self->qp->connection($self->connection->clone());
         $self->qp->reset_transaction;
         if ($self->qp->isa('Danga::Socket')) {
             $self->connection->notes('tls_socket', $tlssocket);
@@ -134,7 +125,7 @@ sub hook_unrecognized_command {
         return DENY, "TLS Negotiation Failed";
     }
     
-    warn("TLS setup returning\n");
+    $self->log(LOGWARN, "TLS setup returning");
     return DONE;
 }
 

@@ -1,6 +1,20 @@
 package Qpsmtpd::Connection;
 use strict;
 
+# All of these parameters depend only on the physical connection, 
+# i.e. not on anything sent from the remote machine.  Hence, they
+# are an appropriate set to use for either start() or clone().  Do
+# not add parameters here unless they also meet that criteria.
+my @parameters = qw(
+        remote_host
+        remote_ip 
+        remote_info 
+        remote_port
+        local_ip
+        local_port
+        relay_client
+);
+
 sub new {
   my $proto = shift;
   my $class = ref($proto) || $proto;
@@ -14,12 +28,20 @@ sub start {
 
   my %args = @_;
 
-  for my $f (qw(remote_host remote_ip remote_info remote_port
-               local_ip local_port)) {
+  foreach my $f ( @parameters ) {
     $self->$f($args{$f}) if $args{$f};
   }
 
   return $self;
+}
+
+sub clone {
+  my $self = shift;
+  my $new = $self->new();
+  foreach my $f ( @parameters ) {
+    $new->$f($self->$f()) if $self->$f();
+  }
+  return $new;
 }
 
 sub remote_host {
