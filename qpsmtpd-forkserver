@@ -192,23 +192,34 @@ while (1) {
     }
     IO::Handle::blocking($client, 1);
     my ($port, $iaddr) = sockaddr_in($hisaddr);
-    if ($MAXCONNIP) {
-      my $num_conn = 1; # seed with current value
-  
-      foreach my $rip (values %childstatus) {
-        ++$num_conn if (defined $rip && $rip eq $iaddr);
+    my $localsockaddr = getsockname($client);
+    my ($lport, $laddr) = sockaddr_in($localsockaddr);
+
+    my ($rc, @msg) = $qpsmtpd->run_hooks("pre-connection",
+                                         remote_ip    => inet_ntoa($iaddr),
+                                         remote_port  => $port,
+                                         local_ip     => inet_ntoa($laddr),
+                                         local_port   => $lport,
+                                         max_conn_ip  => $MAXCONNIP,
+                                         child_addrs  => [values %childstatus],
+                                        );
+    if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
+      unless ($msg[0]) {
+        @msg = ("Sorry, try again later");
       }
-  
-      if ($num_conn > $MAXCONNIP) {
-        my $rem_ip = inet_ntoa($iaddr);
-        ::log(LOGINFO,"Too many connections from $rem_ip: "
-                     ."$num_conn > $MAXCONNIP. Denying connection.");
-        $client->autoflush(1);
-        print $client "451 Sorry, too many connections from $rem_ip, try again later\r\n";
-        close $client;
-        next;
+      &respond_client($client, 451, @msg);
+      close $client;
+      next;
+    } 
+    elsif ($rc == DENY || $rc == DENY_DISCONNECT) {
+      unless ($msg[0]) {
+        @msg = ("Sorry, service not available for you");
       }
+      &respond_client($client, 550, @msg);
+      close $client;
+      next;
     }
+
     my $pid = safe_fork();
     if ($pid) {
       # parent
@@ -231,8 +242,6 @@ while (1) {
        ::log(LOGINFO, "Connection Timed Out"); 
        exit; };
   
-    my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) = sockaddr_in($localsockaddr);
     $ENV{TCPLOCALIP} = inet_ntoa($laddr);
     # my ($port, $iaddr) = sockaddr_in($hisaddr);
     $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
@@ -256,6 +265,7 @@ while (1) {
       );
     $qpsmtpd->run();
     
+    $qpsmtpd->run_hooks("post-connection");
     exit;                                   # child leaves
   }
 }
@@ -263,6 +273,18 @@ while (1) {
 sub log {
   my ($level,$message) = @_;
   $qpsmtpd->log($level,$message);
+}
+
+sub respond_client {
+  my ($client, $code, @message) = @_;
+  $client->autoflush(1);
+  while (my $msg = shift @message) {
+    my $line = $code . (@message?"-":" ").$msg;
+    ::log(LOGDEBUG, $line);
+    print $client "$line\r\n" 
+      or (::log(LOGERROR, "Could not print [$line]: $!"), return 0);
+  }
+  return 1;
 }
 
 ### routine to protect process during fork

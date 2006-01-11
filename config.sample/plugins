@@ -6,6 +6,12 @@
 # plugins/http_config for details.
 #   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
 
+# The hosts_allow module must be loaded if you want the -m / --max-from-ip /
+# my $MAXCONNIP = 5; # max simultaneous connections from one IP
+# settings... without this it will NOT refuse more than $MAXCONNIP connections
+# from one IP!
+hosts_allow
+
 quit_fortune
 
 check_earlytalker
