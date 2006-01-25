@@ -21,8 +21,8 @@ to the left and right of the @.
 
 Copyright 2005 Gordon Rowell <gordonr@gormand.com.au>
 
-This software is free software and may be distributed under the same 
-terms as Perl itself.
+This software is free software and may be distributed under the same
+terms as qpsmtpd itself.
 
 =cut
 
