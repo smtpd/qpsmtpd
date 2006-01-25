@@ -30,7 +30,7 @@ Based on check_relay plugin from the qpsmtpd distribution.
 Copyright 2005 Gordon Rowell <gordonr@gormand.com.au>
 
 This software is free software and may be distributed under the same
-terms as Perl itself.
+terms as qpsmtpd itself.
 
 =cut
 

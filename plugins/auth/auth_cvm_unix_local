@@ -31,8 +31,8 @@ Credential Validation Module (http://untroubled.org/cvm).
 
 Copyright 2005 Gordon Rowell <gordonr@gormand.com.au>
 
-This software is free software and may be distributed or modified
-under the same terms as Perl itself.
+This software is free software and may be distributed under the same
+terms as qpsmtpd itself.
 
 =head1 VERSION
 
