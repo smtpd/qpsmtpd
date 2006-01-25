@@ -1,3 +1,4 @@
+use Qpsmtpd::DSN;
 use Net::DNS qw(mx);
 use Socket;
 
@@ -17,15 +18,21 @@ sub hook_mail {
     }
   }
 
-  $sender->format ne "<>"
-    and $self->qp->config("require_resolvable_fromhost")
-    and !$self->check_dns($sender->host)
-    and return (DENYSOFT, 
-                ($sender->host
-                   ? "Could not resolve ". $sender->host
-                   : "FQDN required in the envelope sender"));
-  
-   return DECLINED;
+  if ($sender ne "<>" 
+      and $self->qp->config("require_resolvable_fromhost")
+      and !$self->check_dns($sender->host)) {
+    if ($sender->host) {
+      # default of temp_resolver_failed is DENYSOFT
+      return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $sender->host);
+    } 
+    else {
+      # default of addr_bad_from_system is DENY, we use DENYSOFT here to
+      # get the same behaviour as without Qpsmtpd::DSN...
+      return Qpsmtpd::DSN->addr_bad_from_system(DENYSOFT, 
+                               "FQDN required in the envelope sender");
+    }
+  }
+  return DECLINED;
 
 }
 

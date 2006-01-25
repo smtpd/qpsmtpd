@@ -2,6 +2,7 @@
 #
 # It should be configured to be run _LAST_!
 #
+use Qpsmtpd::DSN;
 
 sub hook_rcpt {
   my ($self, $transaction, $recipient) = @_;
@@ -30,6 +31,8 @@ sub hook_rcpt {
     return (OK);
   }
   else {
-    return (DENY);
+    # default of relaying_denied is obviously DENY, 
+    # we use the default "Relaying denied" message...
+    return Qpsmtpd::DSN->relaying_denied();
   }
 }

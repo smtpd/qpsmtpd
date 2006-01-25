@@ -71,6 +71,7 @@ Make the "subject munge string" configurable
 =cut
 
 
+use Qpsmtpd::DSN;
 use Socket qw(:DEFAULT :crlf);
 use IO::Handle;
 
@@ -225,7 +226,8 @@ sub check_spam_reject {
   my $score = $self->get_spam_score($transaction) or return DECLINED;  
   $self->log(LOGDEBUG, "check_spam_reject: score=$score");
 
-  return (DENY, "spam score exceeded threshold")
+  # default of media_unsupported is DENY, so just change the message
+  return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold")
     if $score >= $self->{_args}->{reject_threshold};
 
   $self->log(LOGDEBUG, "check_spam_reject: passed");
