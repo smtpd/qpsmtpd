@@ -8,7 +8,7 @@ tls - plugin to support STARTTLS
 
 # in config/plugins
 
-  tls ssl/cert.pem ssl/privkey.pem
+  tls ssl/cert.pem ssl/privkey.pem ssl/ca.pem
 
 =head1 DESCRIPTION
 
@@ -19,26 +19,34 @@ Connection notes is set. If you wish to make TLS mandatory you should check
 that field and take appropriate action. Note that you can only do that from
 MAIL FROM onwards.
 
+Use the script C<plugins/tls_cert> to automatically generate a self-signed
+certificate with the appropriate characteristics.  Otherwise, you should
+give absolute pathnames to the certificate, key, and the CA root cert 
+used to sign that certificate.
+
 =cut
 
 use IO::Socket::SSL;# qw(debug1 debug2 debug3 debug4);
 
 sub init {
-    my ($self, $qp, $cert, $key) = @_;
+    my ($self, $qp, $cert, $key, $ca) = @_;
     $cert ||= 'ssl/qpsmtpd-server.crt';
     $key  ||= 'ssl/qpsmtpd-server.key';
-    unless ( -f $cert && -f $key ) {
-	$self->log(LOGERROR, "Cannot locate cert/key!  Run plugins/tls_cert to generate");
-	return;
+    $ca   ||= 'ssl/qpsmtpd-ca.crt';
+    unless ( -f $cert && -f $key && -f $ca ) {
+        $self->log(LOGERROR, "Cannot locate cert/key!  Run plugins/tls_cert to generate");
+        return;
     }
     $self->tls_cert($cert);
     $self->tls_key($key);
+    $self->tls_ca($ca);
     
     local $^W; # this bit is very noisy...
     my $ssl_ctx = IO::Socket::SSL::SSL_Context->new(
         SSL_use_cert => 1,
         SSL_cert_file => $self->tls_cert,
         SSL_key_file => $self->tls_key,
+        SSL_ca_file => $self->tls_ca,
         SSL_cipher_list => 'HIGH',
         SSL_server => 1
     ) or die "Could not create SSL context: $!";
@@ -91,6 +99,7 @@ sub hook_unrecognized_command {
             SSL_use_cert => 1,
             SSL_cert_file => $self->tls_cert,
             SSL_key_file => $self->tls_key,
+            SSL_ca_file => $self->tls_ca,
             SSL_cipher_list => 'HIGH',
             SSL_server => 1,
             SSL_reuse_ctx => $self->ssl_context,
@@ -128,6 +137,12 @@ sub tls_key {
     my $self = shift;
     @_ and $self->{_tls_key} = shift;
     $self->{_tls_key};
+}
+
+sub tls_ca {
+    my $self = shift;
+    @_ and $self->{_tls_ca} = shift;
+    $self->{_tls_ca};
 }
 
 sub ssl_context {
