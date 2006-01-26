@@ -487,20 +487,30 @@ sub size_threshold {
   return $Size_threshold;
 }
 
+sub authenticated {
+  my ($self, $state) = @_;
+  $self->{_auth_state} = $state if $state;
+  return (defined $self->{_auth_state} ? $self->{_auth_state} : 0);
+}
+
 sub auth_user {
   my ($self, $user) = @_;
-  $user =~ s/[\r\n].*//s;
-  $self->{_auth_user} = $user if $user;    
+  $self->{_auth_user} = $user if $user;
   return (defined $self->{_auth_user} ? $self->{_auth_user} : "" );
+}
+
+sub auth_ticket {
+  my ($self, $ticket) = @_;
+  $self->{_auth_ticket} = $ticket if $ticket;
+  return (defined $self->{_auth_ticket} ? $self->{_auth_ticket} : "" );
 }
 
 sub auth_mechanism {
   my ($self, $mechanism) = @_;
-  $mechanism =~ s/[\r\n].*//s;
-  $self->{_auth_mechanism} = $mechanism if $mechanism;    
+  $self->{_auth_mechanism} = lc($mechanism) if $mechanism;
   return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "" );
 }
-  
+
 sub fd {
     return shift->{fd};
 }

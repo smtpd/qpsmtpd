@@ -26,6 +26,7 @@ my %return_codes = (
         DECLINED               => 909,
         DONE                   => 910,
         CONTINUATION           => 911,
+        AUTH_PENDING           => 912,
 );
 
 use vars qw(@ISA @EXPORT);

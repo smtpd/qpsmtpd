@@ -15,9 +15,10 @@ use fields qw(
     hooks
     start_time
     cmd_timeout
-    _auth
-    _auth_user
     _auth_mechanism
+    _auth_state
+    _auth_ticket
+    _auth_user
     _commands
     _config_cache
     _connection
@@ -157,6 +158,9 @@ sub process_cmd {
             return $self->fault("command '$cmd' failed unexpectedly");
         }
         return $resp;
+    }
+    elsif ( $self->authenticated == AUTH_PENDING ) {
+        return $self->auth_process($line);
     }
     else {
         # No such method - i.e. unrecognized command
@@ -315,7 +319,7 @@ sub end_of_data {
     }
     
     # only true if client authenticated
-    if ( defined $self->{_auth} and $self->{_auth} == OK ) { 
+    if ( $self->authenticated == OK ) { 
         $header->add("X-Qpsmtpd-Auth","True");
     }
     

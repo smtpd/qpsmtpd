@@ -12,6 +12,7 @@ use Qpsmtpd::Auth;
 use Qpsmtpd::Address ();
 
 use Mail::Header ();
+use MIME::Base64;
 #use Data::Dumper;
 use POSIX qw(strftime);
 use Net::DNS;
@@ -47,6 +48,11 @@ sub dispatch {
   my ($cmd) = lc shift;
 
   $self->{_counter}++; 
+
+  if ( $self->authenticated == AUTH_PENDING ) {
+      # must be in the middle of prompting for auth parameters
+      return $self->auth_process($cmd,@_);
+  }
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
@@ -114,13 +120,13 @@ sub connect_respond {
     elsif ($rc != DONE) {
       my $greets = $self->config('smtpgreeting');
       if ( $greets ) {
-	  $greets .= " ESMTP";
+          $greets .= " ESMTP";
       }
       else {
-	  $greets = $self->config('me') 
-	    . " ESMTP qpsmtpd " 
-	    . $self->version 
-	    . " ready; send us your mail, but not your spam.";
+          $greets = $self->config('me') 
+            . " ESMTP qpsmtpd " 
+            . $self->version 
+            . " ready; send us your mail, but not your spam.";
       }
 
       $self->respond(220, $greets);
@@ -197,8 +203,8 @@ sub ehlo_respond {
     $self->transaction;
 
     my @capabilities = $self->transaction->notes('capabilities')
-    			? @{ $self->transaction->notes('capabilities') }
-			: ();
+                        ? @{ $self->transaction->notes('capabilities') }
+                        : ();
 
     # Check for possible AUTH mechanisms
     my %auth_mechanisms;
@@ -229,17 +235,148 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
   }
 }
 
+sub e64
+{
+  my ($arg) = @_;
+  my $res = encode_base64($arg);
+  chomp($res);
+  return($res);
+}
+
 sub auth {
-    my ( $self, $arg, @stuff ) = @_;
+    my ( $self, $mechanism, $prekey ) = @_;
     
     #they AUTH'd once already
     return $self->respond( 503, "but you already said AUTH ..." )
-      if ( defined $self->{_auth}
-        and $self->{_auth} == OK );
+      if ( $self->authenticated == OK );
     return $self->respond( 503, "AUTH not defined for HELO" )
       if ( $self->connection->hello eq "helo" );
 
-    return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $arg, @stuff );
+    # $DB::single = 1;
+
+    $self->auth_mechanism($mechanism);
+    $self->authenticated(AUTH_PENDING);
+    if ( $prekey ) { # easy single step
+        unless ( $mechanism =~ /^(plain|login)$/i ) {
+            # must be plain or login
+            $self->respond( 500, "Unrecognized authentification mechanism" );
+            return DECLINED;
+        }
+        my ($passHash, $user, $passClear) = split /\x0/,decode_base64($prekey);
+        # we have all of the elements ready to go now
+        if ( $mechanism =~ /login/i ) {
+            $self->auth_user($user);
+            return $self->auth_process(e64($passClear));
+        }
+        else {
+            return $self->auth_process($prekey);
+        }
+    }
+    else {
+        if ( $mechanism =~ /plain/i ) {
+          $self->respond( 334, "Please continue" );
+        }
+        elsif ( $mechanism =~ /login/i ) {
+          $self->respond( 334, e64("Username:") );
+        }
+        elsif ( $mechanism =~ /cram-md5/i ) {
+        # rand() is not cryptographic, but we only need to generate a globally
+        # unique number.  The rand() is there in case the user logs in more than
+        # once in the same second, or if the clock is skewed.
+            my $ticket = sprintf( "<%x.%x\@" . $self->config("me") . ">",
+                rand(1000000), time() );
+
+            # Store this for later
+            $self->auth_ticket($ticket);
+            # We send the ticket encoded in Base64
+            $self->respond( 334, encode_base64( $ticket, "" ) );
+        }
+    }
+    return DECLINED;
+}
+        
+sub auth_process {
+    my ($self, $line) = @_;
+    my ( $user, $passClear, $passHash, $ticket, $mechanism );
+    
+    # do this once here
+    $mechanism = $self->auth_mechanism;
+    $user = $self->auth_user;
+    $ticket = $self->auth_ticket;
+    
+    if ( $mechanism eq 'plain' ) {
+        ( $passHash, $user, $passClear ) = split /\x0/,
+          decode_base64($line);
+    }
+    elsif ( $mechanism eq 'login' ) {
+        if ( $user ) {
+            # must be getting the password now
+            $passClear = decode_base64($line);
+        }
+        else {
+            # must be getting the user now
+            $user = decode_base64($line);
+            $self->auth_user($user);
+            $self->respond(334, e64("Password:"));
+        }
+    }
+    elsif ( $mechanism eq "cram-md5" ) {
+        $line =~ tr/[\r\n]//d; # cannot simply chomp CRLF
+
+        ( $user, $passHash ) = split( ' ', decode_base64($line) );
+
+    }
+    else {
+        $self->respond( 500, "Unrecognized authentification mechanism" );
+        return DECLINED;
+    }
+    if ($user eq '*') {
+        $self->respond(501, "Authentification canceled");
+        return DECLINED;
+    }
+
+    # check to see if we can proceed with the hooks
+    if ( $user and ( $passClear or $passHash ) ) {
+        # try running the specific hooks first
+        my ( $rc, $msg ) =
+          $self->run_hooks( "auth-$mechanism",
+            $mechanism, $user, $passClear,
+            $passHash, $ticket );
+
+        # try running the polymorphous hooks next
+        if ( !$rc || $rc == DECLINED ) {    
+            ( $rc, $msg ) =
+              $self->run_hooks( "auth", $mechanism, $user, $passClear,
+                $passHash, $ticket );
+        }
+        return $self->auth_respond($rc, $msg, $mechanism, $user)
+            unless $rc == CONTINUATION;
+    }
+    else {
+        return CONTINUATION;
+    }
+}
+
+
+sub auth_respond {
+    my ($self, $rc, $msg, $mechanism, $user) = @_;
+    if ( $rc == OK ) {
+        $msg = "Authentication successful for $user" .
+            ( defined $msg ? " - " . $msg : "" );
+        $self->respond( 235, $msg );
+        $self->connection->relay_client(1);
+        $self->log( LOGINFO, $msg );
+        $self->authenticated(OK);
+
+        return OK;
+    }
+    else {
+        $msg = "Authentication failed for $user" .
+            ( defined $msg ? " - " . $msg : "" );
+        $self->respond( 535, $msg );
+        $self->log( LOGERROR, $msg );
+        return DENY;
+    }
 }
 
 sub mail {
@@ -541,8 +678,8 @@ sub data_respond {
         # FIXME - call plugins to work on just the header here; can
         # save us buffering the mail content.
 
-	# Save the start of just the body itself	
-	$self->transaction->set_body_start();
+        # Save the start of just the body itself        
+        $self->transaction->set_body_start();
 
       }
 
@@ -564,8 +701,9 @@ sub data_respond {
   $self->transaction->header($header);
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
-  my $authheader = (defined $self->{_auth} and $self->{_auth} == OK) ?
-    "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n" : "";
+  my $authheader = ($self->authenticated == OK)
+    ? "(smtp-auth username $self->auth_user, mechanism $self->auth_mechanism)\n"
+    : "";
 
   $header->add("Received", "from ".$self->connection->remote_info
                ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
