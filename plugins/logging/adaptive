@@ -44,10 +44,10 @@ sub hook_logging { # wlog
     return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
 
     if ( defined $self->{_maxlevel} && $trace <= $self->{_maxlevel} ) {
-	my $fd = $self->fd();
+        my $fd = $self->fd();
         warn join(
             " ", $$.
-	    (defined $fd ? " fd:$fd" : "") .
+            (defined $fd ? " fd:$fd" : "") .
             (
                   defined $plugin ? " $plugin plugin:"
                 : defined $hook   ? " running plugin ($hook):"

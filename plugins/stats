@@ -7,13 +7,6 @@ our $MAILS_RECEIVED = 0;
 our $MAILS_REJECTED = 0;
 our $MAILS_TEMPFAIL = 0;
 
-sub register {
-    my ($self) = @_;
-    
-    $self->register_hook('deny', 'increment_deny');
-    $self->register_hook('queue', 'increment_mails');
-}
-
 sub get_stats {
     my $class = shift;
     my $uptime = $class->uptime;
@@ -29,7 +22,7 @@ sub get_stats {
                                    $uptime, $recvd, $reject, $soft, $rate);
 }
 
-sub increment_deny {
+sub hook_deny {
     my ($self, $tran, $plugin, $level) = @_;
     
     if ($level == DENY or $level == DENY_DISCONNECT) {
@@ -42,7 +35,7 @@ sub increment_deny {
     return DECLINED;
 }
 
-sub increment_mails {
+sub hook_mail {
     my $self = shift;
     
     $MAILS_RECEIVED++;

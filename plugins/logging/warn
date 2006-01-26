@@ -10,10 +10,10 @@ sub register {
   $self->{_level} = LOGWARN;
   if ( defined($loglevel) ) {
       if ($loglevel =~ /^\d+$/) {
-	  $self->{_level} = $loglevel;
+          $self->{_level} = $loglevel;
       }
       else {
-	  $self->{_level} = log_level($loglevel);
+          $self->{_level} = log_level($loglevel);
       }
   }
 

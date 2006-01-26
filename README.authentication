@@ -1,8 +1,10 @@
-#!/usr/bin/perl -w
+#
+# read this with 'perldoc README.authentication'  ...
+#
 
 =head1 NAME
 
-Qpsmtpd::Auth - Authentication framework for qpsmtpd
+Authentication framework for qpsmtpd
 
 =head1 DESCRIPTION
 
@@ -15,7 +17,7 @@ for more details.
 
 =head1 USAGE
 
-This module is automatically loaded by Qpsmtpd::SMTP only if a plugin
+This code is automatically loaded by Qpsmtpd::SMTP only if a plugin
 providing one of the defined L<Auth Hooks> is loaded.  The only
 time this can happen is if the client process employs the EHLO command to
 initiate the SMTP session.  If the client uses HELO, the AUTH command is
@@ -30,14 +32,14 @@ All plugins must provide two functions:
 
 =over 4
 
-=item * register()
+=item * init()
 
 This is the standard function which is called by qpsmtpd for any plugin 
 listed in config/plugins.  Typically, an auth plugin should register at
 least one hook, like this:
 
 
-  sub register {
+  sub init {
     my ($self, $qp) = @_;
 
     $self->register_hook("auth", "authfunction");
@@ -205,7 +207,7 @@ John Peacock <jpeacock@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2004 John Peacock
+Copyright (c) 2004-2006 John Peacock
 
 Portions based on original code by Ask Bjoern Hansen and Guillaume Filion
 
@@ -213,5 +215,3 @@ This plugin is licensed under the same terms as the qpsmtpd package itself.
 Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
-
-1;
