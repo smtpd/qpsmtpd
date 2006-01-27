@@ -60,7 +60,8 @@ sub authsql {
     use DBI;
     use Qpsmtpd::Constants;
     use Digest::HMAC_MD5 qw(hmac_md5_hex);
-
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket )
+    	= @_; 
 #    $DB::single = 1;
 
     my $connect  = "dbi:mysql:dbname=vpopmail";
@@ -69,10 +70,11 @@ sub authsql {
 
     my $dbh = DBI->connect( $connect, $dbuser, $dbpasswd, 
     	{ PrintError => 0, } )
-    	or return DECLINED;
+    	or (
+	    $self->log(LOGERROR, $DBI::errstr)
+	    and return DECLINED
+	);
 
-    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
-      @_;
     my ( $pw_name, $pw_domain ) = split "@", lc($user);
 
     unless ( defined $pw_domain ) {
