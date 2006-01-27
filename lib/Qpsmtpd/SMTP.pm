@@ -8,7 +8,6 @@ use Carp;
 
 use Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
-use Qpsmtpd::Auth;
 use Qpsmtpd::Address ();
 
 use Mail::Header ();

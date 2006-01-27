@@ -67,8 +67,9 @@ sub authsql {
     my $dbuser   = "vpopmailuser";
     my $dbpasswd = "**********";
 
-    my $dbh = DBI->connect( $connect, $dbuser, $dbpasswd );
-    $dbh->{ShowErrorStatement} = 1;
+    my $dbh = DBI->connect( $connect, $dbuser, $dbpasswd, 
+    	{ PrintError => 0, } )
+    	or return DECLINED;
 
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;

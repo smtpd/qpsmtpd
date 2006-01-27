@@ -28,7 +28,6 @@ use fields qw(
     _continuation
 );
 use Qpsmtpd::Constants;
-use Qpsmtpd::Auth;
 use Qpsmtpd::Address;
 use Danga::DNS;
 use Mail::Header;
