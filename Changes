@@ -1,3 +1,11 @@
+0.32 -
+
+  Add logging/file plugin for simple logging to a file (Devin Carraway and
+  Peter J. Holzer).
+
+  Add logging/syslog plugin for logging via the syslog facility (Devin
+  Carrway)
+
 0.31.1 - 2005/11/18
 
   Add missing files to the distribution, oops... (Thanks Budi Ang!)
