@@ -308,8 +308,8 @@ sub _addr_cmp {
     }
 
     #invert the address so we can sort by domain then user    
-    $left = lc($left->host.'='.$left->user);
-    $right = lc($right->host.'='.$right->user);
+    ($left  = join( '=', reverse( split('@', $left->format))) ) =~ tr/[<>]//d;
+    ($right = join( '=', reverse( split('@',$right->format))) ) =~ tr/[<>]//d;
 
     if ( $swap ) {
 	($right, $left) = ($left, $right);
