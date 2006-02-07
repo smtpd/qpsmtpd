@@ -236,7 +236,7 @@ sub SASL {
     if ( $mechanism eq "plain" ) {
         if (!$prekey) {
           $session->respond( 334, "Please continue" );
-          $prekey= <>;
+          $prekey= <STDIN>;
         }
         ( $passHash, $user, $passClear ) = split /\x0/,
           decode_base64($prekey);
@@ -250,7 +250,7 @@ sub SASL {
         else {
     
           $session->respond(334, e64("Username:"));
-          $user = decode_base64(<>);
+          $user = decode_base64(<STDIN>);
           #warn("Debug: User: '$user'");
           if ($user eq '*') {
             $session->respond(501, "Authentification canceled");
@@ -258,7 +258,7 @@ sub SASL {
           }
     
           $session->respond(334, e64("Password:"));
-          $passClear = <>;
+          $passClear = <STDIN>;
           $passClear = decode_base64($passClear);
           #warn("Debug: Pass: '$pass'");
           if ($passClear eq '*') {
@@ -277,9 +277,7 @@ sub SASL {
 
         # We send the ticket encoded in Base64
         $session->respond( 334, encode_base64( $ticket, "" ) );
-        my $line = <>;
-        chop($line);
-        chop($line);
+        my $line = <STDIN>;
 
         if ( $line eq '*' ) {
             $session->respond( 501, "Authentification canceled" );
@@ -287,7 +285,6 @@ sub SASL {
         }
 
         ( $user, $passHash ) = split( ' ', decode_base64($line) );
-
     }
     else {
         $session->respond( 500, "Unrecognized authentification mechanism" );
