@@ -1,4 +1,4 @@
-0.32 -
+0.32 - 2006/02/23
 
   Add logging/file plugin for simple logging to a file (Devin Carraway and
   Peter J. Holzer).
@@ -11,7 +11,7 @@
 
   Add plugins/tls_cert to generate appropriately shaped self-signed certs for 
   TLS support.  Add explicit use of CA used to sign cert.  Abstract clone()ing
-  of connection information when switching to TLS.  Fix Qpsmtpd::Auth to work
+  of connection information when switching to TLS.  Fix the AUTH code to work
   correctly with TLS.
 
   Add hosts_allow plugin to support pre- and post-connection hooks as well
@@ -19,6 +19,13 @@
 
   Improve postfix-queue plugin to support the known processing flags (Hanno
   Hecker).
+
+  Drop root privileges before loading plugins, rather than after.
+
+  A few fixes to the clamdscan plugin (Dave Rolsky)
+
+  Various minor fixes and improvements
+
 
 0.31.1 - 2005/11/18
 
