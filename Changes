@@ -3,6 +3,8 @@
    Make the clamdscan plugin temporarily deny mail if if can't talk to clamd
    (Filippo Carletti)
 
+   Improve Qpsmtpd::Transaction documentation (Fred Moyer)
+
 
 0.32 - 2006/02/26
 

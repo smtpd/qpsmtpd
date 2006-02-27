@@ -136,6 +136,14 @@ These API docs assume you already have a connection object. See the
 source code if you need to construct one. You can access the connection
 object via the C<Qpsmtpd> object's C<< $qp->connection >> method.
 
+=head2 new ( )
+
+Instantiates a new Qpsmtpd::Connection object.
+
+=head2 start ( %args )
+
+Initializes the connection object with %args attribute data.
+
 =head2 remote_host( )
 
 The remote host connecting to the server as looked up via reverse dns.
@@ -144,10 +152,24 @@ The remote host connecting to the server as looked up via reverse dns.
 
 The remote IP address of the connecting host.
 
+=head2 remote_port( )
+
+The remote port.
+
+=head2 hello( )
+
 =head2 remote_info( )
 
 If your server does an ident lookup on the remote host, this is the
 identity of the remote client.
+
+=head2 local_ip( )
+
+The local ip.
+
+=head2 local_port( )
+
+The local port.
 
 =head2 hello( )
 
@@ -167,5 +189,15 @@ set after a successful return from those hooks.
 =head2 notes($key [, $value])
 
 Connection-wide notes, used for passing data between plugins.
+
+=head2 clone( )
+
+Returns a copy of the Qpsmtpd::Connection object.
+
+=cut
+
+=head2 relay_client( )
+
+True if the client is allowed to relay messages.
 
 =cut
