@@ -155,7 +155,7 @@ sub hook_data_post {
 
     unless ( $clamd->ping() ) {
     $self->log( LOGERROR, "Cannot ping clamd server - did you provide the correct clamd port or socket?" );
-    return DECLINED;
+    return DENYSOFT;
     }
 
     if ( my %found = $clamd->scan($filename) ) {
