@@ -93,6 +93,33 @@ sub hook_unrecognized_command {
     # OK, now we setup TLS
     $self->qp->respond (220, "Go ahead with TLS");
     
+    unless ( _convert_to_ssl($self) ) {
+        # SSL setup failed. Now we must respond to every command with 5XX
+        warn("TLS failed: $@\n");
+        $transaction->notes('ssl_failed', 1);
+        return DENY, "TLS Negotiation Failed";
+    }
+    
+    $self->log(LOGWARN, "TLS setup returning");
+    return DONE;
+}
+
+sub hook_connect {
+    my ($self, $transaction) = @_;
+
+    my $local_port = $self->qp->connection->local_port;
+    return DECLINED unless $local_port == 465; # SMTPS
+    
+    unless ( _convert_to_ssl($self) ) {
+	return (DENY_DISCONNECT, "Cannot establish SSL session");
+    }
+    $self->log(LOGWARN, "Connected via SMTPS");
+    return DECLINED;
+}
+
+sub _convert_to_ssl {
+    my ($self) = @_;
+
     eval {
         my $tlssocket = IO::Socket::SSL->new_from_fd(
             fileno(STDIN), '+>',
@@ -112,14 +139,11 @@ sub hook_unrecognized_command {
         $self->connection->notes('tls_enabled', 1);
     };
     if ($@) {
-        # SSL setup failed. Now we must respond to every command with 5XX
-        warn("TLS failed: $@\n");
-        $transaction->notes('ssl_failed', 1);
-        return DENY, "TLS Negotiation Failed";
+	return 0;
     }
-    
-    $self->log(LOGWARN, "TLS setup returning");
-    return DONE;
+    else {
+	return 1;
+    }
 }
 
 sub can_do_tls {

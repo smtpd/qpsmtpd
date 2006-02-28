@@ -56,8 +56,8 @@ GetOptions('h|help' => \&usage,
 if ($PORT =~ /^(\d+)$/) { $PORT = $1 } else { &usage }
 @LOCALADDR = ( '0.0.0.0' ) if !@LOCALADDR;
 for (0..$#LOCALADDR) {
-  if ($LOCALADDR[$_] =~ /^([\d\w\-.]+)$/) {
-    $LOCALADDR[$_] = $1;
+  if ($LOCALADDR[$_] =~ /^([\d\w\-.]+)(?::(\d+))?$/) {
+    $LOCALADDR[$_] = { 'addr' => $1, 'port' => $2 || $PORT };
   } else {
     &usage;
   }
@@ -94,13 +94,13 @@ my $select = new IO::Select;
 
 # establish SERVER socket(s), bind and listen.
 for my $listen_addr (@LOCALADDR) {
-  my $server = IO::Socket::INET->new(LocalPort => $PORT,
-                                     LocalAddr => $listen_addr,
+  my $server = IO::Socket::INET->new(LocalPort => $listen_addr->{'port'},
+                                     LocalAddr => $listen_addr->{'addr'},
                                      Proto     => 'tcp',
                                      Reuse     => 1,
                                      Blocking  => 0,
                                      Listen    => SOMAXCONN )
-    or die "Creating TCP socket $listen_addr:$PORT: $!\n";
+    or die "Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
   IO::Handle::blocking($server, 0);
   $select->add($server);
 }
@@ -149,7 +149,9 @@ $> = $quid;
 
 $qpsmtpd->load_plugins;
 
-::log(LOGINFO,"Listening on port $PORT");
+foreach my $local_addr ( @LOCALADDR ) {
+    ::log(LOGINFO,"Listening on $local_addr->{'addr'}:$local_addr->{'port'}");
+}
 ::log(LOGINFO, 'Running as user '.
 	(getpwuid($>) || $>) .
 	', group '.
