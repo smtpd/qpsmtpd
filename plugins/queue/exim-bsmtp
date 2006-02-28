@@ -90,8 +90,7 @@ sub hook_queue {
                "MAIL FROM:<", ($txn->sender->address || ''), ">\n";
     print $tmp "RCPT TO:<", ($_->address || ''), ">\n"
       for $txn->recipients;
-    print $tmp "DATA\n",
-               $txn->header->as_string, "\n";
+    print $tmp "DATA\n", $txn->header->as_string;
     $txn->body_resetpos;
     while (my $line = $txn->body_getline) {
       $line =~ s/^\./../;

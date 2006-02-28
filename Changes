@@ -1,5 +1,8 @@
 0.33
 
+   Fix a spurious newline at the start of messages queued via exim (Devin
+   Carraway)
+
    Make the clamdscan plugin temporarily deny mail if if can't talk to clamd
    (Filippo Carletti)
 
