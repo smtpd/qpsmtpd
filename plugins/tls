@@ -12,7 +12,15 @@ tls - plugin to support STARTTLS
 
 =head1 DESCRIPTION
 
-This plugin implements basic TLS support.
+This plugin implements basic TLS support.  It can also be used to support
+port 465 (SMTP over SSL), but only with qpsmtpd-forkserver.  In this case,
+be sure to load plugins/tls before any other connect plugins and start
+qpsmtpd like this:
+
+  qpsmtpd-forkserver --port 25 --port 465
+
+You can also specify multiple --listen-address options as well; see the help
+for qpsmtpd-forkserver for more details.
 
 If TLS is successfully negotiated then the C<tls_enabled> field in the
 Connection notes is set. If you wish to make TLS mandatory you should check
