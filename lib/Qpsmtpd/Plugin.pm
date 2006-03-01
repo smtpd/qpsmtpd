@@ -2,11 +2,13 @@ package Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
 use strict;
 
+# more or less in the order they will fire
 our @hooks = qw(
-    logging config  queue  data  data_post  quit  rcpt  mail  ehlo  helo
+    logging config pre-connection connect ehlo helo
     auth auth-plain auth-login auth-cram-md5
-    connect  reset_transaction  unrecognized_command  disconnect
-    deny ok pre-connection post-connection
+    rcpt mail data data_post queue_pre queue queue_post
+    quit reset_transaction disconnect post-connection
+    unrecognized_command deny ok
 );
 our %hooks = map { $_ => 1 } @hooks;
 

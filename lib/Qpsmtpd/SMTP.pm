@@ -50,6 +50,12 @@ sub dispatch {
 
   $self->{_counter}++; 
 
+  if ( $cmd !~ /^(rset|quit)$/ and $self->denied ) { # RFC non-compliant
+      $self->log(LOGWARN, "non-RFC compliant MTA disconnected");
+      $self->respond(521, "non-RFC compliant MTA disconnected (#5.7.0)");
+      $self->disconnect;
+  }
+
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
     if ($rc == DENY_DISCONNECT) {
@@ -150,8 +156,10 @@ sub helo {
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
+    $self->denied(1);
     $self->respond(550, $msg);
   } elsif ($rc == DENYSOFT) {
+    $self->denied(1);
     $self->respond(450, $msg);
   } elsif ($rc == DENY_DISCONNECT) {
       $self->respond(550, $msg);
@@ -178,8 +186,10 @@ sub ehlo {
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
+    $self->denied(1);
     $self->respond(550, $msg);
   } elsif ($rc == DENYSOFT) {
+    $self->denied(1);
     $self->respond(450, $msg);
   } elsif ($rc == DENY_DISCONNECT) {
       $self->respond(550, $msg);
@@ -290,11 +300,13 @@ sub mail {
       return 1;
     }
     elsif ($rc == DENY) {
+      $self->denied(1);
       $msg ||= $from->format . ', denied';
       $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
       $self->respond(550, $msg);
     }
     elsif ($rc == DENYSOFT) {
+      $self->denied(1);
       $msg ||= $from->format . ', temporarily denied';
       $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
       $self->respond(450, $msg);
@@ -336,10 +348,12 @@ sub rcpt {
     return 1;
   }
   elsif ($rc == DENY) {
+    $self->denied(1);
     $msg ||= 'relaying denied';
     $self->respond(550, $msg);
   }
   elsif ($rc == DENYSOFT) {
+    $self->denied(1);
     $msg ||= 'relaying denied';
     return $self->respond(450, $msg);
   }
@@ -558,7 +572,7 @@ sub data {
     $self->respond(452, $msg || "Message denied temporarily");
   } 
   else {
-    $self->queue($self->transaction);    
+    $self->queue($self->transaction);
   }
 
   # DATA is always the end of a "transaction"
@@ -578,7 +592,18 @@ sub getline {
 sub queue {
   my ($self, $transaction) = @_;
 
-  my ($rc, $msg) = $self->run_hooks("queue");
+  # First fire any queue_pre hooks
+  my ($rc, $msg) = $self->run_hooks("queue_pre");
+  if ($rc == DONE) {
+    return 1;
+  }
+  elsif ($rc != OK and $rc != DECLINED) {
+    return $self->log(LOGERROR, "pre plugin returned illegal value");
+    return 0;
+  }
+
+  # If we got this far, run the queue hooks
+  ($rc, $msg) = $self->run_hooks("queue");
   if ($rc == DONE) {
     return 1;
   }
@@ -586,16 +611,20 @@ sub queue {
     $self->respond(250, ($msg || 'Queued'));
   }
   elsif ($rc == DENY) {
+    $self->denied(1);
     $self->respond(552, $msg || "Message denied");
   }
   elsif ($rc == DENYSOFT) {
+    $self->denied(1);
     $self->respond(452, $msg || "Message denied temporarily");
   } 
   else {
     $self->respond(451, $msg || "Queuing declined or disabled; try again later" );
   }
-
-
+  
+  # And finally run any queue_post hooks
+  ($rc, $msg) = $self->run_hooks("queue_post");
+  $self->log(LOGERROR, $msg) unless $rc == OK;
 }
 
 
