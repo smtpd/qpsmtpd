@@ -597,7 +597,7 @@ sub queue {
   if ($rc == DONE) {
     return 1;
   }
-  elsif ($rc != OK and $rc != DECLINED) {
+  elsif ($rc != OK and $rc != DECLINED and $rc != 0 ) {
     return $self->log(LOGERROR, "pre plugin returned illegal value");
     return 0;
   }
@@ -624,7 +624,7 @@ sub queue {
   
   # And finally run any queue_post hooks
   ($rc, $msg) = $self->run_hooks("queue_post");
-  $self->log(LOGERROR, $msg) unless $rc == OK;
+  $self->log(LOGERROR, $msg) unless ($rc == OK or $rc == 0);
 }
 
 
