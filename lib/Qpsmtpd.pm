@@ -433,14 +433,6 @@ sub auth_mechanism {
   my $self = shift;
   return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "" );
 }
-
-sub denied {
-  my ($self, $value) = @_;
-  $self->transaction->{_denied} = $value if defined $value;
-  return (defined $self->transaction->{_denied} 
-  	? $self->transaction->{_denied} 
-	: "" );
-}
   
 1;
 

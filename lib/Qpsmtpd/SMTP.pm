@@ -50,12 +50,6 @@ sub dispatch {
 
   $self->{_counter}++; 
 
-  if ( $cmd !~ /^(rset|quit)$/ and $self->denied ) { # RFC non-compliant
-      $self->log(LOGWARN, "non-RFC compliant MTA disconnected");
-      $self->respond(521, "non-RFC compliant MTA disconnected (#5.7.0)");
-      $self->disconnect;
-  }
-
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
     if ($rc == DENY_DISCONNECT) {
@@ -156,10 +150,8 @@ sub helo {
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
-    $self->denied(1);
     $self->respond(550, $msg);
   } elsif ($rc == DENYSOFT) {
-    $self->denied(1);
     $self->respond(450, $msg);
   } elsif ($rc == DENY_DISCONNECT) {
       $self->respond(550, $msg);
@@ -186,10 +178,8 @@ sub ehlo {
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
-    $self->denied(1);
     $self->respond(550, $msg);
   } elsif ($rc == DENYSOFT) {
-    $self->denied(1);
     $self->respond(450, $msg);
   } elsif ($rc == DENY_DISCONNECT) {
       $self->respond(550, $msg);
@@ -300,13 +290,11 @@ sub mail {
       return 1;
     }
     elsif ($rc == DENY) {
-      $self->denied(1);
       $msg ||= $from->format . ', denied';
       $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
       $self->respond(550, $msg);
     }
     elsif ($rc == DENYSOFT) {
-      $self->denied(1);
       $msg ||= $from->format . ', temporarily denied';
       $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
       $self->respond(450, $msg);
@@ -348,12 +336,10 @@ sub rcpt {
     return 1;
   }
   elsif ($rc == DENY) {
-    $self->denied(1);
     $msg ||= 'relaying denied';
     $self->respond(550, $msg);
   }
   elsif ($rc == DENYSOFT) {
-    $self->denied(1);
     $msg ||= 'relaying denied';
     return $self->respond(450, $msg);
   }
@@ -611,11 +597,9 @@ sub queue {
     $self->respond(250, ($msg || 'Queued'));
   }
   elsif ($rc == DENY) {
-    $self->denied(1);
     $self->respond(552, $msg || "Message denied");
   }
   elsif ($rc == DENYSOFT) {
-    $self->denied(1);
     $self->respond(452, $msg || "Message denied temporarily");
   } 
   else {
