@@ -1,4 +1,5 @@
 
+
 sub hook_mail {
   my ($self, $transaction, $sender) = @_;
 
@@ -18,8 +19,14 @@ sub hook_mail {
     #push(@hosts, $helo) if $helo && $helo ne $sender->host;
     for my $host (@hosts) {
     for my $rhsbl (keys %rhsbl_zones) {
+      # fix to find TXT records, if the rhsbl_zones line doesn't have second field
+      if (defined($rhsbl_zones{$rhsbl})) {
         $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record in the background");
         $sel->add($res->bgsend("$host.$rhsbl"));
+      } else {
+        $self->log(LOGDEBUG, "Checking $host.$rhsbl for TXT record in the background");
+        $sel->add($res->bgsend("$host.$rhsbl", "TXT"));
+      }
         $rhsbl_zones_map{"$host.$rhsbl"} = $rhsbl_zones{$rhsbl};
     }
   }
@@ -79,6 +86,10 @@ sub process_sockets {
         if ($rr->type eq 'A') {
           $result = $rr->name;
           $self->log(LOGDEBUG, "A record found for $result with IP " . $rr->address);
+          last;
+        } elsif ($rr->type eq 'TXT') {
+          $result = $rr->txtdata;
+          $self->log(LOGDEBUG, "TXT record found: " . $rr->txtdata);
           last;
         }
       }

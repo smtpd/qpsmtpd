@@ -1,5 +1,23 @@
 #!perl -w
 
+=head1 NAME
+
+spamassassin - SpamAssassin integration for qpsmtpd
+
+=head1 DESCRIPTION
+
+Plugin that checks if the mail is spam by using the "spamd" daemon
+from the SpamAssassin package.  F<http://www.spamassassin.org>
+
+SpamAssassin 2.6 or newer is required.
+
+=head1 CONFIG
+
+Configured in the config/dnsbl_zones files.  One line per zone name,
+for example
+
+=cut
+
 sub register {
   my ($self, $qp, $denial ) = @_;
   if ( defined $denial and $denial =~ /^disconnect$/i ) {
