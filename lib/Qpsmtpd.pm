@@ -348,6 +348,7 @@ sub run_hooks {
       last unless $r[0] == DECLINED;
     }
     $r[0] = DECLINED if not defined $r[0];
+    @r = map { split /\n/ } @r;
     return @r;
   }
   return (0, '');

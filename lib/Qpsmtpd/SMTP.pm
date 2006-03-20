@@ -51,13 +51,14 @@ sub dispatch {
   $self->{_counter}++; 
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
-    my ($rc, $msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
+    my ($rc, @msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
+    @msg = map { split /\n/ } @msg;
     if ($rc == DENY_DISCONNECT) {
-      $self->respond(521, $msg);
+      $self->respond(521, @msg);
       $self->disconnect;
     }
     elsif ($rc == DENY) {
-      $self->respond(500, $msg);
+      $self->respond(500, @msg);
     }
     elsif ($rc == DONE) {
       1;
@@ -91,13 +92,15 @@ sub start_conversation {
     my $self = shift;
     # this should maybe be called something else than "connect", see
     # lib/Qpsmtpd/TcpServer.pm for more confusion.
-    my ($rc, $msg) = $self->run_hooks("connect");
+    my ($rc, @msg) = $self->run_hooks("connect");
     if ($rc == DENY) {
-      $self->respond(550, ($msg || 'Connection from you denied, bye bye.'));
+      $msg[0] ||= 'Connection from you denied, bye bye.';
+      $self->respond(550, @msg);
       return $rc;
     }
     elsif ($rc == DENYSOFT) {
-      $self->respond(450, ($msg || 'Connection from you temporarily denied, bye bye.'));
+      $msg[0] ||= 'Connection from you temporarily denied, bye bye.';
+      $self->respond(450, @msg);
       return $rc;
     }
     elsif ($rc == DONE) {
@@ -146,18 +149,18 @@ sub helo {
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  my ($rc, $msg) = $self->run_hooks("helo", $hello_host, @stuff);
+  my ($rc, @msg) = $self->run_hooks("helo", $hello_host, @stuff);
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
-    $self->respond(550, $msg);
+    $self->respond(550, @msg);
   } elsif ($rc == DENYSOFT) {
-    $self->respond(450, $msg);
+    $self->respond(450, @msg);
   } elsif ($rc == DENY_DISCONNECT) {
-      $self->respond(550, $msg);
+      $self->respond(550, @msg);
       $self->disconnect;
   } elsif ($rc == DENYSOFT_DISCONNECT) {
-      $self->respond(450, $msg);
+      $self->respond(450, @msg);
       $self->disconnect;
   } else {
     $conn->hello("helo");
@@ -174,18 +177,18 @@ sub ehlo {
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  my ($rc, $msg) = $self->run_hooks("ehlo", $hello_host, @stuff);
+  my ($rc, @msg) = $self->run_hooks("ehlo", $hello_host, @stuff);
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
-    $self->respond(550, $msg);
+    $self->respond(550, @msg);
   } elsif ($rc == DENYSOFT) {
-    $self->respond(450, $msg);
+    $self->respond(450, @msg);
   } elsif ($rc == DENY_DISCONNECT) {
-      $self->respond(550, $msg);
+      $self->respond(550, @msg);
       $self->disconnect;
   } elsif ($rc == DENYSOFT_DISCONNECT) {
-      $self->respond(450, $msg);
+      $self->respond(450, @msg);
       $self->disconnect;
   } else {
     $conn->hello("ehlo");
@@ -285,30 +288,30 @@ sub mail {
     }
     return $self->respond(501, "could not parse your mail from command") unless $from;
 
-    my ($rc, $msg) = $self->run_hooks("mail", $from);
+    my ($rc, @msg) = $self->run_hooks("mail", $from);
     if ($rc == DONE) {
       return 1;
     }
     elsif ($rc == DENY) {
-      $msg ||= $from->format . ', denied';
-      $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
-      $self->respond(550, $msg);
+      $msg[0] ||= $from->format . ', denied';
+      $self->log(LOGINFO, "deny mail from " . $from->format . " (@msg)");
+      $self->respond(550, @msg);
     }
     elsif ($rc == DENYSOFT) {
-      $msg ||= $from->format . ', temporarily denied';
-      $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
-      $self->respond(450, $msg);
+      $msg[0] ||= $from->format . ', temporarily denied';
+      $self->log(LOGINFO, "denysoft mail from " . $from->format . " (@msg)");
+      $self->respond(450, @msg);
     }
     elsif ($rc == DENY_DISCONNECT) {
-      $msg ||= $from->format . ', denied';
-      $self->log(LOGINFO, "deny mail from " . $from->format . " ($msg)");
-      $self->respond(550, $msg);
+      $msg[0] ||= $from->format . ', denied';
+      $self->log(LOGINFO, "deny mail from " . $from->format . " (@msg)");
+      $self->respond(550, @msg);
       $self->disconnect;
     }
     elsif ($rc == DENYSOFT_DISCONNECT) {
-      $msg ||= $from->format . ', temporarily denied';
-      $self->log(LOGINFO, "denysoft mail from " . $from->format . " ($msg)");
-      $self->respond(421, $msg);
+      $msg[0] ||= $from->format . ', temporarily denied';
+      $self->log(LOGINFO, "denysoft mail from " . $from->format . " (@msg)");
+      $self->respond(421, @msg);
       $self->disconnect;
     }
     else { # includes OK
@@ -331,28 +334,28 @@ sub rcpt {
 
   return $self->respond(501, "could not parse recipient") unless $rcpt;
 
-  my ($rc, $msg) = $self->run_hooks("rcpt", $rcpt);
+  my ($rc, @msg) = $self->run_hooks("rcpt", $rcpt);
   if ($rc == DONE) {
     return 1;
   }
   elsif ($rc == DENY) {
-    $msg ||= 'relaying denied';
-    $self->respond(550, $msg);
+    $msg[0] ||= 'relaying denied';
+    $self->respond(550, @msg);
   }
   elsif ($rc == DENYSOFT) {
-    $msg ||= 'relaying denied';
-    return $self->respond(450, $msg);
+    $msg[0] ||= 'relaying denied';
+    return $self->respond(450, @msg);
   }
   elsif ($rc == DENY_DISCONNECT) {
-      $msg ||= 'delivery denied';
-      $self->log(LOGINFO, "delivery denied ($msg)");
-      $self->respond(550, $msg);
+      $msg[0] ||= 'delivery denied';
+      $self->log(LOGINFO, "delivery denied (@msg)");
+      $self->respond(550, @msg);
       $self->disconnect;
   }
   elsif ($rc == DENYSOFT_DISCONNECT) {
-    $msg ||= 'relaying denied';
-    $self->log(LOGINFO, "delivery denied ($msg)");
-    $self->respond(421, $msg);
+    $msg[0] ||= 'relaying denied';
+    $self->log(LOGINFO, "delivery denied (@msg)");
+    $self->respond(421, @msg);
     $self->disconnect;
   }
   elsif ($rc == OK) {
@@ -388,17 +391,19 @@ sub vrfy {
   # documented in RFC2821#3.5.1
   # I also don't think it provides all the proper result codes.
 
-  my ($rc, $msg) = $self->run_hooks("vrfy");
+  my ($rc, @msg) = $self->run_hooks("vrfy");
   if ($rc == DONE) {
     return 1;
   }
   elsif ($rc == DENY) {
-    $self->respond(554, $msg || "Access Denied");
+    $msg[0] ||= "Access Denied";
+    $self->respond(554, @msg);
     $self->reset_transaction();
     return 1;
   }
   elsif ($rc == OK) {
-    $self->respond(250, $msg || "User OK");
+    $msg[0] ||= "User OK";
+    $self->respond(250, @msg);
     return 1;
   }
   else { # $rc == DECLINED or anything else
@@ -415,9 +420,10 @@ sub rset {
 
 sub quit {
   my $self = shift;
-  my ($rc, $msg) = $self->run_hooks("quit");
+  my ($rc, @msg) = $self->run_hooks("quit");
   if ($rc != DONE) {
-    $self->respond(221, $self->config('me') . " closing connection. Have a wonderful day.");
+    $msg[0] ||= $self->config('me') . " closing connection. Have a wonderful day.";
+    $self->respond(221, @msg);
   }
   $self->disconnect();
 }
@@ -430,27 +436,31 @@ sub disconnect {
 
 sub data {
   my $self = shift;
-  my ($rc, $msg) = $self->run_hooks("data");
+  my ($rc, @msg) = $self->run_hooks("data");
   if ($rc == DONE) {
     return 1;
   }
   elsif ($rc == DENY) {
-    $self->respond(554, $msg || "Message denied");
+    $msg[0] ||= "Message denied";
+    $self->respond(554, @msg);
     $self->reset_transaction();
     return 1;
   }
   elsif ($rc == DENYSOFT) {
-    $self->respond(451, $msg || "Message denied temporarily");
+    $msg[0] ||= "Message denied temporarily";
+    $self->respond(451, @msg);
     $self->reset_transaction();
     return 1;
   } 
   elsif ($rc == DENY_DISCONNECT) {
-    $self->respond(554, $msg || "Message denied");
+    $msg[0] ||= "Message denied";
+    $self->respond(554, @msg);
     $self->disconnect;
     return 1;
   }
   elsif ($rc == DENYSOFT_DISCONNECT) {
-    $self->respond(421, $msg || "Message denied temporarily");
+    $msg[0] ||= "Message denied temporarily";
+    $self->respond(421, @msg);
     $self->disconnect;
     return 1;
   }
@@ -547,15 +557,17 @@ sub data {
   #$self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
   $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
 
-  ($rc, $msg) = $self->run_hooks("data_post");
+  ($rc, @msg) = $self->run_hooks("data_post");
   if ($rc == DONE) {
     return 1;
   }
   elsif ($rc == DENY) {
-    $self->respond(552, $msg || "Message denied");
+    $msg[0] ||= "Message denied";
+    $self->respond(552, @msg);
   }
   elsif ($rc == DENYSOFT) {
-    $self->respond(452, $msg || "Message denied temporarily");
+    $msg[0] ||= "Message denied temporarily";
+    $self->respond(452, @msg);
   } 
   else {
     $self->queue($self->transaction);
@@ -579,7 +591,7 @@ sub queue {
   my ($self, $transaction) = @_;
 
   # First fire any queue_pre hooks
-  my ($rc, $msg) = $self->run_hooks("queue_pre");
+  my ($rc, @msg) = $self->run_hooks("queue_pre");
   if ($rc == DONE) {
     return 1;
   }
@@ -589,26 +601,30 @@ sub queue {
   }
 
   # If we got this far, run the queue hooks
-  ($rc, $msg) = $self->run_hooks("queue");
+  ($rc, @msg) = $self->run_hooks("queue");
   if ($rc == DONE) {
     return 1;
   }
   elsif ($rc == OK) {
-    $self->respond(250, ($msg || 'Queued'));
+    $msg[0] ||= 'Queued';
+    $self->respond(250, @msg);
   }
   elsif ($rc == DENY) {
-    $self->respond(552, $msg || "Message denied");
+    $msg[0] ||= 'Message denied';
+    $self->respond(552, @msg);
   }
   elsif ($rc == DENYSOFT) {
-    $self->respond(452, $msg || "Message denied temporarily");
+    $msg[0] ||= 'Message denied temporarily';
+    $self->respond(452, @msg);
   } 
   else {
-    $self->respond(451, $msg || "Queuing declined or disabled; try again later" );
+    $msg[0] ||= 'Queuing declined or disabled; try again later';
+    $self->respond(451, @msg);
   }
   
   # And finally run any queue_post hooks
-  ($rc, $msg) = $self->run_hooks("queue_post");
-  $self->log(LOGERROR, $msg) unless ($rc == OK or $rc == 0);
+  ($rc, @msg) = $self->run_hooks("queue_post");
+  $self->log(LOGERROR, @msg) unless ($rc == OK or $rc == 0);
 }
 
 

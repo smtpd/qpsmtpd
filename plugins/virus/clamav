@@ -27,6 +27,13 @@ Path to the clamav commandline scanner.  Mail will be passed to the clamav
 scanner in Berkeley mbox format (that is, with a "From " line).  See the
 discussion below on which commandline scanner to use.
 
+=item clamd_conf=I<path> (e.g. I<clamd_conf=/etc/sysconfig/clamd.conf>)
+
+Path to the clamd configuration file. Passed as an argument to the
+command-line scanner (--config-file=I<path>).
+
+The default value is '/etc/clamd.conf'.
+
 =item action=E<lt>I<add-header> | I<reject>E<gt> (e.g. I<action=reject>)
 
 Selects an action to take when an inbound message is found to be infected.
@@ -120,6 +127,9 @@ sub register {
     elsif (/^clamscan_path=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
         $self->{_clamscan_loc} = $1;
     }
+    elsif (/^clamd_conf=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+        $self->{_clamd_conf} = "$1";
+    }
     elsif (/^tmp_dir=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
         $self->{_spool_dir} = $1;
     }
@@ -138,6 +148,7 @@ sub register {
   $self->{_max_size} ||= 512 * 1024;
   $self->{_spool_dir} ||= $self->spool_dir();
   $self->{_back_compat} ||= ''; # make sure something is set
+  $self->{_clamd_conf} ||= '/etc/clamd/conf'; # make sure something is set
 
   unless ($self->{_spool_dir}) {
         $self->log(LOGERROR, "No spool dir configuration found");
@@ -172,9 +183,11 @@ sub hook_data_post {
   }
  
   # Now do the actual scanning!
-  my $cmd = $self->{_clamscan_loc}." --stdout "
-    .$self->{_back_compat}
-    ." --disable-summary $filename 2>&1";
+  my $cmd = $self->{_clamscan_loc}
+    . " --stdout "
+    . $self->{_back_compat}
+    . " --config-file=" . $self->{_clamd_conf}
+    . " --disable-summary $filename 2>&1";
   $self->log(LOGDEBUG, "Running: $cmd");
   my $output = `$cmd`;
  

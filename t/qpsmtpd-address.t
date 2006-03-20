@@ -2,7 +2,7 @@
 use strict;
 $^W = 1;
 
-use Test::More tests => 29;
+use Test::More qw/no_plan/;
 
 BEGIN {
     use_ok('Qpsmtpd::Address');
@@ -101,3 +101,8 @@ my @test_list = sort @unsorted_list;
 
 is_deeply( \@test_list, \@sorted_list, "sort via overloaded 'cmp' operator");
 
+# RT#38746 - non-RFC compliant address should return undef
+
+$as='<user@example.com#>';
+$ao = Qpsmtpd::Address->new($as);
+is ($ao, undef, "illegal $as");

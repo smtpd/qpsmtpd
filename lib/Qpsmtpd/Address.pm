@@ -60,7 +60,8 @@ sub new {
     my ($class, $user, $host) = @_;
     my $self = {};
     if ($user =~ /^<(.*)>$/ ) {
-	($user, $host) = $class->canonify($user)
+	($user, $host) = $class->canonify($user);
+	return undef unless defined $user;
     }
     elsif ( not defined $host ) {
 	my $address = $user;
