@@ -1,5 +1,7 @@
 0.33
 
+  Move the Qpsmtpd::Auth POD to a top-level README to be more obvious.
+
   Add Qpsmtpd::Command to gather all parsing logic in one place (Hanno
   Hecker)
 
