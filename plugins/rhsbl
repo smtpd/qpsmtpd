@@ -1,14 +1,14 @@
 
 
 sub hook_mail {
-  my ($self, $transaction, $sender) = @_;
+  my ($self, $transaction, $sender, %param) = @_;
 
   my $res = new Net::DNS::Resolver;
   my $sel = IO::Select->new();
   my %rhsbl_zones_map = ();
 
-  # Perform any RHS lookups in the background. We just send the query packets here
-  # and pick up any results in the RCPT handler.
+  # Perform any RHS lookups in the background. We just send the query packets
+  # here and pick up any results in the RCPT handler.
   # MTAs gets confused when you reject mail during MAIL FROM:
 
     my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');

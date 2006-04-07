@@ -16,6 +16,7 @@ lib/Apache/Qpsmtpd.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
+lib/Qpsmtpd/Command.pm
 lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
 lib/Qpsmtpd/Plugin.pm

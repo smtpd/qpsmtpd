@@ -135,7 +135,7 @@ sub hook_helo {
 }
 
 sub hook_mail {
-    my ($self, $transaction, $address) = @_;
+    my ($self, $transaction, $address, %param) = @_;
     
     my $milter = $self->qp->connection->notes('milter');
 
@@ -148,7 +148,7 @@ sub hook_mail {
 }
 
 sub hook_rcpt {
-    my ($self, $transaction, $address) = @_;
+    my ($self, $transaction, $address, %param) = @_;
     
     my $milter = $self->qp->connection->notes('milter');
 

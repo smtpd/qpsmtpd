@@ -17,7 +17,7 @@ Based heavily on check_badmailfrom.
 =cut
 
 sub hook_mail {
-  my ($self, $transaction, $sender) = @_;
+  my ($self, $transaction, $sender, %param) = @_;
 
   my @badmailfromto = $self->qp->config("badmailfromto")
     or return (DECLINED);
@@ -41,7 +41,7 @@ sub hook_mail {
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt) = @_;
+  my ($self, $transaction, $rcpt, %param) = @_;
   my $recipient = lc($rcpt->user) . '@' . lc($rcpt->host);
   my $sender = $transaction->notes('badmailfromto');
   if ($sender) {

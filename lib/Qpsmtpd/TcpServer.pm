@@ -63,7 +63,7 @@ sub read_input {
     $_ =~ s/\r?\n$//s; # advanced chomp
     $self->log(LOGDEBUG, "dispatching $_");
     $self->connection->notes('original_string', $_);
-    defined $self->dispatch(split / +/, $_)
+    defined $self->dispatch(split / +/, $_, 2)
       or $self->respond(502, "command unrecognized: '$_'");
     alarm $timeout;
   }

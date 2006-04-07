@@ -5,7 +5,7 @@
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {
-  my ($self, $transaction, $recipient) = @_;
+  my ($self, $transaction, $recipient, %param) = @_;
   my $host = lc $recipient->host;
 
   my @rcpt_hosts = ($self->qp->config("me"), $self->qp->config("rcpthosts"));

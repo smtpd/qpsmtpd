@@ -4,9 +4,10 @@ use strict;
 
 # more or less in the order they will fire
 our @hooks = qw(
-    logging config pre-connection connect ehlo helo
-    auth auth-plain auth-login auth-cram-md5
-    rcpt mail data data_post queue_pre queue queue_post
+    logging config pre-connection connect ehlo_parse ehlo
+    helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
+    rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre 
+    data data_post queue_pre queue queue_post
     quit reset_transaction disconnect post-connection
     unrecognized_command deny ok
 );

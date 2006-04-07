@@ -12,6 +12,7 @@ use Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Auth;
 use Qpsmtpd::Address ();
+use Qpsmtpd::Command;
 
 use Mail::Header ();
 #use Data::Dumper;
@@ -143,13 +144,16 @@ sub connection {
 
 
 sub helo {
-  my ($self, $hello_host, @stuff) = @_;
+  my ($self, $line) = @_;
+  my ($rc, @msg) = $self->run_hooks('helo_parse');
+  my ($ok, $hello_host, @stuff) = Qpsmtpd::Command->parse('helo', $line, $msg[0]);
+
   return $self->respond (501,
     "helo requires domain/address - see RFC-2821 4.1.1.1") unless $hello_host;
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  my ($rc, @msg) = $self->run_hooks("helo", $hello_host, @stuff);
+  ($rc, @msg) = $self->run_hooks("helo", $hello_host, @stuff);
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
@@ -171,13 +175,15 @@ sub helo {
 }
 
 sub ehlo {
-  my ($self, $hello_host, @stuff) = @_;
+  my ($self, $line) = @_;
+  my ($rc, @msg) = $self->run_hooks('ehlo_parse');
+  my ($ok, $hello_host, @stuff) = Qpsmtpd::Command->parse('ehlo', $line, $msg[0]);
   return $self->respond (501,
     "ehlo requires domain/address - see RFC-2821 4.1.1.1") unless $hello_host;
   my $conn = $self->connection;
   return $self->respond (503, "but you already said HELO ...") if $conn->hello;
 
-  my ($rc, @msg) = $self->run_hooks("ehlo", $hello_host, @stuff);
+  ($rc, @msg) = $self->run_hooks("ehlo", $hello_host, @stuff);
   if ($rc == DONE) {
     # do nothing
   } elsif ($rc == DENY) {
@@ -229,7 +235,12 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
 }
 
 sub auth {
-    my ( $self, $arg, @stuff ) = @_;
+    my ($self, $line) = @_;
+    my ($rc, $sub)    = $self->run_hooks('auth_parse');
+    my ($ok, $arg, @stuff) = Qpsmtpd::Command->parse('auth', $line, $sub);
+    return $self->respond(501, $arg || "Syntax error in command") 
+      unless ($ok == OK);
+    
 
     #they AUTH'd once already
     return $self->respond( 503, "but you already said AUTH ..." )
@@ -242,9 +253,7 @@ sub auth {
 }
 
 sub mail {
-  my $self = shift;
-  return $self->respond(501, "syntax error in parameters") if !$_[0] or $_[0] !~ m/^from:/i;
-
+  my ($self, $line) = @_;
   # -> from RFC2821
   # The MAIL command (or the obsolete SEND, SOML, or SAML commands)
   # begins a mail transaction.  Once started, a mail transaction
@@ -269,16 +278,29 @@ sub mail {
     return $self->respond(503, "please say hello first ...");
   }
   else {
-    my $from_parameter = join " ", @_;
-    $self->log(LOGINFO, "full from_parameter: $from_parameter");
-
-    my ($from) = ($from_parameter =~ m/^from:\s*(<[^>]*>)/i)[0];
-
-    # support addresses without <> ... maybe we shouldn't?
-    ($from) = "<" . ($from_parameter =~ m/^from:\s*(\S+)/i)[0] . ">"
-      unless $from;
+    $self->log(LOGINFO, "full from_parameter: $line");
+    my ($rc, @msg) = $self->run_hooks("mail_parse");
+    my ($ok, $from, @params) = Qpsmtpd::Command->parse('mail', $line, $msg[0]);
+    return $self->respond(501, $from || "Syntax error in command") 
+      unless ($ok == OK); 
+    my %param;
+    foreach (@params) {
+        my ($k,$v) = split /=/, $_, 2;
+        $param{lc $k} = $v;
+    }
+    # to support addresses without <> we now require a plugin
+    # hooking "mail_pre" to 
+    #   return (OK, "<$from>"); 
+    # (...or anything else parseable by Qpsmtpd::Address ;-))
+    # see also comment in sub rcpt()
+    ($rc, @msg) = $self->run_hooks("mail_pre", $from);
+    if ($rc == OK) {
+      $from = shift @msg;
+    }
 
     $self->log(LOGALERT, "from email address : [$from]");
+    return $self->respond(501, "could not parse your mail from command") 
+      unless $from =~ /^<.*>$/;
 
     if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
       $from = Qpsmtpd::Address->new("<>");
@@ -288,7 +310,7 @@ sub mail {
     }
     return $self->respond(501, "could not parse your mail from command") unless $from;
 
-    my ($rc, @msg) = $self->run_hooks("mail", $from);
+    ($rc, @msg) = $self->run_hooks("mail", $from, %param);
     if ($rc == DONE) {
       return 1;
     }
@@ -323,18 +345,39 @@ sub mail {
 }
 
 sub rcpt {
-  my $self = shift;
-  return $self->respond(501, "syntax error in parameters") unless $_[0] and $_[0] =~ m/^to:/i;
+  my ($self, $line) = @_;
+  my ($rc, @msg)    = $self->run_hooks("rcpt_parse");
+  my ($ok, $rcpt, @param) = Qpsmtpd::Command->parse("rcpt", $line, $msg[0]);
+  return $self->respond(501, $rcpt || "Syntax error in command")
+    unless ($ok == OK);
   return $self->respond(503, "Use MAIL before RCPT") unless $self->transaction->sender;
 
-  my ($rcpt) = ($_[0] =~ m/to:(.*)/i)[0];
-  $rcpt = $_[1] unless $rcpt;
+  my %param;
+  foreach (@param) {
+    my ($k,$v) = split /=/, $_, 2;
+    $param{lc $k} = $v;
+  }
+  # to support addresses without <> we now require a plugin
+  # hooking "rcpt_pre" to 
+  #   return (OK, "<$rcpt>"); 
+  # (... or anything else parseable by Qpsmtpd::Address ;-))
+  # this means, a plugin can decide to (pre-)accept
+  # addresses like <user@example.com.> or <user@example.com >
+  # by removing the trailing "."/" " from this example...
+  ($rc, @msg) = $self->run_hooks("rcpt_pre", $rcpt);
+  if ($rc == OK) {
+    $rcpt = shift @msg;
+  }
   $self->log(LOGALERT, "to email address : [$rcpt]");
+  return $self->respond(501, "could not parse recipient") 
+    unless $rcpt =~ /^<.*>$/;
+
   $rcpt = (Qpsmtpd::Address->parse($rcpt))[0];
 
-  return $self->respond(501, "could not parse recipient") unless $rcpt;
+  return $self->respond(501, "could not parse recipient") 
+    if (!$rcpt or ($rcpt->format eq '<>'));
 
-  my ($rc, @msg) = $self->run_hooks("rcpt", $rcpt);
+  ($rc, @msg) = $self->run_hooks("rcpt", $rcpt, %param);
   if ($rc == DONE) {
     return 1;
   }

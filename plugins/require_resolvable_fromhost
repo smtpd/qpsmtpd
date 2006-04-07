@@ -5,7 +5,7 @@ use Socket;
 my %invalid = ();
 
 sub hook_mail {
-  my ($self, $transaction, $sender) = @_;
+  my ($self, $transaction, $sender, %param) = @_;
 
   return DECLINED
         if ($self->qp->connection->notes('whitelistclient'));

@@ -167,7 +167,7 @@ sub process_sockets {
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt) = @_;
+  my ($self, $transaction, $rcpt, %param) = @_;
   my $connection = $self->qp->connection;
 
   # RBLSMTPD being non-empty means it contains the failure message to return

@@ -1,12 +1,15 @@
 0.33
 
-   Fix a spurious newline at the start of messages queued via exim (Devin
-   Carraway)
+  Add Qpsmtpd::Command to gather all parsing logic in one place (Hanno
+  Hecker)
 
-   Make the clamdscan plugin temporarily deny mail if if can't talk to clamd
-   (Filippo Carletti)
+  Fix a spurious newline at the start of messages queued via exim (Devin
+  Carraway)
 
-   Improve Qpsmtpd::Transaction documentation (Fred Moyer)
+  Make the clamdscan plugin temporarily deny mail if if can't talk to clamd
+  (Filippo Carletti)
+
+  Improve Qpsmtpd::Transaction documentation (Fred Moyer)
 
 
 0.32 - 2006/02/26

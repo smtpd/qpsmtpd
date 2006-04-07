@@ -2,7 +2,7 @@
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {
-  my ($self, $transaction, $recipient) = @_;
+  my ($self, $transaction, $recipient, %param) = @_;
   my @badrcptto = $self->qp->config("badrcptto") or return (DECLINED);
   return (DECLINED) unless $recipient->host && $recipient->user;
   my $host = lc $recipient->host;

@@ -121,7 +121,7 @@ sub main {
                 }
                 else {
                     $qp->log(LOGINFO, "dispatching $req");
-                    defined $qp->dispatch(split / +/, $req)
+                    defined $qp->dispatch(split / +/, $req, 2)
                         or $qp->respond(502, "command unrecognized: '$req'");
                 }
             }

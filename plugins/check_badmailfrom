@@ -21,7 +21,7 @@ stage, so store it until later.
 =cut
 
 sub hook_mail {
-  my ($self, $transaction, $sender) = @_;
+  my ($self, $transaction, $sender, %param) = @_;
 
   my @badmailfrom = $self->qp->config("badmailfrom")
     or return (DECLINED);
@@ -44,7 +44,7 @@ sub hook_mail {
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt) = @_;
+  my ($self, $transaction, $rcpt, %param) = @_;
   my $note = $transaction->notes('badmailfrom');
   if ($note) {
     $self->log(LOGINFO, $note);
