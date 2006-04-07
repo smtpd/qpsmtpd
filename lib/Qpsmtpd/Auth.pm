@@ -27,11 +27,21 @@ sub SASL {
         ( $passHash, $user, $passClear ) = split /\x0/,
           decode_base64($prekey);
 
+        unless ($user && $passClear) {
+          $session->respond(504, "Invalid authentification string");
+          return DECLINED;
+        }
     }
     elsif ($mechanism eq "login") {
 
         if ( $prekey ) {
-          ($passHash, $user, $passClear) = split /\x0/, decode_base64($prekey);
+          ( $passHash, $user, $passClear ) = split /\x0/,
+	    decode_base64($prekey);
+
+          unless ($user && $passClear) {
+            $session->respond(504, "Invalid authentification string");
+            return DECLINED;
+          }
         }
         else {
     
