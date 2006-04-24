@@ -16,7 +16,7 @@ sub SASL {
 
     # $DB::single = 1;
     my ( $session, $mechanism, $prekey ) = @_;
-    my ( $user, $passClear, $passHash, $ticket );
+    my ( $user, $passClear, $passHash, $ticket, $loginas );
     $mechanism = lc($mechanism);
 
     if ( $mechanism eq "plain" ) {
@@ -24,43 +24,36 @@ sub SASL {
           $session->respond( 334, "Please continue" );
           $prekey= <STDIN>;
         }
-        ( $passHash, $user, $passClear ) = split /\x0/,
+        ( $loginas, $user, $passClear ) = split /\x0/,
           decode_base64($prekey);
-
-        unless ($user && $passClear) {
-          $session->respond(504, "Invalid authentification string");
+          
+        # Authorization ID must not be different from
+        # Authentication ID
+        if ( $loginas ne '' && $loginas != $user ) {
+          $session->respond(535, "Authentication invalid");
           return DECLINED;
         }
     }
     elsif ($mechanism eq "login") {
 
         if ( $prekey ) {
-          ( $passHash, $user, $passClear ) = split /\x0/,
-	    decode_base64($prekey);
-
-          unless ($user && $passClear) {
-            $session->respond(504, "Invalid authentification string");
-            return DECLINED;
-          }
+          $user = decode_base64($prekey);
         }
         else {
-    
           $session->respond(334, e64("Username:"));
           $user = decode_base64(<STDIN>);
-          #warn("Debug: User: '$user'");
           if ($user eq '*') {
             $session->respond(501, "Authentification canceled");
             return DECLINED;
           }
+        }
     
-          $session->respond(334, e64("Password:"));
-          $passClear = <STDIN>;
-          $passClear = decode_base64($passClear);
-          #warn("Debug: Pass: '$pass'");
-          if ($passClear eq '*') {
-            $session->respond(501, "Authentification canceled");
-            return DECLINED;
-          }
+        $session->respond(334, e64("Password:"));
+        $passClear = <STDIN>;
+        $passClear = decode_base64($passClear);
+        if ($passClear eq '*') {
+          $session->respond(501, "Authentification canceled");
+          return DECLINED;
         }
     }
     elsif ( $mechanism eq "cram-md5" ) {
@@ -85,6 +78,12 @@ sub SASL {
     else {
         $session->respond( 500, "Unrecognized authentification mechanism" );
         return DECLINED;
+    }
+
+    # Make sure that we have enough information to proceed
+    unless ( $user && ($passClear || $passHash) ) {
+      $session->respond(504, "Invalid authentification string");
+      return DECLINED;
     }
 
     # try running the specific hooks first
