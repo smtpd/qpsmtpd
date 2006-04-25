@@ -8,7 +8,21 @@ tls - plugin to support STARTTLS
 
 # in config/plugins
 
-  tls ssl/cert.pem ssl/privkey.pem ssl/ca.pem
+tls [B<cert_path priv_key_path ca_path>]
+
+=over indentlevel
+
+=item B<cert_path>
+
+Path to the server certificate file. Default: I<ssl/qpsmtpd-server.crt>
+
+=item B<priv_key_path>
+
+Path to the private key file. Default: I<ssl/qpsmtpd-server.key>
+
+=item B<ca_path>
+
+Path to the certificate autority file. Default: I<ssl/qpsmtpd-ca.crt>
 
 =head1 DESCRIPTION
 
