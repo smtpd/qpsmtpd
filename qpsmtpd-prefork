@@ -21,6 +21,7 @@ use lib 'lib';
 use Qpsmtpd::TcpServer::Prefork;
 use Qpsmtpd::Constants;
 use Getopt::Long;
+
 #use Time::HiRes qw(gettimeofday tv_interval);
 
 # secure shell
@@ -48,41 +49,36 @@ my $d; # socket
 #default settings
 my $pid_path       = '/var/run/qpsmtpd/';
 my $PID            = $pid_path . "/qpsmtpd.pid";
-my $user           = 'qmailq';
 my $d_port         = 25;
 my $d_addr         = "0.0.0.0";
 my $debug          = 0;
 my $max_children   = 15; #max number of child processes to spawn
 my $idle_children  = 5; #number of idle child processes to spawn
-my $logFile        = '/tmp/qpsmtpd_daemon.log';
 my $maxconnip      = 10;
 my $child_lifetime = 100; #number of times a child may be reused
-my $loop_sleep     = 30; #max number of seconds main_loop sleeps before checking for busy children
-my $re_nice        = 5; #nice process (parent process is reniced with number substracted from current nice level)
+my $loop_sleep     =
+  30;  #max number of seconds main_loop sleeps before checking for busy children
+my $re_nice = 5
+  ; #nice process (parent process is reniced with number substracted from current nice level)
 my $d_start        = 0; 
 my $quiet          = 0;
 my $status         = 0;
 my $signal         = ''; 
+my $user;
 
 # help text
-sub usage
-{
+sub usage {
 	print <<"EOT";
 Usage: qpsmtpd-highperf [ options ]
---start             : Start daemon
---stop              : Kill daemon (and spawned children)
---reload            : Reload daemon (does not break current connections)
---status            : Show daemon status
 --quiet             : Be quiet (even errors are suppressed)
 --version	    : Show version information
 --debug             : Enable debug output
---debug-path path   : Path to debug file (default: $logFile)
 --interface addr    : Interface daemon should listen on (default: $d_addr)
 --port int          : TCP port daemon should listen on (default: $d_port)
 --max-from-ip int   : Limit number of connections from single IP (default: $maxconnip, 0 to disable)
 --children int      : Max number of children that can be spawned (default: $max_children)
 --idle-children int : Number of idle children to spawn (default: $idle_children, 0 to disable)
---user username     : User the daemon should run as (default: $user)
+--user username     : User the daemon should run as
 --pid-file path	    : Path to pid file
 --renice-parent int : Subtract value from parent process nice level (default: $re_nice)
 --help              : This message
@@ -92,77 +88,38 @@ EOT
 
 # get arguments
 GetOptions(
-	'start'            => \$d_start,
-	'stop'             => sub { $signal = 'TERM' },
-	'reload'           => sub { $signal = 'HUP' },
-	'status'           => \$status,
 	'quiet'            => \$quiet,
 	'version'          => sub { print "Qpsmtpd Daemon - version $VERSION\n"; exit 0; },
 	'debug'            => \$debug,
-	'debug-path=s'     => \$logFile,
 	'interface=s'      => \$d_addr,
         'port=i'     => \$d_port,
 	'max-from-ip=i'    => \$maxconnip,
 	'children=i'       => \$max_children,
 	'idle-children=i'  => \$idle_children,
 	'user=s'           => \$user,
-        'pid-file=s' => \$PID,
 	'renice-parent=i'  => \$re_nice,
 	'help'             => \&usage,
-) || &usage;
-
-# check arguments
-if ( !$d_start && !$signal && !$status ) {
-    print "Wrong aguments!\nSee qpsmtpd-highperf --help for information on options\n";
-    exit 1;
-}
+  )
+  || &usage;
 
 # misc checks
-$maxconnip = $max_children if ($maxconnip == 0); #set max from ip to max number of children if option is set to disabled
+$maxconnip = $max_children
+  if ($maxconnip == 0)
+  ;    #set max from ip to max number of children if option is set to disabled
 $maxconnip++; #to fix limit counter error in plugin <hosts_allow>
-$idle_children = $max_children if ( !$idle_children || $idle_children > $max_children || $idle_children < -1 ); #ensure that idle_children matches value given to max_children
+$idle_children = $max_children
+  if (!$idle_children || $idle_children > $max_children || $idle_children < -1)
+  ;              #ensure that idle_children matches value given to max_children
 $chld_pool = $idle_children;
 
-# show status
-if ($status) {
-	my $p = get_pid($PID);
-  if ($p) {
-    print "daemon is running (pid: $p)...\n";
-  } else {
-    print "daemon is stopped...\n";
-  }
-  exit 0;
-}
+run();
 
 #start daemon
-if ($d_start) {
-    # check if another instance is running (exit if yes)
-    my $p = get_pid($PID);
-    if ($p) {
-    	if (kill 0, $p) {
-        print "Daemon is already running (pid: $p)\n";
-        exit 1;
-      } else {
-        info("delete stale PID file <$PID> and cleanup shared memory");
-        unlink("$PID") || die "can not delete stale PID file <$PID>";
-        #check for muribund shared memory
-        my $T_shmid = `$ipcs -pm | $xargs`;
-        if ($T_shmid =~ /(\d+)\s+$user\s+$p\s+\d+$/) {
-        	my $shmid = $1;
-        	my ($semid, $shmid_key);
-        	open(SEMID, "$ipcs -sm |");
-        	while(<SEMID>) {
-        		$shmid_key = $1 if (/^(0x\w+)\s+$shmid/);
-        		$semid = $1 if ($shmid_key && /^$shmid_key\s+(\d+)/);
-        	}
-        	close(SEMID);
-          system("$ipcrm -m $shmid -s $semid");
-        }
-      }
-    }
+sub run {
 
     # get UUID/GUID
     my ( $uuid, $ugid, $group );
+    if ($user) {
     my $T_uuid  = `id -u $user`;
     my $T_ugid  = `id -g $user`;
     my $T_group = `id -n -g $user`;
@@ -176,26 +133,24 @@ if ($d_start) {
     $group = $1 if ( $T_group =~ /(\w+)/ );
     die("FATAL: unknown user <$user> or missing group information")
       if ( !$uuid || !$ugid );
-
-    # check directory structure
-    if ( $PID =~ /$pid_path/ and !-d $pid_path ) {
-        system("mkdir -p $pid_path");
-        system("chown $user.$group $pid_path");
     }
-    system "chown", "$user.$group", $logFile if ( -f "$logFile" );
 
     # create new socket (used by clients to communicate with daemon)
-    $d = new IO::Socket::INET(
+    $d =
+      new IO::Socket::INET(
         LocalPort => $d_port,
         LocalAddr => $d_addr,
         Proto     => 'tcp',
         Listen    => SOMAXCONN,
         Reuse     => 1,
     );
-    die "FATAL: Failed to start daemon.\nReason: $!\n(It may be nessesary to ".
-        "wait 20 secs before starting daemon again)\n" unless $d;
+    die "FATAL: Failed to start daemon.\nReason: $!\n(It may be nessesary to "
+      . "wait 20 secs before starting daemon again)\n"
+      unless $d;
 
-    info("qpsmtpd-highperf daemon, version: $VERSION, staring on host: $d_addr, port: $d_port (user: $user [$<])");
+    info(
+"qpsmtpd-highperf daemon, version: $VERSION, staring on host: $d_addr, port: $d_port (user: $user [$<])"
+    );
 
     #reset priority
     my $old_nice = getpriority(0, 0);
@@ -203,10 +158,13 @@ if ($d_start) {
     if ($new_nice < 20 && $new_nice > -20) {
 	    setpriority(0, 0, $1) if ( $new_nice =~ /(\-?\d+)/ );
 	    info("parent daemon nice level: $1");
-    } else {
-	    die "FATAL: new nice level: $new_nice is not between -19 and 19 (old level = $old_nice, renice value = $re_nice)";
+    }
+    else {
+        die
+"FATAL: new nice level: $new_nice is not between -19 and 19 (old level = $old_nice, renice value = $re_nice)";
     }
         
+    if ($user) {
     # change UUID/UGID
     $) = "$ugid $ugid";    # effective gid
     $( = $ugid;            # real gid
@@ -214,81 +172,12 @@ if ($d_start) {
     $< = $uuid;            # real uid. we now cannot setuid anymore
     die "FATAL: failed to setuid to user: $user, uid: $uuid\n"
       if ( $> != $uuid and $> != ( $uuid - 2**32 ) );        
-        
-    # daemonize
-    &daemonize;
+    }
 
     #setup shared memory
-    $chld_shmem = &shmem("qpsmtpd", 1);
+    $chld_shmem = shmem("qpsmtpd", 1);
     untie $chld_shmem;
     
-    #setup qpsmtpd_instance
-    $qpsmtpd = &qpmsptd_instance();
-
-    #child reaper
-    $SIG{CHLD} = \&reaper;
-    &spawn_children;
-    &main_loop;
-    exit;
-}
-
-#stop/reload daemon
-if ($signal) {
-    $SIG{TERM} = $SIG{HUP} = 'IGNORE'; #prevent signals to ourself
-    my $p = get_pid($PID);
-    if ($p) {
-    	kill $signal => $p;
-    } else {
-    	print "Unable to $signal daemon...\nQpsmtpd-highperf isn't running!\n";
-    }
-    exit;
-}
-
-#setup daemon process
-sub daemonize {
-	
-	  #redirect std filehandles to the bit bucket
-    open STDIN, "</dev/null" || die "Can't read from: /dev/null - $!\n";
-    open STDOUT, ">/dev/null" || die "Can't write to: /dev/null - $!\n";
-	
-    my $pid = fork;
-    defined($pid) or die "Can't start daemon: $!";
-
-    #if this is the shell-called process, let clients know the daemon is now running and detach
-    if ($pid) {
-
-      #write PID file
-      open( PID, "> $PID" ) || die "can't write to file <$PID> - $!";
-      print PID "$pid\n";
-      close PID;
-
-      #exit back to shell
-      exit;
-    }
-
-    #now we're a daemonized parent process!
-
-    #detach from shell, by setting session and making process group
-    POSIX::setsid();
-
-    #redirect errors (too)
-    open STDERR, '>&STDOUT' || die "Can't duplicate stdout - $!\n";
-    
-    #set pretty parent name in process listing
-    #$0 = "$0 " . "@ARGV";
-
-    # Set up signals that should be catched
-    $SIG{__WARN__} = sub {
-        info( "WARN: " . join( " ", @_ ) ) if ( !$quiet );
-    };
-
-    $SIG{__DIE__} = sub {
-    	  my $msg = join (" ", @_);
-	      chomp($msg);
-        info( "FATAL: <$msg>" ) if ( !$quiet );
-        die "FATAL: <$msg> - "
-    };
-
     $SIG{INT} = $SIG{TERM} = sub {
         # terminate daemon (and children)
         my $sig = shift;
@@ -308,17 +197,27 @@ sub daemonize {
     	info("reload daemon requested" );
     };
 
+    #setup qpsmtpd_instance
+    $qpsmtpd = qpmsptd_instance();
+
+    #child reaper
+    $SIG{CHLD} = \&reaper;
+    spawn_children();
+    main_loop();
+    exit;
 }
 
 # initialize children (only done at daemon startup)
 sub spawn_children {
+
 	  #block signals while new children are being spawned
-	  my $sigset = &block_signal(SIGCHLD);
+    my $sigset = block_signal(SIGCHLD);
     for ( 1 .. $chld_pool ) {
-        &new_child();
+        new_child();
     }
+
     #reset block signals
-    &unblock_signal($sigset);
+    unblock_signal($sigset);
 }
 
 # cleanup after child dies
@@ -329,10 +228,14 @@ sub reaper {
         my $res = WEXITSTATUS($?);
         info("child terminated, pid: $stiff (status $?, res: $res)");
         delete $children{$stiff}; #delete pid from children
-        push @stiffs, $stiff; #add pid to array so it later can be removed from shared memory
+        push @stiffs, $stiff
+          ;    #add pid to array so it later can be removed from shared memory
     }
+
     #remove connection info from shared memory
-    $chld_busy = &shmem_opt(undef, \@stiffs, undef, undef); #and get number of busy children (use by main_loop)
+    $chld_busy =
+      shmem_opt(undef, \@stiffs, undef, undef)
+      ;        #and get number of busy children (use by main_loop)
     $SIG{CHLD} = \&reaper;
 }
 
@@ -341,24 +244,32 @@ sub reaper {
 #ret0: void
 sub main_loop {
     while (1) {
+
     	  #sleep EXPR seconds or until signal (i.e. child death) is received
         my $sleept = sleep $loop_sleep;
+
         #block CHLD signals to avoid race, anyway does it matter?
-        my $sigset = &block_signal(SIGCHLD);
-        $chld_busy = &shmem_opt(undef, undef, undef, undef, 1) if ($sleept == $loop_sleep); #get number of busy children, if sleep wasn't interrupted by signal
+        my $sigset = block_signal(SIGCHLD);
+        $chld_busy = shmem_opt(undef, undef, undef, undef, 1)
+          if ($sleept == $loop_sleep)
+          ;  #get number of busy children, if sleep wasn't interrupted by signal
       	#calculate children in pool (if valid busy children number)
         if (defined($chld_busy)) {
           info("busy children: $chld_busy");
           $chld_pool = $chld_busy + $idle_children;
         }
-        $chld_pool = $max_children if ($chld_pool > $max_children); #ensure pool limit is max_children
+        $chld_pool = $max_children
+          if ($chld_pool > $max_children);    #ensure pool limit is max_children
         #spawn children
         for ( my $i = scalar (keys %children); $i < $chld_pool ; $i++ ) {
-            &new_child(); #add to the child pool
+            new_child();                     #add to the child pool
         }
-        info("children pool: $chld_pool (currently spawned: ".scalar (keys %children).")");
+        info(  "children pool: $chld_pool (currently spawned: "
+             . scalar(keys %children)
+             . ")");
+
         #unblock signals
-        &unblock_signal($sigset);
+        unblock_signal($sigset);
     }
 }
 
@@ -399,11 +310,13 @@ sub new_child {
     my $pid;
     die "Cannot fork child: $!\n" unless defined( $pid = fork );
     if ($pid) {
+
     	# in parent
     	$children{$pid} = 1;
       info("new child, pid: $pid");
       return;
     }
+
     # in child
     
     #reset priority
@@ -417,7 +330,8 @@ sub new_child {
     $SIG{CHLD} = $SIG{INT} = $SIG{TERM} = $SIG{ALRM} = 'DEFAULT';
 
     # child should exit if it receives HUP signal (note: blocked while child is busy, but restored once done)
-    $SIG{HUP} = sub {  info("signal HUP received, going to exit");
+    $SIG{HUP} = sub {
+        info("signal HUP received, going to exit");
                      	 exit 1;
                     };
                     
@@ -426,25 +340,30 @@ sub new_child {
   
       # accept a connection
       $0 = 'qpsmtpd child'; # set pretty child name in process listing
-      my ($client, $iinfo) = $d->accept() or die "failed to create new object - $!"; # wait here until client connects
+        my ($client, $iinfo) = $d->accept()
+          or die
+          "failed to create new object - $!";  # wait here until client connects
       info("connect from: " . $client->peerhost . ":" . $client->peerport );
     
       # set STDIN/STDOUT and autoflush
-      POSIX::dup2(fileno($client), 0) || die "unable to duplicate filehandle to STDIN - $!";
-      POSIX::dup2(fileno($client), 1) || die "unable to duplicate filehandle to STDOUT - $!";
+        POSIX::dup2(fileno($client), 0)
+          || die "unable to duplicate filehandle to STDIN - $!";
+        POSIX::dup2(fileno($client), 1)
+          || die "unable to duplicate filehandle to STDOUT - $!";
       $| = 1;
 
       #connection recieved, block signals
-      my $sigset = &block_signal(SIGHUP);
+        my $sigset = block_signal(SIGHUP);
       	      	
     	#start new qpsmtpd session
-    	&qpsmtpd_session($client, $qpsmtpd) if ($iinfo); #only start a session if connection looks valid
+        qpsmtpd_session($client, $qpsmtpd)
+          if ($iinfo);    #only start a session if connection looks valid
     	
     	#close connection and cleanup
       $client->shutdown(2);
       
       #unset block and receive pending signals
-      &unblock_signal($sigset);
+        unblock_signal($sigset);
 
     }
     exit;    # this child has reached its end-of-life
@@ -462,30 +381,15 @@ sub respond_client {
     my $line = $code . (@message?"-":" ").$msg;
     info("reply to client: <$line>");
     print $client "$line\r\n" 
-      or (&info("Could not print [$line]: $!"), return 0);
+          or (info("Could not print [$line]: $!"), return 0);
   }
   return 1;
-}
-
-#get_pid: get pid of running qpsmtpd-highperf process
-#arg0: str with path to pid file
-#ret0: int with pid (undef if process isn't running or unable to get pid from file)
-sub get_pid {
-  my $pid_path = shift; #arg0
-  
-  open(PID, "<$pid_path") || return;
-  my $p = <PID>;
-  close(PID);
-  $p = $1 if ($p =~ /^(\d+)$/);	
-  
-  return($p);
 }
 
 #qpsmtpd_instance: setup qpsmtpd instance
 #arg0: void
 #ret0: ref to qpsmtpd_instance
 sub qpmsptd_instance {
-	
     my $qpsmtpd = Qpsmtpd::TcpServer::Prefork->new();
     $qpsmtpd->load_plugins;
     $qpsmtpd->spool_dir;
@@ -511,7 +415,8 @@ sub shmem {
 	
 	my %shmem_hash;
 	eval {
-	  tie %shmem_hash, 'IPC::Shareable', $glue, { %options } || die "unable to tie to shared memory - $!";
+        tie %shmem_hash, 'IPC::Shareable', $glue,
+          {%options} || die "unable to tie to shared memory - $!";
 	};
 	if ($@) {
 		info("$@");
@@ -536,15 +441,19 @@ sub shmem_opt {
 	my $check         = shift || 0; #arg4
 	
 	#check arguments
-	return if ( (defined($pid_add_key) && !defined($pid_add_value)) || (!defined($pid_add_key) && defined($pid_add_value)) );
+    return
+      if (   (defined($pid_add_key) && !defined($pid_add_value))
+          || (!defined($pid_add_key) && defined($pid_add_value)));
 	
 	my ($chld_shmem, $chld_busy);
 	eval {
   	$chld_shmem = &shmem("qpsmtpd", 0); #connect to shared memory hash
   	
     if (tied %{$chld_shmem}) {
+
     	#perform options
       (tied %{$chld_shmem})->shlock(LOCK_EX);
+
       #delete
       if ($ref_pid_del) {
         foreach my $pid_del (@{$ref_pid_del}) {
@@ -558,16 +467,21 @@ sub shmem_opt {
       	foreach my $pid (keys %{$chld_shmem}) {
       		if (! kill 0, $pid) {
       			delete $$chld_shmem{$pid};
-      			warn("orphaned child, pid: $pid - removed from shared memory");
+                        warn(
+"orphaned child, pid: $pid - removed from shared memory");
       		}
       	}
       }
+
       #count number of busy children
       $chld_busy = scalar(keys %{$chld_shmem});
       (tied %{$chld_shmem})->shunlock;
-      untie $chld_shmem || die "unable to untie from shared memory"; #untie from shared memory
+            untie $chld_shmem
+              || die
+              "unable to untie from shared memory";    #untie from shared memory
     }
   };
+
   #check for error
   if ($@) {
   	undef($chld_busy);
@@ -588,7 +502,7 @@ sub info {
       $year + 1900, $hour, $min, $sec;
 
     chomp($text);
-    system("echo \"$nowtime:$$: $text\" >> $logFile");
+    print STDERR "$nowtime:$$: $text\n";
 }
 
 #start qpmstpd session
@@ -605,9 +519,11 @@ sub qpsmtpd_session {
 
     #get current connected ip addresses (from shared memory)
     my %children;
-    &shmem_opt(\%children, undef, $$, $iaddr);
+    shmem_opt(\%children, undef, $$, $iaddr);
     
-    my ($rc, @msg) = $qpsmtpd->run_hooks("pre-connection",
+    my ($rc, @msg) =
+      $qpsmtpd->run_hooks(
+                          "pre-connection",
                                          remote_ip    => inet_ntoa($iaddr),
                                          remote_port  => $port,
                                          local_ip     => inet_ntoa($laddr),
@@ -615,18 +531,24 @@ sub qpsmtpd_session {
                                          max_conn_ip  => $maxconnip,
                                          child_addrs  => [values %children],
                                         );
-    if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT || $rc == DENY || $rc == DENY_DISCONNECT ) {
-    	my $rc_reply = 451; #smtp return code to reply client with (seed with soft deny)
+    if (   $rc == DENYSOFT
+        || $rc == DENYSOFT_DISCONNECT
+        || $rc == DENY
+        || $rc == DENY_DISCONNECT)
+    {
+        my $rc_reply =
+          451;    #smtp return code to reply client with (seed with soft deny)
       unless ($msg[0]) {
       	if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
           @msg = ("Sorry, try again later");
-        } else {
+            }
+            else {
         	@msg = ("Sorry, service not available to you");
         	$rc_reply = 550;
         }
       }
-      &respond_client($client, $rc_reply, @msg);
-      &shmem_opt(undef, [$$], undef, undef); #remove pid from shared memory
+        respond_client($client, $rc_reply, @msg);
+        shmem_opt(undef, [$$], undef, undef);    #remove pid from shared memory
       return; #retur so child can be reused
     }
     
@@ -636,7 +558,7 @@ sub qpsmtpd_session {
 #   $SIG{$_} = 'DEFAULT' for keys %SIG;
     $SIG{ALRM} = sub { 
                       print $client "421 Connection Timed Out\n";
-                      &info("Connection Timed Out"); 
+        info("Connection Timed Out");
                       exit 1; #this will kill the child, but who cares?
                      };
   
@@ -662,8 +584,9 @@ sub qpsmtpd_session {
     }
 
     #done - this child is now idle again
-    &shmem_opt(undef, [$$], undef, undef); #remove pid from shared memory
+    shmem_opt(undef, [$$], undef, undef);    #remove pid from shared memory
     
     info("remote host: $ENV{TCPREMOTEIP} left...");
 
 }
+
