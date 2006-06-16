@@ -1,5 +1,8 @@
 0.33
 
+  Fix "help" command when there's no "smtpgreeting" configured (the default)
+  (Thanks to Thomas Ogrisegg)
+
   Move the Qpsmtpd::Auth POD to a top-level README to be more obvious.
 
   Add Qpsmtpd::Command to gather all parsing logic in one place (Hanno

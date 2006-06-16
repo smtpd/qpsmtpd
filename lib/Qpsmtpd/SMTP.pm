@@ -417,7 +417,7 @@ sub help {
   my $self = shift;
   $self->respond(214, 
           "This is qpsmtpd " . 
-          $self->config('smtpgreeting') ? '' : $self->version,
+          ($self->config('smtpgreeting') ? '' : $self->version),
           "See http://smtpd.develooper.com/",
           'To report bugs or send comments, mail to <ask@develooper.com>.');
 }
