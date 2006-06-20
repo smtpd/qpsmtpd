@@ -273,6 +273,8 @@ sub close {
 
 package Danga::DNS::Resolver::Query;
 
+use fields qw( resolver asker host type timeout id data repeat ns nqueries );
+
 use constant MAX_QUERIES => 10;
 
 sub trace {
@@ -281,24 +283,14 @@ sub trace {
 }
 
 sub new {
-    my ($class, $res, $asker, $host, $type, $now, $id, $data) = @_;
+    my Danga::DNS::Resolver::Query $self = shift;
+    $self = fields::new($self) unless ref $self;
     
-    my $self = {
-        resolver    => $res,
-        asker       => $asker,
-        host        => $host,
-        type        => $type,
-        timeout     => $now,
-        id          => $id,
-        data        => $data,
-        repeat      => 2, # number of retries
-        ns          => 0,
-        nqueries    => 0,
-    };
+    @$self{qw( resolver asker host type timeout id data )} = @_;
+    # repeat is number of retries
+    @$self{qw( repeat ns nqueries )} = (2,0,0);
     
-    trace(2, "NS Query: $host ($id)\n");
-
-    bless $self, $class;
+    trace(2, "NS Query: $self->{host} ($self->{id})\n");
     
     $self->send_query || return;
     
