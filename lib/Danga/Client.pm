@@ -2,7 +2,7 @@
 
 package Danga::Client;
 use base 'Danga::TimeoutSocket';
-use fields qw(line closing disable_read can_read_mode);
+use fields qw(line pause_count);
 use Time::HiRes ();
 
 # 30 seconds max timeout!
@@ -21,68 +21,14 @@ sub new {
 sub reset_for_next_message {
     my Danga::Client $self = shift;
     $self->{line} = '';
-    $self->{disable_read} = 0;
-    $self->{can_read_mode} = 0;
+    $self->{pause_count} = 0;
     return $self;
-}
-
-sub get_line {
-    my Danga::Client $self = shift;
-    if (!$self->have_line) {
-        $self->SetPostLoopCallback(sub { $self->have_line ? 0 : 1 });
-        #warn("get_line PRE\n");
-        $self->EventLoop();
-        #warn("get_line POST\n");
-        $self->disable_read();
-    }
-    return if $self->{closing};
-    # now have a line.
-    $self->{alive_time} = time;
-    $self->{line} =~ s/^(.*?\n)//;
-    return $1;
-}
-
-sub can_read {
-    my Danga::Client $self = shift;
-    my ($timeout) = @_;
-    my $end = Time::HiRes::time() + $timeout;
-    # warn("Calling can-read\n");
-    $self->{can_read_mode} = 1;
-    if (!length($self->{line})) {
-        $self->disable_read();
-        # loop because any callback, not just ours, can make EventLoop return
-        while( !(length($self->{line}) || (Time::HiRes::time > $end)) ) {
-            $self->SetPostLoopCallback(sub { (length($self->{line}) || 
-                                             (Time::HiRes::time > $end)) ? 0 : 1 });
-            #warn("get_line PRE\n");
-            $self->EventLoop();
-            #warn("get_line POST\n");
-        }
-        $self->enable_read();
-    }
-    $self->{can_read_mode} = 0;
-    $self->SetPostLoopCallback(undef);
-    return if $self->{closing};
-    $self->{alive_time} = time;
-    # warn("can_read returning for '$self->{line}'\n");
-    return 1 if length($self->{line});
-    return;
-}
-
-sub have_line {
-    my Danga::Client $self = shift;
-    return 1 if $self->{closing};
-    if ($self->{line} =~ /\n/) {
-        return 1;
-    }
-    return 0;
 }
 
 sub event_read {
     my Danga::Client $self = shift;
     my $bref = $self->read(8192);
     return $self->close($!) unless defined $bref;
-    # $self->watch_read(0);
     $self->process_read_buf($bref);
 }
 
@@ -90,8 +36,7 @@ sub process_read_buf {
     my Danga::Client $self = shift;
     my $bref = shift;
     $self->{line} .= $$bref;
-    return if ! $self->readable();
-    return if $::LineMode;
+    return if $self->paused();
     
     while ($self->{line} =~ s/^(.*?\n)//) {
         my $line = $1;
@@ -99,34 +44,40 @@ sub process_read_buf {
         my $resp = $self->process_line($line);
         if ($::DEBUG > 1 and $resp) { print "$$:".($self+0)."S: $_\n" for split(/\n/, $resp) }
         $self->write($resp) if $resp;
-        $self->watch_read(0) if $self->{disable_read};
-        last if ! $self->readable();
-    }
-    if($self->have_line) {
-        $self->shift_back_read($self->{line});
-        $self->{line} = '';
+        # $self->watch_read(0) if $self->{pause_count};
+        last if $self->paused();
     }
 }
 
-sub readable {
+sub has_data {
     my Danga::Client $self = shift;
-    return 0 if $self->{disable_read} > 0;
-    return 0 if $self->{closed} > 0;
-    return 1;
+    return length($self->{line}) ? 1 : 0;
 }
 
-sub disable_read {
+sub clear_data {
     my Danga::Client $self = shift;
-    $self->{disable_read}++;
-    $self->watch_read(0);
+    $self->{line} = '';
 }
 
-sub enable_read {
+sub paused {
     my Danga::Client $self = shift;
-    $self->{disable_read}--;
-    if ($self->{disable_read} <= 0) {
-        $self->{disable_read} = 0;
-        $self->watch_read(1);
+    return 1 if $self->{pause_count};
+    return 1 if $self->{closed};
+    return 0;
+}
+
+sub pause_read {
+    my Danga::Client $self = shift;
+    $self->{pause_count}++;
+    # $self->watch_read(0);
+}
+
+sub continue_read {
+    my Danga::Client $self = shift;
+    $self->{pause_count}--;
+    if ($self->{pause_count} <= 0) {
+        $self->{pause_count} = 0;
+        # $self->watch_read(1);
     }
 }
 
@@ -137,7 +88,6 @@ sub process_line {
 
 sub close {
     my Danga::Client $self = shift;
-    $self->{closing} = 1;
     print "closing @_\n" if $::DEBUG;
     $self->SUPER::close(@_);
 }

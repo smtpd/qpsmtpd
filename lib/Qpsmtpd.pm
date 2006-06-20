@@ -337,7 +337,7 @@ sub run_hooks {
       @r = $self->run_hook($hook, $code, @_);
       next unless @r;
       if ($r[0] == CONTINUATION) {
-        $self->disable_read() if $self->isa('Danga::Client');
+        $self->pause_read() if $self->isa('Danga::Client');
         $self->{_continuation} = [$hook, [@_], @local_hooks];
       }
       last unless $r[0] == DECLINED;
@@ -351,7 +351,7 @@ sub run_hooks {
 sub finish_continuation {
   my ($self) = @_;
   die "No continuation in progress" unless $self->{_continuation};
-  $self->enable_read() if $self->isa('Danga::Client');
+  $self->continue_read() if $self->isa('Danga::Client');
   my $todo = $self->{_continuation};
   $self->{_continuation} = undef;
   my $hook = shift @$todo || die "No hook in the continuation";
@@ -361,7 +361,7 @@ sub finish_continuation {
     my $code = shift @$todo;
     @r = $self->run_hook($hook, $code, @$args);
     if ($r[0] == CONTINUATION) {
-      $self->disable_read() if $self->isa('Danga::Client');
+      $self->pause_read() if $self->isa('Danga::Client');
       $self->{_continuation} = [$hook, $args, @$todo];
       return @r;
     }

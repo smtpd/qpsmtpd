@@ -44,6 +44,15 @@ issued a deny or denysoft (depending on the value of I<action>).  The default
 is to react at the SMTP greeting stage by issuing the apropriate response code
 and terminating the SMTP connection.
 
+=item check-at [string: connect, data]
+
+Defines when to check for early talkers, either at connect time (pre-greet pause)
+or at DATA time (pause before sending "354 go ahead").
+
+The default is I<connect>.
+
+Note that defer-reject has no meaning if check-at is I<data>.
+
 =back
 
 =cut
@@ -61,23 +70,27 @@ sub register {
   	'wait' => 1,
 	'action' => 'denysoft',
 	'defer-reject' => 0,
+	'check-at' => 'connect',
 	@args,
   };
+  print STDERR "Check at: ", $self->{_args}{'check-at'}, "\n";
   if ($qp->isa('Qpsmtpd::Apache')) {
       require APR::Const;
       APR::Const->import(qw(POLLIN SUCCESS));
-      $self->register_hook('connect', 'hook_connect_apr');
+      $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_apr');
   }
   else {
-      $self->register_hook('connect', 'hook_connect');
+      $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_poll');
   }
-  $self->register_hook('connect', 'hook_connect_post');
-  $self->register_hook('mail', 'hook_mail')
-    if $self->{_args}->{'defer-reject'};
+  $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_post');
+  if ($self->{_args}{'check-at'} eq 'connect') {
+    $self->register_hook('mail', 'hook_mail')
+      if $self->{_args}->{'defer-reject'};
+  }
   1;
 }
 
-sub hook_connect_apr {
+sub check_talker_apr {
     my ($self, $transaction) = @_;
     
     return DECLINED if ($self->qp->connection->notes('whitelistclient'));
@@ -104,29 +117,27 @@ sub hook_connect_apr {
     return DECLINED;
 }
 
-sub hook_connect {
+sub check_talker_poll {
   my ($self, $transaction) = @_;
   
   my $qp = $self->qp;
   my $conn = $qp->connection;
-  $qp->AddTimer($self->{_args}{'wait'}, sub { read_now($qp, $conn) });
+  $qp->AddTimer($self->{_args}{'wait'}, sub { read_now($qp, $conn, $self->{_args}{'check-at'}) });
   return CONTINUATION;
 }
 
 sub read_now {
-  my ($qp, $conn) = @_;
+  my ($qp, $conn, $phase) = @_;
   
-  if (my $data = $qp->read(1024)) {
-    if (length($$data)) {
+  if ($qp->has_data) {
       $qp->log(LOGNOTICE, 'remote host started talking before we said hello');
-      $qp->push_back_read($data);
+      $qp->clear_data if $phase eq 'data';
       $conn->notes('earlytalker', 1);
-    }
   }
   $qp->finish_continuation;
 }
 
-sub hook_connect_post {
+sub check_talker_post {
   my ($self, $transaction) = @_;
   
   my $conn = $self->qp->connection;

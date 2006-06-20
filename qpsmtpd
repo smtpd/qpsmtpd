@@ -35,7 +35,6 @@ my $CONFIG_LOCALADDR = '127.0.0.1';
 
 my $PORT        = 2525;
 my $LOCALADDR   = '0.0.0.0';
-my $LineMode    = 0;
 my $PROCS       = 1;
 my $MAXCONN     = 15;           # max simultaneous connections
 my $USER        = 'smtpd';      # user to suid to
@@ -54,7 +53,6 @@ Options:
  -c, --limit-connections N : limit concurrent connections to N; default 15
  -u, --user U              : run as a particular user; defualt 'smtpd'
  -m, --max-from-ip M       : limit connections from a single IP; default 5
- -f, --forkmode            : fork a child for each connection
  -j, --procs J             : spawn J processes; default 1
  -a, --accept K            : accept up to K conns per loop; default 20
  -h, --help                : this page
@@ -73,7 +71,6 @@ GetOptions(
     'l|listen-address=s'    => \$LOCALADDR,
     'j|procs=i'             => \$PROCS,
     'd|debug+'              => \$DEBUG,
-    'f|forkmode'            => \$LineMode,
     'c|limit-connections=i' => \$MAXCONN,
     'm|max-from-ip=i'       => \$MAXCONNIP,
     'u|user=s'              => \$USER,
@@ -90,8 +87,6 @@ if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &help }
 if ($PROCS =~ /^(\d+)$/) { $PROCS = $1 } else { &help }
 if ($NUMACCEPT =~ /^(\d+)$/) { $NUMACCEPT = $1 } else { &help }
 my $_NUMACCEPT = $NUMACCEPT;
-$::LineMode = $LineMode;
-$PROCS = 1 if $LineMode;
 # This is a bit of a hack, but we get to approximate MAXCONN stuff when we
 # have multiple children listening on the same socket.
 $MAXCONN /= $PROCS;
@@ -102,19 +97,13 @@ sub force_poll {
     $Danga::Socket::HaveKQueue = 0;
 }
 
-Danga::Socket::init_poller();
+# Danga::Socket::init_poller();
 
 my $POLL = "with " . ($Danga::Socket::HaveEpoll ? "epoll()" : 
                     $Danga::Socket::HaveKQueue ? "kqueue()" : "poll()");
 
 my $SERVER;
 my $CONFIG_SERVER;
-
-# Code for inetd/tcpserver mode
-if ($ENV{REMOTE_HOST} or $ENV{TCPREMOTEHOST}) {
-    run_as_inetd();
-    exit(0);
-}
 
 my %childstatus = ();
 
@@ -165,8 +154,7 @@ sub sig_chld {
         print "child $child died\n";
         delete $childstatus{$child};
     }
-    return if $LineMode;
-    # restart a new child if in poll server mode
+    # restart a new child (assuming this one died)
     spawn_child();
     $SIG{CHLD} = \&sig_chld;
 }
@@ -175,33 +163,6 @@ sub HUNTSMAN {
   $SIG{CHLD} = 'DEFAULT';
   kill 'INT' => keys %childstatus;
   exit(0);
-}
-
-sub run_as_inetd {
-    $LineMode = $::LineMode = 1;
-    
-    my $insock = IO::Handle->new_from_fd(0, "r");
-    IO::Handle::blocking($insock, 0);
-
-    my $outsock = IO::Handle->new_from_fd(1, "w");
-    IO::Handle::blocking($outsock, 0);
-
-    my $client = Danga::Client->new($insock);
-
-    my $out = Qpsmtpd::PollServer->new($outsock);
-    $out->load_plugins;
-    $out->input_sock($client);
-    $client->push_back_read("Connect\n");
-    # Cause poll/kevent/epoll to end quickly in first iteration
-    Qpsmtpd::PollServer->AddTimer(1, sub { });
-    
-    while (1) {
-        $client->enable_read;
-        my $line = $client->get_line;
-        last if !defined($line);
-        my $output = $out->process_line($line);
-        $out->write($output) if $output;
-    }
 }
 
 sub run_as_server {
@@ -261,11 +222,7 @@ sub run_as_server {
         sleep while (1);
     }
     else {
-        if ($LineMode) {
-            $SIG{INT} = $SIG{TERM} = \&HUNTSMAN;
-        }
-        $plugin_loader->log(LOGDEBUG, "Listening on $PORT with single process $POLL" .
-            ($LineMode ? " (forking server)" : ""));
+        $plugin_loader->log(LOGDEBUG, "Listening on $PORT with single process $POLL");
         Qpsmtpd::PollServer->OtherFds(fileno($SERVER) => \&accept_handler,
                                       fileno($CONFIG_SERVER) => \&config_handler,
                                       );
@@ -298,13 +255,8 @@ sub config_handler {
 # Accept all new connections
 sub accept_handler {
     my $running;
-    if( $LineMode ) {
-        $running = scalar keys %childstatus;
-    }
-    else {
-        my $descriptors = Danga::Client->DescriptorMap;
-        $running = scalar keys %$descriptors;
-    }
+    my $descriptors = Danga::Client->DescriptorMap;
+    $running = scalar keys %$descriptors;
     
     for (1 .. $NUMACCEPT) {
         if ($running >= $MAXCONN) { 
@@ -349,93 +301,43 @@ sub _accept_handler {
     IO::Handle::blocking($csock, 0);
     setsockopt($csock, IPPROTO_TCP, TCP_NODELAY, pack("l", 1)) or die;
 
-    if (!$LineMode) {
-        # multiplex mode
-        my $client = Qpsmtpd::PollServer->new($csock);
-        my $rem_ip = $client->peer_ip_string;
-        
-        if ($PAUSED) {
-            $client->write("451 Sorry, this server is currently paused\r\n");
-            $client->close;
-            return 1;
-        }
-        
-        if ($MAXCONNIP) {
-            my $num_conn = 1; # seed with current value
+    # multiplex mode
+    my $client = Qpsmtpd::PollServer->new($csock);
+    my $rem_ip = $client->peer_ip_string;
     
-            # If we for-loop directly over values %childstatus, a SIGCHLD
-            # can call REAPER and slip $rip out from under us.  Causes
-            # "Use of freed value in iteration" under perl 5.8.4.
-            my $descriptors = Danga::Client->DescriptorMap;
-            my @obj = values %$descriptors;
-            foreach my $obj (@obj) {
-                local $^W;
-                # This is a bit of a slow way to do this. Wish I could cache the method call.
-                ++$num_conn if ($obj->peer_ip_string eq $rem_ip);
-            }
-            
-            if ($num_conn > $MAXCONNIP) {
-                $client->log(LOGINFO,"Too many connections from $rem_ip: "
-                             ."$num_conn > $MAXCONNIP. Denying connection.");
-                $client->write("451 Sorry, too many connections from $rem_ip, try again later\r\n");
-                $client->close;
-                return 1;
-            }
-            $client->log(LOGINFO, "accepted connection $running/$MAXCONN ($num_conn/$MAXCONNIP) from $rem_ip");
-        }
-        
-        $client->push_back_read("Connect\n");
-        $client->watch_read(1);
+    if ($PAUSED) {
+        $client->write("451 Sorry, this server is currently paused\r\n");
+        $client->close;
         return 1;
     }
-
-    # fork-per-connection mode
-    my $rem_ip = $csock->sockhost();
     
     if ($MAXCONNIP) {
         my $num_conn = 1; # seed with current value
 
-        my @rip = values %childstatus;
-        foreach my $rip (@rip) {
-          ++$num_conn if (defined $rip && $rip eq $rem_ip);
+        # If we for-loop directly over values %childstatus, a SIGCHLD
+        # can call REAPER and slip $rip out from under us.  Causes
+        # "Use of freed value in iteration" under perl 5.8.4.
+        my $descriptors = Danga::Client->DescriptorMap;
+        my @obj = values %$descriptors;
+        foreach my $obj (@obj) {
+            local $^W;
+            # This is a bit of a slow way to do this. Wish I could cache the method call.
+            ++$num_conn if ($obj->peer_ip_string eq $rem_ip);
         }
         
         if ($num_conn > $MAXCONNIP) {
-            ::log(LOGINFO,"Too many connections from $rem_ip: "
+            $client->log(LOGINFO,"Too many connections from $rem_ip: "
                          ."$num_conn > $MAXCONNIP. Denying connection.");
-            print $csock "451 Sorry, too many connections from $rem_ip, try again later\r\n";
-            close $csock;
+            $client->write("451 Sorry, too many connections from $rem_ip, try again later\r\n");
+            $client->close;
             return 1;
         }
+        $client->log(LOGINFO, "accepted connection $running/$MAXCONN ($num_conn/$MAXCONNIP) from $rem_ip");
     }
     
-    if (my $pid = _fork) {
-        $childstatus{$pid} = $rem_ip;
-        return $csock->close();
-    }
-
-    $SERVER->close(); # make sure the child doesn't accept() new connections
-    
-    $SIG{$_} = 'DEFAULT' for keys %SIG;
-    
-    my $client = Qpsmtpd::PollServer->new($csock);
     $client->push_back_read("Connect\n");
-    # Cause poll/kevent/epoll to end quickly in first iteration
-    Qpsmtpd::PollServer->AddTimer(0.1, sub { });
-    
-    while (1) {
-        $client->enable_read;
-        my $line = $client->get_line;
-        last if !defined($line);
-        my $resp = $client->process_line($line);
-        $client->write($resp) if $resp;
-    }
-
-    $client->log(LOGDEBUG, "Finished with child %d.\n", fileno($csock))
-        if $DEBUG;
-    $client->close();
-
-    exit;
+    $client->watch_read(1);
+    return 1;
 }
 
 ########################################################################

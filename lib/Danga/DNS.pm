@@ -25,7 +25,7 @@ sub new {
     $resolver ||= Danga::DNS::Resolver->new();
     
     my $client = $options{client};
-    $client->disable_read if $client;
+    $client->pause_read() if $client;
     
     $self = fields::new($self) unless ref $self;
 
@@ -40,13 +40,13 @@ sub new {
     if ($options{type}) {
         if ( ($options{type} eq 'A') || ($options{type} eq 'PTR') ) {
             if (!$resolver->query($self, @{$self->{hosts}})) {
-                $client->enable_read() if $client;
+                $client->continue_read() if $client;
                 return;
             }
         }
         else {
             if (!$resolver->query_type($self, $options{type}, @{$self->{hosts}})) {
-                $client->enable_read() if $client;
+                $client->continue_read() if $client;
                 return;
             }
             # die "Unsupported DNS query type: $options{type}";
@@ -54,7 +54,7 @@ sub new {
     }
     else {
         if (!$resolver->query($self, @{$self->{hosts}})) {
-            $client->enable_read() if $client;
+            $client->continue_read() if $client;
             return;
         }
     }
@@ -84,7 +84,7 @@ sub DESTROY {
             $self->{callback}->("NXDOMAIN", $host);
         }
     }
-    $self->{client}->enable_read if $self->{client};
+    $self->{client}->continue_read() if $self->{client};
     if ($self->{finished}) {
         $self->{finished}->();
     }
