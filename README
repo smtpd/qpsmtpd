@@ -176,6 +176,11 @@ smtpd uses during the data transactions. If this file doesnt exist, it
 will default to use $ENV{HOME}/tmp/. This directory should be set with
 a mode of 700 and owned by the smtpd user.
 
+=item tls_before_auth
+
+If this file contains anything except a 0 on the first noncomment line, then 
+AUTH will not be offered unless TLS/SSL are in place, either with STARTTLS, 
+or SMTP-SSL on port 465.
 
 =item everything (?) that qmail-smtpd supports. 
 

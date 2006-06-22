@@ -1,5 +1,9 @@
 0.33
 
+  Add SSL encryption method to header to mirror other qmail/SSL patches.
+  Add tls_before_auth to suppress AUTH unless TLS has already been 
+  established (Robin Johnson).
+
   Fix "help" command when there's no "smtpgreeting" configured (the default)
   (Thanks to Thomas Ogrisegg)
 

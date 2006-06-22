@@ -219,7 +219,9 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
         }
     }
 
-    if ( %auth_mechanisms ) {
+    # Check if we should only offer AUTH after TLS is completed
+    my $tls_before_auth = ($self->config('tls_before_auth') ? ($self->config('tls_before_auth'))[0] && $self->transaction->notes('tls_enabled') : 0); 
+    if ( %auth_mechanisms && !$tls_before_auth) {
         push @capabilities, 'AUTH '.join(" ",keys(%auth_mechanisms));    
         $self->{_commands}->{'auth'} = "";
     }
@@ -248,6 +250,9 @@ sub auth {
         and $self->{_auth} == OK );
     return $self->respond( 503, "AUTH not defined for HELO" )
       if ( $self->connection->hello eq "helo" );
+    return $self->respond( 503, "SSL/TLS required before AUTH" )
+      if ( ($self->config('tls_before_auth'))[0] 
+      	and $self->transaction->notes('tls_enabled') );
 
     return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $arg, @stuff );
 }
@@ -584,13 +589,15 @@ sub data {
   $self->transaction->header($header);
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
+  my $sslheader = (defined $self->connection->notes('tls_enabled') and $self->connection->notes('tls_enabled')) ? 
+    "(".$self->connection->notes('tls_socket')->get_cipher()." encrypted) " : "";
   my $authheader = (defined $self->{_auth} and $self->{_auth} == OK) ?
     "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n" : "";
 
   $header->add("Received", "from ".$self->connection->remote_info
                ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
                . ")\n  $authheader  by ".$self->config('me')." (qpsmtpd/".$self->version
-               .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
+               .") with $sslheader$smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
                0);
 
   # if we get here without seeing a terminator, the connection is
