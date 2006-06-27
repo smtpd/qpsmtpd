@@ -155,7 +155,7 @@ sub cmd_status {
     
     my $output = "Current Status as of " . gmtime() . " GMT\n\n";
     
-    if (defined &Qpsmtpd::Plugin::stats::register) {
+    if (defined &Qpsmtpd::Plugin::stats::get_stats) {
         # Stats plugin is loaded
         $output .= Qpsmtpd::Plugin::stats->get_stats;
     }
