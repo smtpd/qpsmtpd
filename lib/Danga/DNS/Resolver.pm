@@ -303,7 +303,7 @@ sub new {
 #}
 
 sub timeout {
-    my $self = shift;
+    my Danga::DNS::Resolver::Query $self = shift;
     
     trace(2, "NS Query timeout. Trying next host\n");
     if ($self->send_query) {
@@ -329,7 +329,8 @@ sub timeout {
 }
 
 sub error {
-    my ($self, $error) = @_;
+    my Danga::DNS::Resolver::Query $self = shift;
+    my ($error) = @_;
     
     trace(2, "NS Query error. Trying next host\n");
     if ($self->send_query) {
@@ -355,13 +356,13 @@ sub error {
 }
 
 sub run_callback {
-    my ($self, $response) = @_;
-    trace(2, "NS Query callback($self->{host} = $response\n");
-    $self->{asker}->run_callback($response, $self->{host});
+    my Danga::DNS::Resolver::Query $self = shift;
+    trace(2, "NS Query callback($self->{host} = $_[0]\n");
+    $self->{asker}->run_callback($_[0], $self->{host});
 }
 
 sub send_query {
-    my ($self) = @_;
+    my Danga::DNS::Resolver::Query $self = shift;
     
     my $dst = $self->{resolver}->ns($self->{ns}++);
     return unless defined $dst;
