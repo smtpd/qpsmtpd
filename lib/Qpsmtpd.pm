@@ -260,31 +260,49 @@ sub _load_plugins {
   my @ret;  
   for my $plugin_line (@plugins) {
     my ($plugin, @args) = split ' ', $plugin_line;
-    
-    my $plugin_name = $plugin;
-    $plugin =~ s/:\d+$//;       # after this point, only used for filename
 
-    # Escape everything into valid perl identifiers
-    $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
+    my $package;
 
-    # second pass cares for slashes and words starting with a digit
-    $plugin_name =~ s{
+    if ($plugin =~ m/::/) {
+      # "full" package plugin (My::Plugin)
+      $package = $plugin;
+      $package =~ s/[^_a-z0-9:]+//gi;
+      my $eval = qq[require $package;\n] 
+                .qq[sub ${plugin}::plugin_name { '$plugin' }];
+      $eval =~ m/(.*)/s;
+      $eval = $1;
+      eval $eval;
+      die "Failed loading $package - eval $@" if $@;
+      $self->log(LOGDEBUG, "Loading $package ($plugin_line)") 
+        unless $plugin_line =~ /logging/;
+    }
+    else {
+      # regular plugins/$plugin plugin
+      my $plugin_name = $plugin;
+      $plugin =~ s/:\d+$//;       # after this point, only used for filename
+
+      # Escape everything into valid perl identifiers
+      $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
+      
+      # second pass cares for slashes and words starting with a digit
+      $plugin_name =~ s{
 		      (/+)       # directory
 		      (\d?)      # package's first character
 		     }[
 		       "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
 		      ]egx;
-
-    my $package = "Qpsmtpd::Plugin::$plugin_name";
-
-    # don't reload plugins if they are already loaded
-    unless ( defined &{"${package}::plugin_name"} ) {
-      Qpsmtpd::Plugin->compile($plugin_name,
+      
+      $package = "Qpsmtpd::Plugin::$plugin_name";
+      
+      # don't reload plugins if they are already loaded
+      unless ( defined &{"${package}::plugin_name"} ) {
+        Qpsmtpd::Plugin->compile($plugin_name,
         $package, "$dir/$plugin", $self->{_test_mode});
-      $self->log(LOGDEBUG, "Loading $plugin_line") 
-        unless $plugin_line =~ /logging/;
+        $self->log(LOGDEBUG, "Loading $plugin_line") 
+          unless $plugin_line =~ /logging/;
+      }
     }
-    
+
     my $plug = $package->new();
     push @ret, $plug;
     $plug->_register($self, @args);

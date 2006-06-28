@@ -19,6 +19,10 @@ sub new {
   bless ({}, $class);
 }
 
+sub hook_name { 
+  return shift->{_hook};
+}
+
 sub register_hook {
   my ($plugin, $hook, $method, $unshift) = @_;
 
@@ -29,11 +33,16 @@ sub register_hook {
 
   # I can't quite decide if it's better to parse this code ref or if
   # we should pass the plugin object and method name ... hmn.
-  $plugin->qp->_register_hook($hook, { code => sub { local $plugin->{_qp} = shift; local $plugin->{_hook} = $hook; $plugin->$method(@_) },
-				       name => $plugin->plugin_name,
-				     },
-				     $unshift,
-			     );
+  $plugin->qp->_register_hook
+    ($hook,
+     { code => sub { local $plugin->{_qp} = shift;
+                     local $plugin->{_hook} = $hook;
+                     $plugin->$method(@_)
+                   },
+       name => $plugin->plugin_name,
+     },
+     $unshift,
+    );
 }
 
 sub _register {
@@ -149,7 +158,6 @@ sub compile {
 		    '@ISA = qw(Qpsmtpd::Plugin);',
 		    ($test_mode ? 'use Test::More;' : ''),
 		    "sub plugin_name { qq[$plugin] }",
-		    "sub hook_name { return shift->{_hook}; }",
 		    $line,
 		    $sub,
 		    "\n", # last line comment without newline?
