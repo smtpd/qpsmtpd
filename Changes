@@ -2,6 +2,9 @@
 
   Support "module" plugins ("My::Plugin" in the config/plugins file)
 
+  Enhance the spamassassin plugin to support connecting to a remote
+  spamd process (Kjetil Kjernsmo). 
+
   Add SSL encryption method to header to mirror other qmail/SSL patches.
   Add tls_before_auth to suppress AUTH unless TLS has already been 
   established (Robin Johnson).

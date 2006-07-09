@@ -44,11 +44,12 @@ might want to make another plugin that does this on a per user basis.
 
 The default is to never munge the subject based on the SpamAssassin score.
 
-=item spamd_socket [/path/to/socket]
+=item spamd_socket [/path/to/socket|spamd.host:port]
 
-Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix 
-domain sockets for spamd.  This is faster and more secure than using
-a TCP connection.
+Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix
+domain sockets for spamd.  This is faster and more secure than using a
+TCP connection, but if you run spamd on a remote machine, you need to
+use a TCP connection.
 
 =item leave_old_headers [drop|rename|keep]
 
@@ -101,6 +102,10 @@ sub hook_data_post { # check_spam
 
   my $remote  = 'localhost';
   my $port    = 783;
+  if ($self->{_args}->{spamd_socket} =~ /^([\w.-]+):(\d+)$/) {
+    $remote  = $1;
+    $port    = $2;
+  }
   if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') }
   die "No port" unless $port;
   my $iaddr   = inet_aton($remote) or 
