@@ -1,0 +1,107 @@
+sub hook_data_post {
+    use Mail::DomainKeys::Message;
+    use Mail::DomainKeys::Policy;
+
+    my $self = shift;
+    my $tran = shift;
+
+    my @body;
+
+
+    $tran->body_resetpos;
+
+    $tran->body_getline; # \r\n seperator is NOT part of the body
+
+    while (my $line = $tran->body_getline) {
+        push @body, $line;
+    }
+
+    my $mess = load Mail::DomainKeys::Message(
+        HeadString => $tran->header->as_string,
+        BodyReference => \@body) or
+            $self->log(LOGWARN, "unable to load message"),
+            return DECLINED;
+
+    # no sender domain means no verification 
+    $mess->senderdomain or
+        return DECLINED;
+
+    my $status;
+
+    # key testing
+    if ( $mess->testing ) {
+	# Don't do anything else
+	$status = "testing";
+    }
+    elsif ( $mess->signed ) {
+	if ( $mess->verify ) {
+	    # verified: add good header
+	    $status = $mess->signature->status;
+	}
+	else {
+	    # not verified, i.e. forged signature
+	    $status = undef;
+	}
+    }
+    else { # not signed
+	my $plcy = fetch Mail::DomainKeys::Policy(
+	    Protocol => "dns",
+	    Domain => $mess->senderdomain
+	);
+	if ( $plcy ) {
+	    if ( $plcy->testing ) {
+		# Don't do anything else
+		$status = "testing";
+	    }
+	    elsif ( $plcy->signall ) {
+		# if policy requires all mail to be signed
+		$status = undef;
+	    }
+	    else { # $plcy->signsome
+		# not signed and domain doesn't sign all
+		$status = "no signature";
+	    }
+	}
+	else {
+	    $status = "no signature";
+	}
+    }
+
+    
+    if ( defined $status ) {
+	$tran->header->replace("DomainKey-Status", $status);
+	return DECLINED;
+    }
+    else {	
+	return DENY, "DomainKeys signature failed to verify";
+    }
+}
+
+# Leave this in place until Mail::DomainKeys is patched
+eval
+  q/ 
+    *Mail::DomainKeys::Message::header = sub {
+    my $self = shift;
+
+    $self->signed or
+        return new Mail::DomainKeys::Header(
+            Line => "DomainKey-Status: no signature");
+
+    $self->signature->status and
+        return new Mail::DomainKeys::Header(
+        Line => "DomainKey-Status: " . $self->signature->status);
+    };
+   / 
+unless Mail::DomainKeys::Message->can('header');
+
+=cut
+
+=head1 NAME
+
+domainkeys: validate a DomainKeys signature on an incoming mail
+
+Copyright (C) 2005 John Peacock.
+
+Portions Copyright (C) 2004 Anthony D. Urso.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
