@@ -75,7 +75,8 @@ sub hook_data_post {
 	return DECLINED;
     }
     else {	
-	return DENY, "DomainKeys signature failed to verify";
+	$self->log(LOGWARN, "DomainKeys signature failed to verify");
+	return DECLINED;
     }
 }
 
