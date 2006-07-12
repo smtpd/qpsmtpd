@@ -1,3 +1,11 @@
+sub init {
+    my ($self, %args) = @_;
+
+    foreach my $key ( %args ) {
+	$self->{$key} = $args{$key};
+    }
+}
+
 sub hook_data_post {
     use Mail::DomainKeys::Message;
     use Mail::DomainKeys::Policy;
@@ -35,17 +43,11 @@ sub hook_data_post {
 	# Don't do anything else
 	$status = "testing";
     }
-    elsif ( $message->signed ) {
-	if ( $message->verify ) {
-	    # verified: add good header
-	    $status = $message->signature->status;
-	}
-	else {
-	    # not verified, i.e. forged signature
-	    $status = undef;
-	}
+    elsif ( $message->signed and $message->verify ) {
+	# verified: add good header
+	$status = $message->signature->status;
     }
-    else { # not signed
+    else { # not signed or not verified
 	my $policy = fetch Mail::DomainKeys::Policy(
 	    Protocol => "dns",
 	    Domain => $message->senderdomain
@@ -65,43 +67,47 @@ sub hook_data_post {
 	    }
 	}
 	else {
-	    $status = "no signature";
+	    $status = $message->signed ? "non-participant" : "no signature";
 	}
     }
 
     
     if ( defined $status ) {
 	$transaction->header->replace("DomainKey-Status", $status);
+	$self->log(LOGWARN, "DomainKeys-Status: $status");
 	return DECLINED;
     }
     else {	
-	$self->log(LOGWARN, "DomainKeys signature failed to verify");
-	return DECLINED;
+	$self->log(LOGERROR, "DomainKeys signature failed to verify");
+	if ( $self->{warn_only} ) {
+	    return DECLINED;
+	}
+	else {
+	    return (DENY, "DomainKeys signature failed to verify");
+	}
     }
 }
-
-# Leave this in place until Mail::DomainKeys is patched
-eval
-  q/ 
-    *Mail::DomainKeys::Message::header = sub {
-    my $self = shift;
-
-    $self->signed or
-        return new Mail::DomainKeys::Header(
-            Line => "DomainKey-Status: no signature");
-
-    $self->signature->status and
-        return new Mail::DomainKeys::Header(
-        Line => "DomainKey-Status: " . $self->signature->status);
-    };
-   / 
-unless Mail::DomainKeys::Message->can('header');
 
 =cut
 
 =head1 NAME
 
 domainkeys: validate a DomainKeys signature on an incoming mail
+
+=head1 SYNOPSIS
+
+  domainkeys [warn_only 1]
+
+Performs a DomainKeys validation on the message.  Takes a single
+configuration
+
+  warn_only 1
+
+which means that messages which are not correctly signed (i.e. signed but
+modified or deliberately forged) will not be DENY'd, but an error will still
+be issued to the logfile.
+
+=head1 COPYRIGHT
 
 Copyright (C) 2005-2006 John Peacock.
 
