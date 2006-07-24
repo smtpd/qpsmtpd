@@ -1,5 +1,5 @@
 sub init {
-    my ($self, %args) = @_;
+    my ($self, $qp, %args) = @_;
 
     foreach my $key ( %args ) {
 	$self->{$key} = $args{$key};
