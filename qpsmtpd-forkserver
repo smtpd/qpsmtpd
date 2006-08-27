@@ -17,6 +17,12 @@ use POSIX qw(:sys_wait_h :errno_h :signal_h);
 use strict;
 $| = 1;
 
+my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
+
+if ($has_ipv6) {
+  use Socket6;
+}
+
 # Configuration
 my $MAXCONN   = 15;                  # max simultaneous connections
 my @PORT;                            # port number(s)
@@ -54,12 +60,17 @@ GetOptions('h|help' => \&usage,
           ) || &usage;
 
 # detaint the commandline
-@LOCALADDR = ( '0.0.0.0' ) if !@LOCALADDR;
+if ($has_ipv6) {
+  @LOCALADDR = ( '[::]' ) if !@LOCALADDR;
+}
+else {
+  @LOCALADDR = ( '0.0.0.0' ) if !@LOCALADDR;
+}
 @PORT = ( 2525 ) if !@PORT;
 
 my @LISTENADDR;
 for (0..$#LOCALADDR) {
-  if ($LOCALADDR[$_] =~ /^([\d\w\-.]+)(?::(\d+))?$/) {
+  if ($LOCALADDR[$_] =~ /^(\[.*\]|[\d\w\-.]+)(?::(\d+))?$/) {
     if ( defined $2 ) {
       push @LISTENADDR, { 'addr' => $1, 'port' => $2 };
     } else {
@@ -106,16 +117,24 @@ $SIG{INT} = \&HUNTSMAN;
 $SIG{TERM} = \&HUNTSMAN;
 
 my $select = new IO::Select;
+my $server;
 
 # establish SERVER socket(s), bind and listen.
 for my $listen_addr (@LISTENADDR) {
-  my $server = IO::Socket::INET->new(LocalPort => $listen_addr->{'port'},
+  my @Socket_opts = (LocalPort => $listen_addr->{'port'},
                                      LocalAddr => $listen_addr->{'addr'},
                                      Proto     => 'tcp',
                                      Reuse     => 1,
                                      Blocking  => 0,
-                                     Listen    => SOMAXCONN )
-    or die "Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
+                                     Listen    => SOMAXCONN);
+  if ($has_ipv6) {
+    $server = IO::Socket::INET6->new(@Socket_opts)
+      or die "Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
+  }
+  else {
+    $server = IO::Socket::INET->new(@Socket_opts)
+      or die "Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
+  }
   IO::Handle::blocking($server, 0);
   $select->add($server);
 }
@@ -208,14 +227,19 @@ while (1) {
       next;
     }
     IO::Handle::blocking($client, 1);
-    my ($port, $iaddr) = sockaddr_in($hisaddr);
+    my ($port, $iaddr) = ($server->sockdomain == AF_INET) ? (sockaddr_in($hisaddr)) : (sockaddr_in6($hisaddr));
     my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) = sockaddr_in($localsockaddr);
+    my ($lport, $laddr) = ($server->sockdomain == AF_INET) ? (sockaddr_in($localsockaddr)) : (sockaddr_in6($localsockaddr));
+    my $nto_iaddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($iaddr)) : (inet_ntop(AF_INET6, $iaddr));
+    my $ton_iaddr = ($server->sockdomain == AF_INET) ? (inet_aton($iaddr)) : (inet_pton(AF_INET6, $iaddr));
+    my $nto_laddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($laddr)) : (inet_ntop(AF_INET6, $laddr));
+    $nto_iaddr =~ s/::ffff://;
+    $nto_laddr =~ s/::ffff://;
 
     my ($rc, @msg) = $qpsmtpd->run_hooks("pre-connection",
-                                         remote_ip    => inet_ntoa($iaddr),
+                                         remote_ip    => $nto_iaddr,
                                          remote_port  => $port,
-                                         local_ip     => inet_ntoa($laddr),
+                                         local_ip     => $nto_laddr,
                                          local_port   => $lport,
                                          max_conn_ip  => $MAXCONNIP,
                                          child_addrs  => [values %childstatus],
@@ -259,11 +283,18 @@ while (1) {
        ::log(LOGINFO, "Connection Timed Out"); 
        exit; };
   
-    $ENV{TCPLOCALIP} = inet_ntoa($laddr);
+    $ENV{TCPLOCALIP} = $nto_laddr;
     # my ($port, $iaddr) = sockaddr_in($hisaddr);
-    $ENV{TCPREMOTEIP} = inet_ntoa($iaddr);
-    $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
-  
+    $ENV{TCPREMOTEIP} = $nto_iaddr;
+
+    if ($server->sockdomain == AF_INET) {
+      $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
+    }
+    else {
+      my ($family, $socktype, $proto, $saddr, $canonname, @res) = getaddrinfo($iaddr, $port, AF_UNSPEC);
+      $ENV{TCPREMOTEHOST} = $canonname || "Unknown";
+    }
+
     # don't do this!
     #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
   

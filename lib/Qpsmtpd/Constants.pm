@@ -27,6 +27,24 @@ my %return_codes = (
 	DONE     => 910,
 );
 
+my $has_ipv6;
+
+if (
+    eval {require Socket6;} &&
+    # INET6 prior to 2.01 will not work; sorry.
+    eval {require IO::Socket::INET6; IO::Socket::INET6->VERSION("2.00");}
+   ) {
+    import Socket6;
+    $has_ipv6=1;
+}
+else {
+    $has_ipv6=0;
+}
+
+sub has_ipv6 {
+    return $has_ipv6;
+}
+
 use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
 @EXPORT = (keys(%return_codes), keys(%log_levels), "return_code", "log_level");

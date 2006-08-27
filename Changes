@@ -1,5 +1,7 @@
 0.33
 
+  Experimental IPv6 support (forkserver only). (Mike Williams)
+
   Support "module" plugins ("My::Plugin" in the config/plugins file)
 
   Enhance the spamassassin plugin to support connecting to a remote

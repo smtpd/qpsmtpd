@@ -3,6 +3,7 @@ use Net::DNS qw(mx);
 use Socket;
 
 my %invalid = ();
+my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
 
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
@@ -38,6 +39,7 @@ sub hook_mail {
 
 sub check_dns {
   my ($self, $host) = @_;
+  my @host_answers;
 
   # for stuff where we can't even parse a hostname out of the address
   return 0 unless $host;
@@ -53,15 +55,24 @@ sub check_dns {
   }
   my $query = $res->search($host);
   if ($query) {
-    foreach my $rr ($query->answer) {
-      if ($rr->type eq "A") {
-        return is_valid($rr->address);
-      }
-      elsif ($rr->type eq "MX") {
-        return mx_valid($self, $rr->exchange, $host);
+    foreach my $rrA ($query->answer) {
+      push(@host_answers, $rrA);
+    }
+  }
+  if ($has_ipv6) {
+    my $query = $res->search($host, 'AAAA');
+    if ($query) {
+      foreach my $rrAAAA ($query->answer) {
+        push(@host_answers, $rrAAAA);
       }
     }
   } 
+  if (@host_answers) {
+    foreach my $rr (@host_answers) {
+      return is_valid($rr->address) if $rr->type eq "A" or $rr->type eq "AAAA";
+      return mx_valid($self, $rr->exchange, $host) if $rr->type eq "MX";
+    }
+  }
   else {
     $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
       unless $res->errorstring eq "NXDOMAIN";
@@ -88,10 +99,24 @@ sub is_valid {
 sub mx_valid {
   my ($self, $name, $host) = @_;
   my $res   = new Net::DNS::Resolver;
-  my $query = $res->search($name);
+  my @mx_answers;
+  my $query = $res->search($name, 'A');
   if ($query) {
-    foreach my $rr ($query->answer) {
-      next unless $rr->type eq "A";
+    foreach my $rrA ($query->answer) {
+      push(@mx_answers, $rrA);
+    }
+  }
+  if ($has_ipv6) {
+    my $query = $res->search($name, 'AAAA');
+    if ($query) {
+      foreach my $rrAAAA ($query->answer) {
+        push(@mx_answers, $rrAAAA);
+      }
+    }
+  }
+  if (@mx_answers) {
+    foreach my $rr (@mx_answers) {
+      next unless $rr->type eq "A" or $rr->type eq "AAAA";
       return is_valid($rr->address);
     }
   }
