@@ -25,8 +25,13 @@ sub register {
     $self->{_unrec_cmd_max} = 4;
   }
 
-  $qp->connection->notes('unrec_cmd_count', 0);
+}
 
+sub hook_connect {
+  my ($self, $transaction) = @_;
+
+  $self->qp->connection->notes('unrec_cmd_count', 0);
+  return DECLINED;
 }
 
 sub hook_unrecognized_command {

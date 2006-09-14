@@ -65,7 +65,7 @@ sub authsql {
 
     my $connect  = "dbi:mysql:dbname=vpopmail";
     my $dbuser   = "vpopmailuser";
-    my $dbpasswd = "**********";
+    my $dbpasswd = "vpoppasswd";
 
     my $dbh = DBI->connect( $connect, $dbuser, $dbpasswd );
     $dbh->{ShowErrorStatement} = 1;

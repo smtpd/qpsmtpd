@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -Tw
 # High performance pre-forking qpsmtpd daemon, Copyright (C) 2006 SoftScan
 # http://www.softscan.co.uk
 #
@@ -95,6 +95,8 @@ GetOptions(
     'renice-parent=i' => \$re_nice,
     'help'            => \&usage,
   ) || &usage;
+
+$user  = $1 if ($user  =~ /(\w+)/);
 
 # set max from ip to max number of children if option is set to disabled
 $maxconnip = $max_children if ($maxconnip == 0);
@@ -336,7 +338,7 @@ sub new_child {
     # continue to accept connections until "old age" is reached
     for (my $i = 0 ; $i < $child_lifetime ; $i++) {
         # accept a connection
-        $0 = 'qpsmtpd child';    # set pretty child name in process listing
+        #$0 = 'qpsmtpd child';    # set pretty child name in process listing
         my ($client, $iinfo) = $d->accept()
           or die
           "failed to create new object - $!";  # wait here until client connects

@@ -1,0 +1,35 @@
+#!/usr/bin/perl -w
+=head1 NAME
+
+relay_only - this plugin only permits relaying
+
+=head1 SYNOPSIS
+
+# in config/plugins
+
+check_relay
+
+relay_only
+
+# other rcpt hooks go here
+
+=head1 DESCRIPTION
+
+This plugin can be used for the case where a server is used as the smart
+relay host for internal users and external/authenticated users, but should
+not be considered a normal inbound MX server
+
+It should be configured to be run _AFTER_ check_relay and before other
+RCPT hooks!  Only clients that have authenticated or are listed in the
+relayclient file will be allowed to send mail.
+
+=cut
+
+sub hook_rcpt {
+  if ( shift->qp->connection->relay_client ) {
+    return (OK);
+  }
+  else {
+    return (DENY);
+  }
+}
