@@ -1,6 +1,7 @@
 package Qpsmtpd::SMTP;
 use Qpsmtpd;
 @ISA = qw(Qpsmtpd);
+my %auth_mechanisms = ();
 
 package Qpsmtpd::SMTP;
 use strict;
@@ -206,7 +207,6 @@ sub ehlo {
                         : ();  
 
     # Check for possible AUTH mechanisms
-    my %auth_mechanisms;
 HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
         if ( $hook =~ m/^auth-?(.+)?$/ ) {
             if ( defined $1 ) {
@@ -239,9 +239,11 @@ HOOK: foreach my $hook ( keys %{$self->{hooks}} ) {
 sub auth {
     my ($self, $line) = @_;
     my ($rc, $sub)    = $self->run_hooks('auth_parse');
-    my ($ok, $arg, @stuff) = Qpsmtpd::Command->parse('auth', $line, $sub);
-    return $self->respond(501, $arg || "Syntax error in command") 
+    my ($ok, $mechanism, @stuff) = Qpsmtpd::Command->parse('auth', $line, $sub);
+    return $self->respond(501, $mechanism || "Syntax error in command") 
       unless ($ok == OK);
+
+    $mechanism = lc($mechanism);
     
 
     #they AUTH'd once already
@@ -254,7 +256,14 @@ sub auth {
       if ( ($self->config('tls_before_auth'))[0] 
       	and $self->transaction->notes('tls_enabled') );
 
-    return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $arg, @stuff );
+    # if we don't have a plugin implementing this auth mechanism, 504
+    if( exists $auth_mechanisms{$mechanism} ) {
+      return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $mechanism, @stuff );
+    } else {
+      $self->respond( 504, "Unimplemented authentification mechanism: $mechanism" );
+      return DENY;
+    } 
+
 }
 
 sub mail {

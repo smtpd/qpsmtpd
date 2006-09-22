@@ -17,7 +17,6 @@ sub SASL {
     # $DB::single = 1;
     my ( $session, $mechanism, $prekey ) = @_;
     my ( $user, $passClear, $passHash, $ticket, $loginas );
-    $mechanism = lc($mechanism);
 
     if ( $mechanism eq "plain" ) {
         if (!$prekey) {
@@ -76,7 +75,8 @@ sub SASL {
         ( $user, $passHash ) = split( ' ', decode_base64($line) );
     }
     else {
-        $session->respond( 500, "Unrecognized authentification mechanism" );
+        #this error is now caught in SMTP.pm's sub auth
+        $session->respond( 500, "Internal server error" );
         return DECLINED;
     }
 

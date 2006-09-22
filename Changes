@@ -1,4 +1,6 @@
 0.33
+  Do the right thing for unimplemented AUTH mechanisms (Brian Szymanski)
+
   relay_only plugin for smart relay host. (John Peacock)
 
   Experimental IPv6 support (forkserver only). (Mike Williams)
