@@ -243,7 +243,7 @@ sub auth {
     return $self->respond(501, $mechanism || "Syntax error in command") 
       unless ($ok == OK);
 
-    $mechanism = uc($mechanism);
+    $mechanism = lc($mechanism);
     
 
     #they AUTH'd once already
@@ -257,7 +257,7 @@ sub auth {
       	and $self->transaction->notes('tls_enabled') );
 
     # if we don't have a plugin implementing this auth mechanism, 504
-    if( exists $auth_mechanisms{$mechanism} ) {
+    if( exists $auth_mechanisms{uc($mechanism)} ) {
       return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $mechanism, @stuff );
     } else {
       $self->respond( 504, "Unimplemented authentification mechanism: $mechanism" );
