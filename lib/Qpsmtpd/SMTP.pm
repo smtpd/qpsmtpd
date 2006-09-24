@@ -243,7 +243,7 @@ sub auth {
     return $self->respond(501, $mechanism || "Syntax error in command") 
       unless ($ok == OK);
 
-    $mechanism = lc($mechanism);
+    $mechanism = uc($mechanism);
     
 
     #they AUTH'd once already
@@ -611,10 +611,18 @@ sub data {
 
   # if we get here without seeing a terminator, the connection is
   # probably dead.
-  $self->respond(451, "Incomplete DATA"), return 1 unless $complete;
+  unless ( $complete ) {
+      $self->respond(451, "Incomplete DATA");
+      $self->reset_transaction; # clean up after ourselves
+      return 1;
+  }
 
   #$self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
-  $self->respond(552, "Message too big!"),return 1 if $max_size and $size > $max_size;
+  if ( $max_size and $size > $max_size ) {
+      $self->respond(552, "Message too big!"); 
+      $self->reset_transaction; # clean up after ourselves
+      return 1;
+  }
 
   ($rc, @msg) = $self->run_hooks("data_post");
   if ($rc == DONE) {
