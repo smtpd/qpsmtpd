@@ -72,11 +72,13 @@ sub read_input {
 
 sub respond {
   my ($self, $code, @messages) = @_;
+  my $buf = '';
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
     $self->log(LOGDEBUG, $line);
-    print "$line\r\n" or ($self->log(LOGERROR, "Could not print [$line]: $!"), return 0);
+    $buf .= "$line\r\n";
   }
+  print $buf or ($self->log(LOGERROR, "Could not print [$buf]: $!"), return 0);
   return 1;
 }
 
