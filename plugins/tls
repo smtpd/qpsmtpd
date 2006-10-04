@@ -46,6 +46,15 @@ certificate with the appropriate characteristics.  Otherwise, you should
 give absolute pathnames to the certificate, key, and the CA root cert 
 used to sign that certificate.
 
+=head1 CIPHERS and COMPATIBILITY
+
+By default, we use only the plugins that openssl considers to be
+"high security". If you need to tweak the available ciphers for some
+broken client (such as Versamail 3.x), have a look at the available
+ciphers at L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>,
+and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
+"HIGH:MEDIUM")
+
 =cut
 
 use IO::Socket::SSL;# qw(debug1 debug2 debug3 debug4);
@@ -62,14 +71,17 @@ sub init {
     $self->tls_cert($cert);
     $self->tls_key($key);
     $self->tls_ca($ca);
+    $self->tls_ciphers($self->qp->config('tls_ciphers') || 'HIGH');
     
+    $self->log(LOGINFO, "ciphers: $self->tls_ciphers");
+
     local $^W; # this bit is very noisy...
     my $ssl_ctx = IO::Socket::SSL::SSL_Context->new(
         SSL_use_cert => 1,
         SSL_cert_file => $self->tls_cert,
         SSL_key_file => $self->tls_key,
         SSL_ca_file => $self->tls_ca,
-        SSL_cipher_list => 'HIGH',
+        SSL_cipher_list => $self->tls_ciphers,
         SSL_server => 1
     ) or die "Could not create SSL context: $!";
     # now extract the password...
@@ -149,7 +161,7 @@ sub _convert_to_ssl {
             SSL_cert_file => $self->tls_cert,
             SSL_key_file => $self->tls_key,
             SSL_ca_file => $self->tls_ca,
-            SSL_cipher_list => 'HIGH',
+            SSL_cipher_list => $self->tls_ciphers,
             SSL_server => 1,
             SSL_reuse_ctx => $self->ssl_context,
         ) or die "Could not create SSL socket: $!";
@@ -189,6 +201,12 @@ sub tls_ca {
     my $self = shift;
     @_ and $self->{_tls_ca} = shift;
     $self->{_tls_ca};
+}
+
+sub tls_ciphers {
+    my $self = shift;
+    @_ and $self->{_tls_ciphers} = shift;
+    $self->{_tls_ciphers};
 }
 
 sub ssl_context {
