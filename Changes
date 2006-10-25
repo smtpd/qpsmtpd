@@ -1,4 +1,6 @@
 0.33
+  Add ability to specific socket for syslog (Peter Eisch)
+
   Do the right thing for unimplemented AUTH mechanisms (Brian Szymanski)
 
   relay_only plugin for smart relay host. (John Peacock)

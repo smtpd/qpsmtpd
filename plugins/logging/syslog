@@ -17,7 +17,7 @@ configuration file:
 
 =over
 
-logging/syslog [loglevel l] [priority p] [ident str] [facility f]
+logging/syslog [loglevel l] [priority p] [ident str] [facility f] [logsock t]
 
 For example:
 
@@ -74,11 +74,27 @@ The default is 'qpsmtpd'.
 The syslog facility to which logged mesages will be directed.  See syslog(3)
 for details.  The default is LOG_MAIL.
 
+=item B<logsock>
+
+The syslog socket where messages should be sent via syslogsock().  The valid
+options are 'udp', 'tcp', 'unix', 'stream' and 'console'.  Not all are
+available on all systems.  See Sys::Syslog for details.  The default is
+the above list in that order.  To select specific sockets, use a comma to
+separate the types.
+
+=over
+
+    logsock udp,unix
+    logsock stream
+
+=back
+
 =back
 
 =head1 AUTHOR
 
 Devin Carraway <qpsmtpd@devin.com>
+Peter Eisch <peter@boku.net> (logsock support)
 
 =head1 LICENSE
 
@@ -92,7 +108,7 @@ Please see the LICENSE file included with qpsmtpd for details.
 use strict;
 use warnings;
 
-use Sys::Syslog;
+use Sys::Syslog qw(:DEFAULT setlogsock);
 
 sub register {
     my ($self, $qp, @args) = @_;
@@ -131,6 +147,11 @@ sub register {
     }
     if ($args{facility} && $args{facility} =~ /^(\w+)$/) {
         $facility = $1;
+    }
+
+    if ($args{logsock}) {
+       my @logopt = split(/,/, $args{logsock});
+       setlogsock(@logopt);
     }
 
     unless (openlog $ident, $logopt, $facility) {
