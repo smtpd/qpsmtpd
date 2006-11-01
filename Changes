@@ -1,4 +1,7 @@
 0.33
+  New Qpsmtpd::Postfix::Constants to encapsulate all of the current return
+  codes from Postfix, plus script to generate it.  (Hanno Hecker)
+
   Add ability to specific socket for syslog (Peter Eisch)
 
   Do the right thing for unimplemented AUTH mechanisms (Brian Szymanski)
