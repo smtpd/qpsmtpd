@@ -14,9 +14,10 @@ not start with a ``/'', it is treated as a flag for cleanup (see below).
 If set, the environment variable POSTFIXQUEUE overrides this setting.
 
 All other parameters are flags for cleanup, no flags are enabled by default.
-Known flags are:
+See below in ``POSTFIX COMPATIBILITY'' for flags understood by your postfix
+version. Supported by all postfix versions E<gt>= 2.1 are:
 
-=over 3
+=over 4
 
 =item FLAG_FILTER
 
@@ -32,21 +33,99 @@ Setting this flag enables (for example) the I<recipient_bcc_maps> parameter
 This flag enables the use of other recipient mappings (e.g. 
 I<virtual_alias_maps>) in postfix' cleanup.
 
+=item FLAG_MASK_EXTERNAL
+
+This flag mask combines FLAG_FILTER, FLAG_MILTER (only in postfix >= 2.3)
+FLAG_BCC_OK and FLAG_MAP_OK and is used by postfix for external messages.
+This is probably what you want to use.
+
 =back
+
+For more flags see below in ``POSTFIX COMPATIBILITY'', your postfix version 
+(grep _FLAG_ src/global/cleanup_user.h) and/or lib/Qpsmtpd/Postfix/Constants.pm
+
+=head1 POSTFIX COMPATIBILITY
+
+The first version of this plugin was written for postfix 1.x. 
+
+The next step for Postfix 2.1 (and later) was to add the FLAG_FILTER, 
+FLAG_BCC_OK and FLAG_MAP_OK flags for submission to the cleanup deamon.
+
+This version can use all flags found in Postfix 2.x (up to 2.4 currently). 
+Unknown flags are ignored by the cleanup daemon (just tested with postfix 
+2.1), so it should be safe to set flags just understood by later versions 
+of postfix/cleanup.
+
+Even if all known flags can be set, some are not that useful when feeding
+the message from qpsmtpd, e.g. 
+
+=head2 FLAG_NONE
+
+no effect 
+
+=head2 FLAG_DISCARD
+
+DON'T USE, use another plugin which hooks the I<hook_queue()> and returns 
+B<OK> just for the messages you want to drop. As long as this plugin does
+not support setting queue flags on the fly from other modules, this flag 
+would drop ALL messages. Don't use!
+
+=head2 FLAG_BOUNCE
+
+Qpsmtpd should be configured not to accept bad messages...
+
+=head2 FLAG_HOLD
+
+Not useful in production setup, maybe in testing environment (untested, what 
+real effects this has).
+
+=over 4
+
+=item Flags known by postfix 1.1:
+
+   FLAG_NONE          - No special features
+   FLAG_BOUNCE        - Bounce bad messages
+   FLAG_FILTER        - Enable content filter
+
+=item Flags known by postfix 2.1, 2.2
+
+all flags from postfix 1.1, plus the following:
+   FLAG_HOLD          - Place message on hold
+   FLAG_DISCARD       - Discard message silently
+   FLAG_BCC_OK        - Ok to add auto-BCC addresses 
+   FLAG_MAP_OK        - Ok to map addresses 
+   FLAG_MASK_INTERNAL - alias for FLAG_MAP_OK
+   FLAG_MASK_EXTERNAL - FILTER, BCC_OK and MAP_OK
+
+=item Flags known by postfix 2.3
+
+all flags from postfix 2.1, up to FLAG_MASK_INTERNAL. New or changed:
+   FLAG_MILTER        - Enable Milter applications
+   FLAG_FILTER_ALL    - FILTER and MILTER
+   FLAG_MASK_EXTERNAL - FILTER_ALL, BCC_OK, MAP_OK
+
+=item Flags known by postfix 2.4
+
+currently (postfix-2.4-20061019) the same as 2.3
+
+=back
+
+=head1 MAYBE IN FUTURE 
+
+Settings the (additional) queue flags from another plugin. Currently at the
+beginning of I<hook_queue()> all flags are reset to the flags given as plugin 
+parameters.
 
 =cut
 
 use Qpsmtpd::Postfix;
-
-#
-# postfix' cleanup flags:
-use constant CLEANUP_FLAG_FILTER => (1 << 1);    # /* Enable content filter */
-use constant CLEANUP_FLAG_BCC_OK => (1 << 4);    # /* Ok to add auto-BCC addresses */
-use constant CLEANUP_FLAG_MAP_OK => (1 << 5);    # /* Ok to map addresses */
+use Qpsmtpd::Postfix::Constants;
 
 sub register {
     my ($self, $qp, @args) = @_;
 
+    $self->log(LOGDEBUG, "using constants generated from Postfix"
+                        ."v$postfix_version");
     $self->{_queue_flags} = 0;
     if (@args > 0) {
         if ($args[0] =~ m#^/#) {
@@ -57,16 +136,11 @@ sub register {
         }
 
         foreach (@args) {
-            if ($_ eq 'FLAG_FILTER') {
-                $self->{_queue_flags} |= CLEANUP_FLAG_FILTER;
+            if ($self->can("CLEANUP_".$_) and /^(FLAG_[A-Z0-9_]+)$/) {
+                $_ = $1;
+                $self->{_queue_flags} |= (eval "CLEANUP_$_;" || 0);
+                #print STDERR "queue flag: $_: ".$self->{_queue_flags}."\n";
             }
-            elsif ($_ eq 'FLAG_BCC_OK') {
-                $self->{_queue_flags} |= CLEANUP_FLAG_BCC_OK;
-            }
-            elsif ($_ eq 'FLAG_MAP_OK') {
-                $self->{_queue_flags} |= CLEANUP_FLAG_MAP_OK;
-            }
-
             else {
                 $self->log(LOGWARN, "Ignoring unkown cleanup flag $_");
             }
@@ -84,46 +158,34 @@ sub hook_queue {
     my ($self, $transaction) = @_;
     $transaction->notes('postfix-queue-flags', $self->{_queue_flags});
 
-# $self->log(LOGDEBUG, "queue-flags=".$transaction->notes('postfix-queue-flags'));
+    # $self->log(LOGDEBUG, "queue-flags=".$transaction->notes('postfix-queue-flags'));
     my ($status, $qid, $reason) = Qpsmtpd::Postfix->inject_mail($transaction);
     if ($status) {
-      # this section needs to be kept in sync with the cleanup_stat_map
-      # array found in Postfix source file src/global/cleanup_strerror.c
-      # which in turn uses constants defined in src/global/cleanup_user.h
-      if ($status & (1<<8)) {
-        # CLEANUP_STAT_DEFER
-        return(DENYSOFT, $reason || "service unavailable (#4.7.1)");
-      } elsif ($status & (1<<7)) {
-        # CLEANUP_STAT_PROXY
-        return(DENYSOFT, $reason || "proxy reject (#4.3.0)");
-      } elsif ($status & (1<<0)) {
-        # CLEANUP_STAT_BAD
-        return(DENYSOFT, $reason || "internal prototcal error (#4.3.0)");
-      } elsif ($status & (1<<6)) {
-        # CLEANUP_STAT_RCPT
-        return Qpsmtpd::DSN->addr_unspecified(DENY, $reason || "no recipients specified");
-      } elsif ($status & (1<<4)) {
-        # CLEANUP_STAT_HOPS
-        return Qpsmtpd::DSN->too_many_hops(DENY, $reason || "too many hops");
-      } elsif ($status & (1<<2)) {
-        # CLEANUP_STAT_SIZE
-        return Qpsmtpd::DSN->sys_msg_too_big(DENY, $reason || "message file too big");
-      } elsif ($status & (1<<3)) {
-        # CLEANUP_STAT_CONT
-        return Qpsmtpd::DSN->media_conv_prohibited(DENY, $reason || "message content rejected");
-      } elsif ($status & (1<<1)) {
-        # CLEANUP_STAT_WRITE
-        return (DECLINED, $reason || "queue file write error");
-      } else {
-        # we have no idea why we're here.
-        return (DECLINED, $reason || "unknown error from postfix/cleanup: $status");
+      # this split is needed, because if cleanup returns
+      # CLEANUP_STAT_MASK_INCOMPLETE we might return DENY (CLEANUP_STAT_SIZE)
+      # instead of DENYSOFT (CLEANUP_STAT_WRITE, CLEANUP_STAT_BAD, 
+      # CLEANUP_STAT_DEFER) ... n.b. this is the behaviour of 667.
+      foreach my $key (keys %cleanup_soft) {
+        my $stat = eval $key # keys have the same names as the constants
+          or next;
+        if ($status & $stat) {
+          return (DENYSOFT, $reason || $cleanup_soft{$key});
+        }
       }
+      foreach my $key (keys %cleanup_hard) {
+        my $stat = eval $key # keys have the same names as the constants
+          or next;
+        if ($status & $stat) {
+          return (DENY, $reason || $cleanup_hard{$key});
+        }
+      }
+      # we have no idea why we're here.
+      return (DECLINED, $reason || "Unable to queue message ($status, $reason)");
     }
-    $status and return (DECLINED, "Unable to queue message ($status, $reason)");
 
     my $msg_id = $transaction->header->get('Message-Id') || '';
     $msg_id =~ s/[\r\n].*//s;    # don't allow newlines in the Message-Id here
     return (OK, "Queued! $msg_id (Queue-Id: $qid)");
 }
 
-#vim: sw=2 ts=8
+# vim: sw=2 ts=8 syn=perl
