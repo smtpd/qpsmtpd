@@ -2,6 +2,10 @@
   Add support for multiple plugin directories, whose paths are given by the
   'plugin_dirs' configuration.  (Devin Carraway, Nick Leverton)
 
+  Greylisting DBs may now be stored in a configured location, and are
+  looked for by default in /var/lib/qpsmtpd/greylisting in addition to the
+  previous locations relative to the qpsmtpd binary.  (Devin Carraway)
+
 0.33
   New Qpsmtpd::Postfix::Constants to encapsulate all of the current return
   codes from Postfix, plus script to generate it.  (Hanno Hecker)
