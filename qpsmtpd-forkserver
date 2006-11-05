@@ -20,7 +20,7 @@ $| = 1;
 my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
 
 if ($has_ipv6) {
-  use Socket6;
+  eval 'use Socket6';
 }
 
 # Configuration
