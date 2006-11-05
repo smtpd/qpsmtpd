@@ -1,3 +1,7 @@
+0.3x
+  Add support for multiple plugin directories, whose paths are given by the
+  'plugin_dirs' configuration.  (Devin Carraway, Nick Leverton)
+
 0.33
   New Qpsmtpd::Postfix::Constants to encapsulate all of the current return
   codes from Postfix, plus script to generate it.  (Hanno Hecker)

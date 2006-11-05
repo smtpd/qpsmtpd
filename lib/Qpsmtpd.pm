@@ -19,14 +19,20 @@ sub load_logging {
   my $configdir = $self->config_dir("logging");
   my $configfile = "$configdir/logging";
   my @loggers = $self->_config_from_file($configfile,'logging');
-  my $dir = $self->plugin_dir;
 
-  $self->_load_plugins($dir, @loggers);
+  $configdir = $self->config_dir('plugin_dirs');
+  $configfile = "$configdir/plugin_dirs";
+  my @plugin_dirs = $self->_config_from_file($configfile,'plugin_dirs');
+  
+  my @loaded;
+  for my $logger (@loggers) {
+    push @loaded, $self->_load_plugin($logger, @plugin_dirs);
+  }
 
-  foreach my $logger (@loggers) {
+  foreach my $logger (@loaded) {
     $self->log(LOGINFO, "Loaded $logger");
   }
-  
+
   return @loggers;
 }
   
@@ -121,9 +127,15 @@ sub config_dir {
   return $configdir;
 }
 
-sub plugin_dir {
-    my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-    my $dir = "$name/plugins";
+sub plugin_dirs {
+    my $self = shift;
+    my @plugin_dirs = $self->config('plugin_dirs');
+    
+    unless (@plugin_dirs) {
+        my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+        @plugin_dirs = ( "$name/plugins" );
+    }
+    return @plugin_dirs;
 }
 
 sub get_qmail_config {
@@ -244,70 +256,72 @@ sub load_plugins {
   $self->{hooks} = {};
   
   my @plugins = $self->config('plugins');
+  my @loaded;
 
-  my $dir = $self->plugin_dir;
-  $self->log(LOGNOTICE, "loading plugins from $dir");
+  for my $plugin_line (@plugins) {
+    push @loaded, $self->_load_plugin($plugin_line, $self->plugin_dirs);
+  }
 
-  @plugins = $self->_load_plugins($dir, @plugins);
-  
-  return @plugins;
+  return @loaded;
 }
 
-sub _load_plugins {
+sub _load_plugin {
   my $self = shift;
-  my ($dir, @plugins) = @_;
+  my ($plugin_line, @plugin_dirs) = @_;
 
   my @ret;  
-  for my $plugin_line (@plugins) {
-    my ($plugin, @args) = split ' ', $plugin_line;
+  my ($plugin, @args) = split ' ', $plugin_line;
 
-    my $package;
+  my $package;
 
-    if ($plugin =~ m/::/) {
-      # "full" package plugin (My::Plugin)
-      $package = $plugin;
-      $package =~ s/[^_a-z0-9:]+//gi;
-      my $eval = qq[require $package;\n] 
-                .qq[sub ${plugin}::plugin_name { '$plugin' }];
-      $eval =~ m/(.*)/s;
-      $eval = $1;
-      eval $eval;
-      die "Failed loading $package - eval $@" if $@;
-      $self->log(LOGDEBUG, "Loading $package ($plugin_line)") 
-        unless $plugin_line =~ /logging/;
-    }
-    else {
-      # regular plugins/$plugin plugin
-      my $plugin_name = $plugin;
-      $plugin =~ s/:\d+$//;       # after this point, only used for filename
+  if ($plugin =~ m/::/) {
+    # "full" package plugin (My::Plugin)
+    $package = $plugin;
+    $package =~ s/[^_a-z0-9:]+//gi;
+    my $eval = qq[require $package;\n] 
+              .qq[sub ${plugin}::plugin_name { '$plugin' }];
+    $eval =~ m/(.*)/s;
+    $eval = $1;
+    eval $eval;
+    die "Failed loading $package - eval $@" if $@;
+    $self->log(LOGDEBUG, "Loading $package ($plugin_line)") 
+      unless $plugin_line =~ /logging/;
+  }
+  else {
+    # regular plugins/$plugin plugin
+    my $plugin_name = $plugin;
+    $plugin =~ s/:\d+$//;       # after this point, only used for filename
 
-      # Escape everything into valid perl identifiers
-      $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
-      
-      # second pass cares for slashes and words starting with a digit
-      $plugin_name =~ s{
-		      (/+)       # directory
-		      (\d?)      # package's first character
-		     }[
-		       "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
-		      ]egx;
-      
-      $package = "Qpsmtpd::Plugin::$plugin_name";
-      
-      # don't reload plugins if they are already loaded
-      unless ( defined &{"${package}::plugin_name"} ) {
-        Qpsmtpd::Plugin->compile($plugin_name,
-        $package, "$dir/$plugin", $self->{_test_mode});
-        $self->log(LOGDEBUG, "Loading $plugin_line") 
-          unless $plugin_line =~ /logging/;
+    # Escape everything into valid perl identifiers
+    $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
+    
+    # second pass cares for slashes and words starting with a digit
+    $plugin_name =~ s{
+        (/+)       # directory
+        (\d?)      # package's first character
+       }[
+         "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
+        ]egx;
+    
+    $package = "Qpsmtpd::Plugin::$plugin_name";
+    
+    # don't reload plugins if they are already loaded
+    unless ( defined &{"${package}::plugin_name"} ) {
+      PLUGIN_DIR: for my $dir (@plugin_dirs) {
+        if (-e "$dir/$plugin") {
+          Qpsmtpd::Plugin->compile($plugin_name, $package,
+            "$dir/$plugin", $self->{_test_mode});
+          $self->log(LOGDEBUG, "Loading $plugin_line from $dir/$plugin") 
+            unless $plugin_line =~ /logging/;
+          last PLUGIN_DIR;
+        }
       }
     }
-
-    my $plug = $package->new();
-    push @ret, $plug;
-    $plug->_register($self, @args);
-
   }
+
+  my $plug = $package->new();
+  $plug->_register($self, @args);
+  push @ret, $plug;
   
   return @ret;
 }
