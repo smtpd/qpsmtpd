@@ -230,9 +230,9 @@ while (1) {
     my ($port, $iaddr) = ($server->sockdomain == AF_INET) ? (sockaddr_in($hisaddr)) : (sockaddr_in6($hisaddr));
     my $localsockaddr = getsockname($client);
     my ($lport, $laddr) = ($server->sockdomain == AF_INET) ? (sockaddr_in($localsockaddr)) : (sockaddr_in6($localsockaddr));
-    my $nto_iaddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($iaddr)) : (inet_ntop(AF_INET6, $iaddr));
-    my $ton_iaddr = ($server->sockdomain == AF_INET) ? (inet_aton($iaddr)) : (inet_pton(AF_INET6, $iaddr));
-    my $nto_laddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($laddr)) : (inet_ntop(AF_INET6, $laddr));
+    my $nto_iaddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($iaddr)) : (inet_ntop(AF_INET6(), $iaddr));
+    my $ton_iaddr = ($server->sockdomain == AF_INET) ? (inet_aton($iaddr)) : (inet_pton(AF_INET6(), $iaddr));
+    my $nto_laddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($laddr)) : (inet_ntop(AF_INET6(), $laddr));
     $nto_iaddr =~ s/::ffff://;
     $nto_laddr =~ s/::ffff://;
 
