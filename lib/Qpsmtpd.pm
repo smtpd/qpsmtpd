@@ -23,6 +23,10 @@ sub load_logging {
   $configdir = $self->config_dir('plugin_dirs');
   $configfile = "$configdir/plugin_dirs";
   my @plugin_dirs = $self->_config_from_file($configfile,'plugin_dirs');
+  unless (@plugin_dirs) {
+    my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+    @plugin_dirs = ( "$name/plugins" );
+  }
   
   my @loaded;
   for my $logger (@loggers) {
