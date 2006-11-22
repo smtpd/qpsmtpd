@@ -122,8 +122,8 @@ sub config {
 sub config_dir {
   my ($self, $config) = @_;
   my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
-  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-  $configdir = "$name/config" if (-e "$name/config/$config");
+  my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
+  $configdir = "$path/config" if (-e "$path/config/$config");
   if (exists $ENV{QPSMTPD_CONFIG}) {
     $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/; # detaint
     $configdir = $1 if -e "$1/$config";
@@ -136,8 +136,8 @@ sub plugin_dirs {
     my @plugin_dirs = $self->config('plugin_dirs');
     
     unless (@plugin_dirs) {
-        my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-        @plugin_dirs = ( "$name/plugins" );
+        my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
+        @plugin_dirs = ( "$path/plugins" );
     }
     return @plugin_dirs;
 }
@@ -263,7 +263,8 @@ sub load_plugins {
   my @loaded;
 
   for my $plugin_line (@plugins) {
-    push @loaded, $self->_load_plugin($plugin_line, $self->plugin_dirs);
+    my $this_plugin = $self->_load_plugin($plugin_line, $self->plugin_dirs);
+    push @loaded, $this_plugin if $this_plugin;
   }
 
   return @loaded;
@@ -319,6 +320,10 @@ sub _load_plugin {
             unless $plugin_line =~ /logging/;
           last PLUGIN_DIR;
         }
+	else {
+	  $self->log(LOGDEBUG, "Failed to load plugin - $plugin - ignoring");
+	  return 0;
+	}
       }
     }
   }

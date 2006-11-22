@@ -1,5 +1,6 @@
 package Qpsmtpd::SMTP::Prefork;
 use Qpsmtpd::SMTP;
+use Qpsmtpd::Constants;
 @ISA = qw(Qpsmtpd::SMTP);
 
 sub dispatch {

@@ -59,6 +59,7 @@ my $d_start         = 0;
 my $quiet           = 0;
 my $status          = 0;
 my $signal          = '';
+my $pretty          = 0;
 my $user;
 
 # help text
@@ -73,6 +74,7 @@ Usage: qpsmtpd-prefork [ options ]
 --max-from-ip int   : Limit number of connections from single IP (default: $maxconnip, 0 to disable)
 --children int      : Max number of children that can be spawned (default: $max_children)
 --idle-children int : Number of idle children to spawn (default: $idle_children, 0 to disable)
+--pretty-child      : Change child process name (default: 0)
 --user username     : User the daemon should run as
 --pid-file path	    : Path to pid file
 --renice-parent int : Subtract value from parent process nice level (default: $re_nice)
@@ -91,6 +93,7 @@ GetOptions(
     'max-from-ip=i'   => \$maxconnip,
     'children=i'      => \$max_children,
     'idle-children=i' => \$idle_children,
+    'pretty-child'    => \$pretty,
     'user=s'          => \$user,
     'renice-parent=i' => \$re_nice,
     'help'            => \&usage,
@@ -338,7 +341,10 @@ sub new_child {
     # continue to accept connections until "old age" is reached
     for (my $i = 0 ; $i < $child_lifetime ; $i++) {
         # accept a connection
-        #$0 = 'qpsmtpd child';    # set pretty child name in process listing
+	if ( $pretty ) {
+	    $ENV{PROCESS} = $0 if not defined $ENV{PROCESS}; # 1st time only
+	    $0 = 'qpsmtpd child'; # set pretty child name in process listing
+	}
         my ($client, $iinfo) = $d->accept()
           or die
           "failed to create new object - $!";  # wait here until client connects

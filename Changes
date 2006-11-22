@@ -1,4 +1,10 @@
 0.3x
+  Instead of failing with cryptic message, ignore lines in config/plugins
+  for uninstalled plugins. (John Peacock)
+
+  Patch to prefork code to make it run (Leonardo Helman). Add --pretty
+  option to qpsmtpd-prefork to change $0 for child processes (John Peacock).
+
   Add support for multiple plugin directories, whose paths are given by the
   'plugin_dirs' configuration.  (Devin Carraway, Nick Leverton)
 

@@ -1,6 +1,7 @@
 package Qpsmtpd::TcpServer::Prefork;
 use Qpsmtpd::TcpServer;
 use Qpsmtpd::SMTP::Prefork;
+use Qpsmtpd::Constants;
 
 @ISA = qw(Qpsmtpd::SMTP::Prefork Qpsmtpd::TcpServer);
 
@@ -12,7 +13,7 @@ sub start_connection {
     #reset info
     $self->{_connection} = Qpsmtpd::Connection->new(); #reset connection
     $self->{_transaction} = Qpsmtpd::Transaction->new(); #reset transaction
-    $self->SUPER::start_connection();
+    $self->SUPER::start_connection(@_);
 }
 
 sub read_input {
@@ -51,6 +52,14 @@ sub respond {
     print "$line\r\n" or ($self->log(LOGERROR, "Could not print [$line]: $!"), return 0);
   }
   return 1;
+}
+
+sub disconnect {
+  my $self = shift;
+  $self->log(LOGDEBUG,"click, disconnecting");
+  $self->SUPER::disconnect(@_);
+  $self->run_hooks("post-connection");
+  die "disconnect_tcpserver";
 }
 
 1;
