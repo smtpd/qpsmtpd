@@ -17,14 +17,16 @@ my %log_levels = (
 
 # return codes
 my %return_codes = (
-	OK       => 900,
-	DENY     => 901,   # 550
-	DENYSOFT => 902,   # 450
-	DENYHARD => 903,   # 550 + disconnect  (deprecated in 0.29)
-	DENY_DISCONNECT     => 903, # 550 + disconnect
-	DENYSOFT_DISCONNECT => 904, # 450 + disconnect
-	DECLINED => 909,
-	DONE     => 910,
+	OK                     => 900,
+	DENY                   => 901,   # 550
+	DENYSOFT               => 902,   # 450
+	DENYHARD               => 903,   # 550 + disconnect  (deprecated in 0.29)
+	DENY_DISCONNECT        => 903,   # 550 + disconnect
+	DENYSOFT_DISCONNECT    => 904,   # 450 + disconnect
+	DECLINED               => 909,
+	DONE                   => 910,
+	CONTINUATION           => 911,   # deprecated - use YIELD
+	YIELD                  => 911,
 );
 
 my $has_ipv6;

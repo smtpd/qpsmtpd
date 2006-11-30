@@ -344,55 +344,88 @@ sub run_hooks {
   my $hooks = $self->{hooks};
   if ($hooks->{$hook}) {
     my @r;
-    for my $code (@{$hooks->{$hook}}) {
-      if ( $hook eq 'logging' ) { # without calling $self->log()
-        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-        $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
-      }
-      else {
-        $self->varlog(LOGINFO, $hook, $code->{name});
-        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-        $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
-
-        !defined $r[0]
-          and $self->log(LOGERROR, "plugin ".$code->{name}
-                         ." running the $hook hook returned undef!")
-          and next;
-
-        if ($self->transaction) {
-          my $tnotes = $self->transaction->notes( $code->{name} );
-          $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-            if (!defined $tnotes || ref $tnotes eq "HASH");
-        } else {
-          my $cnotes = $self->connection->notes( $code->{name} );
-          $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-            if (!defined $cnotes || ref $cnotes eq "HASH");
-        }
-
-        # should we have a hook for "OK" too?
-        if ($r[0] == DENY or $r[0] == DENYSOFT or
-            $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
-        {
-          $r[1] = "" if not defined $r[1];
-          $self->log(LOGDEBUG, "Plugin ".$code->{name}.
-	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-          $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
-        } else {
-          $r[1] = "" if not defined $r[1];
-          $self->log(LOGDEBUG, "Plugin ".$code->{name}.
-	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-          $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
-	}
-
-      }
-
-      last unless $r[0] == DECLINED;
-    }
-    $r[0] = DECLINED if not defined $r[0];
-    @r = map { split /\n/ } @r;
-    return @r;
+    my @local_hooks = @{$hooks->{$hook}};
+    $self->{_continuation} = [$hook, [@_], @local_hooks];
+    return $self->run_continuation();
   }
   return (0, '');
+}
+
+sub run_continuation {
+  my $self = shift;
+  die "No continuation in progress" unless $self->{_continuation};
+  $self->continue_read() if $self->isa('Danga::Client');
+  my $todo = $self->{_continuation};
+  $self->{_continuation} = undef;
+  my $hook = shift @$todo || die "No hook in the continuation";
+  my $args = shift @$todo || die "No hook args in the continuation";
+  my @r;
+  while (@$todo) {
+    my $code = shift @$todo;
+    if ( $hook eq 'logging' ) { # without calling $self->log()
+      eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
+      $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
+    }
+    else {
+      $self->varlog(LOGINFO, $hook, $code->{name});
+      eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
+      $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
+
+      !defined $r[0]
+        and $self->log(LOGERROR, "plugin ".$code->{name}
+                       ." running the $hook hook returned undef!")
+        and next;
+
+      if ($self->transaction) {
+        my $tnotes = $self->transaction->notes( $code->{name} );
+        $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+          if (!defined $tnotes || ref $tnotes eq "HASH");
+      }
+      else {
+        my $cnotes = $self->connection->notes( $code->{name} );
+        $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+          if (!defined $cnotes || ref $cnotes eq "HASH");
+      }
+      
+      if ($r[0] == YIELD) {
+        $self->pause_read() if $self->isa('Danga::Client');
+        $self->{_continuation} = [$hook, $args, @$todo];
+        return @r;
+      }
+      elsif ($r[0] == DENY or $r[0] == DENYSOFT or
+          $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
+      {
+        $r[1] = "" if not defined $r[1];
+        $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
+        $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+      }
+      else {
+        $r[1] = "" if not defined $r[1];
+        $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
+        $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
+      }
+
+    }
+
+    last unless $r[0] == DECLINED;
+  }
+  $r[0] = DECLINED if not defined $r[0];
+  @r = map { split /\n/ } @r;
+  return $self->hook_responder($hook, \@r, $args);
+}
+
+sub hook_responder {
+  my ($self, $hook, $msg, $args) = @_;
+  
+  my $code = shift @$msg;
+  
+  my $responder = $hook . '_respond';
+  if (my $meth = $self->can($responder)) {
+    return $meth->($self, $code, $msg, @$args);
+  }
+  return $code, @$msg;
 }
 
 sub _register_hook {
