@@ -2,19 +2,12 @@
 
 =head1 NAME
 
-spamassassin - SpamAssassin integration for qpsmtpd
+dnsbl - handle DNS BlackList lookups
 
 =head1 DESCRIPTION
 
-Plugin that checks if the mail is spam by using the "spamd" daemon
-from the SpamAssassin package.  F<http://www.spamassassin.org>
-
-SpamAssassin 2.6 or newer is required.
-
-=head1 CONFIG
-
-Configured in the config/dnsbl_zones files.  One line per zone name,
-for example
+Plugin that checks the IP address of the incoming connection against
+a configurable set of RBL services.
 
 =cut
 
@@ -208,15 +201,6 @@ sub hook_disconnect {
 }
 
 1;
-
-=head1 NAME
-
-dnsbl - handle DNS BlackList lookups
-
-=head1 DESCRIPTION
-
-Plugin that checks the IP address of the incoming connection against
-a configurable set of RBL services.
 
 =head1 Usage
 
