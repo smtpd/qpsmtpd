@@ -348,7 +348,7 @@ sub run_hooks {
     $self->{_continuation} = [$hook, [@_], @local_hooks];
     return $self->run_continuation();
   }
-  return (0, '');
+  return $self->hook_responder($hook, [0, ''], [@_]);
 }
 
 sub run_continuation {
@@ -423,7 +423,7 @@ sub hook_responder {
   
   my $responder = $hook . '_respond';
   if (my $meth = $self->can($responder)) {
-    return $meth->($self, $code, $msg, @$args);
+    return $meth->($self, $code, $msg, $args);
   }
   return $code, @$msg;
 }
