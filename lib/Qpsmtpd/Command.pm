@@ -63,7 +63,7 @@ sub parse {
     return (OK) unless defined $line; # trivial case
     my $self = {};
     bless $self, $me;
-    $cmd = lc $1;
+    $cmd = lc $cmd;
     if ($sub and (ref($sub) eq 'CODE')) {
         my @ret = eval { $sub->($self, $cmd, $line); };
         if ($@) {
@@ -99,6 +99,7 @@ sub parse_rcpt {
 sub parse_mail {
     my ($self,$cmd,$line) = @_;
     return (DENY, "Syntax error in command") unless $line =~ s/^from:\s*//i;
+    print "parse_mail: $line\n";
     return &_get_mail_params($cmd, $line);
 }
 ### RFC 1869:
