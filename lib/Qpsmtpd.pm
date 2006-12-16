@@ -367,7 +367,7 @@ sub run_continuation {
       $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
     }
     else {
-      $self->varlog(LOGINFO, $hook, $code->{name});
+      $self->varlog(LOGDEBUG, $hook, $code->{name});
       eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
       $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
 
