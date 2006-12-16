@@ -14,6 +14,7 @@ use IO::Select;
 use Socket;
 use Getopt::Long;
 use POSIX qw(:sys_wait_h :errno_h :signal_h);
+use Net::DNS::Header;
 use strict;
 $| = 1;
 
@@ -273,7 +274,10 @@ while (1) {
     # otherwise child
   
     # all children should have different seeds, to prevent conflicts
-    srand( time ^ ($$ + ($$ << 15)) );
+    srand();
+    for (0 .. rand(65536)) {
+	Net::DNS::Header::nextid();
+    }
   
     close($server);
   
