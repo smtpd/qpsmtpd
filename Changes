@@ -1,4 +1,8 @@
 0.3x
+  The ill-named $transaction->body_size() is depreceated now, use 
+  $transaction->data_size() instead. Check your logs for LOGWARN messages 
+  about "body_size" and fix your plugins. (Hanno Hecker)
+
   Instead of failing with cryptic message, ignore lines in config/plugins
   for uninstalled plugins. (John Peacock)
 

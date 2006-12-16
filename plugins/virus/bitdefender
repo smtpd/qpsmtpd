@@ -80,10 +80,10 @@ sub register {
 sub hook_data_post {
     my ( $self, $transaction ) = @_;
 
-    if ( $transaction->body_size > $self->{"_bitd"}->{"max_size"} ) {
+    if ( $transaction->data_size > $self->{"_bitd"}->{"max_size"} ) {
         $self->log( LOGWARN,
                 'Mail too large to scan ('
-              . $transaction->body_size . " vs "
+              . $transaction->data_size . " vs "
               . $self->{"_bitd"}->{"max_size"}
               . ")" );
         return (DECLINED);

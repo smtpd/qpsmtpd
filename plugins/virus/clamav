@@ -164,9 +164,9 @@ sub register {
 sub hook_data_post {
   my ($self, $transaction) = @_;
 
-  if ($transaction->body_size > $self->{_max_size}) {
+  if ($transaction->data_size > $self->{_max_size}) {
 	$self->log(LOGWARN, 'Mail too large to scan ('.
-		$transaction->body_size . " vs $self->{_max_size})" );
+		$transaction->data_size . " vs $self->{_max_size})" );
 	return (DECLINED);
   }
 

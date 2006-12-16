@@ -96,7 +96,7 @@ sub hook_data_post { # check_spam
   my ($self, $transaction) = @_;
 
   $self->log(LOGDEBUG, "check_spam");
-  return (DECLINED) if $transaction->body_size > 500_000;
+  return (DECLINED) if $transaction->data_size > 500_000;
 
   my $leave_old_headers = lc($self->{_args}->{leave_old_headers}) || 'rename';
 

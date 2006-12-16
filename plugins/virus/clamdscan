@@ -107,8 +107,8 @@ sub hook_data_post {
     my ( $self, $transaction ) = @_;
     $DB::single = 1;
 
-    if ( $transaction->body_size > $self->{"_clamd"}->{"max_size"} * 1024 ) {
-        $self->log( LOGNOTICE, "Declining due to body_size" );
+    if ( $transaction->data_size > $self->{"_clamd"}->{"max_size"} * 1024 ) {
+        $self->log( LOGNOTICE, "Declining due to data_size" );
         return (DECLINED);
     }
 
