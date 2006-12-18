@@ -2,6 +2,9 @@
 
   Support "module" plugins ("My::Plugin" in the config/plugins file)
 
+  Make the badmailfrom plugin support (optional) rejection messages after the 
+  rejection pattern (Robin Hugh Johnson)
+
   The ill-named $transaction->body_size() is depreceated now, use 
   $transaction->data_size() instead. Check your logs for LOGWARN messages 
   about "body_size" and fix your plugins. (Hanno Hecker)
