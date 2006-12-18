@@ -1,4 +1,3 @@
 rbl.mail-abuse.org
 spamsources.fabel.dk
-relays.ordb.org
-sbl.spamhaus.org
+sbl-xbl.spamhaus.org
