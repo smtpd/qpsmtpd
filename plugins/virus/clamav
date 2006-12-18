@@ -49,7 +49,7 @@ Specifies the maximum size, in bytes, for mail to be scanned.  Any mail
 exceeding this size will be left alone.  This is recommended, as large mail
 can take an exceedingly long time to scan.  The default is 524288, or 512k.
 
-=item tmp_dir=I<path> (e.g. I<max_size=/tmp>)
+=item tmp_dir=I<path> (e.g. I<tmp_dir=/tmp>)
 
 Specify an alternate temporary directory.  If not specified, the qpsmtpd
 I<spool_dir> will be used.  If neither is available, I<~/tmp/> will be tried,

@@ -1,4 +1,7 @@
-0.3x
+0.33 (to be)
+
+  Support "module" plugins ("My::Plugin" in the config/plugins file)
+
   The ill-named $transaction->body_size() is depreceated now, use 
   $transaction->data_size() instead. Check your logs for LOGWARN messages 
   about "body_size" and fix your plugins. (Hanno Hecker)
@@ -16,19 +19,16 @@
   looked for by default in /var/lib/qpsmtpd/greylisting in addition to the
   previous locations relative to the qpsmtpd binary.  (Devin Carraway)
 
-0.33
   New Qpsmtpd::Postfix::Constants to encapsulate all of the current return
   codes from Postfix, plus script to generate it.  (Hanno Hecker)
+
+  Experimental IPv6 support (forkserver only). (Mike Williams)
 
   Add ability to specific socket for syslog (Peter Eisch)
 
   Do the right thing for unimplemented AUTH mechanisms (Brian Szymanski)
 
   relay_only plugin for smart relay host. (John Peacock)
-
-  Experimental IPv6 support (forkserver only). (Mike Williams)
-
-  Support "module" plugins ("My::Plugin" in the config/plugins file)
 
   Enhance the spamassassin plugin to support connecting to a remote
   spamd process (Kjetil Kjernsmo). 
@@ -198,6 +198,7 @@
   Replace $ENV{RELAYCLIENT} with $connection->relay_client in last plugin.
 
   Fix typo in qpsmtpd-forkserver commandline help
+
 
 0.29 - 2005/03/03
 
