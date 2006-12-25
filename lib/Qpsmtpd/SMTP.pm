@@ -85,7 +85,8 @@ sub unrecognized_command_respond {
 sub fault {
   my $self = shift;
   my ($msg) = shift || "program fault - command not performed";
-  print STDERR "$0[$$]: $msg ($!)\n";
+  my ($name) = split /\s+/, $0, 2;
+  print STDERR $name,"[$$]: $msg ($!)\n";
   return $self->respond(451, "Internal error - try again later - " . $msg);
 }
 
@@ -100,12 +101,12 @@ sub start_conversation {
 
 sub connect_respond {
     my ($self, $rc, $msg) = @_;
-    if ($rc == DENY) {
+    if ($rc == DENY || $rc == DENY_DISCONNECT) {
       $msg->[0] ||= 'Connection from you denied, bye bye.';
       $self->respond(550, @$msg);
       $self->disconnect;
     }
-    elsif ($rc == DENYSOFT) {
+    elsif ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
       $msg->[0] ||= 'Connection from you temporarily denied, bye bye.';
       $self->respond(450, @$msg);
       $self->disconnect;
@@ -113,7 +114,7 @@ sub connect_respond {
     elsif ($rc != DONE) {
       my $greets = $self->config('smtpgreeting');
       if ( $greets ) {
-	  $greets .= " ESMTP";
+	  $greets .= " ESMTP" unless $greets =~ /(^|\W)ESMTP(\W|$)/;
       }
       else {
 	  $greets = $self->config('me') 
