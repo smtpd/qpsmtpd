@@ -12,6 +12,9 @@
 # from one IP!
 hosts_allow
 
+# skip selected plugins for some hosts:
+skip_plugins
+
 # enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
 dont_require_anglebrackets
 
