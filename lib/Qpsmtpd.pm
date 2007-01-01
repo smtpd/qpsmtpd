@@ -367,11 +367,6 @@ sub run_continuation {
       $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
     }
     else {
-      my $skip = $self->connection->notes('_skip_plugins');
-      if (exists $skip->{$code->{name}} and $skip->{$code->{name}}) {
-        $self->log(LOGDEBUG, "skipping plugin ".$code->{name});
-        next;
-      }
       $self->varlog(LOGDEBUG, $hook, $code->{name});
       eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
       $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;

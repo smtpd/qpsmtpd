@@ -1,9 +1,5 @@
 0.33 (to be)
 
-  New "skip plugin API" + example plugin skip_plugins, see perldoc 
-  Qpsmtpd::Plugins for more info. This can be used to disable (and re-
-  enable) loaded plugins for the current connection (Hanno Hecker)
-
   Support "module" plugins ("My::Plugin" in the config/plugins file)
 
   Make the badmailfrom plugin support (optional) rejection messages after the 
