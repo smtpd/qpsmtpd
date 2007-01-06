@@ -658,17 +658,18 @@ sub data_respond {
   $self->transaction->header($header);
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
+  my $esmtp = substr($smtp,0,1) eq "E";
   my $authheader;
   my $sslheader;
 
   if (defined $self->connection->notes('tls_enabled')
       and $self->connection->notes('tls_enabled')) {
-    $smtp eq "ESMTP" and $smtp .= "S"; # RFC3848
+    $smtp .= "S" if $esmtp; # RFC3848
     $sslheader = "(".$self->connection->notes('tls_socket')->get_cipher()." encrypted) ";
   }
 
   if (defined $self->{_auth} and $self->{_auth} == OK) {
-    $smtp eq "ESMTP" and $smtp .= "A"; # RFC3848
+    $smtp .= "A" if $esmtp; # RFC3848
     $authheader = "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n";
   }
 
