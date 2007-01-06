@@ -658,10 +658,19 @@ sub data_respond {
   $self->transaction->header($header);
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
-  my $sslheader = (defined $self->connection->notes('tls_enabled') and $self->connection->notes('tls_enabled')) ? 
-    "(".$self->connection->notes('tls_socket')->get_cipher()." encrypted) " : "";
-  my $authheader = (defined $self->{_auth} and $self->{_auth} == OK) ?
-    "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n" : "";
+  my $authheader;
+  my $sslheader;
+
+  if (defined $self->connection->notes('tls_enabled')
+      and $self->connection->notes('tls_enabled')) {
+    $smtp eq "ESMTP" and $smtp .= "S"; # RFC3848
+    $sslheader = "(".$self->connection->notes('tls_socket')->get_cipher()." encrypted) ";
+  }
+
+  if (defined $self->{_auth} and $self->{_auth} == OK) {
+    $smtp eq "ESMTP" and $smtp .= "A"; # RFC3848
+    $authheader = "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n";
+  }
 
   $header->add("Received", "from ".$self->connection->remote_info
                ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
