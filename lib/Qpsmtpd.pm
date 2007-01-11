@@ -274,7 +274,6 @@ sub _load_plugin {
   my $self = shift;
   my ($plugin_line, @plugin_dirs) = @_;
 
-  my @ret;  
   my ($plugin, @args) = split ' ', $plugin_line;
 
   my $package;
@@ -330,9 +329,8 @@ sub _load_plugin {
 
   my $plug = $package->new();
   $plug->_register($self, @args);
-  push @ret, $plug;
   
-  return @ret;
+  return $plug;
 }
 
 sub transaction {

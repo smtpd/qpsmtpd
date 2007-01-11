@@ -70,8 +70,8 @@ sub config_dir {
     './config.sample';
 }
 
-sub plugin_dir {
-    './plugins';
+sub plugin_dirs {
+    ('./plugins');
 }
 
 sub log {
