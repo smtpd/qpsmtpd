@@ -8,46 +8,89 @@ tls - plugin to support STARTTLS
 
 # in config/plugins
 
-  tls ssl/cert.pem ssl/privkey.pem
+tls [B<cert_path priv_key_path ca_path>]
+
+=over indentlevel
+
+=item B<cert_path>
+
+Path to the server certificate file. Default: I<ssl/qpsmtpd-server.crt>
+
+=item B<priv_key_path>
+
+Path to the private key file. Default: I<ssl/qpsmtpd-server.key>
+
+=item B<ca_path>
+
+Path to the certificate autority file. Default: I<ssl/qpsmtpd-ca.crt>
 
 =head1 DESCRIPTION
 
-This plugin implements basic TLS support.
+This plugin implements basic TLS support.  It can also be used to support
+port 465 (SMTP over SSL), but only with qpsmtpd-forkserver.  In this case,
+be sure to load plugins/tls before any other connect plugins and start
+qpsmtpd like this:
+
+  qpsmtpd-forkserver --port 25 --port 465
+
+You can also specify multiple --listen-address options as well; see the help
+for qpsmtpd-forkserver for more details.
 
 If TLS is successfully negotiated then the C<tls_enabled> field in the
 Connection notes is set. If you wish to make TLS mandatory you should check
 that field and take appropriate action. Note that you can only do that from
 MAIL FROM onwards.
 
+Use the script C<plugins/tls_cert> to automatically generate a self-signed
+certificate with the appropriate characteristics.  Otherwise, you should
+give absolute pathnames to the certificate, key, and the CA root cert 
+used to sign that certificate.
+
+=head1 CIPHERS and COMPATIBILITY
+
+By default, we use only the plugins that openssl considers to be
+"high security". If you need to tweak the available ciphers for some
+broken client (such as Versamail 3.x), have a look at the available
+ciphers at L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>,
+and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
+"HIGH:MEDIUM")
+
 =cut
 
-use IO::Socket::SSL; # qw(debug1 debug2 debug3 debug4);
+use IO::Socket::SSL;# qw(debug1 debug2 debug3 debug4);
 
 sub init {
-    my ($self, $qp, $cert, $key) = @_;
+    my ($self, $qp, $cert, $key, $ca) = @_;
     $cert ||= 'ssl/qpsmtpd-server.crt';
     $key  ||= 'ssl/qpsmtpd-server.key';
-    unless ( -f $cert && -f $key ) {
-	$self->log(LOGERROR, "Cannot locate cert/key!  Run plugins/tls_cert to generate");
-	return;
+    $ca   ||= 'ssl/qpsmtpd-ca.crt';
+    unless ( -f $cert && -f $key && -f $ca ) {
+        $self->log(LOGERROR, "Cannot locate cert/key!  Run plugins/tls_cert to generate");
+        return;
     }
     $self->tls_cert($cert);
     $self->tls_key($key);
+    $self->tls_ca($ca);
+    $self->tls_ciphers($self->qp->config('tls_ciphers') || 'HIGH');
     
+    $self->log(LOGINFO, "ciphers: $self->tls_ciphers");
+
     local $^W; # this bit is very noisy...
     my $ssl_ctx = IO::Socket::SSL::SSL_Context->new(
         SSL_use_cert => 1,
         SSL_cert_file => $self->tls_cert,
         SSL_key_file => $self->tls_key,
-        SSL_cipher_list => 'HIGH',
+        SSL_ca_file => $self->tls_ca,
+        SSL_cipher_list => $self->tls_ciphers,
         SSL_server => 1
     ) or die "Could not create SSL context: $!";
-    
     # now extract the password...
+    
     $self->ssl_context($ssl_ctx);
     
     # Check for possible AUTH mechanisms
 HOOK: foreach my $hook ( keys %{$qp->{hooks}} ) {
+        no strict 'refs';
         if ( $hook =~ m/^auth-?(.+)?$/ ) {
             if ( defined $1 ) {
                 my $hooksub = "hook_$hook";
@@ -68,8 +111,10 @@ sub hook_ehlo {
     return DECLINED if $self->connection->notes('tls_enabled');
     return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
     my $cap = $transaction->notes('capabilities');
+    $cap ||= [];
     push @$cap, 'STARTTLS';
     $transaction->notes('tls_enabled', 1);
+    $transaction->notes('capabilities', $cap);
     return DECLINED;
 }
 
@@ -82,43 +127,7 @@ sub hook_unrecognized_command {
     # OK, now we setup TLS
     $self->qp->respond (220, "Go ahead with TLS");
     
-    eval {
-        my $tlssocket;
-        if ($self->qp->isa('Danga::Socket')) {
-            # high_perf
-            $tlssocket = IO::Socket::SSL->start_SSL($self->qp->sock,
-                SSL_use_cert => 1,
-                SSL_cert_file => $self->tls_cert,
-                SSL_key_file => $self->tls_key,
-                SSL_cipher_list => 'HIGH',
-                SSL_server => 1,
-                SSL_reuse_ctx => $self->ssl_context,
-            ) or die "Could not convert SSL socket: $!";
-        }
-        else {
-            $tlssocket = IO::Socket::SSL->new_from_fd(
-                fileno(STDIN), '+>',
-                SSL_use_cert => 1,
-                SSL_cert_file => $self->tls_cert,
-                SSL_key_file => $self->tls_key,
-                SSL_cipher_list => 'HIGH',
-                SSL_server => 1,
-                SSL_reuse_ctx => $self->ssl_context,
-            ) or die "Could not create SSL socket: $!";
-        }
-        
-        # Clone connection object (without data received from client)
-        $self->qp->connection($self->connection->clone());
-        $self->qp->reset_transaction;
-        if ($self->qp->isa('Danga::Socket')) {
-            $self->connection->notes('tls_socket', $tlssocket);
-        }
-        else {
-            *STDIN = *STDOUT = $self->connection->notes('tls_socket', $tlssocket);
-        }
-        $self->connection->notes('tls_enabled', 1);
-    };
-    if ($@) {
+    unless ( _convert_to_ssl($self) ) {
         # SSL setup failed. Now we must respond to every command with 5XX
         warn("TLS failed: $@\n");
         $transaction->notes('ssl_failed', 1);
@@ -127,6 +136,48 @@ sub hook_unrecognized_command {
     
     $self->log(LOGWARN, "TLS setup returning");
     return DONE;
+}
+
+sub hook_connect {
+    my ($self, $transaction) = @_;
+
+    my $local_port = $self->qp->connection->local_port;
+    return DECLINED unless $local_port == 465; # SMTPS
+    
+    unless ( _convert_to_ssl($self) ) {
+	return (DENY_DISCONNECT, "Cannot establish SSL session");
+    }
+    $self->log(LOGWARN, "Connected via SMTPS");
+    return DECLINED;
+}
+
+sub _convert_to_ssl {
+    my ($self) = @_;
+
+    eval {
+        my $tlssocket = IO::Socket::SSL->new_from_fd(
+            fileno(STDIN), '+>',
+            SSL_use_cert => 1,
+            SSL_cert_file => $self->tls_cert,
+            SSL_key_file => $self->tls_key,
+            SSL_ca_file => $self->tls_ca,
+            SSL_cipher_list => $self->tls_ciphers,
+            SSL_server => 1,
+            SSL_reuse_ctx => $self->ssl_context,
+        ) or die "Could not create SSL socket: $!";
+    
+        # Clone connection object (without data received from client)
+        $self->qp->connection($self->connection->clone());
+        $self->qp->reset_transaction;
+        *STDIN = *STDOUT = $self->connection->notes('tls_socket', $tlssocket);
+        $self->connection->notes('tls_enabled', 1);
+    };
+    if ($@) {
+	return 0;
+    }
+    else {
+	return 1;
+    }
 }
 
 sub can_do_tls {
@@ -144,6 +195,18 @@ sub tls_key {
     my $self = shift;
     @_ and $self->{_tls_key} = shift;
     $self->{_tls_key};
+}
+
+sub tls_ca {
+    my $self = shift;
+    @_ and $self->{_tls_ca} = shift;
+    $self->{_tls_ca};
+}
+
+sub tls_ciphers {
+    my $self = shift;
+    @_ and $self->{_tls_ciphers} = shift;
+    $self->{_tls_ciphers};
 }
 
 sub ssl_context {

@@ -34,7 +34,7 @@ sub register {
 }
 
 sub hook_mail {
-  my ($self, $transaction, $sender) = @_;
+  my ($self, $transaction, $sender, %param) = @_;
 
   return (DECLINED) unless ($sender->format ne "<>"
                             and $sender->host && $sender->user);
@@ -71,7 +71,7 @@ sub hook_mail {
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt) = @_;
+  my ($self, $transaction, $rcpt, %param) = @_;
   
   # special addresses don't get SPF-tested.
   return DECLINED if $rcpt and $rcpt->user and $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i;

@@ -96,6 +96,7 @@ sub config_dir {
     return "/var/qmail/control";
 }
 
+
 sub plugin_dir {
     my $self = shift;
     return "$self->{qpdir}/plugins";
@@ -130,7 +131,7 @@ sub read_input {
     while (defined(my $data = $self->getline)) {
         $data =~ s/\r?\n$//s; # advanced chomp
         $self->log(LOGDEBUG, "dispatching $data");
-        defined $self->dispatch(split / +/, $data)
+        defined $self->dispatch(split / +/, $data, 2)
             or $self->respond(502, "command unrecognized: '$data'");
         last if $self->{_quitting};
     }

@@ -65,7 +65,7 @@ system('openssl', 'genrsa', '-out', $SERVER_key, 1024) == 0
 
 system('openssl', 'req', '-config', $SERVERfilename, '-new', 
 	'-key', $SERVER_key, '-out', $SERVER_csr) == 0
-    or die "Cannot create CA cert: $?";
+    or die "Cannot create server cert: $?";
 
 my ($SIGN, $SIGNfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
 print ${SIGN} <<"EOT";

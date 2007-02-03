@@ -1,0 +1,116 @@
+sub init {
+    my ($self, $qp, %args) = @_;
+
+    foreach my $key ( %args ) {
+	$self->{$key} = $args{$key};
+    }
+}
+
+sub hook_data_post {
+    use Mail::DomainKeys::Message;
+    use Mail::DomainKeys::Policy;
+
+    my ($self, $transaction) = @_;
+
+    # if this isn't signed, just move along
+    return DECLINED
+    	unless $transaction->header->get('DomainKey-Signature');
+	
+    my @body;
+
+    $transaction->body_resetpos;
+
+    $transaction->body_getline; # \r\n seperator is NOT part of the body
+
+    while (my $line = $transaction->body_getline) {
+        push @body, $line;
+    }
+
+    my $message = load Mail::DomainKeys::Message(
+        HeadString => $transaction->header->as_string,
+        BodyReference => \@body) or
+            $self->log(LOGWARN, "unable to load message"),
+            return DECLINED;
+
+    # no sender domain means no verification 
+    $message->senderdomain or
+        return DECLINED;
+
+    my $status;
+
+    # key testing
+    if ( $message->testing ) {
+	# Don't do anything else
+	$status = "testing";
+    }
+    elsif ( $message->signed and $message->verify ) {
+	# verified: add good header
+	$status = $message->signature->status;
+    }
+    else { # not signed or not verified
+	my $policy = fetch Mail::DomainKeys::Policy(
+	    Protocol => "dns",
+	    Domain => $message->senderdomain
+	);
+	if ( $policy ) {
+	    if ( $policy->testing ) {
+		# Don't do anything else
+		$status = "testing";
+	    }
+	    elsif ( $policy->signall ) {
+		# if policy requires all mail to be signed
+		$status = undef;
+	    }
+	    else { # $policy->signsome
+		# not signed and domain doesn't sign all
+		$status = "no signature";
+	    }
+	}
+	else {
+	    $status = $message->signed ? "non-participant" : "no signature";
+	}
+    }
+
+    
+    if ( defined $status ) {
+	$transaction->header->replace("DomainKey-Status", $status);
+	$self->log(LOGWARN, "DomainKeys-Status: $status");
+	return DECLINED;
+    }
+    else {	
+	$self->log(LOGERROR, "DomainKeys signature failed to verify");
+	if ( $self->{warn_only} ) {
+	    return DECLINED;
+	}
+	else {
+	    return (DENY, "DomainKeys signature failed to verify");
+	}
+    }
+}
+
+=cut
+
+=head1 NAME
+
+domainkeys: validate a DomainKeys signature on an incoming mail
+
+=head1 SYNOPSIS
+
+  domainkeys [warn_only 1]
+
+Performs a DomainKeys validation on the message.  Takes a single
+configuration
+
+  warn_only 1
+
+which means that messages which are not correctly signed (i.e. signed but
+modified or deliberately forged) will not be DENY'd, but an error will still
+be issued to the logfile.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2005-2006 John Peacock.
+
+Portions Copyright (C) 2004 Anthony D. Urso.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.

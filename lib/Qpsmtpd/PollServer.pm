@@ -29,7 +29,7 @@ use fields qw(
 );
 use Qpsmtpd::Constants;
 use Qpsmtpd::Address;
-use Danga::DNS;
+use ParaDNS;
 use Mail::Header;
 use POSIX qw(strftime);
 use Socket qw(inet_aton AF_INET CRLF);
@@ -54,6 +54,7 @@ sub new {
     $self->{start_time} = time;
     $self->{mode} = 'connect';
     $self->load_plugins;
+    $self->load_logging;
     return $self;
 }
 
@@ -64,7 +65,7 @@ sub uptime {
 }
 
 sub reset_for_next_message {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     $self->SUPER::reset_for_next_message(@_);
     
     $self->{_commands} = {
@@ -85,7 +86,7 @@ sub reset_for_next_message {
 }
 
 sub respond {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     my ($code, @messages) = @_;
     while (my $msg = shift @messages) {
         my $line = $code . (@messages ? "-" : " ") . $msg;
@@ -95,22 +96,16 @@ sub respond {
 }
 
 sub fault {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     $self->SUPER::fault(@_);
     return;
 }
 
 sub process_line {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     my $line = shift || return;
     if ($::DEBUG > 1) { print "$$:".($self+0)."C($self->{mode}): $line"; }
-    local $SIG{ALRM} = sub {
-        my ($pkg, $file, $line) = caller();
-        die "ALARM: ($self->{mode}) $pkg, $file, $line";
-    };
-    my $prev = alarm($self->{cmd_timeout}); # must process a command in < N seconds
     eval { $self->_process_line($line) };
-    alarm($prev);
     if ($@) {
         print STDERR "Error: $@\n";
         return $self->fault("command failed unexpectedly") if $self->{mode} eq 'cmd';
@@ -121,7 +116,7 @@ sub process_line {
 }
 
 sub _process_line {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     my $line = shift;
     
     if ($self->{mode} eq 'connect') {
@@ -142,7 +137,7 @@ sub _process_line {
 }
 
 sub process_cmd {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     my $line = shift;
     my ($cmd, @params) = split(/ +/, $line);
     my $meth = lc($cmd);
@@ -158,25 +153,21 @@ sub process_cmd {
         }
         return $resp;
     }
-    elsif ( $self->authenticated == AUTH_PENDING ) {
-        return $self->auth_process($line);
-    }
     else {
         # No such method - i.e. unrecognized command
         my ($rc, $msg) = $self->run_hooks("unrecognized_command", $meth, @params);
-        return $self->unrecognized_command_respond($rc, $msg) unless $rc == CONTINUATION;
         return 1;
     }
 }
 
 sub disconnect {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     $self->SUPER::disconnect(@_);
     $self->close;
 }
 
 sub start_conversation {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     
     my $conn = $self->connection;
     # set remote_host, remote_ip and remote_port
@@ -184,28 +175,26 @@ sub start_conversation {
     $conn->remote_ip($ip);
     $conn->remote_port($port);
     $conn->remote_info("[$ip]");
-    Danga::DNS->new(
-        client     => $self,
+    ParaDNS->new(
+        finished   => sub { $self->run_hooks("connect") },
         # NB: Setting remote_info to the same as remote_host
         callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
         host       => $ip,
     );
     
-    my ($rc, $msg) = $self->run_hooks("connect");
-    return $self->connect_respond($rc, $msg) unless $rc == CONTINUATION;
-    return DONE;
+    return;
 }
 
 sub data {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     
     my ($rc, $msg) = $self->run_hooks("data");
-    return $self->data_respond($rc, $msg) unless $rc == CONTINUATION;
     return 1;
 }
 
 sub data_respond {
-    my ($self, $rc, $msg) = @_;
+    my Qpsmtpd::PollServer $self = shift;
+    my ($rc, $msg) = @_;
     if ($rc == DONE) {
         return;
     }
@@ -234,18 +223,83 @@ sub data_respond {
     
     $self->{mode} = 'data';
     
-    $self->{header_lines} = [];
+    $self->{header_lines} = '';
     $self->{data_size} = 0;
     $self->{in_header} = 1;
-    $self->{max_size} = ($self->config('databytes'))[0] || 0;  # this should work in scalar context
+    $self->{max_size} = ($self->config('databytes'))[0] || 0;
     
     $self->log(LOGDEBUG, "max_size: $self->{max_size} / size: $self->{data_size}");
+
+    $self->respond(354, "go ahead");
+
+    my $max_get = $self->{max_size} || 1048576;
+    $self->get_chunks($max_get, sub { $self->got_data($_[0]) });
+    return 1;
+}
+
+sub got_data {
+    my Qpsmtpd::PollServer $self = shift;
+    my $data = shift;
+
+    my $done = 0;
+    my $remainder;
+    if ($data =~ s/^\.\r\n(.*)\z//m) {
+        $remainder = $1;
+        $done = 1;
+    }
+
+    # add a transaction->blocked check back here when we have line by line plugin access...
+    unless (($self->{max_size} and $self->{data_size} > $self->{max_size})) {
+        $data =~ s/\r\n/\n/mg;
+        $data =~ s/^\.\./\./mg;
+        
+        if ($self->{in_header} and $data =~ s/\A(.*?)\n[ \t]*\n//ms) {
+            $self->{header_lines} .= $1;
+            # end of headers
+            $self->{in_header} = 0;
+            
+            # ... need to check that we don't reformat any of the received lines.
+            #
+            # 3.8.2 Received Lines in Gatewaying
+            #   When forwarding a message into or out of the Internet environment, a
+            #   gateway MUST prepend a Received: line, but it MUST NOT alter in any
+            #   way a Received: line that is already in the header.
+            my @header_lines = split(/\n/, $self->{header_lines});
     
-    return $self->respond(354, "go ahead");
+            my $header = Mail::Header->new(\@header_lines,
+                                            Modify => 0, MailFrom => "COERCE");
+            $self->transaction->header($header);
+            $self->{header_lines} = '';
+
+            #$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
+    
+            # FIXME - call plugins to work on just the header here; can
+            # save us buffering the mail content.
+        }
+        
+        if ($self->{in_header}) {
+            $self->{header_lines} .= $data;
+        }
+        else {
+            $self->transaction->body_write(\$data);
+        }
+        
+        $self->{data_size} += length $data;
+    }
+ 
+
+    if ($done) {
+        $self->{mode} = 'cmd';
+        $self->end_of_data;
+        $self->end_get_chunks($remainder);
+    }
+
 }
 
 sub data_line {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
+
+    print "YIKES\n";
     
     my $line = shift;
     
@@ -293,7 +347,7 @@ sub data_line {
             push @{ $self->{header_lines} }, $line;
         }
         else {
-            $self->transaction->body_write($line);
+            $self->transaction->body_write(\$line);
         }
         
         $self->{data_size} += length $line;
@@ -303,7 +357,7 @@ sub data_line {
 }
 
 sub end_of_data {
-    my $self = shift;
+    my Qpsmtpd::PollServer $self = shift;
     
     #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
     
@@ -331,7 +385,6 @@ sub end_of_data {
     return $self->respond(552, "Message too big!") if $self->{max_size} and $self->{data_size} > $self->{max_size};
     
     my ($rc, $msg) = $self->run_hooks("data_post");
-    return $self->data_post_respond($rc, $msg) unless $rc == CONTINUATION;
     return 1;
 }
 

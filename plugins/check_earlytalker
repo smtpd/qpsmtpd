@@ -44,53 +44,42 @@ issued a deny or denysoft (depending on the value of I<action>).  The default
 is to react at the SMTP greeting stage by issuing the apropriate response code
 and terminating the SMTP connection.
 
-=item check-at [string: connect, data]
-
-Defines when to check for early talkers, either at connect time (pre-greet pause)
-or at DATA time (pause before sending "354 go ahead").
-
-The default is I<connect>.
-
-Note that defer-reject has no meaning if check-at is I<data>.
-
 =back
 
 =cut
 
-my $MSG = 'Connecting host started transmitting before SMTP greeting';
+use IO::Select;
+
+use warnings;
+use strict;
 
 sub register {
   my ($self, $qp, @args) = @_;
 
   if (@args % 2) {
-	$self->log(LOGERROR, "Unrecognized/mismatched arguments");
-	return undef;
+        $self->log(LOGERROR, "Unrecognized/mismatched arguments");
+        return undef;
   }
   $self->{_args} = {
-  	'wait' => 1,
-	'action' => 'denysoft',
-	'defer-reject' => 0,
-	'check-at' => 'connect',
-	@args,
+        'wait' => 1,
+        'action' => 'denysoft',
+        'defer-reject' => 0,
+        @args,
   };
-  print STDERR "Check at: ", $self->{_args}{'check-at'}, "\n";
-  if ($qp->isa('Qpsmtpd::Apache')) {
+  if ($qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
       require APR::Const;
       APR::Const->import(qw(POLLIN SUCCESS));
-      $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_apr');
+      $self->register_hook('connect', 'apr_connect_handler');
   }
   else {
-      $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_poll');
+      $self->register_hook('connect', 'connect_handler');
   }
-  $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_post');
-  if ($self->{_args}{'check-at'} eq 'connect') {
-    $self->register_hook('mail', 'hook_mail')
-      if $self->{_args}->{'defer-reject'};
-  }
+  $self->register_hook('mail', 'mail_handler')
+    if $self->{_args}->{'defer-reject'};
   1;
 }
 
-sub check_talker_apr {
+sub apr_connect_handler {
     my ($self, $transaction) = @_;
     
     return DECLINED if ($self->qp->connection->notes('whitelistclient'));
@@ -107,53 +96,47 @@ sub check_talker_apr {
             $self->qp->connection->notes('earlytalker', 1);
         }
         else {
-            return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
-            return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
+            my $msg = 'Connecting host started transmitting before SMTP greeting';
+            return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
+            return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
         }
     }
     else {
         $self->log(LOGINFO, "remote host said nothing spontaneous, proceeding");
     }
-    return DECLINED;
 }
 
-sub check_talker_poll {
+sub connect_handler {
   my ($self, $transaction) = @_;
-  
-  my $qp = $self->qp;
-  my $conn = $qp->connection;
-  $qp->AddTimer($self->{_args}{'wait'}, sub { read_now($qp, $conn, $self->{_args}{'check-at'}) });
-  return CONTINUATION;
-}
+  my $in = new IO::Select;
+  my $ip = $self->qp->connection->remote_ip;
 
-sub read_now {
-  my ($qp, $conn, $phase) = @_;
-  
-  if ($qp->has_data) {
-      $qp->log(LOGNOTICE, 'remote host started talking before we said hello');
-      $qp->clear_data if $phase eq 'data';
-      $conn->notes('earlytalker', 1);
+  return DECLINED
+      if ($self->qp->connection->notes('whitelistclient'));
+
+  $in->add(\*STDIN) || return DECLINED;
+  if ($in->can_read($self->{_args}->{'wait'})) {
+    $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
+    if ($self->{_args}->{'defer-reject'}) {
+        $self->qp->connection->notes('earlytalker', 1);
+    } else {
+      my $msg = 'Connecting host started transmitting before SMTP greeting';
+      return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
+      return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
+    }
+  } else {
+    $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
   }
-  $qp->finish_continuation;
+  return DECLINED;
 }
 
-sub check_talker_post {
-  my ($self, $transaction) = @_;
-  
-  my $conn = $self->qp->connection;
-  return DECLINED unless $conn->notes('earlytalker');
-  return DECLINED if $self->{'defer-reject'};
-  return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
-  return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
-  return DECLINED; # assume action eq 'log'
-}
-
-sub hook_mail {
+sub mail_handler {
   my ($self, $txn) = @_;
+  my $msg = 'Connecting host started transmitting before SMTP greeting';
 
-  return DECLINED unless $self->connection->notes('earlytalker');
-  return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
-  return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
+  return DECLINED unless $self->qp->connection->notes('earlytalker');
+  return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
+  return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
   return DECLINED;
 }
 

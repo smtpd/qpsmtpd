@@ -121,6 +121,10 @@ sub cmd_quit {
     $self->close;
 }
 
+sub cmd_shutdown {
+    exit;
+}
+
 sub cmd_pause {
     my $self = shift;
     
@@ -169,7 +173,7 @@ sub cmd_status {
         if ($pob->isa("Qpsmtpd::PollServer")) {
             $current_connections++;
         }
-        elsif ($pob->isa("Danga::DNS::Resolver")) {
+        elsif ($pob->isa("ParaDNS::Resolver")) {
             $current_dns = $pob->pending;
         }
     }

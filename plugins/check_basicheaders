@@ -44,7 +44,7 @@ sub hook_data_post {
   my ($self, $transaction) = @_;
 
   return (DENY, "You have to send some data first")
-    if $transaction->body_size == 0;
+    if $transaction->data_size == 0;
 
   return (DENY, "Mail with no From header not accepted here")
     unless $transaction->header->get('From');

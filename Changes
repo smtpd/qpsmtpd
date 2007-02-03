@@ -1,4 +1,92 @@
-0.40
+0.33 (to be)
+
+  Update the sample configuration to use zen.spamhaus.org
+
+  Support "module" plugins ("My::Plugin" in the config/plugins file)
+
+  Make the badmailfrom plugin support (optional) rejection messages after the 
+  rejection pattern (Robin Hugh Johnson)
+
+  The ill-named $transaction->body_size() is depreceated now, use 
+  $transaction->data_size() instead. Check your logs for LOGWARN messages 
+  about "body_size" and fix your plugins. (Hanno Hecker)
+
+  Instead of failing with cryptic message, ignore lines in config/plugins
+  for uninstalled plugins. (John Peacock)
+
+  Patch to prefork code to make it run (Leonardo Helman). Add --pretty
+  option to qpsmtpd-prefork to change $0 for child processes (John Peacock).
+
+  Add support for multiple plugin directories, whose paths are given by the
+  'plugin_dirs' configuration.  (Devin Carraway, Nick Leverton)
+
+  Greylisting DBs may now be stored in a configured location, and are
+  looked for by default in /var/lib/qpsmtpd/greylisting in addition to the
+  previous locations relative to the qpsmtpd binary.  (Devin Carraway)
+
+  New Qpsmtpd::Postfix::Constants to encapsulate all of the current return
+  codes from Postfix, plus script to generate it.  (Hanno Hecker)
+
+  Experimental IPv6 support (forkserver only). (Mike Williams)
+
+  Add ability to specific socket for syslog (Peter Eisch)
+
+  Do the right thing for unimplemented AUTH mechanisms (Brian Szymanski)
+
+  relay_only plugin for smart relay host. (John Peacock)
+
+  Enhance the spamassassin plugin to support connecting to a remote
+  spamd process (Kjetil Kjernsmo). 
+
+  Add SSL encryption method to header to mirror other qmail/SSL patches.
+  Add tls_before_auth to suppress AUTH unless TLS has already been 
+  established (Robin Johnson).
+
+  Fix "help" command when there's no "smtpgreeting" configured (the default)
+  (Thanks to Thomas Ogrisegg)
+
+  Move the Qpsmtpd::Auth POD to a top-level README to be more obvious.
+
+  Add Qpsmtpd::Command to gather all parsing logic in one place (Hanno
+  Hecker)
+
+  Fix a spurious newline at the start of messages queued via exim (Devin
+  Carraway)
+
+  Make the clamdscan plugin temporarily deny mail if if can't talk to clamd
+  (Filippo Carletti)
+
+  Improve Qpsmtpd::Transaction documentation (Fred Moyer)
+
+
+0.32 - 2006/02/26
+
+  Add logging/file plugin for simple logging to a file (Devin Carraway and
+  Peter J. Holzer).
+
+  Add logging/syslog plugin for logging via the syslog facility (Devin
+  Carrway)
+
+  Add Qpsmtpd::DSN to return extended SMTP status codes from RFC-1893 and
+  patch existing plugins to use it when appropriate (Hanno Hecker).
+
+  Add plugins/tls_cert to generate appropriately shaped self-signed certs for 
+  TLS support.  Add explicit use of CA used to sign cert.  Abstract clone()ing
+  of connection information when switching to TLS.  Fix the AUTH code to work
+  correctly with TLS.
+
+  Add hosts_allow plugin to support pre- and post-connection hooks as well
+  as move --max-from-ip tests out of core (Hanno Hecker).
+
+  Improve postfix-queue plugin to support the known processing flags (Hanno
+  Hecker).
+
+  Drop root privileges before loading plugins, rather than after.
+
+  A few fixes to the clamdscan plugin (Dave Rolsky)
+
+  Various minor fixes and improvements
+
 
 0.31.1 - 2005/11/18
 
@@ -115,6 +203,7 @@
   Replace $ENV{RELAYCLIENT} with $connection->relay_client in last plugin.
 
   Fix typo in qpsmtpd-forkserver commandline help
+
 
 0.29 - 2005/03/03
 

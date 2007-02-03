@@ -19,7 +19,7 @@ sub hook_connect {
       $connection->relay_client(1);
       last;
     }
-    $client_ip =~ s/\d+\.?$//; # strip off another 8 bits
+    $client_ip =~ s/(\d|\w|::)+(:|\.)?$//; # strip off another 8 bits
   }
   
   return (DECLINED);

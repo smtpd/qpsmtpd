@@ -1,0 +1,267 @@
+#!/usr/bin/perl
+# $Id$
+
+=head1 NAME
+
+file - Simple log-to-file logging for qpsmtpd
+
+=head1 DESCRIPTION
+
+The 'file' logging plugin for qpsmtpd records qpsmtpd log messages into a
+file (or a named pipe, if you prefer.)
+
+=head1 CONFIGURATION
+
+To enable the logging plugin, add a line of this form to the qpsmtpd plugins
+configuration file:
+
+=over
+
+logging/file [loglevel I<level>] [reopen] [nosplit] I<path>
+
+For example:
+
+logging/file loglevel LOGINFO /var/log/qpsmtpd.log
+logging/file /var/log/qpsmtpd.log.%Y-%m-%d
+logging/file loglevel LOGCRIT reopen |/usr/local/sbin/page-sysadmin
+
+=back
+
+Multiple instances of the plugin can be configured by appending :I<N> for any
+integer(s) I<N>, to log to multiple files simultaneously, e.g. to log critical
+errors and normally verbose logs elsewhere.
+
+The filename or command given can include strftime conversion specifiers,
+which can be used to substitute time and date information into the logfile.
+The file will be reopened whenever this output changes (for example, with a
+format of qpsmtpd.log.%Y-%m-%d-%h, the log would be reopened once per hour).
+
+The list of supported conversion specifiers depends on the strftime()
+implementation of your C library. See strftime(3) for details.  Additionally,
+%i will be expanded to a (hopefully) unique session-id; if %i is used, a new
+logfile will be started for each SMTP connection.
+
+The following optional configuration setting can be supplied:
+
+=over
+
+=item nosplit
+
+If specified, the output file or pipe will be reopened at once once per
+connection, and only prior to the first log output.  This prevents logs for
+sessions that span log intervals being split across multiple logfiles.
+Without this option, the log will be reopened only when its output filename
+changes; if strftime specifiers are not used, the log will not be reopened
+at all.
+
+=item reopen
+
+Forces the log output to be reopened once per connection, as soon as something
+is available to be logged.  This can be combined with a high log severity (see
+I<loglevel> below) to facilitate SMTP service alarms with Nagios or a similar
+monitoring agent.
+
+=item loglevel I<loglevel>
+
+The internal log level below which messages will be logged.  The I<loglevel>
+given should be chosen from the list below.  Priorities count downward (for
+example, if LOGWARN were selected, LOGERROR, LOGCRIT and LOGEMERG messages
+would be logged as well).
+
+=over
+
+=item B<LOGDEBUG>
+
+=item B<LOGINFO>
+
+=item B<LOGNOTICE>
+
+=item B<LOGWARN>
+
+=item B<LOGERROR>
+
+=item B<LOGCRIT>
+
+=item B<LOGALERT>
+
+=item B<LOGEMERG>
+
+=back
+
+=back
+
+
+The chosen I<path> should be writable by the user running qpsmtpd; it will be
+created it did not already exist, and appended to otherwise.
+
+=head1 AUTHORS
+
+Devin Carraway <qpsmtpd@devin.com>, with contributions by Peter J.
+Holzer <hjp@hjp.at>.
+
+=head1 LICENSE
+
+Copyright (c) 2005-2006, Devin Carraway
+Copyright (c) 2006, Peter J. Holzer.
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use strict;
+use warnings;
+
+use IO::File;
+use Sys::Hostname;
+use POSIX qw(strftime);
+
+sub register {
+    my ($self, $qp, @args) = @_;
+    my %args;
+
+    $self->{_loglevel} = LOGWARN;
+
+    while (1) {
+    	last if !@args;
+    	if (lc $args[0] eq 'loglevel') {
+            shift @args;
+            my $ll = shift @args;
+            if (!defined $ll) {
+                warn "Malformed arguments to logging/file plugin";
+                return;
+            }
+            if ($ll =~ /^(\d+)$/) {
+                $self->{_loglevel} = $1;
+            }
+            elsif ($ll =~ /^(LOG\w+)$/) {
+                $self->{_loglevel} = log_level($1);
+                defined $self->{_loglevel} or $self->{_loglevel} = LOGWARN;
+            }
+        }
+	elsif (lc $args[0] eq 'nosplit') {
+		shift @args;
+		$self->{_nosplit} = 1;
+	}
+	elsif (lc $args[0] eq 'reopen') {
+		shift @args;
+		$self->{_reopen} = 1;
+	}
+        else { last }
+    }
+
+    unless (@args && $args[0]) {
+        warn "Malformed arguments to syslog plugin";
+        return;
+    }
+
+    my $output = join(' ', @args);
+
+    if ($output =~ /^\s*\|(.*)/) {
+    	$self->{_log_pipe} = 1;
+        $self->{_log_format} = $1;
+    } else {
+        $output =~ /^(.*)/; # detaint
+        $self->{_log_format} = $1;
+    }
+    $self->{_current_output} = '';
+    $self->{_session_counter} = 0;
+    1;
+}
+
+sub log_output {
+    my ($self, $txn) = @_;
+    my $output = $self->{_log_format};
+    $output =~ s/%i/($txn->notes('logging-session-id') || 'parent')/ge;
+    $output = strftime $output, localtime;
+    $output;
+}
+
+sub open_log {
+    my ($self,$output,$qp) = @_;
+
+    if ($self->{_log_pipe}) {
+        unless ($self->{_f} = new IO::File "|$output") {
+            warn "Error opening log output to command $output: $!";
+            return undef;
+        }
+    } else {
+        unless ($self->{_f} = new IO::File ">>$output") {
+            warn "Error opening log output to path $output: $!";
+            return undef;
+        }
+    }
+    $self->{_current_output} = $output;
+    $self->{_f}->autoflush(1);
+    1;
+}
+
+
+# Reopen the output iff the interpolated output filename has changed
+# from the one currently open, or if reopening was selected and we haven't
+# yet done so during this session.
+#
+# Returns true if the file was reopened, zero if not, undef on error.
+sub maybe_reopen {
+    my ($self, $txn) = @_;
+
+    my $new_output = $self->log_output($txn);
+    if (!$self->{_current_output} ||
+        $self->{_current_output} ne $new_output ||
+        ($self->{_reopen} &&
+         !$txn->notes('file-reopened-this-session'))) {
+        unless ($self->open_log($new_output, $txn)) {
+            return undef;
+        }
+        $txn->notes('file-reopened-this-session', 1);
+        return 1;
+    }
+    return 0;
+}
+
+sub hook_connect {
+    my ($self, $txn) = @_;
+
+    $txn->notes('file-logged-this-session', 0);
+    $txn->notes('file-reopened-this-session', 0);
+    $txn->notes('logging-session-id',
+                sprintf("%08d-%04d-%d",
+                        scalar time, $$, ++$self->{_session_counter}));
+    return DECLINED;
+}
+
+sub hook_disconnect {
+    my ($self) = @_;
+
+    if ($self->{reopen_} && $self->{_f}) {
+        $self->{_f} = undef;
+    }
+    return DECLINED;
+}
+
+sub hook_logging {
+    my ($self, $txn, $trace, $hook, $plugin, @log) = @_;
+
+    return DECLINED if !defined $self->{_loglevel} or
+                       $trace > $self->{_loglevel};
+    return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
+
+    # Possibly reopen the log iff:
+    # - It's not already open
+    # - We're allowed to split sessions across logfiles
+    # - We haven't logged anything yet this session
+    if (!$self->{_f} ||
+        !$self->{_nosplit} ||
+        !$txn->notes('file-logged-this-session')) {
+        unless (defined $self->maybe_reopen($txn)) {
+            return DECLINED;
+        }
+        $txn->notes('file-logged-this-session', 1);
+    }
+
+    my $f = $self->{_f};
+    print $f scalar localtime, ' ', hostname(), '[', $$, ']: ', @log, "\n";
+    return DECLINED;
+}
+
+# vi: tabstop=4 shiftwidth=4 expandtab:

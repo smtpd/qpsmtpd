@@ -13,7 +13,7 @@ sub start {
   my $proto = shift;
   my $class = ref($proto) || $proto;
   my %args = @_;
-  my $self = { _notes => { capabilities => [] }, _rcpt => [], started => time };
+  my $self = { _rcpt => [], started => time };
   bless ($self, $class);
   return $self;
 }
@@ -141,8 +141,21 @@ sub body_write {
   }
 }
 
-sub body_size {
+sub body_size { # depreceated, use data_size() instead
+  my $self = shift;
+  $self->log(LOGWARN, "WARNING: body_size() is depreceated, use data_size() instead");
+  $self->{_body_size} || 0;
+}
+
+sub data_size {
   shift->{_body_size} || 0;
+}
+
+sub body_length {
+  my $self = shift;
+  $self->{_body_size}   or return 0;
+  $self->{_header_size} or return 0;
+  return $self->{_body_size} - $self->{_header_size};
 }
 
 sub body_resetpos {
@@ -188,6 +201,10 @@ sub body_as_string {
         $str .= $line;
     }
     return $str;
+}
+
+sub body_fh {
+  return shift->{_body_file};
 }
 
 sub DESTROY {
@@ -294,6 +311,11 @@ use the notes field in the C<Qpsmtpd::Connection> object instead.
 Returns the temporary filename used to store the message contents; useful for
 virus scanners so that an additional copy doesn't need to be made.
 
+Calling C<body_filename()> also forces spooling to disk. A message is not 
+spooled to disk if it's size is smaller than 
+I<$self-E<gt>config("size_threshold")>, default threshold is 0, the sample
+config file sets this to 10000.
+
 =head2 body_write( $data )
 
 Write data to the end of the email.
@@ -302,7 +324,26 @@ C<$data> can be either a plain scalar, or a reference to a scalar.
 
 =head2 body_size( )
 
-Get the current size of the email.
+B<Depreceated>, Use I<data_size()> instead.
+
+=head2 data_size( )
+
+Get the current size of the email. Note that this is not the size of the 
+message that will be queued, it is the size of what the client sent after
+the C<DATA> command. If you need the size that will be queued, use
+
+ my $msg_len = length($transaction->header->as_string) 
+   + $transaction->body_length;
+
+The line above is of course only valid in I<hook_queue( )>, as other plugins
+may add headers and qpsmtpd will add it's I<Received:> header.
+
+=head2 body_length( )
+
+Get the current length of the body of the email. This length includes the
+empty line between the headers and the body. Until the client has sent 
+some data of the body of the message (i.e. headers are finished and client
+sent the empty line) this will return 0.
 
 =head2 body_resetpos( )
 
@@ -315,6 +356,12 @@ file pointer.
 =head2 body_getline( )
 
 Returns a single line of data from the body of the email.
+
+=head2 body_fh( )
+
+Returns the file handle to the temporary file of the email. This will return
+undef if the file is not opened (yet). In I<hook_data( )> or later you can 
+force spooling to disk by calling I<$transaction-E<gt>body_filename>. 
 
 =head1 SEE ALSO
 

@@ -25,8 +25,9 @@ Written by Keith C. Ivey
 Released to the public domain, 17 June 2005.
 
 =cut
+use Qpsmtpd::DSN;
 
-sub register {
+sub init {
   my ($self, $qp, @args) = @_;
 
   $self->{_max_hops} = $args[0] || 100;
@@ -45,7 +46,8 @@ sub hook_data_post {
     $transaction->header->get('Delivered-To');
 
   if ( $hops >= $self->{_max_hops} ) {
-    return DENY, "Too many hops. This message is looping.";
+    # default of too_many_hops is DENY, see comment in POD of Qpsmtpd::DSN
+    return Qpsmtpd::DSN->too_many_hops();
   }
 
   return DECLINED;

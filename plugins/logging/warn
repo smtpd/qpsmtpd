@@ -10,10 +10,10 @@ sub register {
   $self->{_level} = LOGWARN;
   if ( defined($loglevel) ) {
       if ($loglevel =~ /^\d+$/) {
-          $self->{_level} = $loglevel;
+	  $self->{_level} = $loglevel;
       }
       else {
-          $self->{_level} = log_level($loglevel);
+	  $self->{_level} = log_level($loglevel);
       }
   }
 
@@ -29,13 +29,11 @@ sub hook_logging {
   # then these lines will not be logged at all.  You can safely comment
   # out this line and it will not cause an infinite loop.
   return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
-  my $fd = $self->fd();
 
   warn 
     join(" ", $$ .
-    	(defined $fd ? " fd:$fd" : "") .
-        (defined $plugin ? " $plugin plugin:" :
-         defined $hook   ? " running plugin ($hook):"  : ""),
+         (defined $plugin ? " $plugin plugin:" :
+          defined $hook   ? " running plugin ($hook):"  : ""),
          @log), "\n"
     if ($trace <= $self->{_level});
 

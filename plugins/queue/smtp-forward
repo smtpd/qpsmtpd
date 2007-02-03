@@ -21,7 +21,7 @@ Optionally you can also add a port:
 
 use Net::SMTP;
 
-sub register {
+sub init {
   my ($self, $qp, @args) = @_;
 
   if (@args > 0) {

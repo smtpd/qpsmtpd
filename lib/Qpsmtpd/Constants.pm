@@ -4,30 +4,48 @@ require Exporter;
 
 # log levels
 my %log_levels = (
-        LOGDEBUG   => 7,
-        LOGINFO    => 6,
-        LOGNOTICE  => 5,
-        LOGWARN    => 4,
-        LOGERROR   => 3,
-        LOGCRIT    => 2,
-        LOGALERT   => 1,
-        LOGEMERG   => 0,
-        LOGRADAR   => 0,
+	LOGDEBUG   => 7,
+	LOGINFO    => 6,
+	LOGNOTICE  => 5,
+	LOGWARN    => 4,
+	LOGERROR   => 3,
+	LOGCRIT    => 2,
+	LOGALERT   => 1,
+	LOGEMERG   => 0,
+	LOGRADAR   => 0,
 );
 
 # return codes
 my %return_codes = (
-        OK                     => 900,
-        DENY                   => 901,   # 550
-        DENYSOFT               => 902,   # 450
-        DENYHARD               => 903,   # 550 + disconnect  (deprecated in 0.29)
-        DENY_DISCONNECT        => 903,   # 550 + disconnect
-        DENYSOFT_DISCONNECT    => 904,   # 450 + disconnect
-        DECLINED               => 909,
-        DONE                   => 910,
-        CONTINUATION           => 911,
-        AUTH_PENDING           => 912,
+	OK                     => 900,
+	DENY                   => 901,   # 550
+	DENYSOFT               => 902,   # 450
+	DENYHARD               => 903,   # 550 + disconnect  (deprecated in 0.29)
+	DENY_DISCONNECT        => 903,   # 550 + disconnect
+	DENYSOFT_DISCONNECT    => 904,   # 450 + disconnect
+	DECLINED               => 909,
+	DONE                   => 910,
+	CONTINUATION           => 911,   # deprecated - use YIELD
+	YIELD                  => 911,
 );
+
+my $has_ipv6;
+
+if (
+    eval {require Socket6;} &&
+    # INET6 prior to 2.01 will not work; sorry.
+    eval {require IO::Socket::INET6; IO::Socket::INET6->VERSION("2.00");}
+   ) {
+    import Socket6;
+    $has_ipv6=1;
+}
+else {
+    $has_ipv6=0;
+}
+
+sub has_ipv6 {
+    return $has_ipv6;
+}
 
 use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter);
@@ -44,24 +62,24 @@ foreach (keys %log_levels ) {
 sub return_code {
     my $test = shift;
     if ( $test =~ /^\d+$/ ) { # need to return the textural form
-        foreach ( keys %return_codes ) {
-            return $_ if $return_codes{$_} =~ /$test/;
-        }
+	foreach ( keys %return_codes ) {
+	    return $_ if $return_codes{$_} =~ /$test/;
+	}
     }
     else { # just return the numeric value
-        return $return_codes{$test};
+	return $return_codes{$test};
     }
 }
 
 sub log_level {
     my $test = shift;
     if ( $test =~ /^\d+$/ ) { # need to return the textural form
-        foreach ( keys %log_levels ) {
-            return $_ if $log_levels{$_} =~ /$test/;
-        }
+	foreach ( keys %log_levels ) {
+	    return $_ if $log_levels{$_} =~ /$test/;
+	}
     }
     else { # just return the numeric value
-        return $log_levels{$test};
+	return $log_levels{$test};
     }
 }
 

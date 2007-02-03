@@ -55,7 +55,7 @@ sub hook_data_post {
   my ($self, $transaction) = @_;
  
   return (DECLINED)
-    if $transaction->body_size > 250_000;
+    if $transaction->data_size > 250_000;
 
   # Ignore non-multipart emails
   my $content_type = $transaction->header->get('Content-Type');

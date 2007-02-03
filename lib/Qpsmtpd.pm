@@ -4,10 +4,8 @@ use vars qw($VERSION $Logger $TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
-use Qpsmtpd::Transaction;
-use Qpsmtpd::Connection;
 
-$VERSION = "0.40-dev";
+$VERSION = "0.33-dev";
 
 sub version { $VERSION };
 
@@ -17,19 +15,28 @@ sub load_logging {
   # need to do this differently that other plugins so as to 
   # not trigger logging activity
   my $self = shift;
-  #warn("load_logging: $self->{hooks}{logging} ", caller(8), "\n");
   return if $self->{hooks}->{"logging"};
   my $configdir = $self->config_dir("logging");
   my $configfile = "$configdir/logging";
   my @loggers = $self->_config_from_file($configfile,'logging');
-  my $dir = $self->plugin_dir;
 
-  $self->_load_plugins($dir, @loggers);
-
-  foreach my $logger (@loggers) {
-    $self->log(LOGINFO, "Loaded $logger");
+  $configdir = $self->config_dir('plugin_dirs');
+  $configfile = "$configdir/plugin_dirs";
+  my @plugin_dirs = $self->_config_from_file($configfile,'plugin_dirs');
+  unless (@plugin_dirs) {
+    my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
+    @plugin_dirs = ( "$name/plugins" );
   }
   
+  my @loaded;
+  for my $logger (@loggers) {
+    push @loaded, $self->_load_plugin($logger, @plugin_dirs);
+  }
+
+  foreach my $logger (@loaded) {
+    $self->log(LOGINFO, "Loaded $logger");
+  }
+
   return @loggers;
 }
   
@@ -76,9 +83,7 @@ sub varlog {
 
   unless ( $rc and $rc == DECLINED or $rc == OK ) {
     # no logging plugins registered so fall back to STDERR
-    my $fd = $self->fd();
     warn join(" ", $$ .
-      (defined $fd ? " fd:$fd" : "") .
       (defined $plugin ? " $plugin plugin:" : 
        defined $hook   ? " running plugin ($hook):"  : ""),
       @log), "\n"
@@ -117,8 +122,8 @@ sub config {
 sub config_dir {
   my ($self, $config) = @_;
   my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
-  my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-  $configdir = "$name/config" if (-e "$name/config/$config");
+  my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
+  $configdir = "$path/config" if (-e "$path/config/$config");
   if (exists $ENV{QPSMTPD_CONFIG}) {
     $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/; # detaint
     $configdir = $1 if -e "$1/$config";
@@ -126,9 +131,15 @@ sub config_dir {
   return $configdir;
 }
 
-sub plugin_dir {
-    my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-    my $dir = "$name/plugins";
+sub plugin_dirs {
+    my $self = shift;
+    my @plugin_dirs = $self->config('plugin_dirs');
+    
+    unless (@plugin_dirs) {
+        my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
+        @plugin_dirs = ( "$path/plugins" );
+    }
+    return @plugin_dirs;
 }
 
 sub get_qmail_config {
@@ -244,112 +255,102 @@ sub expand_inclusion_ {
 
 sub load_plugins {
   my $self = shift;
-
-#  if ($HOOKS) {
-#      return $self->{hooks} = $HOOKS;
-#  }
-
+  
   $self->log(LOGWARN, "Plugins already loaded") if $self->{hooks};
   $self->{hooks} = {};
   
   my @plugins = $self->config('plugins');
+  my @loaded;
 
-  my $dir = $self->plugin_dir;
-  $self->log(LOGNOTICE, "loading plugins from $dir");
+  for my $plugin_line (@plugins) {
+    my $this_plugin = $self->_load_plugin($plugin_line, $self->plugin_dirs);
+    push @loaded, $this_plugin if $this_plugin;
+  }
 
-  @plugins = $self->_load_plugins($dir, @plugins);
-  
-#  $HOOKS = $self->{hooks};
-#  
-  return @plugins;
+  return @loaded;
 }
 
-sub _load_plugins {
+sub _load_plugin {
   my $self = shift;
-  my ($dir, @plugins) = @_;
+  my ($plugin_line, @plugin_dirs) = @_;
 
-  my @ret;  
-  for my $plugin_line (@plugins) {
-    my ($plugin, @args) = split ' ', $plugin_line;
-    
+  my ($plugin, @args) = split ' ', $plugin_line;
+
+  my $package;
+
+  if ($plugin =~ m/::/) {
+    # "full" package plugin (My::Plugin)
+    $package = $plugin;
+    $package =~ s/[^_a-z0-9:]+//gi;
+    my $eval = qq[require $package;\n] 
+              .qq[sub ${plugin}::plugin_name { '$plugin' }];
+    $eval =~ m/(.*)/s;
+    $eval = $1;
+    eval $eval;
+    die "Failed loading $package - eval $@" if $@;
+    $self->log(LOGDEBUG, "Loading $package ($plugin_line)") 
+      unless $plugin_line =~ /logging/;
+  }
+  else {
+    # regular plugins/$plugin plugin
     my $plugin_name = $plugin;
     $plugin =~ s/:\d+$//;       # after this point, only used for filename
 
     # Escape everything into valid perl identifiers
     $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
-
+    
     # second pass cares for slashes and words starting with a digit
     $plugin_name =~ s{
-		      (/+)       # directory
-		      (\d?)      # package's first character
-		     }[
-		       "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
-		      ]egx;
-
-    my $package = "Qpsmtpd::Plugin::$plugin_name";
-
+        (/+)       # directory
+        (\d?)      # package's first character
+       }[
+         "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
+        ]egx;
+    
+    $package = "Qpsmtpd::Plugin::$plugin_name";
+    
     # don't reload plugins if they are already loaded
     unless ( defined &{"${package}::plugin_name"} ) {
-      Qpsmtpd::Plugin->compile($plugin_name,
-        $package, "$dir/$plugin", $self->{_test_mode});
-      $self->log(LOGDEBUG, "Loading $plugin_line") 
-        unless $plugin_line =~ /logging/;
+      PLUGIN_DIR: for my $dir (@plugin_dirs) {
+        if (-e "$dir/$plugin") {
+          Qpsmtpd::Plugin->compile($plugin_name, $package,
+            "$dir/$plugin", $self->{_test_mode});
+          $self->log(LOGDEBUG, "Loading $plugin_line from $dir/$plugin") 
+            unless $plugin_line =~ /logging/;
+          last PLUGIN_DIR;
+        }
+	else {
+	  $self->log(LOGDEBUG, "Failed to load plugin - $plugin - ignoring");
+	  return 0;
+	}
+      }
     }
-    
-    my $plug = $package->new();
-    push @ret, $plug;
-    $plug->_register($self, @args);
-
   }
+
+  my $plug = $package->new();
+  $plug->_register($self, @args);
   
-  return @ret;
+  return $plug;
 }
 
 sub transaction {
-  my $self = shift;
-  return $self->{_transaction} || $self->reset_transaction();
-}
-
-sub reset_transaction {
-  my $self = shift;
-  $self->run_hooks("reset_transaction") if $self->{_transaction};
-  return $self->{_transaction} = Qpsmtpd::Transaction->new();
-}
-
-
-sub connection {
-  my $self = shift;
-  @_ and $self->{_connection} = shift;
-  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
+    return {}; # base class implements empty transaction
 }
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
-  if ($self->{_continuation} && $hook ne "logging" && $hook ne "config") {
-    die "Continuations in progress from previous hook (this is the $hook hook)";
-  }
   my $hooks = $self->{hooks};
   if ($hooks->{$hook}) {
     my @r;
     my @local_hooks = @{$hooks->{$hook}};
-    while (@local_hooks) {
-      my $code = shift @local_hooks;
-      @r = $self->run_hook($hook, $code, @_);
-      next unless @r;
-      if ($r[0] == CONTINUATION) {
-        $self->pause_read() if $self->isa('Danga::Client');
-        $self->{_continuation} = [$hook, [@_], @local_hooks];
-      }
-      last unless $r[0] == DECLINED;
-    }
-    $r[0] = DECLINED if not defined $r[0];
-    return @r;
+    $self->{_continuation} = [$hook, [@_], @local_hooks];
+    return $self->run_continuation();
   }
-  return (0, '');
+  return $self->hook_responder($hook, [0, ''], [@_]);
 }
 
-sub finish_continuation {
-  my ($self) = @_;
+sub run_continuation {
+  my $self = shift;
   die "No continuation in progress" unless $self->{_continuation};
   $self->continue_read() if $self->isa('Danga::Client');
   my $todo = $self->{_continuation};
@@ -359,61 +360,70 @@ sub finish_continuation {
   my @r;
   while (@$todo) {
     my $code = shift @$todo;
-    @r = $self->run_hook($hook, $code, @$args);
-    if ($r[0] == CONTINUATION) {
-      $self->pause_read() if $self->isa('Danga::Client');
-      $self->{_continuation} = [$hook, $args, @$todo];
-      return @r;
+    if ( $hook eq 'logging' ) { # without calling $self->log()
+      eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
+      $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
     }
+    else {
+      $self->varlog(LOGDEBUG, $hook, $code->{name});
+      eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
+      $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
+
+      !defined $r[0]
+        and $self->log(LOGERROR, "plugin ".$code->{name}
+                       ." running the $hook hook returned undef!")
+        and next;
+
+      if ($self->transaction) {
+        my $tnotes = $self->transaction->notes( $code->{name} );
+        $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+          if (!defined $tnotes || ref $tnotes eq "HASH");
+      }
+      else {
+        my $cnotes = $self->connection->notes( $code->{name} );
+        $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+          if (!defined $cnotes || ref $cnotes eq "HASH");
+      }
+      
+      if ($r[0] == YIELD) {
+        $self->pause_read() if $self->isa('Danga::Client');
+        $self->{_continuation} = [$hook, $args, @$todo];
+        return @r;
+      }
+      elsif ($r[0] == DENY or $r[0] == DENYSOFT or
+          $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
+      {
+        $r[1] = "" if not defined $r[1];
+        $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
+        $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+      }
+      else {
+        $r[1] = "" if not defined $r[1];
+        $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
+        $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
+      }
+
+    }
+
     last unless $r[0] == DECLINED;
   }
   $r[0] = DECLINED if not defined $r[0];
-  my $responder = $hook . "_respond";
-  if (my $meth = $self->can($responder)) {
-    $self->log(LOGNOTICE, "continuation finished on $self\n");
-    return $meth->($self, $r[0], $r[1], @$args);
-  }
-  die "No ${hook}_respond method";
+  @r = map { split /\n/ } @r;
+  return $self->hook_responder($hook, \@r, $args);
 }
 
-sub run_hook {
-  my ($self, $hook, $code, @args) = @_;
-  my @r;
-  if ( $hook eq 'logging' ) { # without calling $self->log()
-    eval { (@r) = $code->{code}->($self, $self->{_transaction}, @args); };
-    $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
+sub hook_responder {
+  my ($self, $hook, $msg, $args) = @_;
+  
+  my $code = shift @$msg;
+  
+  my $responder = $hook . '_respond';
+  if (my $meth = $self->can($responder)) {
+    return $meth->($self, $code, $msg, $args);
   }
-  else {
-    $self->varlog(LOGINFO, $hook, $code->{name});
-    eval { (@r) = $code->{code}->($self, $self->transaction, @args); };
-    $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and return;
-  
-    !defined $r[0]
-      and $self->log(LOGERROR, "plugin ".$code->{name}
-                     ."running the $hook hook returned undef!")
-        and return;
-  
-    if ($self->transaction) {
-      my $tnotes = $self->transaction->notes( $code->{name} );
-      $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-        if (!defined $tnotes || ref $tnotes eq "HASH");
-    } else {
-      my $cnotes = $self->connection->notes( $code->{name} );
-      $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-        if (!defined $cnotes || ref $cnotes eq "HASH");
-    }
-  
-    # should we have a hook for "OK" too?
-    if ($r[0] == DENY or $r[0] == DENYSOFT or
-        $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
-    {
-      $r[1] = "" if not defined $r[1];
-      $self->log(LOGDEBUG, "Plugin $code->{name}, hook $hook returned $r[0], $r[1]");
-      $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
-    }
-  
-  }
-  return @r;
+  return $code, @$msg;
 }
 
 sub _register_hook {
@@ -487,34 +497,16 @@ sub size_threshold {
   return $Size_threshold;
 }
 
-sub authenticated {
-  my ($self, $state) = @_;
-  $self->{_auth_state} = $state if $state;
-  return (defined $self->{_auth_state} ? $self->{_auth_state} : 0);
-}
-
 sub auth_user {
-  my ($self, $user) = @_;
-  $self->{_auth_user} = $user if $user;
+  my $self = shift;
   return (defined $self->{_auth_user} ? $self->{_auth_user} : "" );
 }
 
-sub auth_ticket {
-  my ($self, $ticket) = @_;
-  $self->{_auth_ticket} = $ticket if $ticket;
-  return (defined $self->{_auth_ticket} ? $self->{_auth_ticket} : "" );
-}
-
 sub auth_mechanism {
-  my ($self, $mechanism) = @_;
-  $self->{_auth_mechanism} = lc($mechanism) if $mechanism;
+  my $self = shift;
   return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "" );
 }
-
-sub fd {
-    return shift->{fd};
-}
-
+  
 1;
 
 __END__

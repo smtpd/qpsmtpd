@@ -1,89 +1,130 @@
-#!/usr/bin/perl
-use Danga::DNS;
+use Qpsmtpd::DSN;
+use Net::DNS qw(mx);
+use Socket;
 
 my %invalid = ();
-
-sub init {
-    my ($self, $qp) = @_;
-    foreach my $i ($qp->config("invalid_resolvable_fromhost")) {
-	$i =~ s/^\s*//;
-	$i =~ s/\s*$//;
-	if ($i =~ m#^((\d{1,3}\.){3}\d{1,3})/(\d\d?)#) {
-	    $invalid{$1} = $3;
-	}
-    }
-}
+my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
 
 sub hook_mail {
-    my ($self, $transaction, $sender) = @_;
-    return DECLINED
-    	if ($self->qp->connection->notes('whitelistclient'));
-    
-    $self->transaction->notes('resolvable', 1);
-    return DECLINED if $sender->format eq "<>";
-    return $self->check_dns($sender->host);
+  my ($self, $transaction, $sender, %param) = @_;
+
+  return DECLINED
+        if ($self->qp->connection->notes('whitelistclient'));
+
+  foreach my $i ($self->qp->config("invalid_resolvable_fromhost")) {
+    $i =~ s/^\s*//;
+    $i =~ s/\s*$//;
+    if ($i =~ m#^((\d{1,3}\.){3}\d{1,3})/(\d\d?)#) {
+      $invalid{$1} = $3;
+    }
+  }
+
+  if ($sender ne "<>" 
+      and $self->qp->config("require_resolvable_fromhost")
+      and !$self->check_dns($sender->host)) {
+    if ($sender->host) {
+      # default of temp_resolver_failed is DENYSOFT
+      return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $sender->host);
+    } 
+    else {
+      # default of addr_bad_from_system is DENY, we use DENYSOFT here to
+      # get the same behaviour as without Qpsmtpd::DSN...
+      return Qpsmtpd::DSN->addr_bad_from_system(DENYSOFT, 
+                               "FQDN required in the envelope sender");
+    }
+  }
+  return DECLINED;
+
 }
 
 sub check_dns {
-    my ($self, $host) = @_;
-    
-    # for stuff where we can't even parse a hostname out of the address
-    return DECLINED unless $host;
-    
-    if( $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/ ) {
-        $self->transaction->notes('resolvable', 1);
-        return DECLINED;
+  my ($self, $host) = @_;
+  my @host_answers;
+
+  # for stuff where we can't even parse a hostname out of the address
+  return 0 unless $host;
+
+  return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+
+  my $res = new Net::DNS::Resolver;
+  $res->tcp_timeout(30);
+  $res->udp_timeout(30);
+  my @mx = mx($res, $host);
+  foreach my $mx (@mx) {
+    return mx_valid($self, $mx->exchange, $host);
+  }
+  my $query = $res->search($host);
+  if ($query) {
+    foreach my $rrA ($query->answer) {
+      push(@host_answers, $rrA);
     }
-
-    my $total_queries = 2;
-    my $qp = $self->qp;
-    $self->log(LOGDEBUG, "Checking $host for MX record in the background");
-    Danga::DNS->new(
-        callback => sub { dns_result($qp, @_) },
-        finished => sub { $total_queries--; finished($qp, $total_queries) },
-        host => $host,
-        type => "MX",
-        client => $qp->input_sock,
-    );
-    $self->log(LOGDEBUG, "Checking $host for A record in the background");
-    Danga::DNS->new(
-        callback => sub { dns_result($qp, @_) },
-        finished => sub { $total_queries--; finished($qp, $total_queries) },
-        host => $host,
-        client => $qp->input_sock,
-    );
-    return CONTINUATION;
-}
-
-sub finished {
-    my ($qp, $total_zones) = @_;
-    $qp->finish_continuation unless $total_zones;
-}
-
-sub dns_result {
-    my ($qp, $result, $query) = @_;
-    
-    if ($result =~ /^[A-Z]+$/) {
-        # probably an error
-        $qp->log(LOGDEBUG, "DNS error: $result looking up $query");
-    } else {
-        $qp->transaction->notes('resolvable', 1);
-        $qp->log(LOGDEBUG, "DNS lookup $query returned: $result");
+  }
+  if ($has_ipv6) {
+    my $query = $res->search($host, 'AAAA');
+    if ($query) {
+      foreach my $rrAAAA ($query->answer) {
+        push(@host_answers, $rrAAAA);
+      }
     }
-}
-
-
-sub hook_rcpt {
-    my ($self, $transaction) = @_;
-    
-    if (!$transaction->notes('resolvable')) {
-        my $sender = $transaction->sender;
-        $self->log(LOGDEBUG, "Could not resolve " .$sender->host) if $sender->host;
-        return (DENYSOFT, 
-		      ($sender->host
-    		   ? "Could not resolve ". $sender->host
-           	   : "FQDN required in the envelope sender"));
+  } 
+  if (@host_answers) {
+    foreach my $rr (@host_answers) {
+      return is_valid($rr->address) if $rr->type eq "A" or $rr->type eq "AAAA";
+      return mx_valid($self, $rr->exchange, $host) if $rr->type eq "MX";
     }
-    
-    return DECLINED;
+  }
+  else {
+    $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
+      unless $res->errorstring eq "NXDOMAIN";
+  }
+  return 0;
 }
+
+sub is_valid {
+  my $ip = shift;
+  my ($net,$mask);
+  ### while (($net,$mask) = each %invalid) {
+  ###         ... does NOT reset to beginning, will start on
+  ###         2nd invocation after where it denied the first time..., so
+  ###         2nd time the same "MAIL FROM" would be accepted!
+  foreach $net (keys %invalid) {
+    $mask = $invalid{$net};
+    $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
+    return 0 
+      if join(".", unpack("C4", inet_aton($ip) & $mask)) eq $net;
+  }
+  return 1; 
+}
+
+sub mx_valid {
+  my ($self, $name, $host) = @_;
+  my $res   = new Net::DNS::Resolver;
+  my @mx_answers;
+  my $query = $res->search($name, 'A');
+  if ($query) {
+    foreach my $rrA ($query->answer) {
+      push(@mx_answers, $rrA);
+    }
+  }
+  if ($has_ipv6) {
+    my $query = $res->search($name, 'AAAA');
+    if ($query) {
+      foreach my $rrAAAA ($query->answer) {
+        push(@mx_answers, $rrAAAA);
+      }
+    }
+  }
+  if (@mx_answers) {
+    foreach my $rr (@mx_answers) {
+      next unless $rr->type eq "A" or $rr->type eq "AAAA";
+      return is_valid($rr->address);
+    }
+  }
+  else {
+    $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
+      unless $res->errorstring eq "NXDOMAIN";
+  }
+  return 0;
+}
+
+# vim: ts=2 sw=2 expandtab syn=perl
