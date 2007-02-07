@@ -497,6 +497,11 @@ sub size_threshold {
   return $Size_threshold;
 }
 
+sub authenticated {
+  my $self = shift;
+  return (defined $self->{_auth} ? $self->{_auth} : "" );
+}
+
 sub auth_user {
   my $self = shift;
   return (defined $self->{_auth_user} ? $self->{_auth_user} : "" );

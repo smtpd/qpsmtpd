@@ -15,6 +15,7 @@ use fields qw(
     hooks
     start_time
     cmd_timeout
+    _auth
     _auth_mechanism
     _auth_state
     _auth_ticket
