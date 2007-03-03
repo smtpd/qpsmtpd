@@ -22,6 +22,7 @@ my $qpsmtpd = Qpsmtpd::TcpServer->new();
 $qpsmtpd->load_plugins();
 $qpsmtpd->start_connection();
 $qpsmtpd->run();
+$qpsmtpd->run_hooks("post-connection");
 
 __END__
 
