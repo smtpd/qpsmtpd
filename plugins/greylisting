@@ -129,7 +129,7 @@ my $DENYMSG = "This mail is temporarily denied";
 my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
 my $DB = "denysoft_greylist.dbm";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
-  black_timeout grey_timeout white_timeout deny_late mode);
+  black_timeout grey_timeout white_timeout deny_late mode db_dir);
 
 my %DEFAULTS = (
   remote_ip => 1,
@@ -205,6 +205,10 @@ sub denysoft_greylist {
   return DECLINED if $self->qp->connection->relay_client();
   return DECLINED if $self->qp->connection->notes('whitelisthost');
   return DECLINED if $transaction->notes('whitelistsender');
+
+  if ($config->{db_dir} =~ m{^([-a-zA-Z0-9./_]+)$}) {
+    $config->{db_dir} = $1; 
+  }
 
   # Setup database location
   my $dbdir = $transaction->notes('per_rcpt_configdir') 
