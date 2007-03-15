@@ -1,5 +1,7 @@
 0.33 (to be)
 
+  Correct header parsing of "space only" lines (Joerg Meyer)
+
   Update the sample configuration to use zen.spamhaus.org
 
   Support "module" plugins ("My::Plugin" in the config/plugins file)

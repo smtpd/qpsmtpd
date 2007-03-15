@@ -616,7 +616,7 @@ sub data_respond {
     unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
       s/^\.\./\./;
-      if ($in_header and m/^\s*$/) {
+      if ($in_header and m/^$/) {
         $in_header = 0;
         my @headers = split /^/m, $buffer;
 
