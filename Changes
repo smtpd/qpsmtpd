@@ -1,5 +1,7 @@
 0.33 (to be)
 
+  Added tests for the rcpt_ok plugin (Guy Hulbert, issue #4)
+
   greylisting: fix db_dir configuration option so it actually works
   (kitno455, issue #6)
 

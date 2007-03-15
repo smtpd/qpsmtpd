@@ -1,0 +1,22 @@
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test("test_returnval", 2);
+    $self->register_test("foo", 1);
+}
+
+sub test_returnval {
+    my $self = shift;
+    my $address = Qpsmtpd::Address->parse('<me@example.com>');
+    my ($ret, $note) = $self->hook_rcpt($self->qp->transaction, $address);
+    is($ret, DENY, "Check we got a DENY");
+    print("# rcpt_ok result: $note\n");
+    $address = Qpsmtpd::Address->parse('<me@localhost>');
+    ($ret, $note) = $self->hook_rcpt($self->qp->transaction, $address);
+    is($ret, OK, "Check we got a OK");
+#    print("# rcpt_ok result: $note\n");
+}
+
+sub foo {
+    ok(1);
+}
