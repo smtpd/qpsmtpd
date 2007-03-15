@@ -128,8 +128,9 @@ my $VERSION = '0.07';
 my $DENYMSG = "This mail is temporarily denied";
 my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
 my $DB = "denysoft_greylist.dbm";
-my %ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
+my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
   black_timeout grey_timeout white_timeout deny_late mode);
+
 my %DEFAULTS = (
   remote_ip => 1,
   sender => 0,
@@ -145,7 +146,7 @@ sub register {
   my $config = { %DEFAULTS, 
     map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'), 
     %arg };
-  if (my @bad = grep { ! exists $ARGS{$_} } sort keys %$config) {
+  if (my @bad = grep { ! exists $PERMITTED_ARGS{$_} } sort keys %$config) {
     $self->log(LOGALERT, "invalid parameter(s): " . join(',',@bad));
   }
   $self->{_greylist_config} = $config;
