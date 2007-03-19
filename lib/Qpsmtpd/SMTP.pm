@@ -307,7 +307,7 @@ sub mail {
   # Since we are a qmail-smtpd thing we will do the same.
 
   $self->reset_transaction;
-
+  
   unless ($self->connection->hello) {
     return $self->respond(503, "please say hello first ...");
   }

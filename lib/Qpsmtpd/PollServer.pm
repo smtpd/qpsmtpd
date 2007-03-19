@@ -111,7 +111,6 @@ sub process_line {
     if ($@) {
         print STDERR "Error: $@\n";
         return $self->fault("command failed unexpectedly") if $self->{mode} eq 'cmd';
-        return $self->fault("error processing data lines") if $self->{mode} eq 'data';
         return $self->fault("unknown error");
     }
     return;
@@ -130,9 +129,6 @@ sub _process_line {
         $line =~ s/\r?\n//;
         return $self->process_cmd($line);
     }
-    elsif ($self->{mode} eq 'data') {
-        return $self->data_line($line);
-    }
     else {
         die "Unknown mode";
     }
@@ -141,7 +137,7 @@ sub _process_line {
 sub process_cmd {
     my Qpsmtpd::PollServer $self = shift;
     my $line = shift;
-    my ($cmd, @params) = split(/ +/, $line);
+    my ($cmd, @params) = split(/ +/, $line, 2);
     my $meth = lc($cmd);
     if (my $lookup = $self->{_commands}->{$meth} && $self->can($meth)) {
         my $resp = eval {
@@ -223,8 +219,6 @@ sub data_respond {
     return $self->respond(503, "MAIL first") unless $self->transaction->sender;
     return $self->respond(503, "RCPT first") unless $self->transaction->recipients;
     
-    $self->{mode} = 'data';
-    
     $self->{header_lines} = '';
     $self->{data_size} = 0;
     $self->{in_header} = 1;
@@ -245,7 +239,7 @@ sub got_data {
 
     my $done = 0;
     my $remainder;
-    if ($data =~ s/^\.\r\n(.*)\z//m) {
+    if ($data =~ s/^\.\r\n(.*)\z//ms) {
         $remainder = $1;
         $done = 1;
     }
@@ -291,71 +285,10 @@ sub got_data {
  
 
     if ($done) {
-        $self->{mode} = 'cmd';
         $self->end_of_data;
         $self->end_get_chunks($remainder);
     }
 
-}
-
-sub data_line {
-    my Qpsmtpd::PollServer $self = shift;
-
-    print "YIKES\n";
-    
-    my $line = shift;
-    
-    if ($line eq ".\r\n") {
-        # add received etc.
-        $self->{mode} = 'cmd';
-        return $self->end_of_data;
-    }
-
-    # Reject messages that have either bare LF or CR. rjkaes noticed a
-    # lot of spam that is malformed in the header.
-    if ($line eq ".\n" or $line eq ".\r") {
-        $self->respond(421, "See http://smtpd.develooper.com/barelf.html");
-        $self->disconnect;
-        return;
-    }
-    
-    # add a transaction->blocked check back here when we have line by line plugin access...
-    unless (($self->{max_size} and $self->{data_size} > $self->{max_size})) {
-        $line =~ s/\r\n$/\n/;
-        $line =~ s/^\.\./\./;
-        
-        if ($self->{in_header} and $line =~ m/^\s*$/) {
-            # end of headers
-            $self->{in_header} = 0;
-            
-            # ... need to check that we don't reformat any of the received lines.
-            #
-            # 3.8.2 Received Lines in Gatewaying
-            #   When forwarding a message into or out of the Internet environment, a
-            #   gateway MUST prepend a Received: line, but it MUST NOT alter in any
-            #   way a Received: line that is already in the header.
-    
-            my $header = Mail::Header->new($self->{header_lines},
-                                            Modify => 0, MailFrom => "COERCE");
-            $self->transaction->header($header);
-
-            #$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
-    
-            # FIXME - call plugins to work on just the header here; can
-            # save us buffering the mail content.
-        }
-
-        if ($self->{in_header}) {
-            push @{ $self->{header_lines} }, $line;
-        }
-        else {
-            $self->transaction->body_write(\$line);
-        }
-        
-        $self->{data_size} += length $line;
-    }
-    
-    return;
 }
 
 sub end_of_data {
