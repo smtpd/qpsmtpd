@@ -170,6 +170,7 @@ sub start_conversation {
     my $conn = $self->connection;
     # set remote_host, remote_ip and remote_port
     my ($ip, $port) = split(':', $self->peer_addr_string);
+    return $self->close() unless $ip;
     $conn->remote_ip($ip);
     $conn->remote_port($port);
     $conn->remote_info("[$ip]");
