@@ -1,0 +1,218 @@
+#!/usr/bin/perl -w
+
+use ParaDNS;
+
+sub init {
+  my ($self, $qp, $denial ) = @_;
+  if ( defined $denial and $denial =~ /^disconnect$/i ) {
+    $self->{_dnsbl}->{DENY} = DENY_DISCONNECT;
+  }
+  else {
+    $self->{_dnsbl}->{DENY} = DENY;
+  }
+
+}
+
+sub hook_connect {
+  my ($self, $transaction) = @_;
+
+  my $remote_ip = $self->connection->remote_ip;
+
+  my $allow = grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) } $self->qp->config('dnsbl_allow');
+  return DECLINED if $allow;
+
+  my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
+  return DECLINED unless %dnsbl_zones;
+
+  my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
+
+  my $total_zones = keys %dnsbl_zones;
+  my $qp = $self->qp;
+  for my $dnsbl (keys %dnsbl_zones) {
+    # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
+    if (defined($dnsbl_zones{$dnsbl})) {
+      $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
+      ParaDNS->new(
+        callback => sub { process_a_result($qp, $dnsbl_zones{$dnsbl}, @_) },
+        finished => sub { $total_zones--; finished($qp, $total_zones) },
+        host => "$reversed_ip.$dnsbl",
+        type => 'A',
+        client => $self->qp->input_sock,
+      );
+    } else {
+      $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
+      ParaDNS->new(
+        callback => sub { process_txt_result($qp, @_) },
+        finished => sub { $total_zones--; finished($qp, $total_zones) },
+        host => "$reversed_ip.$dnsbl",
+        type => 'TXT',
+        client => $self->qp->input_sock,
+      );
+    }
+  }
+
+  return YIELD;
+}
+
+sub finished {
+    my ($qp, $total_zones) = @_;
+    $qp->log(LOGINFO, "Finished ($total_zones)");
+    $qp->run_continuation unless $total_zones;
+}
+
+sub process_a_result {
+    my ($qp, $template, $result, $query) = @_;
+    
+    $qp->log(LOGINFO, "Result for A $query: $result");
+    if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
+        # NXDOMAIN or ERROR possibly...
+        return;
+    }
+    
+    my $conn = $qp->connection;
+    my $ip = $conn->remote_ip;
+    $template =~ s/%IP%/$ip/g;
+    $conn->notes('dnsbl', $template) unless $conn->notes('dnsbl');
+}
+
+sub process_txt_result {
+    my ($qp, $result, $query) = @_;
+    
+    $qp->log(LOGINFO, "Result for TXT $query: $result");
+    if ($result !~ /[a-z]/) {
+        # NXDOMAIN or ERROR probably...
+        return;
+    }
+    
+    my $conn = $qp->connection;
+    $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
+}
+
+sub hook_rcpt {
+  my ($self, $transaction, $rcpt) = @_;
+  my $connection = $self->qp->connection;
+
+  # RBLSMTPD being non-empty means it contains the failure message to return
+  if (defined ($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
+    my $result = $ENV{'RBLSMTPD'};
+    my $remote_ip = $self->connection->remote_ip;
+    $result =~ s/%IP%/$remote_ip/g;
+    return (DENY, join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
+  }
+
+  my $note = $self->connection->notes('dnsbl');
+  return (DENY, $note) if $note;
+  return DECLINED;
+}
+
+sub hook_disconnect {
+  my ($self, $transaction) = @_;
+
+  $self->qp->connection->notes('dnsbl_sockets', undef);
+
+  return DECLINED;
+}
+
+1;
+
+=head1 NAME
+
+dnsbl - handle DNS BlackList lookups
+
+=head1 DESCRIPTION
+
+Plugin that checks the IP address of the incoming connection against
+a configurable set of RBL services.
+
+=head1 Configuration files
+
+This plugin uses the following configuration files. All of these are optional.
+However, not specifying dnsbl_zones is like not using the plugin at all.
+
+=over 4
+
+=item dnsbl_zones
+
+Normal ip based dns blocking lists ("RBLs") which contain TXT records are
+specified simply as:
+
+  relays.ordb.org
+  spamsources.fabel.dk
+
+To configure RBL services which do not contain TXT records in the DNS,
+but only A records (e.g. the RBL+ at http://www.mail-abuse.org), specify your
+own error message to return in the SMTP conversation after a colon e.g.
+
+  rbl-plus.mail-abuse.org:You are listed at - http://http://www.mail-abuse.org/cgi-bin/lookup?%IP%
+
+The string %IP% will be replaced with the IP address of incoming connection.
+Thus a fully specified file could be:
+
+  sbl-xbl.spamhaus.org
+  list.dsbl.org
+  rbl-plus.mail-abuse.ja.net:Listed by rbl-plus.mail-abuse.ja.net - see <URL:http://www.mail-abuse.org/cgi-bin/lookup?%IP%>
+  relays.ordb.org
+
+=item dnsbl_allow
+
+List of allowed ip addresses that bypass RBL checking. Format is one entry per line,
+with either a full IP address or a truncated IP address with a period at the end.
+For example:
+
+  192.168.1.1
+  172.16.33.
+
+NB the environment variable RBLSMTPD is considered before this file is 
+referenced. See below.
+
+=item dnsbl_rejectmsg
+
+A textual message that is sent to the sender on an RBL failure. The TXT record
+from the RBL list is also sent, but this file can be used to indicate what
+action the sender should take.
+
+For example:
+
+   If you think you have been blocked in error, then please forward
+   this entire error message to your ISP so that they can fix their problems.
+   The next line often contains a URL that can be visited for more information.
+
+=back
+
+=head1 Environment Variables
+
+=head2 RBLSMTPD
+
+The environment variable RBLSMTPD is supported and mimics the behaviour of
+Dan Bernstein's rblsmtpd. The exception to this is the '-' char at the 
+start of RBLSMTPD which is used to force a hard error in Dan's rblsmtpd.
+NB I don't really see the benefit
+of using a soft error for a site in an RBL list. This just complicates
+things as it takes 7 days (or whatever default period) before a user
+gets an error email back. In the meantime they are complaining that their
+emails are being "lost" :(
+
+=over 4
+
+=item RBLSMTPD is set and non-empty
+
+The contents are used as the SMTP conversation error.
+Use this for forcibly blocking sites you don't like
+
+=item RBLSMTPD is set, but empty
+
+In this case no RBL checks are made.
+This can be used for local addresses.
+
+=item RBLSMTPD is not set
+
+All RBL checks will be made.
+This is the setting for remote sites that you want to check against RBL.
+
+=back
+
+=head1 Revisions
+
+See: http://cvs.perl.org/viewcvs/qpsmtpd/plugins/dnsbl
+
+=cut

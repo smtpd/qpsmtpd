@@ -1,0 +1,138 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+check_earlytalker - Check that the client doesn't talk before we send the SMTP banner
+
+=head1 DESCRIPTION
+
+Checks to see if the remote host starts talking before we've issued a 2xx
+greeting.  If so, we're likely looking at a direct-to-MX spam agent which
+pipelines its entire SMTP conversation, and will happily dump an entire spam
+into our mail log even if later tests deny acceptance.
+
+Depending on configuration, clients which behave in this way are either
+immediately disconnected with a deny or denysoft code, or else are issued this
+on all mail/rcpt commands in the transaction.
+
+=head1 CONFIGURATION
+
+=over 4
+
+=item wait [integer]
+
+The number of seconds to delay the initial greeting to see if the connecting
+host speaks first.  The default is 1.  Do not select a value that is too high,
+or you may be unable to receive mail from MTAs with short SMTP connect or
+greeting timeouts -- these are known to range as low as 30 seconds, and may
+in some cases be configured lower by mailserver admins.  Network transit time
+must also be allowed for.
+
+=item action [string: deny, denysoft, log]
+
+What to do when matching an early-talker -- the options are I<deny>,
+I<denysoft> or I<log>.
+
+If I<log> is specified, the connection will be allowed to proceed as normal,
+and only a warning will be logged.
+
+The default is I<denysoft>.
+
+=item defer-reject [boolean]
+
+When an early-talker is detected, if this option is set to a true value, the
+SMTP greeting will be issued as usual, but all RCPT/MAIL commands will be
+issued a deny or denysoft (depending on the value of I<action>).  The default
+is to react at the SMTP greeting stage by issuing the apropriate response code
+and terminating the SMTP connection.
+
+=item check-at [string: connect, data]
+
+Defines when to check for early talkers, either at connect time (pre-greet pause)
+or at DATA time (pause before sending "354 go ahead").
+
+The default is I<connect>.
+
+Note that defer-reject has no meaning if check-at is I<data>.
+
+=back
+
+=cut
+
+my $MSG = 'Connecting host started transmitting before SMTP greeting';
+
+sub register {
+  my ($self, $qp, @args) = @_;
+
+  if (@args % 2) {
+	$self->log(LOGERROR, "Unrecognized/mismatched arguments");
+	return undef;
+  }
+  $self->{_args} = {
+  	'wait' => 1,
+	'action' => 'denysoft',
+	'defer-reject' => 0,
+	'check-at' => 'connect',
+	@args,
+  };
+  print STDERR "Check at: ", $self->{_args}{'check-at'}, "\n";
+  $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_poll');
+  $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_post');
+  if ($self->{_args}{'check-at'} eq 'connect') {
+    $self->register_hook('mail', 'hook_mail')
+      if $self->{_args}->{'defer-reject'};
+  }
+  1;
+}
+
+sub check_talker_poll {
+  my ($self, $transaction) = @_;
+  
+  my $qp = $self->qp;
+  my $conn = $qp->connection;
+  my $check_until = time + $self->{_args}{'wait'};
+  $qp->AddTimer(1, sub { read_now($qp, $conn, $check_until, $self->{_args}{'check-at'}) });
+  return YIELD;
+}
+
+sub read_now {
+  my ($qp, $conn, $until, $phase) = @_;
+  
+  if ($qp->has_data) {
+    $qp->log(LOGNOTICE, 'remote host started talking after $phase before we responded');
+    $qp->clear_data if $phase eq 'data';
+    $conn->notes('earlytalker', 1);
+    $qp->run_continuation;
+  }
+  elsif (time >= $until) {
+    # no early talking
+    $qp->run_continuation;
+  }
+  else {
+    $qp->AddTimer(1, sub { read_now($qp, $conn, $until, $phase) });
+  }
+}
+
+sub check_talker_post {
+  my ($self, $transaction) = @_;
+  
+  my $conn = $self->qp->connection;
+  return DECLINED unless $conn->notes('earlytalker');
+  return DECLINED if $self->{'defer-reject'};
+  return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
+  return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
+  return DECLINED; # assume action eq 'log'
+}
+
+sub hook_mail {
+  my ($self, $txn) = @_;
+
+  return DECLINED unless $self->connection->notes('earlytalker');
+  return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
+  return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
+  return DECLINED;
+}
+
+
+1;
+
