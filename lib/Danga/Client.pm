@@ -152,7 +152,11 @@ sub continue_read {
     $self->{pause_count}--;
     if ($self->{pause_count} <= 0) {
         $self->{pause_count} = 0;
-        # $self->watch_read(1);
+        $self->AddTimer(0, sub {
+            if (length($self->{line}) && !$self->paused) {
+                $self->process_read_buf(\""); # " for bad syntax highlighters
+            }
+        });
     }
 }
 
