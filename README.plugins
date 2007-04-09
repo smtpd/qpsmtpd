@@ -232,6 +232,24 @@ in
 
     - if we're in a connection, store things in the connection notes instead.
 
+=head2 received_line
+
+If you wish to provide your own Received header line, do it here.
+
+The hook is passed the following extra parameters (beyond $self and $transaction):
+
+ - $smtp - the SMTP type used (e.g. "SMTP" or "ESMTP").
+ - $auth - the Auth header additionals.
+ - $sslinfo - information about SSL for the header.
+
+You're free to use or discard any of the above.
+
+Allowed return codes:
+
+  OK, $string   - use this string for the Received header.
+  Anything Else - use the standard Received header.
+
+
 
 =head1 Include Files
 

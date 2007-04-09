@@ -308,16 +308,24 @@ sub end_of_data {
         $self->transaction->header($header);
     }
     
-    # only true if client authenticated
-    if ( $self->authenticated == OK ) { 
-        $header->add("X-Qpsmtpd-Auth","True");
+    my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
+    my $esmtp = substr($smtp,0,1) eq "E";
+    my $authheader;
+    my $sslheader;
+    
+    if (defined $self->connection->notes('tls_enabled')
+            and $self->connection->notes('tls_enabled'))
+    {
+        $smtp .= "S" if $esmtp; # RFC3848
+        $sslheader = "(".$self->connection->notes('tls_socket')->get_cipher()." encrypted) ";
     }
     
-    $header->add("Received", "from ".$self->connection->remote_info
-                 ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
-                 . ")\n  by ".$self->config('me')." (qpsmtpd/".$self->version
-                 .") with $smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
-                  0);
+    if (defined $self->{_auth} and $self->{_auth} == OK) {
+        $smtp .= "A" if $esmtp; # RFC3848
+        $authheader = "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n";
+    }
+    
+    $header->add("Received", $self->received_line($smtp, $authheader, $sslheader), 0);
     
     return $self->respond(552, "Message too big!") if $self->{max_size} and $self->{data_size} > $self->{max_size};
     

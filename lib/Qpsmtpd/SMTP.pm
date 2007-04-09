@@ -673,11 +673,7 @@ sub data_respond {
     $authheader = "(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n";
   }
 
-  $header->add("Received", "from ".$self->connection->remote_info
-               ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
-               . ")\n  $authheader  by ".$self->config('me')." (qpsmtpd/".$self->version
-               .") with $sslheader$smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime)),
-               0);
+  $header->add("Received", $self->received_line($smtp, $authheader, $sslheader), 0);
 
   # if we get here without seeing a terminator, the connection is
   # probably dead.
@@ -695,6 +691,23 @@ sub data_respond {
   }
 
   $self->run_hooks("data_post");
+}
+
+sub received_line {
+  my ($self, $smtp, $authheader, $sslheader) = @_;
+  my ($rc, $received) = $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
+  if ($rc == YIELD) {
+    die "YIELD not supported for received_line hook";
+  }
+  elsif ($rc == OK) {
+    return $received;
+  }
+  else { # assume $rc == DECLINED
+    return  "from ".$self->connection->remote_info
+           ." (HELO ".$self->connection->hello_host . ") (".$self->connection->remote_ip
+           . ")\n  $authheader  by ".$self->config('me')." (qpsmtpd/".$self->version
+           .") with $sslheader$smtp; ". (strftime('%a, %d %b %Y %H:%M:%S %z', localtime))
+  }
 }
 
 sub data_post_respond {

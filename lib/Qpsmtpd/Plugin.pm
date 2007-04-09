@@ -9,7 +9,7 @@ our @hooks = qw(
     rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre 
     data data_post queue_pre queue queue_post
     quit reset_transaction disconnect post-connection
-    unrecognized_command deny ok
+    unrecognized_command deny ok received_line
 );
 our %hooks = map { $_ => 1 } @hooks;
 
