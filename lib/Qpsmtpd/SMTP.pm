@@ -695,12 +695,12 @@ sub data_respond {
 
 sub received_line {
   my ($self, $smtp, $authheader, $sslheader) = @_;
-  my ($rc, $received) = $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
+  my ($rc, @received) = $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
   if ($rc == YIELD) {
     die "YIELD not supported for received_line hook";
   }
   elsif ($rc == OK) {
-    return $received;
+    return join("\n", @received);
   }
   else { # assume $rc == DECLINED
     return  "from ".$self->connection->remote_info
