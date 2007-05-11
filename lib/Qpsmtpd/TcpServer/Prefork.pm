@@ -29,7 +29,7 @@ sub read_input {
     while (<STDIN>) {
       alarm 0;
       $_ =~ s/\r?\n$//s; # advanced chomp
-      $self->log(LOGDEBUG, "dispatching $_");
+      $self->log(LOGINFO, "dispatching $_");
       $self->connection->notes('original_string', $_);
       defined $self->dispatch(split / +/, $_, 2)
         or $self->respond(502, "command unrecognized: '$_'");
@@ -48,7 +48,7 @@ sub respond {
   my ($self, $code, @messages) = @_;
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
-    $self->log(LOGDEBUG, $line);
+    $self->log(LOGINFO, $line);
     print "$line\r\n" or ($self->log(LOGERROR, "Could not print [$line]: $!"), return 0);
   }
   return 1;
@@ -56,7 +56,7 @@ sub respond {
 
 sub disconnect {
   my $self = shift;
-  $self->log(LOGDEBUG,"click, disconnecting");
+  $self->log(LOGINFO,"click, disconnecting");
   $self->SUPER::disconnect(@_);
   $self->run_hooks("post-connection");
   die "disconnect_tcpserver";
