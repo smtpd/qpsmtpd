@@ -684,7 +684,8 @@ sub data_respond {
   }
 
   #$self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
-  if ( $max_size and $size > $max_size ) {
+  if ($max_size and $size > $max_size) {
+      $self->log(LOGALERT, "Message too big: size: $size (max size: $max_size)");
       $self->respond(552, "Message too big!"); 
       $self->reset_transaction; # clean up after ourselves
       return 1;
