@@ -12,7 +12,7 @@ use Qpsmtpd::Constants;
 use IO::Socket;
 use IO::Select;
 use Socket;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use POSIX qw(:sys_wait_h :errno_h :signal_h);
 use Net::DNS::Header;
 use strict;
@@ -28,10 +28,13 @@ if ($has_ipv6) {
 my $MAXCONN   = 15;                  # max simultaneous connections
 my @PORT;                            # port number(s)
 my @LOCALADDR;                       # ip address(es) to bind to
-my $USER      = 'smtpd';             # user to suid to
 my $MAXCONNIP = 5;                   # max simultaneous connections from one IP
 my $PID_FILE   = '';
 my $DETACH;                          # daemonize on startup
+my $NORDNS;
+
+my $USER = (getpwuid $>)[0];         # user to suid to
+$USER = "smtpd" if $USER eq "root";
 
 sub usage {
         print <<"EOT";
@@ -46,6 +49,7 @@ usage: qpsmtpd-forkserver [ options ]
  -m, --max-from-ip M       : limit connections from a single IP; default 5
      --pid-file P          : print main servers PID to file P
  -d, --detach              : detach from controlling terminal (daemonize)
+ -H, --no-rdns             : don't perform reverse DNS lookups
 EOT
         exit 0;
 }
@@ -58,6 +62,7 @@ GetOptions('h|help' => \&usage,
            'u|user=s' => \$USER,
            'pid-file=s' => \$PID_FILE,
            'd|detach' => \$DETACH,
+	   'H|no-rdns' => \$NORDNS,
           ) || &usage;
 
 # detaint the commandline
@@ -175,6 +180,7 @@ while (my ($name,$passwd,$gid,$members) = getgrent()) {
         $groups .= " $gid";
     }
 }
+endgrent;
 $) = $groups;
 POSIX::setgid($qgid) or
       die "unable to change gid: $!\n";
@@ -279,7 +285,7 @@ while (1) {
 	Net::DNS::Header::nextid();
     }
   
-    close($server);
+    close $_ for $select->handles;
   
     $SIG{$_} = 'DEFAULT' for keys %SIG;
     $SIG{ALRM} = sub { 
@@ -291,12 +297,22 @@ while (1) {
     # my ($port, $iaddr) = sockaddr_in($hisaddr);
     $ENV{TCPREMOTEIP} = $nto_iaddr;
 
+    if ($NORDNS) {
+      $ENV{TCPREMOTEHOST} = $ENV{TCPREMOTEIP} ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
+    }
+    else {
+      my $zero = $0;
+      $0 = "$zero (gethostbyname $ENV{TCPREMOTEIP})";
+
     if ($server->sockdomain == AF_INET) {
       $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
     }
     else {
       my ($family, $socktype, $proto, $saddr, $canonname, @res) = getaddrinfo($iaddr, $port, AF_UNSPEC);
       $ENV{TCPREMOTEHOST} = $canonname || "Unknown";
+    }
+
+      $0 = $zero;
     }
 
     # don't do this!
@@ -307,6 +323,7 @@ while (1) {
     # dup to STDIN/STDOUT
     POSIX::dup2(fileno($client), 0);
     POSIX::dup2(fileno($client), 1);
+    close $client;
     
     $qpsmtpd->start_connection
       (
