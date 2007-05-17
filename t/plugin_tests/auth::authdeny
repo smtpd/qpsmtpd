@@ -1,0 +1,14 @@
+# -*-perl-*- [emacs]
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test("test_authdeny", 1);
+}
+
+sub test_authdeny {
+    my $self = shift;
+    my $address = Qpsmtpd::Address->parse('<me@example.com>');
+    my ($ret, $note) = $self->hook_auth($self->qp->transaction, 'bogus_method',
+					'bogus_user');
+    is ($ret, DECLINED, "bogus_user is not free to abuse my relay");
+}
