@@ -314,7 +314,7 @@ sub _load_plugin {
       PLUGIN_DIR: for my $dir (@plugin_dirs) {
         if (-e "$dir/$plugin") {
           Qpsmtpd::Plugin->compile($plugin_name, $package,
-            "$dir/$plugin", $self->{_test_mode});
+            "$dir/$plugin", $self->{_test_mode}, $plugin);
           $self->log(LOGDEBUG, "Loading $plugin_line from $dir/$plugin") 
             unless $plugin_line =~ /logging/;
           last PLUGIN_DIR;

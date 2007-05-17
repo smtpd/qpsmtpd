@@ -127,7 +127,7 @@ sub isa_plugin {
 
 # why isn't compile private?  it's only called from Plugin and Qpsmtpd.
 sub compile {
-    my ($class, $plugin, $package, $file, $test_mode) = @_;
+    my ($class, $plugin, $package, $file, $test_mode, $orig_name) = @_;
     
     my $sub;
     open F, $file or die "could not open $file: $!";
@@ -140,9 +140,9 @@ sub compile {
     my $line = "\n#line 0 $file\n";
 
     if ($test_mode) {
-        if (open(F, "t/plugin_tests/$plugin")) {
+        if (open(F, "t/plugin_tests/$orig_name")) {
             local $/ = undef;
-            $sub .= "#line 1 t/plugin_tests/$plugin\n";
+            $sub .= "#line 1 t/plugin_tests/$orig_name\n";
             $sub .= <F>;
             close F;
         }
