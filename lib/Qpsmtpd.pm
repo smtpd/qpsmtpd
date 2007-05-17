@@ -319,10 +319,6 @@ sub _load_plugin {
             unless $plugin_line =~ /logging/;
           last PLUGIN_DIR;
         }
-	else {
-	  $self->log(LOGDEBUG, "Failed to load plugin - $plugin - ignoring");
-	  return 0;
-	}
       }
     }
   }
