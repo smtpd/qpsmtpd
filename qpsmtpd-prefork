@@ -19,6 +19,12 @@ use Qpsmtpd::TcpServer::Prefork;
 use Qpsmtpd::Constants;
 use Getopt::Long;
 
+my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
+
+if ($has_ipv6) {
+  use Socket6;
+}
+
 #use Time::HiRes qw(gettimeofday tv_interval);
 
 # secure shell
@@ -47,7 +53,14 @@ my $d;          # socket
 my $pid_path        = '/var/run/qpsmtpd/';
 my $PID             = $pid_path . "/qpsmtpd.pid";
 my $d_port          = 25;
-my $d_addr          = "0.0.0.0";
+my $d_addr;
+if ($has_ipv6) {
+  $d_addr           = "[::]";
+}
+else {
+  $d_addr           = "0.0.0.0";
+}
+
 my $debug           = 0;
 my $max_children    = 15;   # max number of child processes to spawn
 my $idle_children   = 5;    # number of idle child processes to spawn
@@ -67,7 +80,7 @@ sub usage {
     print <<"EOT";
 Usage: qpsmtpd-prefork [ options ]
 --quiet             : Be quiet (even errors are suppressed)
---version	    : Show version information
+--version           : Show version information
 --debug             : Enable debug output
 --interface addr    : Interface daemon should listen on (default: $d_addr)
 --port int          : TCP port daemon should listen on (default: $d_port)
@@ -134,15 +147,20 @@ sub run {
           if (!$uuid || !$ugid);
     }
 
+    my @Socket_opts = (
+                       LocalPort => $d_port,
+                       LocalAddr => $d_addr,
+                       Proto     => 'tcp',
+                       Listen    => SOMAXCONN,
+                       Reuse     => 1,
+                      );
     # create new socket (used by clients to communicate with daemon)
-    $d =
-      new IO::Socket::INET(
-                           LocalPort => $d_port,
-                           LocalAddr => $d_addr,
-                           Proto     => 'tcp',
-                           Listen    => SOMAXCONN,
-                           Reuse     => 1,
-                          );
+    if ($has_ipv6) {
+      $d = IO::Socket::INET6->new(@Socket_opts);
+    }
+    else {
+      $d = IO::Socket::INET(@Socket_opts);
+    }
     die "FATAL: Failed to start daemon.\nReason: $!\n(It may be nessesary to "
       . "wait 20 secs before starting daemon again)\n"
       unless $d;
@@ -361,7 +379,7 @@ sub new_child {
         my $sigset = block_signal(SIGHUP);
 
         # start a session if connection looks valid
-        qpsmtpd_session($client, $qpsmtpd) if ($iinfo);
+        qpsmtpd_session($client, $iinfo, $qpsmtpd) if ($iinfo);
 
         # close connection and cleanup
         $client->shutdown(2);
@@ -512,15 +530,16 @@ sub info {
 
 # start qpmstpd session
 # arg0: ref to socket object
-# arg1: ref to qpsmtpd instance
+# arg1: ref to socket object
+# arg2: ref to qpsmtpd instance
 # ret0: void
 sub qpsmtpd_session {
     my $client  = shift;    #arg0
-    my $qpsmtpd = shift;    #arg1
+    my $iinfo   = shift;    #arg1
+    my $qpsmtpd = shift;    #arg2
 
     # get local/remote hostname, port and ip address
-    my ($port,  $iaddr) = sockaddr_in(getpeername($client));    #remote
-    my ($lport, $laddr) = sockaddr_in(getsockname($client));    #local
+    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) = Qpsmtpd::TcpServer::lrpip($d, $client, $iinfo);
 
     # get current connected ip addresses (from shared memory)
     my %children;
@@ -529,9 +548,9 @@ sub qpsmtpd_session {
     my ($rc, @msg) =
       $qpsmtpd->run_hooks(
                           "pre-connection",
-                          remote_ip   => inet_ntoa($iaddr),
+                          remote_ip   => $nto_iaddr,
                           remote_port => $port,
-                          local_ip    => inet_ntoa($laddr),
+                          local_ip    => $nto_laddr,
                           local_port  => $lport,
                           max_conn_ip => $maxconnip,
                           child_addrs => [values %children],
@@ -574,9 +593,7 @@ sub qpsmtpd_session {
     };
 
     # set enviroment variables
-    $ENV{TCPLOCALIP}    = inet_ntoa($laddr);
-    $ENV{TCPREMOTEIP}   = inet_ntoa($iaddr);
-    $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
+    ($ENV{TCPLOCALIP}, $ENV{TCPREMOTEIP}, $ENV{TCPREMOTEHOST}) = Qpsmtpd::TcpServer::tcpenv($nto_laddr, $nto_iaddr);
 
     # run qpmsptd functions
     $SIG{__DIE__} = 'DEFAULT';

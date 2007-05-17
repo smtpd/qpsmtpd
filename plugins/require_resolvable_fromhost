@@ -1,9 +1,10 @@
 use Qpsmtpd::DSN;
 use Net::DNS qw(mx);
 use Socket;
+use Net::IP qw(:PROC);
 
 my %invalid = ();
-my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
+my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
@@ -99,6 +100,9 @@ sub is_valid {
 sub mx_valid {
   my ($self, $name, $host) = @_;
   my $res   = new Net::DNS::Resolver;
+  # IP in MX
+  return is_valid($name) if ip_is_ipv4($name) or ip_is_ipv6($name);
+
   my @mx_answers;
   my $query = $res->search($name, 'A');
   if ($query) {

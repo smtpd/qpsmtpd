@@ -2,25 +2,70 @@
 # $ENV{RELAYCLIENT} to see if relaying is allowed.
 #
 
+use Net::IP qw(:PROC);
+
 sub hook_connect {
   my ($self, $transaction) = @_;
   my $connection = $self->qp->connection;
 
   # Check if this IP is allowed to relay
-  my @relay_clients = $self->qp->config("relayclients");
-  my $more_relay_clients = $self->qp->config("morerelayclients", "map");
-  my %relay_clients = map { $_ => 1 } @relay_clients;
   my $client_ip = $self->qp->connection->remote_ip;
-  while ($client_ip) {
-    if (exists($ENV{RELAYCLIENT}) or
-        exists($relay_clients{$client_ip}) or
-        exists($more_relay_clients->{$client_ip}))
-    {
-      $connection->relay_client(1);
-      last;
+
+  # @crelay... for comparing, @srelay... for stripping
+  my (@crelay_clients, @srelay_clients);
+
+  my @relay_clients = $self->qp->config("relayclients");
+  for (@relay_clients) {
+    my ($range_ip, $range_prefix) = ip_splitprefix($_);
+    if($range_prefix){
+      # has a prefix, so due for comparing
+      push @crelay_clients, $_;
     }
-    $client_ip =~ s/(\d|\w|::)+(:|\.)?$//; # strip off another 8 bits
+    else {
+      # has no prefix, so due for splitting
+      push @srelay_clients, $_;
+    }
   }
   
+  if (@crelay_clients){
+    my ($range_ip, $range_prefix, $rversion, $begin, $end, $bin_client_ip);
+    my $cversion = ip_get_version($client_ip);
+    for (@crelay_clients) {
+      # Get just the IP from the CIDR range, to get the IP version, so we can
+      # get the start and end of the range
+      ($range_ip, $range_prefix) = ip_splitprefix($_);
+      $rversion = ip_get_version($range_ip);
+      ($begin, $end) = ip_normalize($_, $rversion);
+
+      # expand the client address (zero pad it) before converting to binary
+      $bin_client_ip = ip_iptobin(ip_expand_address($client_ip, $cversion), $cversion);
+
+      if (ip_bincomp($bin_client_ip, 'gt', ip_iptobin($begin, $rversion)) 
+        && ip_bincomp($bin_client_ip, 'lt', ip_iptobin($end, $rversion)))
+      {
+        $connection->relay_client(1);
+        last;
+      }
+    }
+  }
+
+  # If relay_client is already set, no point checking again
+  if (@srelay_clients && !$connection->relay_client) {
+    my $more_relay_clients = $self->qp->config("morerelayclients", "map");
+    my %srelay_clients = map { $_ => 1 } @srelay_clients;
+    $client_ip =~ s/::/:/;
+	($connection->relay_client(1) && undef($client_ip)) if $client_ip eq ":1";
+
+    while ($client_ip) {
+      if (exists($ENV{RELAYCLIENT}) or
+          exists($srelay_clients{$client_ip}) or
+          exists($more_relay_clients->{$client_ip}))
+      {
+        $connection->relay_client(1);
+        last;
+      }
+      $client_ip =~ s/(\d|\w)+(:|\.)?$//; # strip off another 8 bits
+    }
+  }
   return (DECLINED);
 }

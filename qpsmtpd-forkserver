@@ -18,7 +18,7 @@ use Net::DNS::Header;
 use strict;
 $| = 1;
 
-my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
+my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
 if ($has_ipv6) {
   eval 'use Socket6';
@@ -40,8 +40,10 @@ sub usage {
         print <<"EOT";
 usage: qpsmtpd-forkserver [ options ]
  -l, --listen-address addr : listen on specific address(es); can be specified
-                             multiple times for multiple bindings.  Default is
-        		     0.0.0.0 (all interfaces).
+                             multiple times for multiple bindings. IPv6 
+                             addresses must be inside square brackets [], and 
+                             don't need to be zero padded.
+                             Default is [::] (if has_ipv6) or 0.0.0.0 (if not)
  -p, --port P              : listen on a specific port; default 2525; can be
                              specified multiple times for multiple bindings.
  -c, --limit-connections N : limit concurrent connections to N; default 15
@@ -234,14 +236,8 @@ while (1) {
       next;
     }
     IO::Handle::blocking($client, 1);
-    my ($port, $iaddr) = ($server->sockdomain == AF_INET) ? (sockaddr_in($hisaddr)) : (sockaddr_in6($hisaddr));
-    my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) = ($server->sockdomain == AF_INET) ? (sockaddr_in($localsockaddr)) : (sockaddr_in6($localsockaddr));
-    my $nto_iaddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($iaddr)) : (inet_ntop(AF_INET6(), $iaddr));
-    my $ton_iaddr = ($server->sockdomain == AF_INET) ? (inet_aton($iaddr)) : (inet_pton(AF_INET6(), $iaddr));
-    my $nto_laddr = ($server->sockdomain == AF_INET) ? (inet_ntoa($laddr)) : (inet_ntop(AF_INET6(), $laddr));
-    $nto_iaddr =~ s/::ffff://;
-    $nto_laddr =~ s/::ffff://;
+    # get local/remote hostname, port and ip address
+    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) = Qpsmtpd::TcpServer::lrpip($server, $client, $hisaddr);
 
     my ($rc, @msg) = $qpsmtpd->run_hooks("pre-connection",
                                          remote_ip    => $nto_iaddr,
@@ -293,28 +289,9 @@ while (1) {
        ::log(LOGINFO, "Connection Timed Out"); 
        exit; };
   
-    $ENV{TCPLOCALIP} = $nto_laddr;
-    # my ($port, $iaddr) = sockaddr_in($hisaddr);
-    $ENV{TCPREMOTEIP} = $nto_iaddr;
-
-    if ($NORDNS) {
-      $ENV{TCPREMOTEHOST} = $ENV{TCPREMOTEIP} ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
-    }
-    else {
-      my $zero = $0;
-      $0 = "$zero (gethostbyname $ENV{TCPREMOTEIP})";
-
-    if ($server->sockdomain == AF_INET) {
-      $ENV{TCPREMOTEHOST} = gethostbyaddr($iaddr, AF_INET) || "Unknown";
-    }
-    else {
-      my ($family, $socktype, $proto, $saddr, $canonname, @res) = getaddrinfo($iaddr, $port, AF_UNSPEC);
-      $ENV{TCPREMOTEHOST} = $canonname || "Unknown";
-    }
-
-      $0 = $zero;
-    }
-
+    # set enviroment variables
+    ($ENV{TCPLOCALIP}, $ENV{TCPREMOTEIP}, $ENV{TCPREMOTEHOST}) = Qpsmtpd::TcpServer::tcpenv($nto_laddr, $nto_iaddr);
+    
     # don't do this!
     #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
   
