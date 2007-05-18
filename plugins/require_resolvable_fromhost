@@ -2,9 +2,10 @@ use Qpsmtpd::DSN;
 use Net::DNS qw(mx);
 use Socket;
 use Net::IP qw(:PROC);
+use Qpsmtpd::TcpServer;
 
 my %invalid = ();
-my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
+my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
 
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
