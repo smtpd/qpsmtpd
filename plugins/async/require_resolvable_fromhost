@@ -3,9 +3,10 @@
 use Qpsmtpd::DSN;
 use ParaDNS;
 use Socket;
+use Qpsmtpd::TcpServer;
 
 my %invalid  = ();
-my $has_ipv6 = Qpsmtpd::Constants::has_ipv6;
+my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
 
 sub register {
     my ( $self, $qp ) = @_;
