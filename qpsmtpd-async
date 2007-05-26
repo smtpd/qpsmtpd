@@ -36,7 +36,7 @@ my $CONFIG_LOCALADDR = '127.0.0.1';
 my $PORT        = 2525;
 my $LOCALADDR   = '0.0.0.0';
 my $PROCS       = 1;
-my $USER        = 'smtpd';      # user to suid to
+my $USER        = '';      # user to suid to
 my $PAUSED      = 0;
 my $NUMACCEPT   = 20;
 my $ACCEPT_RSET = Danga::Socket->AddTimer(30, \&reset_num_accept);
@@ -76,7 +76,7 @@ GetOptions(
 # detaint the commandline
 if ($PORT =~ /^(\d+)$/) { $PORT = $1 } else { &help }
 if ($LOCALADDR =~ /^([\d\w\-.]+)$/) { $LOCALADDR = $1 } else { &help }
-if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &help }
+if ($USER =~ /^([\w\-]+)$/) { $USER = $1 }
 if ($PROCS =~ /^(\d+)$/) { $PROCS = $1 } else { &help }
 
 sub force_poll {
@@ -192,15 +192,17 @@ sub run_as_server {
     IO::Handle::blocking($CONFIG_SERVER, 0);
     binmode($CONFIG_SERVER, ':raw');
 
-    # Drop priviledges
-    my (undef, undef, $quid, $qgid) = getpwnam $USER or
-          die "unable to determine uid/gid for $USER\n";
-    $) = "";
-    POSIX::setgid($qgid) or
-          die "unable to change gid: $!\n";
-    POSIX::setuid($quid) or
-          die "unable to change uid: $!\n";
-    $> = $quid;
+    if ($USER) {
+        # Drop priviledges
+        my (undef, undef, $quid, $qgid) = getpwnam $USER or
+              die "unable to determine uid/gid for $USER\n";
+        $) = "";
+        POSIX::setgid($qgid) or
+              die "unable to change gid: $!\n";
+        POSIX::setuid($quid) or
+              die "unable to change uid: $!\n";
+        $> = $quid;
+    }
     
     # Load plugins here
     my $plugin_loader = Qpsmtpd::SMTP->new();
@@ -292,7 +294,7 @@ sub _accept_handler {
         return 1;
     }
     
-    $client->push_back_read("Connect\n");
+    $client->process_line("Connect\n");
     $client->watch_read(1);
     return 1;
 }
