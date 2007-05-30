@@ -659,8 +659,8 @@ sub data_respond {
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
   my $esmtp = substr($smtp,0,1) eq "E";
-  my $authheader;
-  my $sslheader;
+  my $authheader = '';
+  my $sslheader = '';
 
   if (defined $self->connection->notes('tls_enabled')
       and $self->connection->notes('tls_enabled')) {
