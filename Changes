@@ -1,4 +1,14 @@
-0.33 (to be)
+0.40 - June 9, 2007
+
+  Add async server - uses epoll/kqueue/poll where available. (Matt Sergeant)
+
+  Add preforking qpsmtp server (Lars Roland)
+
+  Support SMTPS (John Peacock)
+  
+  Support "module" plugins ("My::Plugin" in the config/plugins file)
+
+  Added IPv6 support. (Mike Williams)
 
   Added tests for the rcpt_ok plugin (Guy Hulbert, issue #4)
 
@@ -13,8 +23,6 @@
   Correct header parsing of "space only" lines (Joerg Meyer, issue #11)
 
   Update the sample configuration to use zen.spamhaus.org
-
-  Support "module" plugins ("My::Plugin" in the config/plugins file)
 
   Make the badmailfrom plugin support (optional) rejection messages after the 
   rejection pattern (Robin Hugh Johnson)
@@ -34,8 +42,6 @@
   
   Clean up some of the logging (hjp)
   
-  Add async server - uses epoll/kqueue/poll where available. (Matt Sergeant)
-
   Patch to prefork code to make it run (Leonardo Helman). Add --pretty
   option to qpsmtpd-prefork to change $0 for child processes (John Peacock).
 
@@ -48,8 +54,6 @@
 
   New Qpsmtpd::Postfix::Constants to encapsulate all of the current return
   codes from Postfix, plus script to generate it.  (Hanno Hecker)
-
-  Added IPv6 support. (Mike Williams)
 
   Add ability to specific socket for syslog (Peter Eisch)
 
@@ -69,8 +73,6 @@
   Fix "help" command when there's no "smtpgreeting" configured (the default)
   (Thanks to Thomas Ogrisegg)
   
-  Add preforking qpsmtp server (Lars Roland)
-
   Move the Qpsmtpd::Auth POD to a top-level README to be more obvious.
 
   Add Qpsmtpd::Command to gather all parsing logic in one place (Hanno
@@ -79,8 +81,6 @@
   Support multiline responses from plugins (Charlie Brady)
   
   Added queue_pre and queue_post hooks (John Peacock)
-  
-  Support SMTPS (John Peacock)
   
   Implement multiple host/port listening for qpsmtpd-forkserver (Devin
   Carraway)

@@ -10,11 +10,11 @@ pez (or pezmail)
 Near term roadmap
 =================
 
-0.32:
+0.41:
       - Bugfixes
       - add module requirements to the META.yml file
 
-0.40:
+0.50:
       - Add user configuration plugin
       - Add plugin API for checking if a local email address is valid
       - use keyword "ESMTPA" in Received header in case of authentication to comply with RFC 3848.
@@ -30,8 +30,6 @@ Near term roadmap
 
 0.51: bugfixes
 
-0.60: merge with the highperf branch?
-
 1.0bN: bugfixes (repeat until we run out of bugs to fix) 
 1.0.0: it just might happen!
 1.1.0: new development
@@ -40,20 +38,7 @@ Near term roadmap
 Issues
 ======
 
-Before next release
--------------------
-
-update clamav plugin config to support the latest version properly
-
-
-Some day...
------------
-
-Understand "extension parameters" to the MAIL FROM and RCPT TO
-parameters (and make the plugin hooks able to get at them).
-
-plugins/queue/qmail-queue is still calling exit inappropriately
-(should call disconnect or some such)
+See http://code.google.com/p/smtpd/issues/list
 
 add whitelist support to the dnsbl plugin (and maybe to the rhsbl
 plugin too).  Preferably both supporting DNS based whitelists and
