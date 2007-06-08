@@ -25,3 +25,4 @@ output/.*
 ^MakeMaker-\d
 \#$
 \B\.svn\b
+^\.perltidyrc$
