@@ -1,4 +1,4 @@
-0.40 - June 9, 2007
+0.40 - June 11, 2007
 
   Add async server - uses epoll/kqueue/poll where available. (Matt Sergeant)
 
