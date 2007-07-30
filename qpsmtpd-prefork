@@ -159,7 +159,7 @@ sub run {
       $d = IO::Socket::INET6->new(@Socket_opts);
     }
     else {
-      $d = IO::Socket::INET(@Socket_opts);
+      $d = IO::Socket::INET->new(@Socket_opts);
     }
     die "FATAL: Failed to start daemon.\nReason: $!\n(It may be nessesary to "
       . "wait 20 secs before starting daemon again)\n"
