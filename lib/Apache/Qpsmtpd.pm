@@ -62,7 +62,9 @@ sub start_connection {
         remote_info => $remote_info,
         remote_ip   => $remote_ip,
         remote_host => $remote_host,
-        @_);
+        local_ip    => $opts{conn}->local_ip,
+        @_
+    );
 }
 
 sub config {
