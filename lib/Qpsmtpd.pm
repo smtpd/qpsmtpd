@@ -320,6 +320,9 @@ sub _load_plugin {
           last PLUGIN_DIR;
         }
       }
+      die "Plugin $plugin_name not found in our plugin dirs (",
+      	  join(", ", @plugin_dirs),")"
+        unless defined &{"${package}::plugin_name"};
     }
   }
 
