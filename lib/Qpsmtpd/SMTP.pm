@@ -767,7 +767,7 @@ sub queue_respond {
   my ($self, $rc, $msg, $args) = @_;
   
   # reset transaction if we queued the mail
-  return $self->reset_transaction;
+  $self->reset_transaction;
   
   if ($rc == DONE) {
     return 1;
