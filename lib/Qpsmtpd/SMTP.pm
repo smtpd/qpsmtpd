@@ -719,18 +719,18 @@ sub data_post_respond {
   elsif ($rc == DENY) {
     $msg->[0] ||= "Message denied";
     $self->respond(552, @$msg);
+    # DATA is always the end of a "transaction"
+    return $self->reset_transaction;
   }
   elsif ($rc == DENYSOFT) {
     $msg->[0] ||= "Message denied temporarily";
     $self->respond(452, @$msg);
+    # DATA is always the end of a "transaction"
+    return $self->reset_transaction;
   } 
   else {
     $self->queue($self->transaction);
   }
-
-  # DATA is always the end of a "transaction"
-  return $self->reset_transaction;
-
 }
 
 sub getline {
@@ -765,6 +765,10 @@ sub queue_pre_respond {
 
 sub queue_respond {
   my ($self, $rc, $msg, $args) = @_;
+  
+  # reset transaction if we queued the mail
+  return $self->reset_transaction;
+  
   if ($rc == DONE) {
     return 1;
   }
