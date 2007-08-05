@@ -172,7 +172,12 @@ Apache::Qpsmtpd - a mod_perl-2 connection handler for qpsmtpd
 
 =head1 SYNOPSIS
 
-  Listen 0.0.0.0:25
+  Listen 0.0.0.0:25 smtp
+  AcceptFilter smtp none
+  ## "smtp" and the AcceptFilter are required for Linux, FreeBSD 
+  ## with apache >= 2.1.5, for others it doesn't hurt. See also
+  ## http://httpd.apache.org/docs/2.2/mod/core.html#acceptfilter
+  ## and http://httpd.apache.org/docs/2.2/mod/mpm_common.html#listen
   
   LoadModule perl_module modules/mod_perl.so
   
