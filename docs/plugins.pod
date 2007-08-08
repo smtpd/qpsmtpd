@@ -1,0 +1,1421 @@
+#
+# This file is best read with ``perldoc plugins.pod''
+#
+
+### 
+# Conventions:
+#  plugin names:  F<myplugin>, F<qpsmtpd-async>
+#  constants:     I<LOGDEBUG>
+#  smtp commands, answers: B<HELO>, B<250 Queued!>
+#
+# Notes: 
+#  * due to restrictions of some POD parsers, no C<<$object->method()>>
+#    are allowed, use C<$object-E<gt>method()> 
+# 
+
+=head1 Introduction
+
+Plugins are the heart of qpsmtpd. The core implements only basic SMTP protocol
+functionality. No useful function can be done by qpsmtpd without loading 
+plugins.
+
+Plugins are loaded on startup where each of them register their interest in 
+various I<hooks> provided by the qpsmtpd core engine.
+
+At least one plugin B<must> allow or deny the B<RCPT> command to enable 
+receiving mail. The F<check_relay> plugin is the standard plugin for this.
+Other plugins provide extra functionality related to this; for example the
+F<require_resolvable_fromhost> plugin.
+
+=head2 Loading Plugins
+
+The list of plugins to load are configured in the I<config/plugins>
+configuration file. One plugin per line, empty lines and lines starting
+with I<#> are ignored. The order they are loaded is the same as given 
+in this config file. This is also the order the registered I<hooks>
+are run. The plugins are loaded from the F<plugins/> directory or 
+from a subdirectory of it. If a plugin should be loaded from such a 
+subdirectory, the directory must also be given, like the 
+F<virus/clamdscan> in the example below. Alternate plugin directories
+may be given in the F<config/plugin_dirs> config file, one directory
+per line, these will be searched first before using the builtin fallback
+of F<plugins/> relative to the qpsmtpd root directory. It may be 
+necessary, that the F<config/plugin_dirs> must be used (if you're using 
+F<Apache::Qpsmtpd>, for example).
+
+Some plugins may be configured by passing arguments in the F<plugins>
+config file.
+
+A plugin can be loaded two or more times with different arguments by adding
+I<:N> to the plugin filename, with I<N> being a number, usually starting at 
+I<0>. 
+
+Another method to load a plugin is to create a valid perl module, drop this
+module in perl's C<@INC> path and give the name of this module as
+plugin name. The only restriction to this is, that the module name B<must>
+contain I<::>, e.g. C<My::Plugin> would be ok, C<MyPlugin> not. Appending of
+I<:0>, I<:1>, ... does not work with module plugins.
+
+ check_relay
+ virus/clamdscan
+ spamassassin reject_threshold 7
+ my_rcpt_check example.com
+ my_rcpt_check:0 example.org
+ My::Plugin
+
+=head1 Anatomy of a plugin
+
+A plugin has at least one method, which inherits from the 
+C<Qpsmtpd::Plugin> object. The first argument for this method is always the 
+plugin object itself (and usually called C<$self>). The most simple plugin 
+has one method with a predefined name which just returns one constant.
+
+ # plugin temp_disable_connection
+ sub hook_connect {
+    return(DENYSOFT, "Sorry, server is temporarily unavailable.");
+ }
+
+While this is a valid plugin, it is not very useful except for rare 
+circumstances. So let us see what happens when a plugin is loaded.
+
+=head2 Initialisation
+
+After the plugin is loaded the C<init()> method of the plugin is called, 
+if present. The arguments passed to C<init()> are 
+
+=over 4
+
+=item $self 
+
+the current plugin object, usually called C<$self>
+
+=item $qp
+
+the Qpsmtpd object, usually called C<$qp>.
+
+=item @args
+
+the values following the plugin name in the F<plugins> config, split by 
+white space. These arguments can be used to configure the plugin with 
+default and/or static config settings, like database paths, 
+timeouts, ...
+
+=back
+
+This is mainly used for inheriting from other plugins, but may be used to do
+the same as in C<register()>.
+
+The next step is to register the hooks the plugin provides. Any method which 
+is named C<hook_$hookname> is automagically added.
+
+Plugins should be written using standard named hook subroutines. This 
+allows them to be overloaded and extended easily. Because some of the 
+callback names have characters invalid in subroutine names , they must be 
+translated. The current translation routine is C<s/\W/_/g;>. If you choose 
+not to use the default naming convention, you need to register the hooks in 
+your plugin in the C<register()> method (see below) with the 
+C<register_hook()> call on the plugin object.
+
+  sub register {
+    my ($self, $qp, @args) = @_;
+    $self->register_hook("mail", "mail_handler");
+    $self->register_hook("rcpt", "rcpt_handler");
+  }
+  sub mail_handler { ... }
+  sub rcpt_handler { ... }
+
+The C<register()> method is called last. It receives the same arguments as 
+C<init()>. There is no restriction, what you can do in C<register()>, but 
+creating database connections and reuse them later in the process may not be
+a good idea. This initialisation happens before any C<fork()> is done. 
+Therefore the file handle will be shared by all qpsmtpd processes and the 
+database will probably be confused if several different queries arrive on 
+the same file handle at the same time (and you may get the wrong answer, if
+any). This is also true for F<qpsmtpd-async> and the pperl flavours, but 
+not for F<qpsmtpd> started by (x)inetd or tcpserver. 
+
+In short: don't do it if you want to write portable plugins.
+
+=head2 Inheritance
+
+Inheriting methods from other plugins is an advanced topic. You can alter 
+arguments for the underlying plugin, prepare something for the I<real> 
+plugin or skip a hook with this. Instead of modifying C<@ISA>
+directly in your plugin, use the C<isa_plugin()> method from the 
+C<init()> subroutine.
+
+  # rcpt_ok_child
+  sub init {
+    my ($self, $qp, @args) = @_;
+    $self->isa_plugin("rcpt_ok");
+  }
+  
+  sub hook_rcpt {
+    my ($self, $transaction, $recipient) = @_;
+    # do something special here...
+    $self->SUPER::hook_rcpt($transaction, $recipient);
+  }
+
+=head2 Config files
+
+Most of the existing plugins fetch their configuration data from files in the
+F<config/> sub directory. This data is read at runtime and may be changed
+without restarting qpsmtpd. 
+B<(FIXME: caching?!)>
+The contents of the files can be fetched via
+
+  @lines = $self->qp->config("my_config");
+
+All empty lines and lines starting with C<#> are ignored.
+
+If you don't want to read your data from files, but from a database you can 
+still use this syntax and write another plugin hooking the C<config>
+hook. 
+
+=head2 Logging
+
+Log messages can be written to the log file (or STDERR if you use the 
+F<logging/warn> plugin) with 
+
+  $self->qp->log($loglevel, $logmessage);
+
+The log level is one of (from low to high priority)
+
+=over 4
+
+=item LOGDEBUG
+
+=item LOGINFO
+
+=item LOGNOTICE
+
+=item LOGWARN
+
+=item LOGERROR
+
+=item LOGCRIT
+
+=item LOGALERT
+
+=item LOGEMERG
+
+=back
+
+While debugging your plugins, you want to set the log level in the F<logging>
+config file to I<LOGDEBUG>. This will log very much data. To restrict this 
+output just to the plugin you are debugging, you can use the following plugin: 
+
+=cut
+
+FIXME: Test if this really works as inteded ;-)
+
+=pod
+
+ # logging/debug_plugin - just show LOGDEBUG messages of one plugin
+ # Usage: 
+ #  logging/debug_plugin my_plugin LOGLEVEL
+ #
+ #  LOGLEVEL is the log level for all other log messages
+ use Qpsmtpd::Constants;
+ 
+ sub register {
+   my ($self, $qp, $plugin, $loglevel) = @_;
+   die "no plugin name given"
+     unless $plugin;
+   $loglevel = "LOGWARN"
+     unless defined $loglevel;
+   $self->{_plugin} = $plugin;
+   $self->{_level}  = Qpsmtpd::Constants::log_level($loglevel);
+   $self->{_level}  = LOGWARN 
+     unless defined $self->{_level};
+ }
+ 
+ sub hook_logging {
+   my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+   return(OK) # drop these lines
+     if $plugin ne $self->{_plugin} and $trace > $self->{_level};
+   return(DECLINED);
+ }
+
+The above plugin should be loaded before the default logging plugin, which 
+logs with I<LOGDEBUG>. The plugin name must be the one returned by the 
+C<plugin_name()> method of the debugged plugin. This is probably not 
+the same as the name of the plugin (i.e. not the same you write in the 
+F<plugins> config file). In doubt: take a look in the log file for lines 
+like C<queue::qmail_2dqueue hooking queue> (here: F<queue/qmail-queue> 
+=E<gt> F<queue::qmail_2dqueue>).
+
+=head2 Information about the current plugin
+
+Each plugin inherits the public methods from C<Qpsmtpd::Plugin>. 
+
+=over 4
+
+=item plugin_name()
+
+Returns the name of the currently running plugin
+
+=item hook_name()
+
+Returns the name of the running hook
+
+=item auth_user()
+
+Returns the name of the user the client is authed as (if authentication is 
+used, of course)
+
+=item auth_mechanism()
+
+Returns the auth mechanism if authentication is used
+
+=item connection()
+
+Returns the C<Qpsmtpd::Connection> object associated with the current 
+connection
+
+=item transaction()
+
+Returns the C<Qpsmtpd::Transaction> object associated with the current 
+transaction
+
+=back
+
+=head2 Temporary Files
+
+The temporary file and directory functions can be used for plugin specific 
+workfiles and will automatically be deleted at the end of the current 
+transaction.
+
+=over 4
+
+=item temp_file()
+
+Returns a unique name of a file located in the default spool directory, 
+but does not open that file (i.e. it is the name not a file handle).
+
+=item temp_dir()
+
+Returns the name of a unique directory located in the default spool 
+directory, after creating the directory with 0700 rights. If you need a 
+directory with different rights (say for an antivirus daemon), you will
+need to use the base function C<$self-E<gt>qp-E<gt>temp_dir()>, which takes a 
+single parameter for the permissions requested (see L<mkdir> for details). 
+A directory created like this will not be deleted when the transaction 
+is ended.
+
+=item spool_dir()
+
+Returns the configured system-wide spool directory.
+
+=back
+
+
+=head2 Connection and Transaction Notes
+
+Both may be used to share notes across plugins and/or hooks. The only real
+difference is their life time. The connection notes start when a new 
+connection is made and end, when the connection ends. This can, for example,
+be used to count the number of none SMTP commands. The plugin which uses 
+this is the F<count_unrecognized_commands> plugin from the qpsmtpd core
+distribution.
+
+The transaction note starts after the B<MAIL FROM: > command and are just 
+valid for the current transaction, see below in the I<reset_transaction>
+hook when the transaction ends.
+
+
+=head1 Return codes
+
+Each plugin must return an allowed constant for the hook and (usually)
+optionally a ``message'' for the client.
+Generally all plugins for a hook are processed until one returns 
+something other than I<DECLINED>.
+
+Plugins are run in the order they are listed in the F<plugins> 
+configuration file.
+
+The return constants are defined in C<Qpsmtpd::Constants> and have
+the following meanings:
+
+=over 4
+
+=item DECLINED
+
+Plugin declined work; proceed as usual. This return code is I<always allowed>
+unless noted otherwise.
+
+=item OK
+
+Action allowed.
+
+=item DENY
+
+Action denied.
+
+=item DENYSOFT
+
+Action denied; return a temporary rejection code (say B<450> instead 
+of B<550>).
+
+=item DENY_DISCONNECT
+
+Action denied; return a permanent rejection code and disconnect the client. 
+Use this for "rude" clients. Note that you're not supposed to do this 
+according to the SMTP specs, but bad clients don't listen sometimes.
+
+=item DENYSOFT_DISCONNECT
+
+Action denied; return a temporary rejection code and disconnect the client. 
+See note above about SMTP specs.
+
+=item DONE
+
+Finishing processing of the request. Usually used when the plugin sent the 
+response to the client.
+
+=back
+
+The I<YIELD> constant is not mentioned here, because it is not used by
+plugins directly.
+
+=head1 SMTP hooks
+
+This section covers the hooks, which are run in a normal SMTP connection. 
+The order of these hooks is like you will (probably) see them, while a mail
+is received. 
+
+Every hook receives a C<Qpsmtpd::Plugin> object of the currently 
+running plugin as the first argument. A C<Qpsmtpd::Transaction> object is 
+the second argument of the current transaction in the most hooks, exceptions 
+are noted in the description of the hook. If you need examples how the 
+hook can be used, see the source of the plugins, which are given as 
+example plugins.
+
+=head2 hook_pre_connection
+
+Called by a controlling process (e.g. forkserver or prefork) after accepting 
+the remote server, but before beginning a new instance (or handing the 
+connection to the worker process).
+
+Useful for load-management and rereading large config files at some
+frequency less than once per session.
+
+This hook only works in the F<qpsmtpd-forkserver> and F<qpsmtpd-prefork>
+flavours. 
+
+=cut 
+
+NOT FOR: -async, apache, -server and inetd/pperl
+
+=pod
+
+B<NOTE:> You should not use this hook to do major work and / or use lookup 
+methods which (I<may>) take some time, like DNS lookups. This will slow down
+B<all> incoming connections, no other connection will be accepted while this
+hook is running!
+
+Arguments this hook receives are:
+
+  my ($self,$transaction,%args) = @_;
+  # %args is:
+  # %args = ( remote_ip    => inet_ntoa($iaddr),
+  #           remote_port  => $port,
+  #           local_ip     => inet_ntoa($laddr),
+  #           local_port   => $lport,
+  #           max_conn_ip  => $MAXCONNIP,
+  #           child_addrs  => [values %childstatus],
+  #         );
+
+B<NOTE:> the C<$transaction> is of course C<undef> at this time.
+
+Allowed return codes are
+
+=over 4
+
+=item DENY / DENY_DISCONNECT
+
+returns a B<550> to the client and ends the connection
+
+=item DENYSOFT / DENYSOFT_DISCONNECT
+
+returns a B<451> to the client and ends the connection
+
+=back
+
+Anything else is ignored.
+
+Example plugins are F<hosts_allow> and F<connection_time>. 
+
+=head2 hook_connect
+
+It is called at the start of a connection before the greeting is sent to 
+the connecting client.
+
+Arguments for this hook are
+
+  my $self = shift;
+
+B<NOTE:> in fact you get passed two more arguments, which are C<undef> at this
+early stage of the connection, so ignore them.
+
+Allowed return codes are
+
+=over 4
+
+=item OK
+
+Stop processing plugins, give the default response
+
+=item DECLINED
+
+Process the next plugin
+
+=item DONE
+
+Stop processing plugins and dont give the default response, i.e. the plugin 
+gave the response
+
+=item DENY
+
+Return hard failure code and disconnect
+
+=item DENYSOFT
+
+Return soft failure code and disconnect
+
+=back
+
+Example plugin for this hook is the F<check_relay> plugin. 
+
+=head2 hook_helo / hook_ehlo
+
+It is called after the client sent B<EHLO> (hook_ehlo) or B<HELO> (hook_helo)
+Allowed return codes are
+
+=over 4
+
+=item DENY
+
+Return a 550 code
+
+=item DENYSOFT
+
+Return a B<450> code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+Qpsmtpd wont do anything, the plugin sent the message
+
+=item DECLINED 
+
+Qpsmtpd will send the standard B<EHLO>/B<HELO> answer, of course only 
+if all plugins hooking I<helo/ehlo> return I<DECLINED>.
+
+=back
+
+Arguments of this hook are
+
+  my ($self, $transaction, $host) = @_;
+  # $host: the name the client sent in the 
+  # (EH|HE)LO line
+
+B<NOTE:> C<$transaction> is C<undef> at this point.
+
+=head2 hook_mail_pre
+
+After the B<MAIL FROM: > line sent by the client is broken into 
+pieces by the C<hook_mail_parse()>, this hook recieves the results.
+This hook may be used to pre-accept adresses without the surrounding 
+I<E<lt>E<gt>> (by adding them) or addresses like 
+I<E<lt>user@example.com.E<gt>> or I<E<lt>user@example.com E<gt>> by 
+removing the trailing I<"."> / C<" ">.
+
+Expected return values are I<OK> and an address which must be parseable
+by C<Qpsmtpd::Address-E<gt>parse()> on success or any other constant to
+indicate failure.
+
+Arguments are 
+
+  my ($self, $transaction, $addr) = @_;
+
+=head2 hook_mail
+
+Called right after the envelope sender line is parsed (the B<MAIL FROM: >
+command). The plugin gets passed a C<Qpsmtpd::Address> object, which means 
+the parsing and verifying the syntax of the address (and just the syntax, 
+no other checks) is already done. Default is to allow the sender address. 
+The remaining arguments are the extensions defined in RFC 1869 (if sent by 
+the client).
+
+B<NOTE:> According to the SMTP protocol, you can not reject an invalid
+sender until after the B<RCPT> stage (except for protocol errors, i.e.
+syntax errors in address). So store it in an C<$transaction-E<gt>note()> and 
+process it later in an rcpt hook.
+
+Allowed return codes are
+
+=over 4
+
+=item OK
+
+sender allowed
+
+=item DENY
+
+Return a hard failure code
+
+=item DENYSOFT
+
+Return a soft failure code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DECLINED
+
+next plugin (if any)
+
+=item DONE
+
+skip further processing, plugin sent response
+
+=back
+
+Arguments for this hook are 
+
+  my ($self,$transaction, $sender, %args) = @_;
+  # $sender: an Qpsmtpd::Address object for 
+  # sender of the message
+
+Example plugins for the C<hook_mail> are F<require_resolvable_fromhost>
+and F<check_badmailfrom>.
+
+=head2 hook_rcpt_pre
+
+See C<hook_mail_pre>, s/MAIL FROM:/RCPT TO:/.
+
+=head2 hook_rcpt
+
+This hook is called after the client sent an I<RCPT TO: > command (after 
+parsing the line). The given argument is parsed by C<Qpsmtpd::Address>, 
+then this hook is called. Default is to deny the mail with a soft error 
+code. The remaining arguments are the extensions defined in RFC 1869
+(if sent by the client).
+
+Allowed return codes
+
+=over 4
+
+=item OK
+
+recipient allowed
+
+=item DENY
+
+Return a hard failure code, for example for an I<User does not exist here> 
+message.
+
+=item DENYSOFT
+
+Return a soft failure code, for example if the connect to a user lookup 
+database failed
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+skip further processing, plugin sent response
+
+=back
+
+Arguments are
+
+  my ($self, $transaction, $recipient, %args) = @_;
+  # $rcpt = Qpsmtpd::Address object with 
+  # the given recipient address
+
+Example plugin is F<rcpt_ok>.
+
+=head2 hook_data
+
+After the client sent the B<DATA> command, before any data of the message
+was sent, this hook is called. 
+
+B<NOTE:> This hook, like B<EHLO>, B<VRFY>, B<QUIT>, B<NOOP>, is an 
+endpoint of a pipelined command group (see RFC 1854) and may be used to 
+detect ``early talkers''. Since svn revision 758 the F<check_earlytalker>
+plugin may be configured to check at this hook for ``early talkers''.
+
+Allowed return codes are
+
+=over 4
+
+=item DENY
+
+Return a hard failure code
+
+=item DENYSOFT
+
+Return a soft failure code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+Plugin took care of receiving data and calling the queue (not recommended)
+
+B<NOTE:> The only real use for I<DONE> is implementing other ways of
+receiving the message, than the default... for example the CHUNKING SMTP
+extension (RFC 1869, 1830/3030) ... a plugin for this exists at 
+http://svn.perl.org/qpsmtpd/contrib/vetinari/experimental/chunking, but it
+was never tested ``in the wild''.
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_;
+
+Example plugin is F<greylisting>.
+
+=head2 hook_data_post
+
+The C<data_post> hook is called after the client sent the final C<.\r\n> 
+of a message, before the mail is sent to the queue.
+
+Allowed return codes are
+
+=over 4
+
+=item DENY
+
+Return a hard failure code
+
+=item DENYSOFT
+
+Return a soft failure code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+skip further processing (message will not be queued), plugin gave the response.
+
+B<NOTE:> just returning I<OK> from a special queue plugin does (nearly) 
+the same (i.e. dropping the mail to F</dev/null>) and you don't have to 
+send the response on your own.
+
+If you want the mail to be queued, you have to queue it manually!
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_;
+
+Example plugins: F<spamassassin>, F<virus/clamdscan>
+
+=head2 hook_queue_pre
+
+This hook is run, just before the mail is queued to the ``backend''. You 
+may modify the in-process transaction object (e.g. adding headers) or add 
+something like a footer to the mail (the latter is not recommended).
+
+Allowed return codes are 
+
+=over 4
+
+=item DONE
+
+no queuing is done
+
+=item OK / DECLINED
+
+queue the mail
+
+=back
+
+=head2 hook_queue
+
+When all C<data_post> hooks accepted the message, this hook is called. It 
+is used to queue the message to the ``backend''.
+
+Allowed return codes:
+
+=over 4
+
+=item DONE
+
+skip further processing (plugin gave response code)
+
+=item OK
+
+Return success message, i.e. tell the client the message was queued (this
+may be used to drop the message silently).
+
+=item DENY
+
+Return hard failure code
+
+=item DENYSOFT
+
+Return soft failure code, i.e. if disk full or other temporary queuing 
+problems
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_;
+
+Example plugins: all F<queue/*> plugins
+
+=head2 hook_queue_post
+
+This hook is called always after C<hook_queue>. If the return code is 
+B<not> I<OK>, a message (all remaining return values) with level I<LOGERROR> 
+is written to the log.
+Arguments are
+
+ my $self = shift;
+ 
+B<NOTE:> C<$transaction> is not valid at this point, therefore not mentioned.
+
+
+=head2 hook_reset_transaction
+
+This hook will be called several times. At the beginning of a transaction 
+(i.e. when the client sends a B<MAIL FROM:> command the first time), 
+after queueing the mail and every time a client sends a B<RSET> command.
+Arguments are 
+
+ my ($self, $transaction) = @_;
+
+B<NOTE:> don't rely on C<$transaction> being valid at this point.
+
+=head2 hook_quit
+
+After the client sent a B<QUIT> command, this hook is called (before the
+C<hook_disconnect>).
+
+Allowed return codes
+
+=over 4
+
+=item DONE
+
+plugin sent response
+
+=item DECLINED
+
+next plugin and / or qpsmtpd sends response
+
+=back
+
+Arguments: the only argument is C<$self>
+
+=cut 
+
+### XXX: FIXME pass the rest of the line to this hook?
+
+=pod
+
+Expample plugin is the F<quit_fortune> plugin.
+
+=head2 hook_disconnect
+
+This hook will be called from several places: After a plugin returned 
+I<DENY(|SOFT)_DISCONNECT>, before connection is disconnected or after the 
+client sent the B<QUIT> command, AFTER the quit hook and ONLY if no plugin 
+hooking C<hook_quit> returned I<DONE>.
+
+All return values are ignored, arguments are just C<$self>
+
+Example plugin is F<logging/file>
+
+=head2 hook_post_connection
+
+This is the counter part of the C<pre-connection> hook, it is called 
+directly before the connection is finished, for example, just before the 
+qpsmtpd-forkserver instance exits or if the client drops the connection 
+without notice (without a B<QUIT>). This hook is not called if the qpsmtpd
+instance is killed.
+
+=cut 
+
+FIXME: we should run this hook on a ``SIGHUP'' or some other signal?
+
+=pod 
+
+B<NOTE:> This hook only works in the (x)inetd, -forkserver and -prefork 
+flavours.
+The only argument is C<$self> and all return codes are ignored, it would 
+be too late anyway :-).
+
+Example: F<connection_time>
+
+=head1 Parsing Hooks
+
+Before the line from the client is parsed by 
+C<Qpsmtpd::Command-E<gt>parse()> with the built in parser, these hooks 
+are called. They can be used to supply a parsing function for the line,
+which will be used instead of the built in parser.
+
+The hook must return two arguments, the first is (currently) ignored,
+the second argument must be a (CODE) reference to a sub routine. This sub 
+routine receives three arguments:
+
+=over 4
+
+=item $self
+
+the plugin object
+
+=item $cmd
+
+the command (i.e. the first word of the line) sent by the client
+
+=item $line
+
+the line sent by the client without the first word
+
+=back
+
+Expected return values from this sub are I<DENY> and a reason which is 
+sent to the client or I<OK> and the C<$line> broken into pieces according
+to the syntax rules for the command.
+
+B<NOTE: ignore the example from C<Qpsmtpd::Command>, the C<unrecognized_command_parse> hook was never implemented,...>
+
+=head2 hook_helo_parse / hook_ehlo_parse
+
+The provided sub routine must return two or more values. The first is 
+discarded, the second is the hostname (sent by the client as argument 
+to the B<HELO> / B<EHLO> command). All other values are passed to the 
+helo / ehlo hook. This hook may be used to change the hostname the client
+sent... not recommended, but if your local policy says only to accept
+I<HELO> hosts with FQDNs and you have a legal client which can not be 
+changed to send his FQDN, this is the right place.
+
+=head2 hook_mail_parse / hook_rcpt_parse
+
+The provided sub routine must return two or more values. The first is 
+either I<OK> to indicate that parsing of the line was successfull
+or anything else to bail out with I<501 Syntax error in command>. In
+case of failure the second argument is used as the error message for the 
+client.
+
+If parsing was successfull, the second argument is the sender's / 
+recipient's address (this may be without the surrounding I<E<lt>> and 
+I<E<gt>>, don't add them here, use the C<hook_mail_pre()> / 
+C<hook_rcpt_pre()> methods for this). All other arguments are 
+sent to the C<mail / rcpt> hook as B<MAIL> / B<RCPT> parameters (see 
+RFC 1869 I<SMTP Service Extensions> for more info). Note that 
+the mail and rcpt hooks expect a list of key/value pairs as the 
+last arguments.
+
+=head2 hook_auth_parse
+
+B<FIXME...>
+
+=head1 Special hooks
+
+Now some special hooks follow. Some of these hooks are some internal hooks, 
+which may be used to alter the logging or retrieving config values from 
+other sources (other than flat files) like SQL databases.
+
+=head2 hook_logging
+
+This hook is called when a log message is written, for example in a plugin 
+it fires if someone calls C<$self-E<gt>log($level, $msg);>. Allowed
+return codes are
+
+=over 4
+
+=item DECLINED
+
+next logging plugin
+
+=item OK
+
+(not I<DONE>, as some might expect!) ok, plugin logged the message
+
+=back
+
+Arguments are
+
+  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+  # $trace: level of message, for example 
+  #          LOGWARN, LOGDEBUG, ...
+  # $hook:  the hook in\/for which this logging 
+  #          was called
+  # $plugin: the plugin calling this hook
+  # @log:   the log message
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+All F<logging/*> plugins can be used as example plugins.
+
+=head2 hook_deny
+
+This hook is called after a plugin returned I<DENY>, I<DENYSOFT>, 
+I<DENY_DISCONNECT> or I<DENYSOFT_DISCONNECT>. All return codes are ignored, 
+arguments are
+
+  my ($self, $transaction, $prev_hook, $return, $return_text) = @_;
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+Example plugin for this hook is F<logging/adaptive>.
+
+=head2 hook_ok
+
+The counter part of C<hook_deny>, it is called after a plugin B<did not>
+return I<DENY>, I<DENYSOFT>, I<DENY_DISCONNECT> or I<DENYSOFT_DISCONNECT>. 
+All return codes are ignored, arguments are
+
+  my ( $self, $transaction, $prev_hook, $return, $return_text ) = @_;
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+=head2 hook_config
+
+Called when a config file is requested, for example in a plugin it fires 
+if someone calls C<my @cfg = $self-E<gt>qp-E<gt>config($cfg_name);>. 
+Allowed return codes are
+
+=over 4
+
+=item DECLINED
+
+plugin didn't find the requested value
+
+=item OK
+
+requested values as C<@list>, example:
+
+  return (OK, @{$config{$value}}) 
+    if exists $config{$value};
+  return (DECLINED);
+
+=back
+
+Arguments:
+
+  my ($self,$transaction,$value) = @_; 
+  # $value: the requested config item(s)
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+Example plugin is F<http_config> from the qpsmtpd distribution.
+
+=head2 hook_unrecognized_command
+
+This is called if the client sent a command unknown to the core of qpsmtpd.
+This can be used to implement new SMTP commands or just count the number 
+of unknown commands from the client, see below for examples.
+Allowed return codes:
+
+=over 4
+
+=item DENY_DISCONNECT
+
+Return B<521> and disconnect the client
+
+=item DENY
+
+Return B<500>
+
+=item DONE
+
+Qpsmtpd wont do anything; the plugin responded, this is what you want to 
+return, if you are implementing new commands
+
+=item Anything else...
+
+Return B<500 Unrecognized command>
+
+=back
+
+Arguments:
+
+  my ($self, $transaction, $cmd, @args) = @_;
+  # $cmd  = the first "word" of the line 
+  #         sent by the client
+  # @args = all the other "words" of the 
+  #         line sent by the client
+  #         "word(s)": white space split() line
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+Example plugin is F<tls>.
+
+=head2 hook_vrfy
+
+If the client sents the B<VRFY> command, this hook is called. Default is to 
+return a message telling the user to just try sending the message.
+Allowed return codes:
+
+=over 4
+
+=item OK
+
+Recipient Exists
+
+=item DENY
+
+Return a hard failure code
+
+=item DONE
+
+Return nothing and move on
+
+=item Anything Else...
+
+Return a B<252>
+
+=back
+
+Arguments are:
+
+ my ($self) = shift;
+
+=cut 
+
+FIXME: this sould be changed in Qpsmtpd::SMTP to pass the rest of the line
+as arguments to the hook
+
+=pod
+
+=head2 hook_post_fork
+
+B<NOTE:> This hook is only available in qpsmtpd-async.
+
+It is called while starting qpsmtpd-async. You can run more than one 
+instance of qpsmtpd-async (one per CPU probably). This hook is called 
+after forking one instance.
+
+Arguments: 
+
+ my $self = shift;
+
+The return values of this hook are discarded.
+
+=head1 Authentication hooks
+
+=cut 
+
+B<FIXME missing:> auth_parse
+
+#=head2 auth
+
+B<FIXME>
+
+#=head2 auth-plain
+
+B<FIXME>
+
+#=head2 auth-login
+
+B<FIXME>
+
+#=head2 auth-cram-md5
+
+B<FIXME>
+
+=pod
+
+...documentation will follow later
+
+=head1 Writing your own plugins
+
+This is a walk through a new queue plugin, which queues the mail to a (remote)
+QMQP-Server.
+
+First step is to pull in the necessary modules
+
+ use IO::Socket;
+ use Text::Netstring qw( netstring_encode 
+                         netstring_decode 
+                         netstring_verify 
+                         netstring_read );
+
+We know, we need a server to send the mails to. This will be the same 
+for every mail, so we can use arguments to the plugin to configure this 
+server (and port).
+
+Inserting this static config is done in C<register()>:
+
+  sub register {
+    my ($self, $qp, @args) = @_;
+  
+    die "No QMQP server specified in qmqp-forward config"
+      unless @args;
+  
+    $self->{_qmqp_timeout} = 120;
+  
+    if ($args[0] =~ /^([\.\w_-]+)$/) {
+      $self->{_qmqp_server} = $1;
+    }
+    else {
+      die "Bad data in qmqp server: $args[0]";
+    }
+  
+    $self->{_qmqp_port} = 628;
+    if (@args > 1 and $args[1] =~ /^(\d+)$/) {
+      $self->{_qmqp_port} = $1;
+    }
+  
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") 
+      if (@args > 2);
+  }
+
+We're going to write a queue plugin, so we need to hook to the I<queue>
+hook.
+
+  sub hook_queue {
+    my ($self, $transaction) = @_;
+  
+    $self->log(LOGINFO, "forwarding to $self->{_qmqp_server}:"
+                       ."$self->{_qmqp_port}");
+
+The first step is to open a connection to the remote server.
+
+   my $sock = IO::Socket::INET->new(
+                 PeerAddr => $self->{_qmqp_server},
+                 PeerPort => $self->{_qmqp_port},
+                 Timeout  => $self->{_qmqp_timeout},
+                 Proto    => 'tcp')
+      or $self->log(LOGERROR, "Failed to connect to "
+                      ."$self->{_qmqp_server}:"
+                      ."$self->{_qmqp_port}: $!"), 
+        return(DECLINED);
+    $sock->autoflush(1);
+
+=over 4
+
+=item *
+
+The client starts with a safe 8-bit text message. It encodes the message 
+as the byte string C<firstline\012secondline\012 ... \012lastline>. (The
+last line is usually, but not necessarily, empty.) The client then encodes
+this byte string as a netstring. The client also encodes the envelope 
+sender address as a netstring, and encodes each envelope recipient address
+as a netstring.
+
+The client concatenates all these netstrings, encodes the concatenation 
+as a netstring, and sends the result. 
+
+(from L<http://cr.yp.to/proto/qmqp.html>)
+
+=back
+
+The first idea is to build the package we send, in the order described 
+in the paragraph above:
+
+  my $message = $transaction->header->as_string;
+  $transaction->body_resetpos;
+  while (my $line = $transaction->body_getline) {
+    $message .= $line;
+  }
+  $message  = netstring_encode($message);
+  $message .= netstring_encode($transaction->sender->address);
+  for ($transaction->recipients) {
+    push @rcpt, $_->address;
+  }
+  $message .= join "", netstring_encode(@rcpt);
+  print $sock netstring_encode($message)
+    or do { 
+      my $err = $!;
+      $self->_disconnect($sock);
+      return(DECLINED, "Failed to print to socket: $err");
+    };
+
+This would mean, we have to hold the full message in memory... Not good 
+for large messages, and probably even slower (for large messages).
+
+Luckily it's easy to build a netstring without the help of the
+C<Text::Netstring> module if you know the size of the string (for more
+info about netstrings see L<http://cr.yp.to/proto/netstrings.txt>).
+
+We start with the sender and recipient addresses:
+
+  my ($addrs, $headers, @rcpt);
+  $addrs = netstring_encode($transaction->sender->address);
+  for ($transaction->recipients) {
+    push @rcpt, $_->address;
+  }
+  $addrs .= join "", netstring_encode(@rcpt);
+
+Ok, we got the sender and the recipients, now let's see what size the
+message is.
+
+  $headers   = $transaction->header->as_string;
+  my $msglen = length($headers) + $transaction->body_length;
+
+We've got everything we need. Now build the netstrings for the full package
+and the message.
+
+First the beginning of the netstring of the full package 
+
+  # (+ 2: the ":" and "," of the message's netstring)
+  print $sock ($msglen + length($msglen) + 2 + length($addrs))
+               .":"
+               ."$msglen:$headers" ### beginning of messages netstring
+    or do { 
+      my $err = $!;
+      $self->_disconnect($sock);
+      return(DECLINED, 
+             "Failed to print to socket: $err");
+    };
+
+Go to beginning of the body
+
+  $transaction->body_resetpos;
+
+If the message is spooled to disk, read the message in
+blocks and write them to the server
+
+  if ($transaction->body_fh) {
+    my $buff;
+    my $size = read $transaction->body_fh, $buff, 4096;
+    unless (defined $size) {
+      my $err = $!;
+      $self->_disconnect($sock);
+      return(DECLINED, "Failed to read from body_fh: $err");
+    }
+    while ($size) {
+      print $sock $buff
+        or do { 
+          my $err = $!;
+          $self->_disconnect($sock);
+          return(DECLINED, "Failed to print to socket: $err");
+        };
+  
+      $size = read $transaction->body_fh, $buff, 4096;
+      unless (defined $size) {
+        my $err = $!;
+        $self->_disconnect($sock);
+        return(DECLINED, 
+               "Failed to read from body_fh: $err");
+      }
+    }
+  }
+
+Else we have to read it line by line ...
+
+  else { 
+    while (my $line = $transaction->body_getline) {
+      print $sock $line
+        or do { 
+          my $err = $!;
+          $self->_disconnect($sock);
+          return(DECLINED, "Failed to print to socket: $err");
+        };
+    }
+  }
+
+Message is at the server, now finish the package.
+
+  print $sock ","    # end of messages netstring
+             .$addrs # sender + recpients
+             .","    # end of netstring of 
+                     #   the full package
+    or do { 
+      my $err = $!;
+      $self->_disconnect($sock);
+      return(DECLINED, 
+             "Failed to print to socket: $err");
+    };
+
+We're done. Now let's see what the remote qmqpd says...
+
+
+=over 4 
+
+=item *
+
+(continued from L<http://cr.yp.to/proto/qmqp.html>:)
+
+The server's response is a nonempty string of 8-bit bytes, encoded as a 
+netstring.
+  
+The first byte of the string is either K, Z, or D. K means that the 
+message has been accepted for delivery to all envelope recipients. This 
+is morally equivalent to the 250 response to DATA in SMTP; it is subject 
+to the reliability requirements of RFC 1123, section 5.3.3. Z means 
+temporary failure; the client should try again later. D means permanent 
+failure.
+   
+Note that there is only one response for the entire message; the server 
+cannot accept some recipients while rejecting others.
+
+=back
+
+
+    my $answer = netstring_read($sock);
+    $self->_disconnect($sock);
+    
+    if (defined $answer and netstring_verify($answer)) {
+      $answer = netstring_decode($answer);
+  
+      $answer =~ s/^K// and return(OK,
+                                 "Queued! $answer");
+      $answer =~ s/^Z// and return(DENYSOFT, 
+                                 "Deferred: $answer");
+      $answer =~ s/^D// and return(DENY,
+                                 "Denied: $answer");
+    }
+
+If this is the only F<queue/*> plugin, the client will get a 451 temp error:
+
+    return(DECLINED, "Protocol error");
+  }
+
+  sub _disconnect {
+    my ($self,$sock) = @_;
+    if (defined $sock) {
+      eval { close $sock; };
+      undef $sock;
+    }
+  }
+
+=head1 Advanced Playground
+
+=head2 Discarding messages
+
+If you want to make the client think a message has been regularily accepted,
+but in real you delete it or send it to F</dev/null>, ..., use something
+like the following plugin and load it before your default queue plugin.
+
+  sub hook_queue {
+    my ($self, $transaction) = @_;
+    if ($transaction->notes('discard_mail')) {
+      my $msg_id = $transaction->header->get('Message-Id') || '';
+      $msg_id =~ s/[\r\n].*//s;
+      return(OK, "Queued! $msg_id");
+    }
+    return(DECLINED);
+  }
+
+=head2 TBC... :-)
+
+=cut
+
+# vim: ts=2 sw=2 expandtab
