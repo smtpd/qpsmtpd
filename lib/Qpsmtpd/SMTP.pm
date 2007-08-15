@@ -728,6 +728,18 @@ sub data_post_respond {
     # DATA is always the end of a "transaction"
     return $self->reset_transaction;
   } 
+  elsif ($rc == DENY_DISCONNECT) {
+    $msg->[0] ||= "Message denied";
+    $self->respond(552, @$msg);
+    $self->disconnect;
+    return 1;
+  }
+  elsif ($rc == DENYSOFT_DISCONNECT) {
+    $msg->[0] ||= "Message denied temporarily";
+    $self->respond(452, @$msg);
+    $self->disconnect;
+    return 1;
+  }
   else {
     $self->queue($self->transaction);
   }
