@@ -94,6 +94,8 @@ sub open_cleanup {
   my $self = IO::Socket::UNIX->new(Type => SOCK_STREAM,
   				   Peer => "/var/spool/postfix/public/cleanup");
   die qq[Couldn't open unix socket "/var/spool/postfix/public/cleanup": $!] unless ref $self;
+  # allow buffered writes
+  $self->autoflush(0);
   bless ($self, $class);
   $self->init();
   return $self;
