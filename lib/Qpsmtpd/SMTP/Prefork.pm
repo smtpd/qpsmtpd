@@ -10,22 +10,8 @@ sub dispatch {
   $self->{_counter}++; 
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
-    my ($rc, @msg) = $self->run_hooks("unrecognized_command", $cmd, @_);
-    @msg = map { split /\n/ } @msg;
-    if ($rc == DENY_DISCONNECT) {
-      $self->respond(521, @msg);
-      $self->disconnect;
-    }
-    elsif ($rc == DENY) {
-      $self->respond(500, @msg);
-    }
-    elsif ($rc == DONE) {
-      1;
-    }
-    else {
-      $self->respond(500, "Unrecognized command");
-    }
-    return 1
+    $self->run_hooks("unrecognized_command", $cmd, @_);
+    return 1;
   }
   $cmd = $1;
 
