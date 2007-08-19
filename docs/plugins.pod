@@ -687,6 +687,32 @@ Arguments:
 
 Example plugin is F<greylisting>.
 
+=head2 hook_received_line
+
+If you wish to provide your own Received header line, do it here. You can use
+or discard any of the given arguments (see below).
+
+Allowed return codes:
+
+=over 4
+
+=item OK, $string
+
+use this string for the Received header.
+
+=item anything else
+
+use the default Received header
+
+=back
+
+Arguments are
+
+ my ($self, $transaction, $smtp, $auth, $sslinfo) = @_;
+ # $smtp - the SMTP type used (e.g. "SMTP" or "ESMTP").
+ # $auth - the Auth header additionals.
+ # $sslinfo - information about SSL for the header.
+
 =head2 hook_data_post
 
 The C<data_post> hook is called after the client sent the final C<.\r\n> 
