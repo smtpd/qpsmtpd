@@ -18,7 +18,7 @@ sub start {
   
   # generate id
   my $conn = $args{connection};
-  my $ip = $conn->local_port || "0";
+  my $ip = $conn->remote_port || "0";
   my $start = time;
   my $id = "$start.$$.$ip";
   
