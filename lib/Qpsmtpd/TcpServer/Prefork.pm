@@ -12,7 +12,7 @@ sub start_connection {
 
     #reset info
     $self->{_connection} = Qpsmtpd::Connection->new(); #reset connection
-    $self->{_transaction} = Qpsmtpd::Transaction->new(); #reset transaction
+    $self->reset_transaction;
     $self->SUPER::start_connection(@_);
 }
 

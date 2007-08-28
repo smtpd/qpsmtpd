@@ -4,6 +4,8 @@ use Qpsmtpd;
 use strict;
 use Qpsmtpd::Utils;
 use Qpsmtpd::Constants;
+use Socket qw(inet_aton);
+use Time::HiRes qw(time);
 
 use IO::File qw(O_RDWR O_CREAT);
 
@@ -13,9 +15,21 @@ sub start {
   my $proto = shift;
   my $class = ref($proto) || $proto;
   my %args = @_;
-  my $self = { _rcpt => [], started => time };
+  
+  # generate id
+  my $conn = $args{connection};
+  my $ip = $conn->local_port || "0";
+  my $start = time;
+  my $id = "$start.$$.$ip";
+  
+  my $self = { _rcpt => [], started => $start, _id => $id };
   bless ($self, $class);
   return $self;
+}
+
+sub id {
+  my $self = shift;
+  $self->{_id};
 }
 
 sub add_recipient {
