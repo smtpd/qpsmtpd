@@ -5,9 +5,13 @@ use strict;
 use Qpsmtpd::Utils;
 use Qpsmtpd::Constants;
 use Socket qw(inet_aton);
+use Sys::Hostname;
 use Time::HiRes qw(gettimeofday);
 
 use IO::File qw(O_RDWR O_CREAT);
+
+my $SALT_HOST => crypt(hostname, chr(65+rand(57)).chr(65+rand(57)));
+$SALT_HOST =~ tr/A-Za-z0-9//cd;
 
 sub new { start(@_) }
 
@@ -16,12 +20,18 @@ sub start {
   my $class = ref($proto) || $proto;
   my %args = @_;
   
-  # generate id
+  # Generate unique id
   # use gettimeofday for microsec precision
-  my ($start, $mstart) = gettimeofday();
   # add in rand() in case gettimeofday clock is slow (e.g. bsd?)
   # add in $$ in case srand is set per process
-  my $id = sprintf("%d.%06d.%d.%d", $start, $mstart, rand(10000), $$);
+  my ($start, $mstart) = gettimeofday();
+  my $id = sprintf("%d.%06d.%s.%d.%d",
+      $start,
+      $mstart,
+      $SALT_HOST, 
+      rand(10000),
+      $$,
+  );
   
   my $self = { _rcpt => [], started => $start, _id => $id };
   bless ($self, $class);
