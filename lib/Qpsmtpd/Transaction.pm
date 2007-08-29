@@ -5,7 +5,7 @@ use strict;
 use Qpsmtpd::Utils;
 use Qpsmtpd::Constants;
 use Socket qw(inet_aton);
-use Time::HiRes qw(time);
+use Time::HiRes qw(gettimeofday);
 
 use IO::File qw(O_RDWR O_CREAT);
 
@@ -17,10 +17,11 @@ sub start {
   my %args = @_;
   
   # generate id
-  my $conn = $args{connection};
-  my $ip = $conn->remote_port || "0";
-  my $start = time;
-  my $id = "$start.$$.$ip";
+  # use gettimeofday for microsec precision
+  my ($start, $mstart) = gettimeofday();
+  # add in rand() in case gettimeofday clock is slow (e.g. bsd?)
+  # add in $$ in case srand is set per process
+  my $id = sprintf("%d.%06d.%d.%d", $start, $mstart, rand(10000), $$);
   
   my $self = { _rcpt => [], started => $start, _id => $id };
   bless ($self, $class);

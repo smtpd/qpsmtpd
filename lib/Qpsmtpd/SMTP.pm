@@ -135,7 +135,7 @@ sub transaction {
 sub reset_transaction {
   my $self = shift;
   $self->run_hooks("reset_transaction") if $self->{_transaction};
-  return $self->{_transaction} = Qpsmtpd::Transaction->new(connection => $self->connection);
+  return $self->{_transaction} = Qpsmtpd::Transaction->new();
 }
 
 
