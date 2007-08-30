@@ -10,7 +10,7 @@ use Time::HiRes qw(gettimeofday);
 
 use IO::File qw(O_RDWR O_CREAT);
 
-my $SALT_HOST => crypt(hostname, chr(65+rand(57)).chr(65+rand(57)));
+my $SALT_HOST = crypt(hostname, chr(65+rand(57)).chr(65+rand(57)));
 $SALT_HOST =~ tr/A-Za-z0-9//cd;
 
 sub new { start(@_) }
