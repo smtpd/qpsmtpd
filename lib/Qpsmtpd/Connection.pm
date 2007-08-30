@@ -1,6 +1,9 @@
 package Qpsmtpd::Connection;
 use strict;
 
+use Sys::Hostname;
+use Time::HiRes qw(gettimeofday);
+
 # All of these parameters depend only on the physical connection, 
 # i.e. not on anything sent from the remote machine.  Hence, they
 # are an appropriate set to use for either start() or clone().  Do
@@ -15,6 +18,27 @@ my @parameters = qw(
         relay_client
 );
 
+my $SALT_HOST = crypt(hostname, chr(65+rand(57)).chr(65+rand(57)));
+$SALT_HOST =~ tr/A-Za-z0-9//cd;
+
+
+sub new_id {
+  my $self = shift;
+  # Generate unique id
+  # use gettimeofday for microsec precision
+  # add in rand() in case gettimeofday clock is slow (e.g. bsd?)
+  # add in $$ in case srand is set per process
+  my ($start, $mstart) = gettimeofday();
+  my $id = sprintf("%d.%06d.%s.%d.%d",
+      $start,
+      $mstart,
+      $SALT_HOST, 
+      rand(10000),
+      $$,
+  );
+  $self->{_id} = $id;
+  
+}
 sub new {
   my $proto = shift;
   my $class = ref($proto) || $proto;
@@ -35,12 +59,19 @@ sub start {
   return $self;
 }
 
+sub id {
+  my $self = shift;
+  $self->new_id unless $self->{_id};
+  $self->{_id};
+}
+
 sub clone {
   my $self = shift;
   my $new = $self->new();
   foreach my $f ( @parameters ) {
     $new->$f($self->$f()) if $self->$f();
   }
+  # should we generate a new id here?
   return $new;
 }
 
