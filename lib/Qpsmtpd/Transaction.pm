@@ -13,6 +13,8 @@ use IO::File qw(O_RDWR O_CREAT);
 my $SALT_HOST = crypt(hostname, chr(65+rand(57)).chr(65+rand(57)));
 $SALT_HOST =~ tr/A-Za-z0-9//cd;
 
+my $SEQUENCE_ID = 1;
+
 sub new { start(@_) }
 
 sub start {
@@ -22,14 +24,15 @@ sub start {
   
   # Generate unique id
   # use gettimeofday for microsec precision
-  # add in rand() in case gettimeofday clock is slow (e.g. bsd?)
-  # add in $$ in case srand is set per process
+  # add in a sequence in case gettimeofday clock is slow (e.g. alpha)
+  # add in $$ to provide uniqueness per process/child
   my ($start, $mstart) = gettimeofday();
+  my $seq = $SEQUENCE_ID++ % 10000;
   my $id = sprintf("%d.%06d.%s.%d.%d",
       $start,
       $mstart,
       $SALT_HOST, 
-      rand(10000),
+      $seq,
       $$,
   );
   
