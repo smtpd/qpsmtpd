@@ -1,0 +1,83 @@
+#!/usr/bin/perl
+# this is a simple 'connection_id' plugin like the default builtin logging
+#
+# It demonstrates that a logging plugin can call ->log itself as well
+# as how to ignore log entries from itself
+
+sub register {
+  my ($self, $qp, $loglevel) = @_;
+
+  $self->{_level} = LOGWARN;
+  if ( defined($loglevel) ) {
+      if ($loglevel =~ /^\d+$/) {
+	  $self->{_level} = $loglevel;
+      }
+      else {
+	  $self->{_level} = log_level($loglevel);
+      }
+  }
+
+  # If you want to capture this log entry with this plugin, you need to
+  # wait until after you register the plugin
+  $self->log(LOGINFO,'Initializing logging::connection_id plugin');
+}
+
+sub hook_logging {
+  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+
+  # Don't log your own log entries!  If this is the only logging plugin
+  # then these lines will not be logged at all.  You can safely comment
+  # out this line and it will not cause an infinite loop.
+  return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
+
+  my $connection = $self->qp && $self->qp->connection;
+  # warn "connection = $connection\n";
+  warn 
+    join(" ", ($connection ? $connection->id : "???") .
+         (defined $plugin ? " $plugin plugin:" :
+          defined $hook   ? " running plugin ($hook):"  : ""),
+         @log), "\n"
+    if ($trace <= $self->{_level});
+
+  return DECLINED;
+}
+
+=cut
+
+=head1 NAME
+
+connection_id - plugin to demo use of the connection id
+
+=head1 DESCRIPTION
+
+A qpsmtpd plugin which replicates the built in logging functionality, which
+is to send all logging messages to STDERR below a specific log level.
+
+This plugin differs from logging/warn only by using the connection id
+instead of the pid to demonstrate the effect of different algorithms.
+
+=head1 INSTALL AND CONFIG
+
+Place this plugin in the plugin/logging directory beneath the standard
+qpsmtpd installation.  Edit the config/logging file and add a line like
+this:
+
+  logging/connection_id [loglevel]
+
+where the optional parameters C<loglevel> is either the numeric or text
+representation of the maximum log level, as shown in the
+L<config.sample/loglevel> file.
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2005 John Peacock
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
