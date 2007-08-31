@@ -117,9 +117,19 @@ sub isa_plugin {
   # don't reload plugins if they are already loaded
   return if defined &{"${newPackage}::plugin_name"};
 
+  # find $parent in plugin_dirs
+  my $parent_dir;
+  for ($self->qp->plugin_dirs) {
+    if (-e "$_/$parent") {
+      $parent_dir = $_;
+      last;
+    }
+  }
+  die "cannot find plugin '$parent'" unless $parent_dir;
+
   $self->compile($self->plugin_name . "_isa_$cleanParent",
                     $newPackage,
-                    "plugins/$parent"); # assumes Cwd is qpsmtpd root
+                    "$parent_dir/$parent");
   warn "---- $newPackage\n";
   no strict 'refs';
   push @{"${currentPackage}::ISA"}, $newPackage;
