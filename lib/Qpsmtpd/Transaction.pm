@@ -22,21 +22,7 @@ sub start {
   my $class = ref($proto) || $proto;
   my %args = @_;
   
-  # Generate unique id
-  # use gettimeofday for microsec precision
-  # add in a sequence in case gettimeofday clock is slow (e.g. alpha)
-  # add in $$ to provide uniqueness per process/child
-  my ($start, $mstart) = gettimeofday();
-  my $seq = $SEQUENCE_ID++ % 10000;
-  my $id = sprintf("%d.%06d.%s.%d.%d",
-      $start,
-      $mstart,
-      $SALT_HOST, 
-      $seq,
-      $$,
-  );
-  
-  my $self = { _rcpt => [], started => $start, _id => $id };
+  my $self = { _rcpt => [], started => time, _id => $args{id} };
   bless ($self, $class);
   return $self;
 }
