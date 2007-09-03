@@ -191,7 +191,7 @@ sub run {
     }
 
     # setup shared memory
-    $chld_shmem = shmem("qpsmtpd", 1);
+    $chld_shmem = shmem($d_port."qpsmtpd", 1);
     untie $chld_shmem;
 
     # Interrupt handler
@@ -474,7 +474,7 @@ sub shmem_opt {
 
     my ($chld_shmem, $chld_busy);
     eval {
-        $chld_shmem = &shmem("qpsmtpd", 0);    #connect to shared memory hash
+        $chld_shmem = &shmem($d_port."qpsmtpd", 0);    #connect to shared memory hash
 
         if (tied %{$chld_shmem}) {
             # perform options
