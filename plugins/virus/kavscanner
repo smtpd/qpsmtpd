@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 # Kasperski-AV plugin.
- 
+
 =head1 NAME
 
 kavscanner - plugin for qpsmtpd which calls the Kasperski anti virus scanner

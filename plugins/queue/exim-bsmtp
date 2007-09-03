@@ -30,6 +30,8 @@ The path to use to execute the Exim BSMTP receiver; by default this is
 I</usr/sbin/rsmtp>.  The commandline switch '-bS' will be added (this is
 actually redundant with rsmtp, but harmless).
 
+=back
+
 =cut
 
 =head1 LICENSE

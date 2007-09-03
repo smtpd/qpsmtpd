@@ -247,7 +247,7 @@ default: DENY
 =cut
 
 sub addr_bad_from_system      { shift->_dsn(shift,shift,DENY,1,8); }
-   
+
 =head1 MAILBOX STATUS
 
 =over 5
@@ -411,7 +411,7 @@ default: DENY, but RFC says:
   transient error.
 
 Why do we want to DENYSOFT something like this?
- 
+
 =back
 
 =cut
@@ -446,7 +446,7 @@ sub proto_invalid_command        { shift->_dsn(shift,shift,DENY,5,1); }
 
 X.5.2
 default: DENY
- 
+
 =cut
 
 sub proto_syntax_error           { shift->_dsn(shift,shift,DENY,5,2); }

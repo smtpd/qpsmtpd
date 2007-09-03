@@ -170,8 +170,6 @@ The remote IP address of the connecting host.
 
 The remote port.
 
-=head2 hello( )
-
 =head2 remote_info( )
 
 If your server does an ident lookup on the remote host, this is the

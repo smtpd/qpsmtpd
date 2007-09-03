@@ -25,6 +25,7 @@ Written by Keith C. Ivey
 Released to the public domain, 17 June 2005.
 
 =cut
+
 use Qpsmtpd::DSN;
 
 sub init {

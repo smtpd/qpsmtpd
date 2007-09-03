@@ -178,14 +178,14 @@ Apache::Qpsmtpd - a mod_perl-2 connection handler for qpsmtpd
   ## with apache >= 2.1.5, for others it doesn't hurt. See also
   ## http://httpd.apache.org/docs/2.2/mod/core.html#acceptfilter
   ## and http://httpd.apache.org/docs/2.2/mod/mpm_common.html#listen
-  
+
   LoadModule perl_module modules/mod_perl.so
-  
+
   <Perl>
   use lib qw( /path/to/qpsmtpd/lib );
   use Apache::Qpsmtpd;
   </Perl>
-  
+
   <VirtualHost _default_:25>
   PerlSetVar QpsmtpdDir /path/to/qpsmtpd
   PerlModule Apache::Qpsmtpd

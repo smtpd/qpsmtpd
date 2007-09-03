@@ -35,7 +35,7 @@ Inside a plugin
     my ($self, $transaction, $cmd) = @_;
     return (OK, \&bdat_parser) if ($cmd eq 'bdat');
  }
- 
+
  sub bdat_parser {
     my ($self,$cmd,$line) = @_;
     # .. do something with $line...
@@ -43,7 +43,7 @@ Inside a plugin
       if $some_reason_why_there_is_a_syntax_error;
     return (OK, @args);
  }
- 
+
  sub hook_unrecognized_command {
     my ($self, $transaction, $cmd, @args) = @_;
     return (DECLINED) if ($self->qp->connection->hello eq 'helo');

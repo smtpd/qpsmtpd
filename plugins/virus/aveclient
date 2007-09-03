@@ -69,7 +69,7 @@ command line, the return code corresponds to the results of scanning the last fi
 8      scan results are unavailable: file is corrupted or input/output error.
 
 9      some of the required parameters are missing from the command line.
-   
+
 =head1 VERSION
 
 0.1rc first proof of concept.
@@ -87,7 +87,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-   
+
 =cut
 
 use File::Temp qw(tempfile);

@@ -1,4 +1,5 @@
 #! perl
+
 =head1 NAME
 
 check_badmailfromto - checks the badmailfromto config

@@ -3,11 +3,11 @@
 =head1 NAME
 
 check_basicheaders - Make sure both From and Date headers are present, and
-do optional range checking on the Date header
+do optional range checking on the Date header.
 
 =head1 DESCRIPTION
 
-Rejects messages that do not have a From or Date header or are completely 
+Rejects messages that do not have a From or Date header or are completely
 empty.
 
 Can also reject messages where the date in the Date header is more than

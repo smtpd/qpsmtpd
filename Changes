@@ -1,5 +1,7 @@
 0.41
 
+  POD syntax cleanup (Steve Kemp)
+
   Make connection->local_ip available from the Apache transport (Peter Eisch)
 
 

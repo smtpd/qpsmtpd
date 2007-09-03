@@ -28,6 +28,8 @@ the connecting MTA's IP address.  Any A or TXT answer is means that the
 remote HOST address can be selectively exempted at other stages by plugins
 testing for a 'whitelisthost' connection note.
 
+=back
+
 NOTE: other 'connect' hooks will continue to fire (e.g. dnsbl), since the DNS
 queries happen in the background.  This plugin's 'rcpt_handler' retrieves
 the results of the query and sets the connection note if found.

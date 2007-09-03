@@ -24,6 +24,8 @@ Path to the private key file. Default: I<ssl/qpsmtpd-server.key>
 
 Path to the certificate autority file. Default: I<ssl/qpsmtpd-ca.crt>
 
+=back
+
 =head1 DESCRIPTION
 
 This plugin implements basic TLS support.  It can also be used to support
