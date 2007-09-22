@@ -36,7 +36,6 @@ check_spamhelo
 # sender_permitted_from
 
 auth/auth_flat_file
-auth/authnull
 auth/authdeny
 
 # this plugin needs to run after all other "rcpt" plugins
