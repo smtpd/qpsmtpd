@@ -1,5 +1,8 @@
 0.41
 
+  Remove the auth/authnull sample plugin (there are plenty proper examples now
+  so we don't have to include this insecure plugin)
+
   POD syntax cleanup (Steve Kemp)
 
   Make connection->local_ip available from the Apache transport (Peter Eisch)
