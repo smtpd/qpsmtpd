@@ -59,8 +59,13 @@ spamassassin
 # run the clamav virus checking plugin
 # virus/clamav
 
+# You must enable a queue plugin - see the options in plugins/queue/ - for example:
+
+# queue to a maildir
+# queue/maildir /home/spamtrap/mail
+
 # queue the mail with qmail-queue
-queue/qmail-queue
+# queue/qmail-queue
 
 
 # If you need to run the same plugin multiple times, you can do
