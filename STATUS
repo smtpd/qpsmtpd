@@ -10,7 +10,7 @@ pez (or pezmail)
 Near term roadmap
 =================
 
-0.41:
+0.42:
       - Bugfixes
       - add module requirements to the META.yml file
 
@@ -20,15 +20,15 @@ Near term roadmap
       - use keyword "ESMTPA" in Received header in case of authentication to comply with RFC 3848.
 
 
-0.50:
-      Include the popular check_delivery[1] functionality via the 0.30 API
+0.60:
+      Include the popular check_delivery[1] functionality via the 0.50 API
       [1] until then get it from 
           http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
 
       Add API to reject individual recipients after the RCPT has been
       accepted and generate individual bounce messages.
 
-0.51: bugfixes
+0.61: bugfixes
 
 1.0bN: bugfixes (repeat until we run out of bugs to fix) 
 1.0.0: it just might happen!

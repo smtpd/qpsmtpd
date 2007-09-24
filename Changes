@@ -1,15 +1,38 @@
-0.41
+0.41 - September 25, 2007
+
+  New docs/plugins.pod documentation!
+
+  Connection and transaction objects now have an "id" method returning a 
+  unique id (good for logging etc). 
 
   Add X-Spam-Level header in spamassassin plugin (idea from Werner Fleck)
+
+  prefork: support two or more parallel running instances (on different
+  ports; the first 4 digits of the port number must be different for each
+  instance - see IPC::Sharable).
 
   Remove the auth/authnull sample plugin (there are plenty proper examples now
   so we don't have to include this insecure plugin)
 
   POD syntax cleanup (Steve Kemp)
 
+  Fix Qpsmtpd::Plugins::isa_plugin() with multiple plugin dirs (Gavin Carr)
+
   Make connection->local_ip available from the Apache transport (Peter Eisch)
 
+  Support checking for early talkers at DATA
+
+  Make the documented DENY{,SOFT}_DISCONNECT work in the data-post hook
+
+  Allow buffered writes in Postfix plugin (from Joe Schaefer)
+
   Cleanup spamassassin plugin code a little
+
+  Fix bug which breaks queue plugins that implement continuations
+
+  Unrecognized command fix (issue #16)
+
+  Updated documentation (Apache 2.2, more)
 
 
 0.40 - June 11, 2007
