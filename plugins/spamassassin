@@ -98,8 +98,6 @@ sub hook_data_post { # check_spam
   $self->log(LOGDEBUG, "check_spam");
   return (DECLINED) if $transaction->data_size > 500_000;
 
-  my $leave_old_headers = lc($self->{_args}->{leave_old_headers}) || 'rename';
-
   my $remote  = 'localhost';
   my $port    = 783;
   if (defined $self->{_args}->{spamd_socket}
@@ -165,21 +163,11 @@ sub hook_data_post { # check_spam
   if ($line0) {
     $self->log(LOGDEBUG, "check_spam: spamd: $line0");
 
-    if ( $leave_old_headers eq 'rename' )
-    {
-      foreach my $header ( $transaction->header->get('X-Spam-Check-By') )
-      {
-        $transaction->header->add('X-Old-Spam-Check-By', $header);
-      }
-    }
-    
-    if ( $leave_old_headers eq 'drop' || $leave_old_headers eq 'rename' )
-    {
-      $transaction->header->delete('X-Spam-Check-By');
-    }
+    $self->_cleanup_spam_header($transaction, 'X-Spam-Check-By');
 
     $transaction->header->add("X-Spam-Check-By", $self->qp->config('me'), 0);
-  }
+ }    
+
 
   my ($flag, $hits, $required);
   while (<SPAMD>) {
@@ -196,24 +184,8 @@ sub hook_data_post { # check_spam
   $flag = $flag eq 'True' ? 'Yes' : 'No';
   $self->log(LOGDEBUG, "check_spam: finished reading from spamd");
 
-  if ( $leave_old_headers eq 'rename' )
-  {
-    foreach my $header ( $transaction->header->get('X-Spam-Flag') )
-    {
-      $transaction->header->add('X-Old-Spam-Flag', $header);
-    }
-
-    foreach my $header ( $transaction->header->get('X-Spam-Status') )
-    {
-      $transaction->header->add('X-Old-Spam-Status', $header);
-    }
-  }
-    
-  if ( $leave_old_headers eq 'drop' || $leave_old_headers eq 'rename' )
-  {
-    $transaction->header->delete('X-Spam-Flag');
-    $transaction->header->delete('X-Spam-Status');
-  }
+  $self->_cleanup_spam_header($transaction, 'X-Spam-Flag');
+  $self->_cleanup_spam_header($transaction, 'X-Spam-Status');
 
   $transaction->header->add('X-Spam-Flag', 'YES', 0) if ($flag eq 'Yes');
   $transaction->header->add('X-Spam-Status',
@@ -258,4 +230,25 @@ sub get_spam_score {
   my $status  = $transaction->header->get('X-Spam-Status') or return; 
   my ($score) = ($status =~ m/hits=(-?\d+\.\d+)/)[0];
   return $score;
+
+
+sub _cleanup_spam_header {
+  my ($self, $transaction, $header_name) = @_;
+
+  my $action = lc($self->{_args}->{leave_old_headers}) || 'rename';
+
+  return unless $action eq 'drop' or $action eq 'rename';
+
+  my $old_header_name = $header_name;
+  $old_header_name = ($old_header_name =~ s/^X-//) ? "X-Old-$old_header_name" : "Old-$old_header_name";
+
+  for my $header ( $transaction->header->get($header_name) ) {
+      $transaction->header->add($old_header_name, $header) if $action eq 'rename';
+      $transaction->header->delete($header_name);
+  }
+  
+        
+}
+
+
 }
