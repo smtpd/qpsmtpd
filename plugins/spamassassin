@@ -186,11 +186,18 @@ sub hook_data_post { # check_spam
 
   $self->_cleanup_spam_header($transaction, 'X-Spam-Flag');
   $self->_cleanup_spam_header($transaction, 'X-Spam-Status');
+  $self->_cleanup_spam_header($transaction, 'X-Spam-Level');
 
   $transaction->header->add('X-Spam-Flag', 'YES', 0) if ($flag eq 'Yes');
   $transaction->header->add('X-Spam-Status',
 			    "$flag, hits=$hits required=$required\n" .
 			    "\ttests=$tests", 0);
+
+  my $length = int($hits);
+  $length = 1 if $length < 1;
+  $length = 50 if $length > 50;
+  $transaction->header->add('X-Spam-Level', '*' x $length, 0);
+
   $self->log(LOGNOTICE, "check_spam: $flag, hits=$hits, required=$required, " .
 			     "tests=$tests");
 
