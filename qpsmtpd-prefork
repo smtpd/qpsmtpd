@@ -373,10 +373,16 @@ sub new_child {
         $qpsmtpd = $qpsmtpd_base;
 
         # set STDIN/STDOUT and autoflush
-        POSIX::dup2(fileno($client), 0)
-          || die "unable to duplicate filehandle to STDIN - $!";
-        POSIX::dup2(fileno($client), 1)
-          || die "unable to duplicate filehandle to STDOUT - $!";
+        #  ... no longer use POSIX::dup2: it failes after a few 
+        #  million connections
+        close(STDIN);
+        open(STDIN, "+<&".fileno($client))
+          or die "unable to duplicate filehandle to STDIN - $!";
+
+        close(STDOUT);
+        open(STDOUT, "+>&".fileno($client))
+          or die "unable to duplicate filehandle to STDOUT - $!";
+        select(STDOUT);
         $| = 1;
 
         # connection recieved, block signals
