@@ -24,10 +24,13 @@ use fields qw(
     _commands
     _config_cache
     _connection
-    _transaction
-    _test_mode
-    _extras
+    _connection_count
     _continuation
+    _extras
+    _id
+    _test_mode
+    _transaction
+    _transaction_count
 );
 use Qpsmtpd::Constants;
 use Qpsmtpd::Address;
