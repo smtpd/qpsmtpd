@@ -11,7 +11,6 @@ sub start_connection {
     my $self = shift;
 
     #reset info
-    # $self->{_connection} = Qpsmtpd::Connection->new(); #reset connection
     $self->reset_connection; #reset connection
     $self->reset_transaction;
     $self->SUPER::start_connection(@_);
