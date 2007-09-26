@@ -1,4 +1,4 @@
-0.41 - September 25, 2007
+0.42
 
   New docs/plugins.pod documentation!
 
@@ -29,6 +29,8 @@
   Cleanup spamassassin plugin code a little
 
   Fix bug which breaks queue plugins that implement continuations
+
+  Fix false positives in check_for_hi_virus plugin (Jerry D. Hedden)
 
   Unrecognized command fix (issue #16)
 
