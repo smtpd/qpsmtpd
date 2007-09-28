@@ -1,4 +1,4 @@
-0.42
+0.42 - October 1, 2007
 
   New docs/plugins.pod documentation!
 
@@ -11,12 +11,17 @@
   ports; the first 4 digits of the port number must be different for each
   instance - see IPC::Sharable).
 
+  prefork: Fix sporadic bug showing itself after millions of
+  connections (S. Priebe)
+
   Remove the auth/authnull sample plugin (there are plenty proper examples now
   so we don't have to include this insecure plugin)
 
   POD syntax cleanup (Steve Kemp)
 
   Fix Qpsmtpd::Plugins::isa_plugin() with multiple plugin dirs (Gavin Carr)
+
+  Fix false positives in check_for_hi_virus plugin (Jerry D. Hedden)
 
   Make connection->local_ip available from the Apache transport (Peter Eisch)
 

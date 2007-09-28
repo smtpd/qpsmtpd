@@ -16,6 +16,7 @@ config.sample/rcpthosts
 config.sample/tls_before_auth
 config.sample/tls_ciphers
 CREDITS
+docs/plugins.pod
 lib/Apache/Qpsmtpd.pm
 lib/Danga/Client.pm
 lib/Danga/TimeoutSocket.pm
@@ -53,7 +54,6 @@ plugins/auth/auth_flat_file
 plugins/auth/auth_ldap_bind
 plugins/auth/auth_vpopmail_sql
 plugins/auth/authdeny
-plugins/auth/authnull
 plugins/check_badmailfrom
 plugins/check_badmailfromto
 plugins/check_badrcptto
@@ -76,9 +76,11 @@ plugins/http_config
 plugins/ident/geoip
 plugins/ident/p0f
 plugins/logging/adaptive
+plugins/logging/connection_id
 plugins/logging/devnull
 plugins/logging/file
 plugins/logging/syslog
+plugins/logging/transaction_id
 plugins/logging/warn
 plugins/milter
 plugins/parse_addr_withhelo
