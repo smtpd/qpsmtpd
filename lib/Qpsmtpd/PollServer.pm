@@ -2,6 +2,8 @@
 
 package Qpsmtpd::PollServer;
 
+use Event::Lib qw(:dns);
+
 use base ('Danga::Client', 'Qpsmtpd::SMTP');
 # use fields required to be a subclass of Danga::Client. Have to include
 # all fields used by Qpsmtpd.pm here too.
@@ -177,12 +179,18 @@ sub start_conversation {
     $conn->remote_ip($ip);
     $conn->remote_port($port);
     $conn->remote_info("[$ip]");
-    ParaDNS->new(
-        finished   => sub { $self->run_hooks("connect") },
-        # NB: Setting remote_info to the same as remote_host
-        callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
-        host       => $ip,
-    );
+    
+    event_resolve_reverse($ip, sub {
+        $conn->remote_info($conn->remote_host($_[3]));
+        $self->run_hooks('connect');
+    });
+    
+#    ParaDNS->new(
+#        finished   => sub { $self->run_hooks("connect") },
+#        # NB: Setting remote_info to the same as remote_host
+#        callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
+#        host       => $ip,
+#    );
     
     return;
 }
@@ -302,8 +310,6 @@ sub end_of_data {
     #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
     
     $self->log(LOGDEBUG, "max_size: $self->{max_size} / size: $self->{data_size}");
-    
-    my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
     
     my $header = $self->transaction->header;
     if (!$header) {
