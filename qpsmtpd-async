@@ -41,6 +41,8 @@ my $USER        = (getpwuid $>)[0];         # user to suid to
 my $PAUSED      = 0;
 my $NUMACCEPT   = 20;
 my $ACCEPT_RSET = Danga::Socket->AddTimer(30, \&reset_num_accept);
+my $PID_FILE   = '';
+my $DETACH;       # daemonize on startup
 
 # make sure we don't spend forever doing accept()
 use constant ACCEPT_MAX => 1000;
@@ -59,6 +61,9 @@ Options:
  -p, --port P              : listen on a specific port; default 2525
  -u, --user U              : run as a particular user; defualt 'smtpd'
  -j, --procs J             : spawn J processes; default 1
+ -d, --detach              : detach from controlling terminal (daemonize)
+     --pid-file P          : print main servers PID to file P
+ 
  -h, --help                : this page
      --use-poll            : force use of poll() instead of epoll()/kqueue()
 EOT
@@ -71,6 +76,8 @@ GetOptions(
     'j|procs=i'             => \$PROCS,
     'd|debug+'              => \$DEBUG,
     'u|user=s'              => \$USER,
+    'pid-file=s'            => \$PID_FILE,
+    'd|detach'              => \$DETACH,
     'h|help'                => \&help,
 ) || help();
 
@@ -92,6 +99,17 @@ my $SERVER;
 my $CONFIG_SERVER;
 
 my %childstatus = ();
+if ($PID_FILE && -r $PID_FILE) {
+    open PID, "<$PID_FILE"
+	or die "open_pidfile $PID_FILE: $!\n";
+    my $running_pid = <PID> || ''; chomp $running_pid;
+    if ($running_pid =~ /^(\d+)/) {
+    	if (kill 0, $running_pid) {
+    	    die "Found an already running qpsmtpd with pid $running_pid.\n";
+    	}
+    }
+    close(PID);
+}
 
 run_as_server();
 exit(0);
@@ -164,6 +182,9 @@ sub sig_chld {
 sub HUNTSMAN {
     $SIG{CHLD} = 'DEFAULT';
     kill 'INT' => keys %childstatus;
+    if ($PID_FILE && -e $PID_FILE) {
+        unlink $PID_FILE or ::log(LOGERROR, "unlink: $PID_FILE: $!");
+    }
     exit(0);
 }
 
@@ -193,6 +214,21 @@ sub run_as_server {
     IO::Handle::blocking($CONFIG_SERVER, 0);
     binmode($CONFIG_SERVER, ':raw');
 
+    if ($DETACH) {
+     	open STDIN, '/dev/null' or die "/dev/null: $!";
+     	open STDOUT, '>/dev/null' or die "/dev/null: $!";
+     	open STDERR, '>&STDOUT' or die "open(stderr): $!";
+     	defined (my $pid = fork) or die "fork: $!";
+     	exit 0 if $pid;
+     	POSIX::setsid or die "setsid: $!";
+    }
+
+    if ($PID_FILE) {
+     	open PID, ">$PID_FILE" || die "$PID_FILE: $!";
+ 	    print PID $$,"\n";
+        close PID;
+    }
+ 
     # Drop priviledges
     my (undef, undef, $quid, $qgid) = getpwnam $USER or
           die "unable to determine uid/gid for $USER\n";
