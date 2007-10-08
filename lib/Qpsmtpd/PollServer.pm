@@ -2,8 +2,6 @@
 
 package Qpsmtpd::PollServer;
 
-use Event::Lib qw(:dns);
-
 use base ('Danga::Client', 'Qpsmtpd::SMTP');
 # use fields required to be a subclass of Danga::Client. Have to include
 # all fields used by Qpsmtpd.pm here too.
@@ -180,17 +178,12 @@ sub start_conversation {
     $conn->remote_port($port);
     $conn->remote_info("[$ip]");
     
-    event_resolve_reverse($ip, sub {
-        $conn->remote_info($conn->remote_host($_[3]));
-        $self->run_hooks('connect');
-    });
-    
-#    ParaDNS->new(
-#        finished   => sub { $self->run_hooks("connect") },
-#        # NB: Setting remote_info to the same as remote_host
-#        callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
-#        host       => $ip,
-#    );
+    ParaDNS->new(
+        finished   => sub { $self->run_hooks("connect") },
+        # NB: Setting remote_info to the same as remote_host
+        callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
+        host       => $ip,
+    );
     
     return;
 }
