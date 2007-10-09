@@ -6,7 +6,7 @@
 
 sub register {
   my ($self, $qp, $loglevel) = @_;
-
+  die "The connection ID feature is currently unsupported";
   $self->{_level} = LOGWARN;
   if ( defined($loglevel) ) {
       if ($loglevel =~ /^\d+$/) {

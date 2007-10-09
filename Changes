@@ -2,9 +2,6 @@
 
   New docs/plugins.pod documentation!
 
-  Connection and transaction objects now have an "id" method returning a 
-  unique id (good for logging etc). 
-
   Add X-Spam-Level header in spamassassin plugin (idea from Werner Fleck)
 
   prefork: support two or more parallel running instances (on different

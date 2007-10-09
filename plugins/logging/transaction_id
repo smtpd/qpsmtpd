@@ -6,6 +6,7 @@
 
 sub register {
   my ($self, $qp, $loglevel) = @_;
+  die "The transaction ID feature is currently unsupported";
 
   $self->{_level} = LOGWARN;
   if ( defined($loglevel) ) {

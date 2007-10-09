@@ -239,7 +239,6 @@ while (1) {
     # get local/remote hostname, port and ip address
     my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) = Qpsmtpd::TcpServer::lrpip($server, $client, $hisaddr);
 
-    $qpsmtpd->reset_connection;
     my ($rc, @msg) = $qpsmtpd->run_hooks("pre-connection",
                                          remote_ip    => $nto_iaddr,
                                          remote_port  => $port,

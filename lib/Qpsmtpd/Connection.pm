@@ -36,18 +36,6 @@ sub start {
   return $self;
 }
 
-sub id {
-  my $self = shift;
-  $self->{_id} = shift if @_;
-  $self->{_id};
-}
-
-sub inc_id {
-    my $self = shift;
-    my ($qp_id, $count) = $self->{_id} =~ m/(.+)\.(\d+)/;
-    $self->{_id} = $qp_id . "." . ++$count;
-}
-
 sub clone {
   my $self = shift;
   my $new = $self->new();

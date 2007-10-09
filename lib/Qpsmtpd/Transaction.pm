@@ -10,11 +10,6 @@ use Time::HiRes qw(gettimeofday);
 
 use IO::File qw(O_RDWR O_CREAT);
 
-my $SALT_HOST = crypt(hostname, chr(65+rand(57)).chr(65+rand(57)));
-$SALT_HOST =~ tr/A-Za-z0-9//cd;
-
-my $SEQUENCE_ID = 1;
-
 sub new { start(@_) }
 
 sub start {
@@ -22,14 +17,9 @@ sub start {
   my $class = ref($proto) || $proto;
   my %args = @_;
   
-  my $self = { _rcpt => [], started => time, _id => $args{id} };
+  my $self = { _rcpt => [], started => time, };
   bless ($self, $class);
   return $self;
-}
-
-sub id {
-  my $self = shift;
-  $self->{_id};
 }
 
 sub add_recipient {

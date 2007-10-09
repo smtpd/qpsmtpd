@@ -19,8 +19,6 @@ use Mail::Header ();
 #use Data::Dumper;
 use POSIX qw(strftime);
 use Net::DNS;
-use Time::HiRes qw(gettimeofday);
-use Sys::Hostname;
 
 # this is only good for forkserver
 # can't set these here, cause forkserver resets them
@@ -40,17 +38,6 @@ sub new {
   # this list of valid commands should probably be a method or a set of methods
   $self->{_commands} = \%commands;
   $self;
-}
-
-sub id {
-  my $self = shift;
-  unless ($self->{_id}) {
-    $self->{_id} = sprintf("%d.%06d.%s.%d",
-                           gettimeofday,
-                           unpack("H*", (gethostbyname(hostname))[4]),
-                           $$);
-  }
-  return $self->{_id};
 }
 
 sub command_counter {
@@ -147,26 +134,14 @@ sub transaction {
 sub reset_transaction {
   my $self = shift;
   $self->run_hooks("reset_transaction") if $self->{_transaction};
-  return $self->{_transaction} =
-    Qpsmtpd::Transaction->new(id => $self->connection->id . "." .  ++$self->{_transaction_count});
+  return $self->{_transaction} = Qpsmtpd::Transaction->new();
 }
 
 
 sub connection {
   my $self = shift;
   @_ and $self->{_connection} = shift;
-  unless ($self->{_connection}) {
-    $self->{_connection} = Qpsmtpd::Connection->new();
-    $self->reset_connection;
-  }
-  return $self->{_connection};
-}
-
-sub reset_connection {
-  my $self = shift;
-  $self->connection->id($self->id . "." . ++$self->{_connection_count});
-  $self->{_transaction_count} = 0;
-  $self->reset_transaction;
+  return $self->{_connection} || ($self->{_connection} = Qpsmtpd::Connection->new());
 }
 
 sub helo {
