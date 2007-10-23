@@ -1,4 +1,5 @@
-# this plugin checks the badrcptto config (like badmailfrom for rcpt address)
+# this plugin checks the badrcptto config (like badmailfrom, but for rcpt address
+# rather than sender address)
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {
@@ -6,12 +7,12 @@ sub hook_rcpt {
   my @badrcptto = $self->qp->config("badrcptto") or return (DECLINED);
   return (DECLINED) unless $recipient->host && $recipient->user;
   my $host = lc $recipient->host;
-  my $from = lc($recipient->user) . '@' . $host;
+  my $to = lc($recipient->user) . '@' . $host;
   for my $bad (@badrcptto) {
     $bad = lc $bad;
     $bad =~ s/^\s*(\S+)/$1/;
     return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here")
-      if $bad eq $from;
+      if $bad eq $to;
     return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here")
       if substr($bad,0,1) eq '@' && $bad eq "\@$host";
   }
