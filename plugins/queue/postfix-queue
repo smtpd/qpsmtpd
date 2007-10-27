@@ -128,8 +128,10 @@ sub register {
                         ."v$postfix_version");
     $self->{_queue_flags} = 0;
     if (@args > 0) {
-        if ($args[0] =~ m#^/#) {
-            $self->{_queue_socket} = shift @args;
+        if ($args[0] =~ m#^(/.+)#) {
+            # untaint socket path
+            $self->{_queue_socket} = $1;
+            shift @args;
         }
         else {
             $self->{_queue_socket} = "/var/spool/postfix/public/cleanup";
@@ -157,6 +159,7 @@ sub register {
 sub hook_queue {
     my ($self, $transaction) = @_;
     $transaction->notes('postfix-queue-flags', $self->{_queue_flags});
+    $transaction->notes('postfix-queue-socket', $self->{_queue_socket});
 
     # $self->log(LOGDEBUG, "queue-flags=".$transaction->notes('postfix-queue-flags'));
     my ($status, $qid, $reason) = Qpsmtpd::Postfix->inject_mail($transaction);

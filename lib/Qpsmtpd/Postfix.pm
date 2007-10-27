@@ -90,10 +90,14 @@ sub print_rec_time {
 }
 
 sub open_cleanup {
-  my ($class) = @_;
+  my ($class, $socket) = @_;
+
+  $socket = "/var/spool/postfix/public/cleanup"
+    unless defined $socket;
+
   my $self = IO::Socket::UNIX->new(Type => SOCK_STREAM,
-  				   Peer => "/var/spool/postfix/public/cleanup");
-  die qq[Couldn't open unix socket "/var/spool/postfix/public/cleanup": $!] unless ref $self;
+  				   Peer => $socket);
+  die qq(Couldn't open unix socket "$socket": $!) unless ref $self;
   # allow buffered writes
   $self->autoflush(0);
   bless ($self, $class);
@@ -159,7 +163,7 @@ $transaction is supposed to be a Qpsmtpd::Transaction object.
 sub inject_mail {
   my ($class, $transaction) = @_;
 
-  my $strm = $class->open_cleanup();
+  my $strm = $class->open_cleanup($transaction->notes('postfix-queue-socket'));
 
   my %at = $strm->get_attr;
   my $qid = $at{queue_id};
