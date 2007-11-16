@@ -18,7 +18,7 @@ sub load_logging {
   # need to do this differently that other plugins so as to 
   # not trigger logging activity
   my $self = shift;
-  return if $self->{hooks}->{"logging"};
+  return if $hooks->{"logging"};
   my $configdir = $self->config_dir("logging");
   my $configfile = "$configdir/logging";
   my @loggers = $self->_config_from_file($configfile,'logging');
@@ -263,12 +263,14 @@ sub expand_inclusion_ {
 sub load_plugins {
   my $self = shift;
   
-  $self->log(LOGWARN, "Plugins already loaded") if $self->{hooks};
-  $self->{hooks} = {};
-  
   my @plugins = $self->config('plugins');
   my @loaded;
 
+  if (keys %$hooks) {
+    $self->log(LOGWARN, "Plugins already loaded");
+    return @plugins;
+  }
+  
   for my $plugin_line (@plugins) {
     my $this_plugin = $self->_load_plugin($plugin_line, $self->plugin_dirs);
     push @loaded, $this_plugin if $this_plugin;
@@ -345,7 +347,6 @@ sub transaction {
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
-  my $hooks = $self->{hooks};
   if ($hooks->{$hook}) {
     my @r;
     my @local_hooks = @{$hooks->{$hook}};
@@ -436,7 +437,6 @@ sub _register_hook {
   my $self = shift;
   my ($hook, $code, $unshift) = @_;
 
-  my $hooks = $self->{hooks};
   if ($unshift) {
     unshift @{$hooks->{$hook}}, $code;
   }
