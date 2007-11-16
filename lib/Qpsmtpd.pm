@@ -5,7 +5,10 @@ use vars qw($VERSION $Logger $TraceLevel $Spool_dir $Size_threshold);
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
-$VERSION = "0.42rc1";
+$VERSION = "0.40-dev";
+
+my $hooks = {};
+my $_config_cache = {};
 
 sub version { $VERSION };
 
@@ -119,8 +122,12 @@ sub config {
    }
 }
 
+my %config_dir_memo;
 sub config_dir {
   my ($self, $config) = @_;
+  if (exists $config_dir_memo{$config}) {
+      return $config_dir_memo{$config};
+  }
   my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
   my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
   $configdir = "$path/config" if (-e "$path/config/$config");
@@ -128,7 +135,7 @@ sub config_dir {
     $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/; # detaint
     $configdir = $1 if -e "$1/$config";
   }
-  return $configdir;
+  return $config_dir_memo{$config} = $configdir;
 }
 
 sub plugin_dirs {
@@ -145,8 +152,8 @@ sub plugin_dirs {
 sub get_qmail_config {
   my ($self, $config, $type) = @_;
   $self->log(LOGDEBUG, "trying to get config for $config");
-  if ($self->{_config_cache}->{$config}) {
-    return wantarray ? @{$self->{_config_cache}->{$config}} : $self->{_config_cache}->{$config}->[0];
+  if ($_config_cache->{$config}) {
+    return wantarray ? @{$_config_cache->{$config}} : $_config_cache->{$config}->[0];
   }
   my $configdir = $self->config_dir($config);
 
@@ -223,7 +230,7 @@ sub _config_from_file {
     }
   }
 
-  $self->{_config_cache}->{$config} = \@config;
+  $_config_cache->{$config} = \@config;
 
   return wantarray ? @config : $config[0];
 }
@@ -239,7 +246,7 @@ sub expand_inclusion_ {
 
     if (opendir(INCD, $inclusion)) {
       @includes = map { "$inclusion/$_" }
-        (grep { -f "$inclusion/$_" and !/^\./ } readdir INCD);
+        (grep { -f "$inclusion/$_" and !/^\./ } sort readdir INCD);
       closedir INCD;
     } else {
       $self->log(LOGERROR, "Couldn't open directory $inclusion,".
