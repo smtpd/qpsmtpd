@@ -120,7 +120,7 @@ sub hook_data_post {
     # Ignore non-multipart emails
     my $content_type = $transaction->header->get('Content-Type');
     $content_type =~ s/\s/ /g if defined $content_type;
-    unless ( $self->{"_clamd"}-{"scan_all"}
+    unless ( $self->{"_clamd"}->{"scan_all"}
         || $content_type
         && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
     {
