@@ -67,6 +67,10 @@ a header to the message with the virus results.
 
 The maximum size, in kilobytes, of messages to scan; defaults to 128k.
 
+=item B<scan_all>
+
+Scan all messages, even if there are no attachments
+
 =back
 
 =head1 REQUIREMENTS
@@ -101,6 +105,7 @@ sub register {
     $self->{"_clamd"}->{"clamd_socket"} ||= "/tmp/clamd";
     $self->{"_clamd"}->{"deny_viruses"} ||= "yes";
     $self->{"_clamd"}->{"max_size"}     ||= 128;
+    $self->{"_clamd"}->{"scan_all"}     ||= 0;
 }
 
 sub hook_data_post {
@@ -115,7 +120,8 @@ sub hook_data_post {
     # Ignore non-multipart emails
     my $content_type = $transaction->header->get('Content-Type');
     $content_type =~ s/\s/ /g if defined $content_type;
-    unless ( $content_type
+    unless ( $self->{"_clamd"}-{"scan_all"}
+        || $content_type
         && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
     {
         $self->log( LOGNOTICE, "non-multipart mail - skipping" );
