@@ -59,6 +59,10 @@ not trust such headers and should either rename them to X-Old-... (default,
 parameter 'rename') or have them removed (parameter 'drop'). If you know
 what you are doing, you can also leave them intact (parameter 'keep').
 
+=item spamd_user [username]
+
+The username to pass to spamd, if different from the user qpsmtpd runs as.
+
 =back
 
 With both of the first options the configuration line will look like the following
@@ -133,7 +137,7 @@ sub hook_data_post { # check_spam
   SPAMD->autoflush(1);
   
   $transaction->body_resetpos;
-  my $username = getpwuid($>);
+  my $username = $self->{_args}->{spamd_user} || getpwuid($>);
 
   print SPAMD "SYMBOLS SPAMC/1.3" . CRLF;
   print SPAMD "User: $username" . CRLF;
