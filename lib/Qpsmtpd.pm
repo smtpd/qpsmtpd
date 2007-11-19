@@ -266,7 +266,7 @@ sub load_plugins {
   my @plugins = $self->config('plugins');
   my @loaded;
 
-  if (keys %$hooks) {
+  if ($hooks->{queue}) {
     $self->log(LOGWARN, "Plugins already loaded");
     return @plugins;
   }
