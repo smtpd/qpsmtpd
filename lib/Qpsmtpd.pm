@@ -8,7 +8,12 @@ use Qpsmtpd::Constants;
 $VERSION = "0.40-dev";
 
 my $hooks = {};
+my %defaults = (
+		  me      => hostname,
+		  timeout => 1200,
+		  );
 my $_config_cache = {};
+clear_config_cache();
 
 sub version { $VERSION };
 
@@ -94,6 +99,13 @@ sub varlog {
   }
 }
 
+sub clear_config_cache {
+    $_config_cache = {};
+    for (keys %defaults) {
+        $_config_cache->{$_} = [$defaults{$_}];
+    }
+}
+
 #
 # method to get the configuration.  It just calls get_qmail_config by
 # default, but it could be overwritten to look configuration up in a
@@ -102,12 +114,11 @@ sub varlog {
 sub config {
   my ($self, $c, $type) = @_;
 
+  if ($_config_cache->{$c}) {
+      return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
+  }
+  
   #warn "SELF->config($c) ", ref $self;
-
-  my %defaults = (
-		  me      => hostname,
-		  timeout => 1200,
-		  );
 
   my ($rc, @config) = $self->run_hooks("config", $c);
   @config = () unless $rc == OK;
@@ -152,15 +163,15 @@ sub plugin_dirs {
 sub get_qmail_config {
   my ($self, $config, $type) = @_;
   $self->log(LOGDEBUG, "trying to get config for $config");
-  if ($_config_cache->{$config}) {
-    return wantarray ? @{$_config_cache->{$config}} : $_config_cache->{$config}->[0];
-  }
   my $configdir = $self->config_dir($config);
 
   my $configfile = "$configdir/$config";
 
   if ($type and $type eq "map")  {
-    return +{} unless -e $configfile . ".cdb";
+    unless (-e $configfile . ".cdb") {
+        $_config_cache->{$config} = [];
+        return +{};
+    }
     eval { require CDB_File };
 
     if ($@) {
@@ -183,7 +194,10 @@ sub get_qmail_config {
 
 sub _config_from_file {
   my ($self, $configfile, $config, $visited) = @_;
-  return unless -e $configfile;
+  unless (-e $configfile) {
+      $_config_cache->{$config} = [];
+      return;
+  }
 
   $visited ||= [];
   push @{$visited}, $configfile;
