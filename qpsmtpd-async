@@ -100,10 +100,11 @@ my $POLL = "with " . ($Danga::Socket::HaveEpoll ? "epoll()" :
 my $SERVER;
 my $CONFIG_SERVER;
 
-use constant ACCEPTING  => 1;
-use constant RESTARTING => 2;
+use constant READY      => 1;
+use constant ACCEPTING  => 2;
+use constant RESTARTING => 999;
+
 my %childstatus = ();
-my %childhandle = ();
 
 if ($PID_FILE && -r $PID_FILE) {
     open PID, "<$PID_FILE"
@@ -150,21 +151,22 @@ sub spawn_child {
     my $plugin_loader = shift || Qpsmtpd::SMTP->new;
     
     socketpair(my $reader, my $writer, AF_UNIX, SOCK_STREAM, PF_UNSPEC) || die "Unable to create a pipe";
-    $reader->autoflush(1);
     $writer->autoflush(1);
+    $reader->autoflush(1);
     
     if (my $pid = _fork) {
-        $childstatus{$pid} = ACCEPTING;
-        $childhandle{$pid} = $writer;
+        $childstatus{$pid} = $writer;
         return $pid;
     }
 
     $SIG{CHLD} = $SIG{INT} = $SIG{TERM} = 'DEFAULT';
     $SIG{PIPE} = 'IGNORE';
-    $SIG{HUP}  = sub { print "Child got SIGHUP\n" };
-    # sub { cmd_hup(); Qpsmtpd::PollServer->EventLoop(); }; # so we can HUP just one child
+    $SIG{HUP}  = 'IGNORE';
     
-    Qpsmtpd::PollServer->OtherFds(fileno($reader) => sub { command_handler($reader) });
+    Qpsmtpd::PollServer->OtherFds(
+        fileno($reader) => sub { command_handler($reader) },
+        fileno($SERVER) => \&accept_handler,
+    );
 
     $plugin_loader->run_hooks('post-fork');
 
@@ -172,13 +174,11 @@ sub spawn_child {
     exit;
 }
 
+# Note this is broken on KQueue because it requires that it handle signals itself or it breaks the event loop.
 sub sig_hup {
-    for my $writer (values %childhandle) {
+    for my $writer (values %childstatus) {
         print $writer "hup\n";
-        my $result = <$writer>;
     }
-    $SIG{HUP} = \&sig_hup;
-    Qpsmtpd::PollServer->EventLoop();
 }
 
 sub sig_chld {
@@ -191,7 +191,6 @@ sub sig_chld {
         last unless $child > 0;
         print "SIGCHLD: child $child died\n";
         delete $childstatus{$child};
-        delete $childhandle{$child};
         $spawn_count++;
     }
     if ($spawn_count) {
@@ -282,9 +281,9 @@ sub run_as_server {
     $SIG{HUP}  = \&sig_hup;
     
     Qpsmtpd::PollServer->OtherFds(
-        fileno($SERVER) => \&accept_handler,
-        fileno($CONFIG_SERVER) => \&config_handler
-        );
+        fileno($CONFIG_SERVER) => \&config_handler,
+    );
+    
     Qpsmtpd::PollServer->EventLoop;
     
     exit;
@@ -309,20 +308,6 @@ sub config_handler {
     return;
 }
 
-# server is ready to accept - tell a child to accept().
-sub accept_handler {
-    # pick a random child to tell to accept()
-    my $child = (shuffle keys %childstatus)[0];
-    if ($childstatus{$child} != ACCEPTING) {
-        # recurse...
-        return accept_handler() if %childstatus;
-        die "No children available";
-    }
-    my $writer = $childhandle{$child};
-    print $writer "accept\n";
-    my $result = <$writer>;
-}
-
 sub command_handler {
     my $reader = shift;
     
@@ -333,20 +318,18 @@ sub command_handler {
     my $real_command = "cmd_$command";
     
     no strict 'refs';
-    my $result = $real_command->();
-    print $reader "$result\n";
+    $real_command->();
 }
 
 sub cmd_hup {
     # clear cache
-    #print "Clearing cache\n";
+    print "Clearing cache\n";
     Qpsmtpd::clear_config_cache();
     # should also reload modules... but can't do that yet.
-    return "ok";
 }
 
 # Accept all new connections
-sub cmd_accept {
+sub accept_handler {
     for (1 .. $NUMACCEPT) {
         return unless _accept_handler();
     }
@@ -357,7 +340,6 @@ sub cmd_accept {
     $NUMACCEPT = ACCEPT_MAX if $NUMACCEPT > ACCEPT_MAX;
     $ACCEPT_RSET->cancel;
     $ACCEPT_RSET = Danga::Socket->AddTimer(30, \&reset_num_accept);
-    return "ok";
 }
 
 use Errno qw(EAGAIN EWOULDBLOCK);
