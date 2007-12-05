@@ -275,27 +275,35 @@ sub format {
     return "<".$self->address().">";
 }
 
-=head2 user()
+=head2 user([$user])
 
 Returns the "localpart" of the address, per RFC-2821, or the portion
 before the '@' sign.
 
+If called with one parameter, the localpart is set and the new value is
+returned.
+
 =cut
 
 sub user {
-    my ($self) = @_;
+    my ($self, $user) = @_;
+    $self->{_user} = $user if defined $user;
     return $self->{_user};
 }
 
-=head2 host()
+=head2 host([$host])
 
 Returns the "domain" part of the address, per RFC-2821, or the portion
 after the '@' sign.
 
+If called with one parameter, the domain is set and the new value is
+returned.
+
 =cut
 
 sub host {
-    my ($self) = @_;
+    my ($self, $host) = @_;
+    $self->{_host} = $host if defined $host;
     return $self->{_host};
 }
 
