@@ -474,12 +474,30 @@ sub rcpt_respond {
 }
 
 sub help {
-  my $self = shift;
-  $self->respond(214, 
-          "This is qpsmtpd " . 
-          ($self->config('smtpgreeting') ? '' : $self->version),
-          "See http://smtpd.develooper.com/",
-          'To report bugs or send comments, mail to <ask@develooper.com>.');
+  my ($self, @args) = @_;
+  $self->run_hooks("help", @args);
+}
+
+sub help_respond {
+  my ($self, $rc, $msg, $args) = @_;
+
+  return 1 
+    if $rc == DONE;
+
+  if ($rc == DENY) {
+    $msg->[0] ||= "Syntax error, command not recognized";
+    $self->respond(500, @$msg);
+  }
+  else {
+    unless ($msg->[0]) {
+      @$msg = (
+        "This is qpsmtpd " . ($self->config('smtpgreeting') ? '' : $self->version),
+        "See http://smtpd.develooper.com/",
+        'To report bugs or send comments, mail to <ask@develooper.com>.');
+    }
+    $self->respond(214, @$msg);
+  }
+  return 1;
 }
 
 sub noop {
