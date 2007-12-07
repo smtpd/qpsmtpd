@@ -1,4 +1,9 @@
 0.42 - October 1, 2007
+  
+  Pluggable hook "help" (based on patch by Jose Luis Martinez)
+
+  async: better config caching (of flat files, not results from hook_config
+  or .cdb files), send SIGHUP to clear cache
 
   New docs/plugins.pod documentation!
 
