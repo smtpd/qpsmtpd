@@ -186,21 +186,37 @@ The log level is one of (from low to high priority)
 
 =over 4
 
-=item LOGDEBUG
+=item * 
 
-=item LOGINFO
+LOGDEBUG
 
-=item LOGNOTICE
+=item *
 
-=item LOGWARN
+LOGINFO
 
-=item LOGERROR
+=item *
 
-=item LOGCRIT
+LOGNOTICE
 
-=item LOGALERT
+=item *
 
-=item LOGEMERG
+LOGWARN
+
+=item *
+
+LOGERROR
+
+=item *
+
+LOGCRIT
+
+=item *
+
+LOGALERT
+
+=item *
+
+LOGEMERG
 
 =back
 
