@@ -369,6 +369,7 @@ sub _accept_handler {
     
     $client->process_line("Connect\n");
     $client->watch_read(1);
+    $client->pause_read();
     return 1;
 }
 
