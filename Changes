@@ -1,5 +1,7 @@
 0.42 - October 1, 2007
   
+  Pluggable hook "noop"
+
   Pluggable hook "help" (based on patch by Jose Luis Martinez)
 
   async: better config caching (of flat files, not results from hook_config
