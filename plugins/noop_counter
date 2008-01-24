@@ -1,0 +1,65 @@
+#
+# 
+#
+
+=head1 NAME
+
+noop_counter - disconnect after too many consecutive NOOPs, example plugin for the hook_noop()
+
+=head1 DESCRIPTION
+
+The B<noop_counter> counts the number of consecutive C<NOOP> commands given
+by a client and disconnects after a given number. 
+
+Any other command than a C<NOOP> resets the counter.
+
+One argument may be given: the number of C<NOOP>s after which the client will
+be disconnected.
+
+=head1 NOTE
+
+This plugin should be loaded early to be able to reset the counter on any other
+command.
+
+=cut
+
+sub register {
+    my ($self, $qp, @args) = @_;
+    $self->{_noop_count} = 0;
+    $self->{_max_noop}   = 3;
+    if ($args[0] && $args[0] =~ /^\d+$/) {
+        $self->{_max_noop} = shift @args;
+    }
+}
+
+sub hook_noop {
+    my ($self, $transaction, @args) = @_;
+    ++$self->{_noop_count};
+    ### the following block is not used, RFC 2821 says we SHOULD ignore 
+    ### any arguments... so we MAY return an error if we want to :-) 
+    # return (DENY, "Syntax error, NOOP does not take any arguments")
+    #   if $args[0];
+    
+    if ($self->{_noop_count} >= $self->{_max_noop}) {
+        return (DENY_DISCONNECT, 
+		"Stop wasting my time, too many consecutive NOOPs");
+    }
+    return (DECLINED);
+}
+
+sub reset_noop_counter {
+   $_[0]->{_noop_count} = 0;
+   return (DECLINED);
+}
+
+# and bind the counter reset to the hooks, QUIT not useful here:
+*hook_helo = *hook_ehlo =       # HELO / EHLO
+    *hook_mail =                # MAIL FROM: 
+    *hook_rcpt =                # RCPT TO:
+    *hook_data =                # DATA
+    *hook_reset_transaction =   # RSET
+    *hook_vrfy =                # VRFY
+    *hook_help =                # HELP
+        \&reset_noop_counter;
+
+# vim: ts=4 sw=4 expandtab syn=perl

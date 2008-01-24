@@ -1003,7 +1003,7 @@ Arguments are
   my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
   # $trace: level of message, for example 
   #          LOGWARN, LOGDEBUG, ...
-  # $hook:  the hook in\/for which this logging 
+  # $hook:  the hook in/for which this logging 
   #          was called
   # $plugin: the plugin calling this hook
   # @log:   the log message
@@ -1173,6 +1173,37 @@ FIXME: this sould be changed in Qpsmtpd::SMTP to pass the rest of the line
 as arguments to the hook
 
 =pod
+
+=head2 hook_noop 
+
+If the client sents the B<NOOP> command, this hook is called. Default is to
+return C<250 OK>.
+
+Allowed return codes are:
+
+=over 4
+
+=item DONE
+
+Plugin gave the answer
+
+=item DENY_DISCONNECT
+
+Return error code and disconnect client
+
+=item DENY
+
+Return error code.
+
+=item Anything Else...
+
+Give the default answer of B<250 OK>.
+
+=back
+
+Arguments are
+
+  my ($self,$transaction,@args) = @_;
 
 =head2 hook_post_fork
 

@@ -502,7 +502,22 @@ sub help_respond {
 
 sub noop {
   my $self = shift;
+  $self->run_hooks("noop");
+}
+
+sub noop_respond {
+  my ($self, $rc, $msg, $args) = @_;
+  return 1 if $rc == DONE;
+
+  if ($rc == DENY || $rc == DENY_DISCONNECT) {
+    $msg->[0] ||= "Stop wasting my time."; # FIXME: better default message?
+    $self->respond(500, @$msg);
+    $self->disconnect if $rc == DENY_DISCONNECT;
+    return 1;
+  }
+
   $self->respond(250, "OK");
+  return 1;
 }
 
 sub vrfy {
