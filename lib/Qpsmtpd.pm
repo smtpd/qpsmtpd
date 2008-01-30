@@ -1,9 +1,11 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $Logger $TraceLevel $Spool_dir $Size_threshold);
+use vars qw($VERSION $TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
+
+#use DashProfiler;
 
 $VERSION = "0.42rc1";
 
@@ -14,6 +16,13 @@ my %defaults = (
 		  );
 my $_config_cache = {};
 clear_config_cache();
+
+#DashProfiler->add_profile("qpsmtpd");
+#my $SAMPLER = DashProfiler->prepare("qpsmtpd");
+
+sub DESTROY {
+    #warn $_ for DashProfiler->profile_as_text("qpsmtpd");
+}
 
 sub version { $VERSION };
 
@@ -87,7 +96,7 @@ sub varlog {
 
   $self->load_logging; # in case we already don't have this loaded yet
 
-  my ($rc) = $self->run_hooks("logging", $trace, $hook, $plugin, @log);
+  my ($rc) = $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log);
 
   unless ( $rc and $rc == DECLINED or $rc == OK ) {
     # no logging plugins registered so fall back to STDERR
@@ -114,13 +123,14 @@ sub clear_config_cache {
 sub config {
   my ($self, $c, $type) = @_;
 
+  #my $timer = $SAMPLER->("config", undef, 1);
   if ($_config_cache->{$c}) {
       return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
   
   #warn "SELF->config($c) ", ref $self;
 
-  my ($rc, @config) = $self->run_hooks("config", $c);
+  my ($rc, @config) = $self->run_hooks_no_respond("config", $c);
   @config = () unless $rc == OK;
 
   if (wantarray) {
@@ -284,7 +294,7 @@ sub load_plugins {
     $self->log(LOGWARN, "Plugins already loaded");
     return @plugins;
   }
-  
+
   for my $plugin_line (@plugins) {
     my $this_plugin = $self->_load_plugin($plugin_line, $self->plugin_dirs);
     push @loaded, $this_plugin if $this_plugin;
@@ -370,8 +380,27 @@ sub run_hooks {
   return $self->hook_responder($hook, [0, ''], [@_]);
 }
 
+sub run_hooks_no_respond {
+    my ($self, $hook) = (shift, shift);
+    if ($hooks->{$hook}) {
+        my @r;
+        for my $code (@{$hooks->{$hook}}) {
+            eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
+            $@ and warn("FATAL PLUGIN ERROR: ", $@) and next;
+            if ($r[0] == YIELD) {
+                die "YIELD not valid from $hook hook";
+            }
+            last unless $r[0] == DECLINED;
+        }
+        $r[0] = DECLINED if not defined $r[0];
+        return @r;
+    }
+    return (0, '');
+}
+
 sub run_continuation {
   my $self = shift;
+  #my $t1 = $SAMPLER->("run_hooks", undef, 1);
   die "No continuation in progress" unless $self->{_continuation};
   $self->continue_read() if $self->isa('Danga::Client');
   my $todo = $self->{_continuation};
@@ -381,6 +410,8 @@ sub run_continuation {
   my @r;
   while (@$todo) {
     my $code = shift @$todo;
+    #my $t2 = $SAMPLER->($hook . "_" . $code->{name}, undef, 1);
+    #warn("Got sampler called: ${hook}_$code->{name}\n");
     if ( $hook eq 'logging' ) { # without calling $self->log()
       eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
       $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
@@ -417,13 +448,13 @@ sub run_continuation {
         $r[1] = "" if not defined $r[1];
         $self->log(LOGDEBUG, "Plugin ".$code->{name}.
 	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-        $self->run_hooks("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+        $self->run_hooks_no_respond("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
       }
       else {
         $r[1] = "" if not defined $r[1];
         $self->log(LOGDEBUG, "Plugin ".$code->{name}.
 	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-        $self->run_hooks("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
+        $self->run_hooks_no_respond("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
       }
 
     }
@@ -438,6 +469,8 @@ sub run_continuation {
 sub hook_responder {
   my ($self, $hook, $msg, $args) = @_;
   
+  #my $t1 = $SAMPLER->("hook_responder", undef, 1);
+
   my $code = shift @$msg;
   
   my $responder = $hook . '_respond';
