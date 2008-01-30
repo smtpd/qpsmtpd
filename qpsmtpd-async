@@ -75,7 +75,7 @@ GetOptions(
     'p|port=i'              => \$PORT,
     'l|listen-address=s'    => \$LOCALADDR,
     'j|procs=i'             => \$PROCS,
-    'd|debug+'              => \$DEBUG,
+    'v|verbose+'              => \$DEBUG,
     'u|user=s'              => \$USER,
     'pid-file=s'            => \$PID_FILE,
     'd|detach'              => \$DETACH,
