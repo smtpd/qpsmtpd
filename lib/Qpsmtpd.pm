@@ -291,7 +291,7 @@ sub load_plugins {
   my @loaded;
 
   if ($hooks->{queue}) {
-    $self->log(LOGWARN, "Plugins already loaded");
+    #$self->log(LOGWARN, "Plugins already loaded");
     return @plugins;
   }
 
@@ -412,51 +412,47 @@ sub run_continuation {
     my $code = shift @$todo;
     #my $t2 = $SAMPLER->($hook . "_" . $code->{name}, undef, 1);
     #warn("Got sampler called: ${hook}_$code->{name}\n");
-    if ( $hook eq 'logging' ) { # without calling $self->log()
-      eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
-      $@ and warn("FATAL LOGGING PLUGIN ERROR: ", $@) and next;
-    }
-    else {
-      $self->varlog(LOGDEBUG, $hook, $code->{name});
-      eval { (@r) = $code->{code}->($self, $self->transaction, @$args); };
-      $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
+    $self->varlog(LOGDEBUG, $hook, $code->{name});
+    my $tran = $self->transaction;
+    eval { (@r) = $code->{code}->($self, $tran, @$args); };
+    $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
 
-      !defined $r[0]
+    !defined $r[0]
         and $self->log(LOGERROR, "plugin ".$code->{name}
                        ." running the $hook hook returned undef!")
         and next;
 
-      if ($self->transaction) {
-        my $tnotes = $self->transaction->notes( $code->{name} );
-        $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $tnotes || ref $tnotes eq "HASH");
-      }
-      else {
-        my $cnotes = $self->connection->notes( $code->{name} );
-        $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-          if (!defined $cnotes || ref $cnotes eq "HASH");
-      }
+    # note this is wrong as $tran is always true in the
+    # current code...
+    if ($tran) {
+      my $tnotes = $tran->notes( $code->{name} );
+      $tnotes->{"hook_$hook"}->{'return'} = $r[0]
+        if (!defined $tnotes || ref $tnotes eq "HASH");
+    }
+    else {
+      my $cnotes = $self->connection->notes( $code->{name} );
+      $cnotes->{"hook_$hook"}->{'return'} = $r[0]
+        if (!defined $cnotes || ref $cnotes eq "HASH");
+    }
       
-      if ($r[0] == YIELD) {
-        $self->pause_read() if $self->isa('Danga::Client');
-        $self->{_continuation} = [$hook, $args, @$todo];
-        return @r;
-      }
-      elsif ($r[0] == DENY or $r[0] == DENYSOFT or
+    if ($r[0] == YIELD) {
+      $self->pause_read() if $self->isa('Danga::Client');
+      $self->{_continuation} = [$hook, $args, @$todo];
+      return @r;
+    }
+    elsif ($r[0] == DENY or $r[0] == DENYSOFT or
           $r[0] == DENY_DISCONNECT or $r[0] == DENYSOFT_DISCONNECT)
-      {
-        $r[1] = "" if not defined $r[1];
-        $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+    {
+      $r[1] = "" if not defined $r[1];
+      $self->log(LOGDEBUG, "Plugin ".$code->{name}.
 	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-        $self->run_hooks_no_respond("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
-      }
-      else {
-        $r[1] = "" if not defined $r[1];
-        $self->log(LOGDEBUG, "Plugin ".$code->{name}.
+      $self->run_hooks_no_respond("deny", $code->{name}, $r[0], $r[1]) unless ($hook eq "deny");
+    }
+    else {
+      $r[1] = "" if not defined $r[1];
+      $self->log(LOGDEBUG, "Plugin ".$code->{name}.
 	    ", hook $hook returned ".return_code($r[0]).", $r[1]");
-        $self->run_hooks_no_respond("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
-      }
-
+      $self->run_hooks_no_respond("ok", $code->{name}, $r[0], $r[1]) unless ($hook eq "ok");
     }
 
     last unless $r[0] == DECLINED;
