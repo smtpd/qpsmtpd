@@ -1,4 +1,39 @@
-0.42 - October 1, 2007
+0.43 - February 5, 2008
+
+  (This release was mostly done by Matt Sergeant and Hanno Hecker)
+
+  Allow qpsmtpd-async to detatch (Chris Lewis).
+
+  plugins/tls: work-around for failed connections in -prefork after
+  STARTTLS connection (Stefan Priebe, Hanno Hecker)
+
+  Make the cleanup socket location parameter in the postfix plugin work 
+  (ulr...@topfen.net)
+
+  Implement config caching properly (for async).
+
+  Hook/plugin caching
+
+  Remove the connection / transaction id feature (never released)
+
+  Option to clamdscan to scan all messages, even if there are no attachments
+
+  add new clamd_user parameter that sets the user we pass to clamd
+
+  async: Support for HUPing the server to clear the cache. Wake-one child support.
+
+  async: Don't listen for readiness in the parent any more - breaks
+  under high load.
+
+  Made user() and host() setters as well as getters in
+  Qpsmtpd::Address.  Suggested by mpelzer@gmail.com.
+
+  Pluggable "help", based on patch by Jose Luis Martinez.
+ 
+  Updated plugin documentation.
+
+
+0.42 - October 1, 2007 - Never released
   
   Pluggable hook "noop"
 
