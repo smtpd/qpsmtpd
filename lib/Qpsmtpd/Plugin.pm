@@ -60,8 +60,8 @@ sub qp {
 
 sub log {
   my $self = shift;
-  $self->qp->varlog(shift, $self->hook_name, $self->plugin_name, @_)
-    unless defined $self->hook_name and $self->hook_name eq 'logging';
+  $self->{_qp}->varlog(shift, $self->{_hook}, $self->plugin_name, @_)
+    unless defined $self->{_hook} and $self->{_hook} eq 'logging';
 }
 
 sub transaction {

@@ -103,59 +103,43 @@ sub fault {
     return;
 }
 
+my %cmd_cache;
+
 sub process_line {
     my Qpsmtpd::PollServer $self = shift;
     my $line = shift || return;
     if ($::DEBUG > 1) { print "$$:".($self+0)."C($self->{mode}): $line"; }
-    eval { $self->_process_line($line) };
-    if ($@) {
-        print STDERR "Error: $@\n";
-        return $self->fault("command failed unexpectedly") if $self->{mode} eq 'cmd';
-        return $self->fault("unknown error");
-    }
-    return;
-}
-
-sub _process_line {
-    my Qpsmtpd::PollServer $self = shift;
-    my $line = shift;
-    
-    if ($self->{mode} eq 'connect') {
-        $self->{mode} = 'cmd';
-        my $rc = $self->start_conversation;
-        return;
-    }
-    elsif ($self->{mode} eq 'cmd') {
+    if ($self->{mode} eq 'cmd') {
         $line =~ s/\r?\n//;
-        return $self->process_cmd($line);
+        my ($cmd, @params) = split(/ +/, $line, 2);
+        my $meth = lc($cmd);
+        if (my $lookup = $cmd_cache{$meth} || $self->{_commands}->{$meth} && $self->can($meth)) {
+            $cmd_cache{$meth} = $lookup;
+            eval {
+                $lookup->($self, @params);
+            };
+            if ($@) {
+                my $error = $@;
+                chomp($error);
+                $self->log(LOGERROR, "Command Error: $error");
+                $self->fault("command '$cmd' failed unexpectedly");
+            }
+        }
+        else {
+            # No such method - i.e. unrecognized command
+            my ($rc, $msg) = $self->run_hooks("unrecognized_command", $meth, @params);
+        }
+    }
+    elsif ($self->{mode} eq 'connect') {
+        $self->{mode} = 'cmd';
+        # I've removed an eval{} from around this. It shouldn't ever die()
+        # but if it does we're a bit screwed... Ah well :-)
+        $self->start_conversation;
     }
     else {
         die "Unknown mode";
     }
-}
-
-sub process_cmd {
-    my Qpsmtpd::PollServer $self = shift;
-    my $line = shift;
-    my ($cmd, @params) = split(/ +/, $line, 2);
-    my $meth = lc($cmd);
-    if (my $lookup = $self->{_commands}->{$meth} && $self->can($meth)) {
-        my $resp = eval {
-            $lookup->($self, @params);
-        };
-        if ($@) {
-            my $error = $@;
-            chomp($error);
-            $self->log(LOGERROR, "Command Error: $error");
-            return $self->fault("command '$cmd' failed unexpectedly");
-        }
-        return $resp;
-    }
-    else {
-        # No such method - i.e. unrecognized command
-        my ($rc, $msg) = $self->run_hooks("unrecognized_command", $meth, @params);
-        return 1;
-    }
+    return;
 }
 
 sub disconnect {

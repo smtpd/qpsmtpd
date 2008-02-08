@@ -15,7 +15,6 @@ my %defaults = (
 		  timeout => 1200,
 		  );
 my $_config_cache = {};
-clear_config_cache();
 
 #DashProfiler->add_profile("qpsmtpd");
 #my $SAMPLER = DashProfiler->prepare("qpsmtpd");
@@ -57,6 +56,14 @@ sub load_logging {
     $self->log(LOGINFO, "Loaded $logger");
   }
 
+  $configdir = $self->config_dir("loglevel");
+  $configfile = "$configdir/loglevel";
+  $TraceLevel = $self->_config_from_file($configfile,'loglevel');
+
+  unless (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
+    $TraceLevel = LOGWARN; # Default if no loglevel file found.
+  }
+
   $LOGGING_LOADED = 1;
 
   return @loggers;
@@ -64,16 +71,6 @@ sub load_logging {
   
 sub trace_level {
   my $self = shift;
-  return $TraceLevel if $TraceLevel;
-
-  my $configdir = $self->config_dir("loglevel");
-  my $configfile = "$configdir/loglevel";
-  $TraceLevel = $self->_config_from_file($configfile,'loglevel');
-
-  unless (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
-    $TraceLevel = LOGWARN; # Default if no loglevel file found.
-  }
-
   return $TraceLevel;
 }
 
@@ -106,18 +103,15 @@ sub varlog {
   unless ( $rc and $rc == DECLINED or $rc == OK ) {
     # no logging plugins registered so fall back to STDERR
     warn join(" ", $$ .
-      (defined $plugin ? " $plugin plugin:" : 
+      (defined $plugin ? " $plugin plugin ($hook):" : 
        defined $hook   ? " running plugin ($hook):"  : ""),
       @log), "\n"
-    if $trace <= $self->trace_level();
+    if $trace <= $TraceLevel;
   }
 }
 
 sub clear_config_cache {
     $_config_cache = {};
-    for (keys %defaults) {
-        $_config_cache->{$_} = [$defaults{$_}];
-    }
 }
 
 #
@@ -132,6 +126,8 @@ sub config {
   if ($_config_cache->{$c}) {
       return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
+  
+  $_config_cache->{$c} = [$defaults{$c}] if exists($defaults{$c});
   
   #warn "SELF->config($c) ", ref $self;
 
