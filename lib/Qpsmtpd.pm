@@ -178,6 +178,7 @@ sub get_qmail_config {
 
   my $configfile = "$configdir/$config";
 
+  # CDB config support really should be moved to a plugin
   if ($type and $type eq "map")  {
     unless (-e $configfile . ".cdb") {
         $_config_cache->{$config} = [];
@@ -195,8 +196,9 @@ sub get_qmail_config {
       $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
       return +{};
     }
-    #warn Data::Dumper->Dump([\%h], [qw(h)]);
-    # should we cache this?
+    # We explicitly don't cache cdb entries. The assumption is that
+    # the data is in a CDB file in the first place because there's
+    # lots of data and the cache hit ratio would be low.
     return \%h;
   }
 
