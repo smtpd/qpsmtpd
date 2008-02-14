@@ -76,7 +76,7 @@ sub plugin_dirs {
 
 sub log {
     my ($self, $trace, $hook, $plugin, @log) = @_;
-    my $level = Qpsmtpd::TRACE_LEVEL();
+    my $level = Qpsmtpd::TRACE_LEVEL() || 5;
     $level = $self->init_logger unless defined $level;
     print("# " . join(" ", $$, @log) . "\n") if $trace <= $level;
 }
