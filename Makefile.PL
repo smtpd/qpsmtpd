@@ -14,7 +14,7 @@ WriteMakefile(
         'File::Temp'   => 0,
         'Time::HiRes'  => 0,
     },
-    ABSTRACT_FROM  => 'README',
+    ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjorn Hansen <ask@develooper.com>',
     EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver)],
 );
