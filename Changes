@@ -1,3 +1,6 @@
+
+  Add qpsmtpd-prefork to the install targets (Robin Bowes)
+
 0.43 - February 5, 2008
 
   (This release was mostly done by Matt Sergeant and Hanno Hecker)
