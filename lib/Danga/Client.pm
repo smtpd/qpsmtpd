@@ -113,7 +113,7 @@ sub process_read_buf {
     $self->{line} .= $$bref;
     return if $self->{pause_count} || $self->{closed};
     
-    while ($self->{line} =~ s/^(.*?\n)//) {
+    if ($self->{line} =~ s/^(.*?\n)//) {
         my $line = $1;
         $self->{alive_time} = time;
         my $resp = $self->process_line($line);
@@ -121,6 +121,12 @@ sub process_read_buf {
         $self->write($resp) if $resp;
         # $self->watch_read(0) if $self->{pause_count};
         return if $self->{pause_count} || $self->{closed};
+        # read more in a timer, to give other clients a look in
+        $self->AddTimer(0, sub {
+            if (length($self->{line}) && !$self->paused) {
+                $self->process_read_buf(\""); # " for bad syntax highlighters
+            }
+        });
     }
 }
 
