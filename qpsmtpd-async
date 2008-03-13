@@ -264,7 +264,15 @@ sub run_as_server {
     # Drop priviledges
     my (undef, undef, $quid, $qgid) = getpwnam $USER or
           die "unable to determine uid/gid for $USER\n";
-    $) = "";
+    my $groups = "$qgid $qgid";
+    while (my (undef, undef, $gid, $members) = getgrent) {
+        my @m = split(/ /, $members);
+        if (grep { $_ eq $USER } @m) {
+            $groups .= " $gid";
+        }
+    }
+    endgrent;
+    $) = $groups;
     POSIX::setgid($qgid) or
           die "unable to change gid: $!\n";
     POSIX::setuid($quid) or
