@@ -7,6 +7,10 @@ BEGIN {
     $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin:/usr/local/bin';
 }
 
+# Profiling - requires Devel::Profiler 0.05
+#BEGIN { $Devel::Profiler::NO_INIT = 1; }
+#use Devel::Profiler;
+
 use strict;
 use vars qw($DEBUG);
 use FindBin qw();
@@ -60,6 +64,7 @@ Usage:
 Options:
  -l, --listen-address addr : listen on a specific address; default 0.0.0.0
  -p, --port P              : listen on a specific port; default 2525
+ --config-port             : config server port; default 20025
  -u, --user U              : run as a particular user; defualt 'smtpd'
  -j, --procs J             : spawn J processes; default 1
  -d, --detach              : detach from controlling terminal (daemonize)
@@ -162,6 +167,10 @@ sub spawn_child {
     $SIG{CHLD} = $SIG{INT} = $SIG{TERM} = 'DEFAULT';
     $SIG{PIPE} = 'IGNORE';
     $SIG{HUP}  = 'IGNORE';
+    
+    close $CONFIG_SERVER;
+    
+    Qpsmtpd::PollServer->Reset;
     
     Qpsmtpd::PollServer->OtherFds(
         fileno($reader) => sub { command_handler($reader) },
@@ -272,6 +281,31 @@ sub run_as_server {
         (getgrgid($)) || $)));
 
     $SIG{INT} = $SIG{TERM} = \&HUNTSMAN;
+
+######################
+# more Profiling code
+=pod
+    $plugin_loader->run_hooks('post-fork');
+
+    Devel::Profiler->set_options(
+        bad_subs => [qw(Danga::Socket::EventLoop)],
+        sub_filter => sub {
+                        my ($pkg, $sub) = @_;
+                        return 0 if $sub eq 'AUTOLOAD';
+                        return 0 if $pkg =~ /ParaDNS::XS/;
+                        return 1; 
+                      },
+    );
+    Devel::Profiler->init();
+    
+    Qpsmtpd::PollServer->OtherFds(
+        fileno($SERVER) => \&accept_handler,
+        fileno($CONFIG_SERVER) => \&config_handler,    ); 
+
+    Qpsmtpd::PollServer->EventLoop;
+    exit;
+=cut
+#####################
 
     for (1..$PROCS) {
         my $pid = spawn_child($plugin_loader);
