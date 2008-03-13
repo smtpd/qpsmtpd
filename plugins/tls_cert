@@ -5,6 +5,10 @@ use Getopt::Long;
 
 my %opts = ();
 chomp (my $hostname = `hostname --fqdn`);
+if ($?) {
+    chomp($hostname = `hostname`);
+}
+print "Using hostname: $hostname\n";
 my %defaults = (
     C  => 'XY',
     ST => 'unknown',
