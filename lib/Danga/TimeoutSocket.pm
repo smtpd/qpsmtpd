@@ -25,6 +25,11 @@ sub new {
 sub max_idle_time       { 0 }
 sub max_connect_time    { 0 }
 
+sub Reset {
+    Danga::Socket->Reset;
+    Danga::Socket->AddTimer(15, \&_do_cleanup);
+}
+
 sub _do_cleanup {
     my $now = time;
     

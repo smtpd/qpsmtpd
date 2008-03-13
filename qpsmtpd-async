@@ -45,8 +45,8 @@ my $USER        = (getpwuid $>)[0];         # user to suid to
    $USER        = "smtpd" if $USER eq "root";
 my $PAUSED      = 0;
 my $NUMACCEPT   = 20;
-my $ACCEPT_RSET = Danga::Socket->AddTimer(30, \&reset_num_accept);
-my $PID_FILE   = '';
+my $PID_FILE    = '';
+my $ACCEPT_RSET;
 my $DETACH;       # daemonize on startup
 
 # make sure we don't spend forever doing accept()
@@ -176,6 +176,8 @@ sub spawn_child {
         fileno($reader) => sub { command_handler($reader) },
         fileno($SERVER) => \&accept_handler,
     );
+
+    $ACCEPT_RSET = Danga::Socket->AddTimer(30, \&reset_num_accept);
 
     $plugin_loader->run_hooks('post-fork');
 
@@ -380,7 +382,7 @@ sub accept_handler {
     # So double the number we accept next time.
     $NUMACCEPT *= 2;
     $NUMACCEPT = ACCEPT_MAX if $NUMACCEPT > ACCEPT_MAX;
-    $ACCEPT_RSET->cancel;
+    $ACCEPT_RSET->cancel if defined $ACCEPT_RSET;
     $ACCEPT_RSET = Danga::Socket->AddTimer(30, \&reset_num_accept);
 }
 
