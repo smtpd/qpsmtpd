@@ -57,7 +57,7 @@ sub hook_mail_done {
     return DECLINED
       if ( $self->qp->connection->notes('whitelistclient') );
 
-    if (!$transaction->notes('resolvable_fromhost')) {
+    if ( $sender ne "<>" && !$transaction->notes('resolvable_fromhost') ) {
         # default of temp_resolver_failed is DENYSOFT
         return Qpsmtpd::DSN->temp_resolver_failed(
             "Could not resolve " . $sender->host );
