@@ -49,6 +49,7 @@ META.yml			Module meta-data (added by MakeMaker)
 plugins/async/check_earlytalker
 plugins/async/dnsbl
 plugins/async/require_resolvable_fromhost
+plugins/async/queue/smtp-forward
 plugins/auth/auth_cvm_unix_local
 plugins/auth/auth_flat_file
 plugins/auth/auth_ldap_bind
