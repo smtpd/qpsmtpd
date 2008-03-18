@@ -30,7 +30,6 @@ sub handler {
         ip => $c->remote_ip,
         host => $c->remote_host,
         info => undef,
-        dir => $c->base_server->dir_config('QpsmtpdDir'),
         conn => $c,
     );
     
@@ -48,7 +47,6 @@ sub start_connection {
     my $self = shift;
     my %opts = @_;
 
-    $self->{qpdir} = $opts{dir};
     $self->{conn} = $opts{conn};
     $self->{conn}->client_socket->timeout_set($self->config('timeout') * 1_000_000);
     $self->{bb_in} = APR::Brigade->new($self->{conn}->pool, $self->{conn}->bucket_alloc);
