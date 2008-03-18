@@ -23,7 +23,7 @@ sub handler {
     my Apache2::Connection $c = shift;
     $c->client_socket->opt_set(APR::Const::SO_NONBLOCK => 0);
 
-    die "SetEnv QPSMTPD_CONFIG must be given" unless $ENV{QPSMTPD_CONFIG};
+    die "\$ENV{QPSMTPD_CONFIG} must be given" unless $ENV{QPSMTPD_CONFIG};
     
     my $qpsmtpd = Qpsmtpd::Apache->new();
     $qpsmtpd->start_connection(
