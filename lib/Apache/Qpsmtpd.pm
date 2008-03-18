@@ -23,6 +23,8 @@ sub handler {
     my Apache2::Connection $c = shift;
     $c->client_socket->opt_set(APR::Const::SO_NONBLOCK => 0);
 
+    die "SetEnv QPSMTPD_CONFIG must be given" unless $ENV{QPSMTPD_CONFIG};
+    
     my $qpsmtpd = Qpsmtpd::Apache->new();
     $qpsmtpd->start_connection(
         ip => $c->remote_ip,
@@ -89,13 +91,6 @@ sub run {
     # this should really be the loop and read_input should just
     # get one line; I think
     $self->read_input();
-}
-
-sub config_dir {
-    my ($self, $config) = @_;
-    -e "$_/$config" and return $_
-        for "$self->{qpdir}/config";
-    return "/var/qmail/control";
 }
 
 sub getline {
@@ -181,9 +176,11 @@ Apache::Qpsmtpd - a mod_perl-2 connection handler for qpsmtpd
   </Perl>
 
   <VirtualHost _default_:25>
-  PerlSetVar QpsmtpdDir /path/to/qpsmtpd
+  SetEnv QPSMTPD_CONFIG /path/to/qpsmtpd/config
   PerlModule Apache::Qpsmtpd
   PerlProcessConnectionHandler Apache::Qpsmtpd
+  # can specify this in config/plugin_dirs if you wish:
+  PerlSetVar qpsmtpd.plugin_dirs /path/to/qpsmtpd/plugins
   PerlSetVar qpsmtpd.loglevel 4
   </VirtualHost>
 
@@ -202,14 +199,10 @@ module.
 
 =head1 BUGS
 
-Currently the F<check_early_talker> plugin will not work because it
-relies on being able to do C<select()> on F<STDIN> which does not
-work here. It should be possible with the next release of mod_perl
-to do a C<poll()> on the socket though, so we can hopefully get
-that working in the future.
+Probably a few. Make sure you test your plugins carefully.
 
-Other operations that perform directly on the STDIN/STDOUT filehandles
-will not work.
+The Apache scoreboard (/server-status/) mostly works and shows
+connections, but could do with some enhancements specific to SMTP.
 
 =head1 AUTHOR
 
