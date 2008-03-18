@@ -85,7 +85,7 @@ GetOptions(
     'pid-file=s'            => \$PID_FILE,
     'd|detach'              => \$DETACH,
     'h|help'                => \&help,
-    'config-port'           => \$CONFIG_PORT,
+    'config-port=i'         => \$CONFIG_PORT,
 ) || help();
 
 # detaint the commandline
