@@ -98,12 +98,6 @@ sub config_dir {
     return "/var/qmail/control";
 }
 
-
-sub plugin_dir {
-    my $self = shift;
-    return "$self->{qpdir}/plugins";
-}
-
 sub getline {
     my $self = shift;
     my $c = $self->{conn} || die "Cannot getline without a conn";
