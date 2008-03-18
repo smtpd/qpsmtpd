@@ -171,10 +171,10 @@ Apache::Qpsmtpd - a mod_perl-2 connection handler for qpsmtpd
   <Perl>
   use lib qw( /path/to/qpsmtpd/lib );
   use Apache::Qpsmtpd;
+  $ENV{QPSMTPD_CONFIG} = "/path/to/qpsmtpd/config";
   </Perl>
 
   <VirtualHost _default_:25>
-  SetEnv QPSMTPD_CONFIG /path/to/qpsmtpd/config
   PerlModule Apache::Qpsmtpd
   PerlProcessConnectionHandler Apache::Qpsmtpd
   # can specify this in config/plugin_dirs if you wish:
