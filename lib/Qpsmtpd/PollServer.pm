@@ -235,35 +235,35 @@ sub got_data {
         $data =~ s/\r\n/\n/mg;
         $data =~ s/^\.\./\./mg;
         
-        if ($self->{in_header} and $data =~ s/\A(.*?\n)\n/\n/ms) {
-            $self->{header_lines} .= $1;
-            # end of headers
-            $self->{in_header} = 0;
-            
-            # ... need to check that we don't reformat any of the received lines.
-            #
-            # 3.8.2 Received Lines in Gatewaying
-            #   When forwarding a message into or out of the Internet environment, a
-            #   gateway MUST prepend a Received: line, but it MUST NOT alter in any
-            #   way a Received: line that is already in the header.
-            my @header_lines = split(/^/m, $self->{header_lines});
-    
-            my $header = Mail::Header->new(\@header_lines,
-                                            Modify => 0, MailFrom => "COERCE");
-            $self->transaction->header($header);
-            $self->{header_lines} = '';
-
-            #$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
-    
-            # FIXME - call plugins to work on just the header here; can
-            # save us buffering the mail content.
-            
-            # Save the start of just the body itself	
-            $self->transaction->set_body_start();
-        }
-        
         if ($self->{in_header}) {
             $self->{header_lines} .= $data;
+            
+            if ($self->{header_lines} =~ s/\n(\n.*)\z/\n/ms) {
+                $data = $1;
+                # end of headers
+                $self->{in_header} = 0;
+                
+                # ... need to check that we don't reformat any of the received lines.
+                #
+                # 3.8.2 Received Lines in Gatewaying
+                #   When forwarding a message into or out of the Internet environment, a
+                #   gateway MUST prepend a Received: line, but it MUST NOT alter in any
+                #   way a Received: line that is already in the header.
+                my @header_lines = split(/^/m, $self->{header_lines});
+    
+                my $header = Mail::Header->new(\@header_lines,
+                                                Modify => 0, MailFrom => "COERCE");
+                $self->transaction->header($header);
+                $self->{header_lines} = '';
+
+                #$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
+    
+                # FIXME - call plugins to work on just the header here; can
+                # save us buffering the mail content.
+            
+                # Save the start of just the body itself	
+                $self->transaction->set_body_start();
+            }
         }
 
         $self->transaction->body_write(\$data);
