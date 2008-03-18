@@ -181,7 +181,7 @@ sub get_qmail_config {
   # CDB config support really should be moved to a plugin
   if ($type and $type eq "map")  {
     unless (-e $configfile . ".cdb") {
-        $_config_cache->{$config} = [];
+        $_config_cache->{$config} ||= [];
         return +{};
     }
     eval { require CDB_File };
@@ -208,7 +208,7 @@ sub get_qmail_config {
 sub _config_from_file {
   my ($self, $configfile, $config, $visited) = @_;
   unless (-e $configfile) {
-      $_config_cache->{$config} = [];
+      $_config_cache->{$config} ||= [];
       return;
   }
 
