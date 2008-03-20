@@ -461,7 +461,9 @@ sub run_continuation {
     last unless $r[0] == DECLINED;
   }
   $r[0] = DECLINED if not defined $r[0];
-  @r = map { split /\n/ } @r;
+  # hook_*_parse() may return a CODE ref..
+  # ... which breaks when splitting as string:
+  @r = map { split /\n/ } @r unless (ref($r[1]) eq "CODE");
   return $self->hook_responder($hook, \@r, $args);
 }
 
