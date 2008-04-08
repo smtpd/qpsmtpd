@@ -91,7 +91,7 @@ sub init {
     $self->ssl_context($ssl_ctx);
     
     # Check for possible AUTH mechanisms
-HOOK: foreach my $hook ( keys %{$qp->{hooks}} ) {
+HOOK: foreach my $hook ( keys %{$qp->hooks} ) {
         no strict 'refs';
         if ( $hook =~ m/^auth-?(.+)?$/ ) {
             if ( defined $1 ) {

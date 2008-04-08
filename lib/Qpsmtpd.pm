@@ -29,6 +29,8 @@ sub TRACE_LEVEL { $TraceLevel }; # leave for plugin compatibility
 
 my $LOGGING_LOADED = 0;
 
+sub hooks { $hooks; }
+
 sub load_logging {
   # need to do this differently that other plugins so as to 
   # not trigger logging activity
