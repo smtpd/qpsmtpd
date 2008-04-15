@@ -238,6 +238,7 @@ sub got_data {
 
     # add a transaction->blocked check back here when we have line by line plugin access...
     unless (($self->{max_size} and $self->{data_size} > $self->{max_size})) {
+        $self->{prev_crlf} = $data =~ /\r\n\z/;
         $data =~ s/\r\n/\n/mg;
         $data =~ s/^\.\./\./mg;
         
@@ -274,7 +275,6 @@ sub got_data {
 
         $self->transaction->body_write(\$data);
         $self->{data_size} += length $data;
-        $self->{prev_crlf} = $data =~ /\r\n\z/;
     }
  
 
