@@ -105,14 +105,6 @@ sub hook_rcpt {
   return DECLINED;
 }
 
-sub hook_disconnect {
-  my ($self, $transaction) = @_;
-
-  $self->qp->connection->notes('dnsbl_sockets', undef);
-
-  return DECLINED;
-}
-
 1;
 
 =head1 NAME
