@@ -183,22 +183,26 @@ sub data_respond {
         return;
     }
     elsif ($rc == DENY) {
-        $self->respond(554, $msg || "Message denied");
+        $msg->[0] ||= "Message denied";
+        $self->respond(554, @$msg);
         $self->reset_transaction();
         return;
     }
     elsif ($rc == DENYSOFT) {
-        $self->respond(451, $msg || "Message denied temporarily");
+        $msg->[0] ||= "Message denied temporarily";
+        $self->respond(451, @$msg);
         $self->reset_transaction();
         return;
     } 
     elsif ($rc == DENY_DISCONNECT) {
-        $self->respond(554, $msg || "Message denied");
+        $msg->[0] ||= "Message denied";
+        $self->respond(554, @$msg);
         $self->disconnect;
         return;
     }
     elsif ($rc == DENYSOFT_DISCONNECT) {
-        $self->respond(451, $msg || "Message denied temporarily");
+        $msg->[0] ||= "Message denied temporarily";
+        $self->respond(451, @$msg);
         $self->disconnect;
         return;
     }
