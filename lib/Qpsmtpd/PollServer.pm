@@ -16,7 +16,6 @@ use fields qw(
     start_time
     cmd_timeout
     conn
-    prev_crlf
     _auth
     _auth_mechanism
     _auth_state
@@ -209,7 +208,6 @@ sub data_respond {
     $self->{header_lines} = '';
     $self->{data_size} = 0;
     $self->{in_header} = 1;
-    $self->{prev_crlf} = 0;
     $self->{max_size} = ($self->config('databytes'))[0] || 0;
     
     $self->log(LOGDEBUG, "max_size: $self->{max_size} / size: $self->{data_size}");
@@ -227,18 +225,13 @@ sub got_data {
 
     my $done = 0;
     my $remainder;
-    if ($data =~ s/\r\n\.\r\n(.*)\z/\r\n/ms
-        ||
-        ($self->{prev_crlf} && $data =~ s/^\.\r\n(.*)\z//ms)
-       ) 
-    {
+    if ($data =~ s/^\.\r\n(.*)\z//ms) {
         $remainder = $1;
         $done = 1;
     }
 
     # add a transaction->blocked check back here when we have line by line plugin access...
     unless (($self->{max_size} and $self->{data_size} > $self->{max_size})) {
-        $self->{prev_crlf} = $data =~ /\r\n\z/;
         $data =~ s/\r\n/\n/mg;
         $data =~ s/^\.\./\./mg;
         
