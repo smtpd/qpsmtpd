@@ -4,7 +4,7 @@ use strict;
 
 # more or less in the order they will fire
 our @hooks = qw(
-    logging config pre-connection connect ehlo_parse ehlo
+    logging config post-fork pre-connection connect ehlo_parse ehlo
     helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
     rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre 
     data data_post queue_pre queue queue_post vrfy noop
