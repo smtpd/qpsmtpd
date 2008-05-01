@@ -73,7 +73,8 @@ sub check_dns {
     $qp->input_sock->pause_read;
     
     my $a_records = [];
-    my $num_queries = $has_ipv6 ? 3 : 2;    # queries in progress
+    my $num_queries = 1;    # queries in progress
+    my $mx_found = 0;
 
     ParaDNS->new(
         callback  => sub {
@@ -81,6 +82,7 @@ sub check_dns {
             return if $mx =~ /^[A-Z]+$/; # error
 
             my $addr = $mx->[0];
+            $mx_found = 1;
 
             $num_queries++;
             ParaDNS->new(
@@ -100,28 +102,42 @@ sub check_dns {
                 );
             }
         },
-        finished  => sub { $num_queries--; $self->finish_up($qp, $a_records, $num_queries) },
+        finished  => sub {
+
+            unless ($mx_found) {
+
+                $num_queries++;
+                ParaDNS->new(
+                    callback  => sub { push @$a_records, $_[0] if $_[0] !~ /^[A-Z]+$/; },
+                    finished  => sub { $num_queries--; $self->finish_up($qp, $a_records, $num_queries) },
+                    host      => $host,
+                    type      => 'A',
+                );
+
+                if ($has_ipv6) {
+                    $num_queries++;
+                    ParaDNS->new(
+                        callback  => sub { push @$a_records, $_[0] if $_[0] !~ /^[A-Z]+$/; },
+                        finished  => sub { $num_queries--; $self->finish_up($qp, $a_records, $num_queries) },
+                        host      => $host,
+                        type      => 'AAAA',
+                   );
+                }
+
+            }
+
+            $num_queries--;
+            $self->finish_up($qp, $a_records, $num_queries);
+        },
         host      => $host,
         type      => 'MX',
-    ) or return;
-    ParaDNS->new(
-        callback  => sub { push @$a_records, $_[0] if $_[0] !~ /^[A-Z]+$/; },
-        finished  => sub { $num_queries--; $self->finish_up($qp, $a_records, $num_queries) },
-        host      => $host,
-        type      => 'A',
-    ) or return;
-    ParaDNS->new(
-        callback  => sub { push @$a_records, $_[0] if $_[0] !~ /^[A-Z]+$/; },
-        finished  => sub { $num_queries--; $self->finish_up($qp, $a_records, $num_queries) },
-        host      => $host,
-        type      => 'AAAA',
-    ) or return if $has_ipv6;
+    ) or $qp->input_sock->continue_read, return;
 
     return 1;
 }
 
 sub finish_up {
-    my ($self, $qp, $a_records, $num_queries, $source) = @_;
+    my ($self, $qp, $a_records, $num_queries) = @_;
 
     return if defined $qp->transaction->notes('resolvable_fromhost');
 
