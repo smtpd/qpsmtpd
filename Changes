@@ -1,3 +1,11 @@
+  async: Dereference the DATA deny message before sending it to the client
+
+  Change async/require_resolvable_fromhost to match the logic of
+  the non-async version and other MTAs
+
+  async: Handle End-of-data marker split across packets
+
+  Allow plugins to use the post-fork hook
 
   Add qpsmtpd-prefork to the install targets (Robin Bowes)
 
