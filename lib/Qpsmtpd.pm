@@ -403,11 +403,14 @@ sub run_hooks_no_respond {
     return (0, '');
 }
 
+sub continue_read {} # subclassed in -async
+sub pause_read { die "Continuations only work in qpsmtpd-async" }
+
 sub run_continuation {
   my $self = shift;
   #my $t1 = $SAMPLER->("run_hooks", undef, 1);
   die "No continuation in progress" unless $self->{_continuation};
-  $self->continue_read() if $self->isa('Danga::Client');
+  $self->continue_read();
   my $todo = $self->{_continuation};
   $self->{_continuation} = undef;
   my $hook = shift @$todo || die "No hook in the continuation";
@@ -441,7 +444,7 @@ sub run_continuation {
     }
       
     if ($r[0] == YIELD) {
-      $self->pause_read() if $self->isa('Danga::Client');
+      $self->pause_read();
       $self->{_continuation} = [$hook, $args, @$todo];
       return @r;
     }

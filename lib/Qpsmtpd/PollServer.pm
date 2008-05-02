@@ -1,5 +1,3 @@
-# $Id: Server.pm,v 1.10 2005/02/14 22:04:48 msergeant Exp $
-
 package Qpsmtpd::PollServer;
 
 use base ('Danga::Client', 'Qpsmtpd::SMTP');
@@ -160,7 +158,7 @@ sub start_conversation {
     $conn->remote_info("[$ip]");
     
     ParaDNS->new(
-        finished   => sub { $self->run_hooks("connect") },
+        finished   => sub { $self->continue_read(); $self->run_hooks("connect") },
         # NB: Setting remote_info to the same as remote_host
         callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
         host       => $ip,
