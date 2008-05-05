@@ -183,9 +183,9 @@ sub register {
 }
 
 sub log_output {
-    my ($self, $txn) = @_;
+    my ($self, $transaction) = @_;
     my $output = $self->{_log_format};
-    $output =~ s/%i/($txn->notes('logging-session-id') || 'parent')/ge;
+    $output =~ s/%i/($transaction->notes('logging-session-id') || 'parent')/ge;
     $output = strftime $output, localtime;
     $output;
 }
@@ -216,28 +216,28 @@ sub open_log {
 #
 # Returns true if the file was reopened, zero if not, undef on error.
 sub maybe_reopen {
-    my ($self, $txn) = @_;
+    my ($self, $transaction) = @_;
 
-    my $new_output = $self->log_output($txn);
+    my $new_output = $self->log_output($transaction);
     if (!$self->{_current_output} ||
         $self->{_current_output} ne $new_output ||
         ($self->{_reopen} &&
-         !$txn->notes('file-reopened-this-session'))) {
-        unless ($self->open_log($new_output, $txn)) {
+         !$transaction->notes('file-reopened-this-session'))) {
+        unless ($self->open_log($new_output, $transaction)) {
             return undef;
         }
-        $txn->notes('file-reopened-this-session', 1);
+        $transaction->notes('file-reopened-this-session', 1);
         return 1;
     }
     return 0;
 }
 
 sub hook_connect {
-    my ($self, $txn) = @_;
+    my ($self, $transaction) = @_;
 
-    $txn->notes('file-logged-this-session', 0);
-    $txn->notes('file-reopened-this-session', 0);
-    $txn->notes('logging-session-id',
+    $transaction->notes('file-logged-this-session', 0);
+    $transaction->notes('file-reopened-this-session', 0);
+    $transaction->notes('logging-session-id',
                 sprintf("%08d-%04d-%d",
                         scalar time, $$, ++$self->{_session_counter}));
     return DECLINED;
@@ -253,7 +253,7 @@ sub hook_disconnect {
 }
 
 sub hook_logging {
-    my ($self, $txn, $trace, $hook, $plugin, @log) = @_;
+    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
     return DECLINED if !defined $self->{_loglevel} or
                        $trace > $self->{_loglevel};
@@ -265,11 +265,11 @@ sub hook_logging {
     # - We haven't logged anything yet this session
     if (!$self->{_f} ||
         !$self->{_nosplit} ||
-        !$txn->notes('file-logged-this-session')) {
-        unless (defined $self->maybe_reopen($txn)) {
+        !$transaction->notes('file-logged-this-session')) {
+        unless (defined $self->maybe_reopen($transaction)) {
             return DECLINED;
         }
-        $txn->notes('file-logged-this-session', 1);
+        $transaction->notes('file-logged-this-session', 1);
     }
 
     my $f = $self->{_f};

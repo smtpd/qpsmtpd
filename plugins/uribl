@@ -215,7 +215,7 @@ sub send_query {
         if (defined $s1) {
             $self->{sockets}->{$z}->{$name}->{'txt'} = $s1;
             $self->{socket_select}->add($s1);
-            $self->{socket_idx}->{"$s1"} = 
+            $self->{socket_idx}->{"$s1"} =
             $self->{socket_idx}->{"$s1"} = $index;
             $count++;
         } else {
@@ -251,18 +251,18 @@ sub evaluate {
 }
 
 sub data_handler {
-    my ($self, $txn) = @_;
+    my ($self, $transaction) = @_;
     my $l;
     my $queries = 0;
     my %pending;
     my @qp_continuations;
 
-    $txn->body_resetpos;
-    while ($self->{check_headers} and $l = $txn->body_getline) {
+    $transaction->body_resetpos;
+    while ($self->{check_headers} and $l = $transaction->body_getline) {
         chomp $l;
         last if !$l;
     }
-    while ($l = $txn->body_getline) {
+    while ($l = $transaction->body_getline) {
         chomp $l;
 
                 if ($l =~ /(.*)=$/) {
@@ -378,7 +378,7 @@ sub data_handler {
             }
         }
     }
-    $txn->body_resetpos;
+    $transaction->body_resetpos;
 
     unless ($queries) {
         $self->log(LOGINFO, "No URIs found in mail");
@@ -448,7 +448,7 @@ sub data_handler {
     for (@matches) {
         $self->log(LOGWARN, $_->{desc});
         if ($_->{action} eq 'add-header') {
-            $txn->header->add('X-URIBL-Match', $_->{desc});
+            $transaction->header->add('X-URIBL-Match', $_->{desc});
         } elsif ($_->{action} eq 'deny') {
             return (DENY, $_->{desc});
         } elsif ($_->{action} eq 'denysoft') {

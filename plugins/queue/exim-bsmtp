@@ -78,7 +78,7 @@ sub register {
 }
 
 sub hook_queue {
-    my ($self, $txn) = @_;
+    my ($self, $transaction) = @_;
 
     my $tmp_dir = $self->qp->config('spool_dir') || '/tmp';
     $tmp_dir = $1 if ($tmp_dir =~ /(.*)/);
@@ -89,12 +89,12 @@ sub hook_queue {
     }
 
     print $tmp "HELO ", hostname(), "\n",
-               "MAIL FROM:<", ($txn->sender->address || ''), ">\n";
+               "MAIL FROM:<", ($transaction->sender->address || ''), ">\n";
     print $tmp "RCPT TO:<", ($_->address || ''), ">\n"
-      for $txn->recipients;
-    print $tmp "DATA\n", $txn->header->as_string;
-    $txn->body_resetpos;
-    while (my $line = $txn->body_getline) {
+      for $transaction->recipients;
+    print $tmp "DATA\n", $transaction->header->as_string;
+    $transaction->body_resetpos;
+    while (my $line = $transaction->body_getline) {
       $line =~ s/^\./../;
       print $tmp $line;
     }
@@ -107,7 +107,7 @@ sub hook_queue {
     unless ($exim) {
         $self->log(LOGERROR, "Could not execute $self->{_exim_path}: $!");
         unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
-        return (DECLINED, "Internal error enqueuing mail"); 
+        return (DECLINED, "Internal error enqueuing mail");
     }
     # Normally exim produces no output in BSMTP mode; anything that
     # does come out is an error worth logging.

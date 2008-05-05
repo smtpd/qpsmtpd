@@ -61,7 +61,7 @@ Normally, log messages will be mapped from the above log levels into the
 syslog(3) log levels of their corresponding names.  This will cause various
 messages to appear or not in syslog outputs according to your syslogd
 configuration (typically /etc/syslog.conf).  However, if the B<priority>
-setting is used, all messages will be logged at that priority regardless of 
+setting is used, all messages will be logged at that priority regardless of
 what the original priority might have been.
 
 =item B<ident>
@@ -141,7 +141,7 @@ sub register {
             $self->{_priority} = $1;
         }
     }
-    
+
     if ($args{ident} && $args{ident} =~ /^([\w\-.]+)$/) {
         $ident = $1;
     }
@@ -172,7 +172,7 @@ my %priorities_ = (
 );
 
 sub hook_logging {
-    my ($self, $txn, $trace, $hook, $plugin, @log) = @_;
+    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
     return DECLINED if $trace > $self->{_loglevel};
     return DECLINED if defined $plugin and $plugin eq $self->plugin_name;

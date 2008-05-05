@@ -87,7 +87,7 @@ sub register {
 
 sub check_talker_poll {
   my ($self, $transaction) = @_;
-  
+
   my $qp = $self->qp;
   my $conn = $qp->connection;
   my $check_until = time + $self->{_args}{'wait'};
@@ -97,7 +97,7 @@ sub check_talker_poll {
 
 sub read_now {
   my ($qp, $conn, $until, $phase) = @_;
-  
+
   if ($qp->has_data) {
     $qp->log(LOGNOTICE, 'remote host started talking after $phase before we responded');
     $qp->clear_data if $phase eq 'data';
@@ -115,7 +115,7 @@ sub read_now {
 
 sub check_talker_post {
   my ($self, $transaction) = @_;
-  
+
   my $conn = $self->qp->connection;
   return DECLINED unless $conn->notes('earlytalker');
   return DECLINED if $self->{'defer-reject'};
@@ -125,7 +125,7 @@ sub check_talker_post {
 }
 
 sub hook_mail {
-  my ($self, $txn) = @_;
+  my ($self, $transaction) = @_;
 
   return DECLINED unless $self->connection->notes('earlytalker');
   return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';

@@ -102,7 +102,7 @@ sub register {
 
 sub apr_connect_handler {
     my ($self, $transaction) = @_;
-    
+
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
     return DECLINED if ($self->qp->connection->notes('whitelistclient'));
     my $ip = $self->qp->connection->remote_ip;
@@ -110,7 +110,7 @@ sub apr_connect_handler {
     my $c = $self->qp->{conn};
     my $socket = $c->client_socket;
     my $timeout = $self->{_args}->{'wait'} * 1_000_000;
-    
+
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
         $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
@@ -130,7 +130,7 @@ sub apr_connect_handler {
 
 sub apr_data_handler {
     my ($self, $transaction) = @_;
-    
+
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
     return DECLINED if ($self->qp->connection->notes('whitelistclient'));
     my $ip = $self->qp->connection->remote_ip;
@@ -138,7 +138,7 @@ sub apr_data_handler {
     my $c = $self->qp->{conn};
     my $socket = $c->client_socket;
     my $timeout = $self->{_args}->{'wait'} * 1_000_000;
-    
+
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
         $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
@@ -199,7 +199,7 @@ sub data_handler {
 }
 
 sub mail_handler {
-  my ($self, $txn) = @_;
+  my ($self, $transaction) = @_;
   my $msg = 'Connecting host started transmitting before SMTP greeting';
 
   return DECLINED unless $self->qp->connection->notes('earlytalker');
