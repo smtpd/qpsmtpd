@@ -215,7 +215,6 @@ sub send_query {
         if (defined $s1) {
             $self->{sockets}->{$z}->{$name}->{'txt'} = $s1;
             $self->{socket_select}->add($s1);
-            $self->{socket_idx}->{"$s1"} =
             $self->{socket_idx}->{"$s1"} = $index;
             $count++;
         } else {
