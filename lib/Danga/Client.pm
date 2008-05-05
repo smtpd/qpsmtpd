@@ -2,7 +2,15 @@
 
 package Danga::Client;
 use base 'Danga::TimeoutSocket';
-use fields qw(line pause_count read_bytes data_bytes callback get_chunks);
+use fields qw(
+    line
+    pause_count
+    read_bytes
+    data_bytes
+    callback
+    get_chunks
+    reader_object
+    );
 use Time::HiRes ();
 
 use bytes;
@@ -26,6 +34,7 @@ sub reset_for_next_message {
     $self->{pause_count} = 0;
     $self->{read_bytes} = 0;
     $self->{callback} = undef;
+    $self->{reader_object} = undef;
     $self->{data_bytes} = '';
     $self->{get_chunks} = 0;
     return $self;
@@ -96,9 +105,18 @@ sub end_get_chunks {
     }
 }
 
+sub set_reader_object {
+    my Danga::Client $self = shift;
+    $self->{reader_object} = shift;
+}
+
 sub event_read {
     my Danga::Client $self = shift;
-    if ($self->{callback}) {
+    if (my $obj = $self->{reader_object}) {
+        $self->{reader_object} = undef;
+        $obj->event_read($self);
+    }
+    elsif ($self->{callback}) {
         $self->{alive_time} = time;
         if ($self->{get_chunks}) {
             my $bref = $self->read($self->{read_bytes});

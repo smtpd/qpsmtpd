@@ -150,7 +150,7 @@ sub hook_connect {
     return DECLINED unless $local_port == 465; # SMTPS
     
     unless ( _convert_to_ssl($self) ) {
-	return (DENY_DISCONNECT, "Cannot establish SSL session");
+        return (DENY_DISCONNECT, "Cannot establish SSL session");
     }
     $self->log(LOGWARN, "Connected via SMTPS");
     return DECLINED;
@@ -158,6 +158,10 @@ sub hook_connect {
 
 sub _convert_to_ssl {
     my ($self) = @_;
+
+    if ($self->qp->isa('Qpsmtpd::PollServer')) {
+        return _convert_to_ssl_async($self);
+    }
 
     eval {
         my $tlssocket = IO::Socket::SSL->new_from_fd(
@@ -178,11 +182,19 @@ sub _convert_to_ssl {
         $self->connection->notes('tls_enabled', 1);
     };
     if ($@) {
-	return 0;
+        return 0;
     }
     else {
-	return 1;
+        return 1;
     }
+}
+
+sub _convert_to_ssl_async {
+    my ($self) = @_;
+    my $upgrader = $self->connection
+                        ->notes( 'tls_upgrader', UpgradeClientSSL->new($self) );
+    $upgrader->upgrade_socket();
+    return 1;
 }
 
 sub can_do_tls {
@@ -238,3 +250,81 @@ sub prefork_workaround {
     $self->log(LOGWARN, "Exiting because 'tls_enabled' was true.");
     exit;
 }
+
+package UpgradeClientSSL;
+
+# borrowed heavily from Perlbal::SocketSSL
+
+use strict;
+use warnings;
+no  warnings qw(deprecated);
+
+use Danga::Socket 1.44;
+use IO::Socket::SSL 0.98;
+use Errno qw( EAGAIN );
+
+use fields qw( _stashed_qp _stashed_plugin _ssl_started );
+
+sub new {
+    my UpgradeClientSSL $self = shift;
+    $self = fields::new($self) unless ref $self;
+    $self->{_stashed_plugin} = shift;
+    $self->{_stashed_qp} = $self->{_stashed_plugin}->qp;
+    return $self;
+}
+
+sub upgrade_socket {
+    my UpgradeClientSSL $self = shift;
+
+    unless ( $self->{_ssl_started} ) {
+        IO::Socket::SSL->start_SSL(
+            $self->{_stashed_qp}->{sock}, {
+                SSL_use_cert => 1,
+                SSL_cert_file => $self->{_stashed_plugin}->tls_cert,
+                SSL_key_file => $self->{_stashed_plugin}->tls_key,
+                SSL_ca_file => $self->{_stashed_plugin}->tls_ca,
+                SSL_cipher_list => $self->{_stashed_plugin}->tls_ciphers,
+                SSL_startHandshake => 0,
+                SSL_server => 1,
+                SSL_reuse_ctx => $self->{_stashed_plugin}->ssl_context,
+            } 
+        ) or die "Could not upgrade socket to SSL: $!";
+        $self->{_ssl_started} = 1;
+    }
+    
+    $self->event_read($self->{_stashed_qp});
+}
+
+sub event_read {
+    my UpgradeClientSSL $self = shift;
+    my $qp = shift;
+    
+    $qp->watch_read( 0 );
+
+    my $sock = $qp->{sock}->accept_SSL;
+
+    if (defined $sock) {
+        $qp->connection( $qp->connection->clone );
+        $qp->reset_transaction;
+        $qp->connection->notes('tls_socket', $sock);
+        $qp->connection->notes('tls_enabled', 1);
+        $qp->watch_read(1);
+        return 1;
+    }
+
+    # nope, let's see if we can continue the process
+    if ($! == EAGAIN) {
+        $qp->set_reader_object($self);
+        if ($SSL_ERROR == SSL_WANT_READ) {
+            $qp->watch_read(1);
+        } elsif ($SSL_ERROR == SSL_WANT_WRITE) {
+            $qp->watch_write(1);
+        } else {
+            $qp->disconnect();
+        }
+    } else {
+        $qp->disconnect();
+    }
+}
+
+1;
