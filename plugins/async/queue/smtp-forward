@@ -72,6 +72,7 @@ sub finish_queue {
     my ($self, $transaction) = @_;
     
     my $sender = $transaction->notes('async_sender');
+    $transaction->notes('async_sender', undef);
     
     my ($rc, $msg) = $sender->results;
     
