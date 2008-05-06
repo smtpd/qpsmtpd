@@ -259,6 +259,7 @@ use strict;
 use warnings;
 no  warnings qw(deprecated);
 
+use IO::Socket::SSL 0.98;
 use Errno qw( EAGAIN );
 
 use fields qw( _stashed_qp _stashed_plugin _ssl_started );
