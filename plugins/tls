@@ -59,7 +59,7 @@ and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
 
 =cut
 
-use IO::Socket::SSL;# qw(debug1 debug2 debug3 debug4);
+use IO::Socket::SSL 0.98; # qw(debug1 debug2 debug3 debug4);
 
 sub init {
     my ($self, $qp, $cert, $key, $ca) = @_;
@@ -259,8 +259,6 @@ use strict;
 use warnings;
 no  warnings qw(deprecated);
 
-use Danga::Socket 1.44;
-use IO::Socket::SSL 0.98;
 use Errno qw( EAGAIN );
 
 use fields qw( _stashed_qp _stashed_plugin _ssl_started );
