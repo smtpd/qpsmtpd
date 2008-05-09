@@ -119,6 +119,7 @@ sub read_input {
 
     while (defined(my $data = $self->getline)) {
         $data =~ s/\r?\n$//s; # advanced chomp
+        $self->connection->notes('original_string', $data);
         $self->log(LOGDEBUG, "dispatching $data");
         defined $self->dispatch(split / +/, $data, 2)
             or $self->respond(502, "command unrecognized: '$data'");
