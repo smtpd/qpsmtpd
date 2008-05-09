@@ -104,10 +104,6 @@ HOOK: foreach my $hook ( keys %{$qp->hooks} ) {
             }
         }
     }
-
-    # work-around for failed connections in -prefork after STARTTLS connection:
-    $self->register_hook('post-connection', 'prefork_workaround')
-      if $qp->isa('Qpsmtpd::SMTP::Prefork');
 }
 
 sub hook_ehlo {
@@ -239,17 +235,6 @@ sub bad_ssl_hook {
     return DECLINED;
 }
 *hook_helo = *hook_data = *hook_rcpt = *hook_mail = \&bad_ssl_hook;
-
-# work-around for failed connections in -prefork after STARTTLS connection:
-sub prefork_workaround {
-    my $self = shift;
-    # nothing to do on SSL only (SMTPS) and clear text communications
-    return (DECLINED) if     $self->connection->local_port == 465;
-    return (DECLINED) unless $self->connection->notes('tls_enabled');
-
-    $self->log(LOGWARN, "Exiting because 'tls_enabled' was true.");
-    exit;
-}
 
 package UpgradeClientSSL;
 
