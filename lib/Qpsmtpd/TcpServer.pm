@@ -118,6 +118,7 @@ sub disconnect {
   $self->log(LOGINFO,"click, disconnecting");
   $self->SUPER::disconnect(@_);
   $self->run_hooks("post-connection");
+  $self->connection->reset;
   exit;
 }
 

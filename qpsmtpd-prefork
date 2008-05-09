@@ -616,6 +616,7 @@ sub qpsmtpd_session {
                                   );
         $qpsmtpd->run();
         $qpsmtpd->run_hooks("post-connection");
+        $qpsmtpd->connection->reset;
     };
     if ($@ !~ /^(disconnect_tcpserver|died while reading from STDIN)/) {
         warn("$@");

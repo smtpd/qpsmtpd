@@ -312,6 +312,7 @@ while (1) {
     $qpsmtpd->run();
     
     $qpsmtpd->run_hooks("post-connection");
+    $qpsmtpd->connection->reset;
     exit;                                   # child leaves
   }
 }

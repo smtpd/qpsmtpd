@@ -108,6 +108,12 @@ sub notes {
   $self->{_notes}->{$key};
 }
 
+sub reset {
+   my $self = shift;
+   $self->{_notes} = undef;
+   $self = $self->new;
+}
+
 1;
 
 __END__

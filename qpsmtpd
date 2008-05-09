@@ -23,6 +23,7 @@ $qpsmtpd->load_plugins();
 $qpsmtpd->start_connection();
 $qpsmtpd->run();
 $qpsmtpd->run_hooks("post-connection");
+$qpsmtpd->connection->reset;
 
 __END__
 
