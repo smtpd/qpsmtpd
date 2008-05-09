@@ -108,7 +108,8 @@ sub process_line {
     my $line = shift || return;
     if ($::DEBUG > 1) { print "$$:".($self+0)."C($self->{mode}): $line"; }
     if ($self->{mode} eq 'cmd') {
-        $line =~ s/\r?\n//;
+        $line =~ s/\r?\n$//s;
+        $self->connection->notes('original_string', $line);
         my ($cmd, @params) = split(/ +/, $line, 2);
         my $meth = lc($cmd);
         if (my $lookup = $cmd_cache{$meth} || $self->{_commands}->{$meth} && $self->can($meth)) {
