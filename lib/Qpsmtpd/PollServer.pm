@@ -84,7 +84,6 @@ sub reset_for_next_message {
     };
     $self->{mode} = 'cmd';
     $self->{_extras} = {};
-    warn "resetting...\n";
 }
 
 sub respond {
