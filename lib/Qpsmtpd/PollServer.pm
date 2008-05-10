@@ -152,6 +152,7 @@ sub disconnect {
 sub close {
     my Qpsmtpd::PollServer $self = shift;
     $self->run_hooks("post-connection");
+    $self->connection->reset;
     $self->SUPER::close;
 }
 
