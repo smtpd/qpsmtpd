@@ -1,3 +1,9 @@
+  async: added pre- and post-connection hooks
+
+  Qpsmtpd::Connection->notes are now reset on end of connection (currently
+  not in Apache). The workaround plugins/tls for -prefork is no longer 
+  needed now.
+
   async: Dereference the DATA deny message before sending it to the client
 
   Change async/require_resolvable_fromhost to match the logic of
