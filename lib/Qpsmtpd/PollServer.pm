@@ -55,6 +55,7 @@ sub new {
     $self->{mode} = 'connect';
     $self->load_plugins;
     $self->load_logging;
+    $self->run_hooks("pre-connection");
     return $self;
 }
 
@@ -83,6 +84,7 @@ sub reset_for_next_message {
     };
     $self->{mode} = 'cmd';
     $self->{_extras} = {};
+    warn "resetting...\n";
 }
 
 sub respond {
@@ -145,6 +147,12 @@ sub disconnect {
     my Qpsmtpd::PollServer $self = shift;
     $self->SUPER::disconnect(@_);
     $self->close;
+}
+
+sub close {
+    my Qpsmtpd::PollServer $self = shift;
+    $self->run_hooks("post-connection");
+    $self->SUPER::close;
 }
 
 sub start_conversation {
