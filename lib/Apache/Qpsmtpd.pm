@@ -34,6 +34,8 @@ sub handler {
     );
     
     $qpsmtpd->run($c);
+    $qpsmtpd->run_hooks("post-connection");
+    $qpsmtpd->connection->reset;
 
     return Apache2::Const::OK;
 }

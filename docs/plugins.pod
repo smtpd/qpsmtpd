@@ -904,8 +904,6 @@ FIXME: we should run this hook on a ``SIGHUP'' or some other signal?
 
 =pod 
 
-B<NOTE:> This hook does not work in Apache currently.
-
 The only argument is C<$self> and all return codes are ignored, it would 
 be too late anyway :-).
 
