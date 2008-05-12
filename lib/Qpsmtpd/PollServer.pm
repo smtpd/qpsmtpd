@@ -56,7 +56,7 @@ sub new {
     $self->load_plugins;
     $self->load_logging;
 
-    my ($rc, @msg) = $self->run_hooks("pre-connection");
+    my ($rc, @msg) = $self->run_hooks_no_respond("pre-connection");
     if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
         @msg = ("Sorry, try again later")
           unless @msg;
@@ -164,7 +164,7 @@ sub disconnect {
 
 sub close {
     my Qpsmtpd::PollServer $self = shift;
-    $self->run_hooks("post-connection");
+    $self->run_hooks_no_respond("post-connection");
     $self->connection->reset;
     $self->SUPER::close;
 }
