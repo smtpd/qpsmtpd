@@ -55,7 +55,21 @@ sub new {
     $self->{mode} = 'connect';
     $self->load_plugins;
     $self->load_logging;
-    $self->run_hooks("pre-connection");
+
+    my ($rc, @msg) = $self->run_hooks("pre-connection");
+    if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
+        @msg = ("Sorry, try again later")
+          unless @msg;
+        $self->respond(451, @msg);
+        $self->disconnect;
+    }
+    elsif ($rc == DENY || $rc == DENY_DISCONNECT) {
+        @msg = ("Sorry, service not available for you")
+          unless @msg;
+        $self->respond(550, @msg);
+        $self->disconnect;
+    }
+
     return $self;
 }
 
