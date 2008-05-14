@@ -73,6 +73,7 @@ my $quiet           = 0;
 my $status          = 0;
 my $signal          = '';
 my $pretty          = 0;
+my $detach          = 0;
 my $user;
 
 # help text
@@ -91,6 +92,7 @@ Usage: qpsmtpd-prefork [ options ]
 --user username     : User the daemon should run as
 --pid-file path	    : Path to pid file
 --renice-parent int : Subtract value from parent process nice level (default: $re_nice)
+--detach            : detach from controlling terminal (daemonize)
 --help              : This message
 EOT
     exit 0;
@@ -109,10 +111,11 @@ GetOptions(
     'pretty-child'    => \$pretty,
     'user=s'          => \$user,
     'renice-parent=i' => \$re_nice,
+    'detach'          => \$detach,
     'help'            => \&usage,
   ) || &usage;
 
-$user  = $1 if ($user  =~ /(\w+)/);
+if ($user =~ /^([\w\-]+)$/) { $user = $1 } else { &usage }
 
 # set max from ip to max number of children if option is set to disabled
 $maxconnip = $max_children if ($maxconnip == 0);
@@ -125,26 +128,32 @@ $idle_children = $max_children
   if (!$idle_children || $idle_children > $max_children || $idle_children < -1);
 $chld_pool = $idle_children;
 
+if ($detach) {
+    open STDIN, '/dev/null' or die "/dev/null: $!";
+    open STDOUT, '>/dev/null' or die "/dev/null: $!";
+    open STDERR, '>&STDOUT' or die "open(stderr): $!";
+    defined (my $pid = fork) or die "fork: $!";
+    exit 0 if $pid;
+    POSIX::setsid or die "setsid: $!";
+}
+
 run();
 
 #start daemon
 sub run {
     # get UUID/GUID
-    my ($uuid, $ugid, $group);
+    my ($quid, $qgid, $groups);
     if ($user) {
-        my $T_uuid  = `id -u $user`;
-        my $T_ugid  = `id -g $user`;
-        my $T_group = `id -n -g $user`;
-        chomp($T_uuid);
-        chomp($T_ugid);
-        chomp($T_group);
-
-        # make the following vars taint happy
-        $uuid  = $1 if ($T_uuid  =~ /(\d+)/);
-        $ugid  = $1 if ($T_ugid  =~ /(\d+)/);
-        $group = $1 if ($T_group =~ /(\w+)/);
-        die("FATAL: unknown user <$user> or missing group information")
-          if (!$uuid || !$ugid);
+        (undef, undef, $quid, $qgid) = getpwnam $user
+          or die "unable to determine uid/gid for $user\n";
+        $groups = "$qgid $qgid";
+        while (my ($name,$passwd,$gid,$members) = getgrent()) {
+            my @m = split(/ /, $members);
+            if (grep {$_ eq $user} @m) {
+                $groups .= " $gid";
+            }
+        }
+        endgrent;
     }
 
     my @Socket_opts = (
@@ -182,12 +191,12 @@ sub run {
 
     if ($user) {
         # change UUID/UGID
-        $) = "$ugid $ugid";    # effective gid
-        $( = $ugid;            # real gid
-        $> = $uuid;            # effective uid
-        $< = $uuid;            # real uid. we now cannot setuid anymore
-        die "FATAL: failed to setuid to user: $user, uid: $uuid\n"
-          if ($> != $uuid and $> != ($uuid - 2**32));
+        $) = $groups;
+        POSIX::setgid($qgid) or die "unable to change gid: $!\n";
+        POSIX::setuid($quid) or die "unable to change uid: $!\n";
+        $> = $quid;
+        die "FATAL: failed to setuid to user: $user, uid: $quid\n"
+          if ($> != $quid and $> != ($quid - 2**32));
     }
 
     # setup shared memory
