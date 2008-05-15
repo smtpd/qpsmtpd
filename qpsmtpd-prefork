@@ -50,8 +50,7 @@ my $chld_busy;
 my $d;          # socket
 
 # default settings
-my $pid_path        = '/var/run/qpsmtpd/';
-my $PID             = $pid_path . "/qpsmtpd.pid";
+my $pid_file;
 my $d_port          = 25;
 my $d_addr;
 if ($has_ipv6) {
@@ -112,6 +111,7 @@ GetOptions(
     'user=s'          => \$user,
     'renice-parent=i' => \$re_nice,
     'detach'          => \$detach,
+    'pid-file=s'      => \$pid_file,
     'help'            => \&usage,
   ) || &usage;
 
@@ -128,6 +128,28 @@ $idle_children = $max_children
   if (!$idle_children || $idle_children > $max_children || $idle_children < -1);
 $chld_pool = $idle_children;
 
+if ($pid_file) {
+    if ($pid_file =~ m#^(/[\w\d/\-.]+)$#) { $pid_file = $1 } else { &usage }
+    if (-e $pid_file) {
+        open PID, "+<$pid_file" 
+          or die "open pid_file: $!\n";
+        my $running_pid = <PID> || ''; chomp $running_pid;
+        if ($running_pid =~ /(\d+)/) {
+            $running_pid = $1;
+            die "Found an already running qpsmtpd with pid $running_pid.\n"
+              if (kill 0, $running_pid);
+        }
+        seek PID, 0, 0
+          or die "Could not seek back to beginning of $pid_file: $!\n";
+        truncate PID, 0
+          or die "Could not truncate $pid_file at 0: $!";
+    }
+    else {
+        open PID, ">$pid_file"
+          or die "open pid_file: $!\n";
+    }
+}
+
 if ($detach) {
     open STDIN, '/dev/null' or die "/dev/null: $!";
     open STDOUT, '>/dev/null' or die "/dev/null: $!";
@@ -135,6 +157,11 @@ if ($detach) {
     defined (my $pid = fork) or die "fork: $!";
     exit 0 if $pid;
     POSIX::setsid or die "setsid: $!";
+}
+
+if ($pid_file) {
+    print PID $$,"\n";
+    close PID;
 }
 
 run();
@@ -210,7 +237,7 @@ sub run {
 
         # prevent another signal and disable reaper
         $SIG{$sig} = $SIG{CHLD} = $SIG{HUP} = 'IGNORE';
-        unlink("$PID");
+        unlink($pid_file) if $pid_file;
 
         # close socket
         $d->close();
