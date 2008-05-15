@@ -334,8 +334,8 @@ sub data_handler {
             my $cutoff = exists
                 $strict_twolevel_cctlds{$host_domains[$#host_domains]} ? 3 : 2;
             if (exists $self->{whitelist_zones}->{
-                    join('.', @host_domains[($cutoff-1)..$#host_domains])}) {
-
+		join('.', 
+		     @host_domains[($#host_domains-$cutoff+1)..$#host_domains])}) {
                 $self->log(LOGINFO, "Skipping whitelist URI domain '$host'");
             } else {
                 while (@host_domains >= $cutoff) {
