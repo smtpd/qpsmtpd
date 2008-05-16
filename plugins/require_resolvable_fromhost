@@ -11,7 +11,7 @@ sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
 
   return DECLINED
-        if ($self->qp->connection->notes('whitelistclient'));
+        if ($self->qp->connection->notes('whitelisthost'));
 
   foreach my $i ($self->qp->config("invalid_resolvable_fromhost")) {
     $i =~ s/^\s*//;

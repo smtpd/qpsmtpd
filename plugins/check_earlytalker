@@ -104,7 +104,7 @@ sub apr_connect_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
-    return DECLINED if ($self->qp->connection->notes('whitelistclient'));
+    return DECLINED if ($self->qp->connection->notes('whitelisthost'));
     my $ip = $self->qp->connection->remote_ip;
 
     my $c = $self->qp->{conn};
@@ -132,7 +132,7 @@ sub apr_data_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
-    return DECLINED if ($self->qp->connection->notes('whitelistclient'));
+    return DECLINED if ($self->qp->connection->notes('whitelisthost'));
     my $ip = $self->qp->connection->remote_ip;
 
     my $c = $self->qp->{conn};
@@ -158,7 +158,7 @@ sub connect_handler {
 
   return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
   return DECLINED
-      if ($self->qp->connection->notes('whitelistclient'));
+      if ($self->qp->connection->notes('whitelisthost'));
 
   $in->add(\*STDIN) || return DECLINED;
   if ($in->can_read($self->{_args}->{'wait'})) {
@@ -183,7 +183,7 @@ sub data_handler {
 
   return DECLINED unless $self->{_args}{'check-at'}{DATA};
   return DECLINED
-      if ($self->qp->connection->notes('whitelistclient'));
+      if ($self->qp->connection->notes('whitelisthost'));
 
   $in->add(\*STDIN) || return DECLINED;
   if ($in->can_read($self->{_args}->{'wait'})) {
