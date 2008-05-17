@@ -1,8 +1,42 @@
 #!/bin/sh
 QMAILDUID=`id -u smtpd`
 NOFILESGID=`id -g smtpd`
+
+export SLOWROOT=/home/smtpd/slowforward
+
+method=forkserver
+
+# robert bumped up max-from-ip to 5 to make postfix on x6 happier.  dropped connections to 40 from 90
+
+if [ ${method} = "forkserver" ]; then
+
+exec /usr/local/bin/softlimit -m 25000000 \
+     /pkg/bin/perl -T ./qpsmtpd-forkserver \
+     --port 25 \
+     --limit-connections 40 \
+     --user smtpd \
+     --listen-address `head -1 config/IP` \
+     --max-from-ip 5 \
+     2>&1
+
+elif [ ${method} = "prefork" ]; then
+
+exec /usr/local/bin/softlimit -m 25000000 \
+     /pkg/bin/perl -T ./qpsmtpd-prefork \
+     --port 25 \
+     --user smtpd \
+     --interface `head -1 config/IP` \
+     --max-from-ip 3 \
+     --children 90 \
+     --idle-children 10 \
+     --pretty-child \
+     2>&1
+
+else
+
 exec /usr/local/bin/softlimit -m 25000000 \
   /usr/local/bin/tcpserver -c 10 -v -R -p \
   -u $QMAILDUID -g $NOFILESGID `head -1 config/IP` smtp \
   ./qpsmtpd 2>&1
 
+fi

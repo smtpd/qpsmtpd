@@ -323,11 +323,11 @@ sub data_handler {
             }
         }
         while ($l =~ m{
-            ([Ww]{3,3}\.[\w\-.]+\.[a-zA-Z]{2,8}|    # www.hostname
+            ([Ww]{3,3}\.[\w\-.]+\.[a-zA-Z]{2,32}|    # www.hostname
              [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname.   ...
                (?:com|net|org|biz|info|[a-zA-Z]{2,2}))(?!\w)  # (cc)TLD
-            }gx) {
-            my $host = $1;
+            }gix) {
+            my $host = lc $1;
             my @host_domains = split /\./, $host;
             $self->log(LOGDEBUG, "uribl: matched 'www.' hostname $host");
 
@@ -352,9 +352,9 @@ sub data_handler {
         while ($l =~ m{
             \w{3,16}:/+                 # protocol
             (?:\S+@)?                   # user/pass
-            ([\w\-.]+\.[a-zA-Z]{2,8})   # hostname
+            ([\w\-.]+\.[a-zA-Z]{2,32})   # hostname
             }gx) {
-            my $host = $1;
+            my $host = lc $1;
             my @host_domains = split /\./, $host;
             $self->log(LOGDEBUG, "uribl: matched full URI hostname $host");
 
