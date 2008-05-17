@@ -67,10 +67,6 @@ The username to pass to spamd, if different from the user qpsmtpd runs as.
 
 =back
 
-=item timeout [seconds]
-
-How long to wait for spamd?  Default 60 seconds.
-
 With both of the first options the configuration line will look like the following
 
  spamasssasin  reject_threshold 18  munge_subject_threshold 8
@@ -100,7 +96,6 @@ sub register {
   $self->register_hook("data_post", "check_spam_munge_subject")
     if $self->{_args}->{munge_subject_threshold};
 
-  $self->{timeout} = $self->{_args}->{timeout} || 60; 
 }
 
 sub hook_data_post { # check_spam
@@ -142,14 +137,6 @@ sub hook_data_post { # check_spam
   $self->log(LOGDEBUG, "check_spam: connected to spamd");
 
   SPAMD->autoflush(1);
-
-  local $SIG{ALRM} = sub { 
-    $self->qp->respond(451, "An error occured while processing your mail. (#SA)");
-    $self->log(LOGERROR, "spamassassin timeout");
-    exit(1); 
-  };
-
-  alarm $self->{timeout};
   
   $transaction->body_resetpos;
   my $username = $self->{_args}->{spamd_user} || getpwuid($>);
@@ -199,7 +186,6 @@ sub hook_data_post { # check_spam
 
   }
   my $tests = <SPAMD>;
-  alarm 0;
   $tests =~ s/\015//;  # hack for outlook
   $flag = $flag eq 'True' ? 'Yes' : 'No';
   $self->log(LOGDEBUG, "check_spam: finished reading from spamd");
