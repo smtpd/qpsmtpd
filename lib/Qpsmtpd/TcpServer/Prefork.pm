@@ -39,6 +39,8 @@ sub read_input {
   if ($@ =~ /^disconnect_tcpserver/) {
   	die "disconnect_tcpserver";
   } else {
+  	$self->run_hooks("post-connection");
+	$self->connection->reset;
   	die "died while reading from STDIN (probably broken sender) - $@";
   }
   alarm(0);
