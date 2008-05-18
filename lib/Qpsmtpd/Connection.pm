@@ -38,10 +38,15 @@ sub start {
 
 sub clone {
   my $self = shift;
+  my %args = @_;
   my $new = $self->new();
   foreach my $f ( @parameters ) {
     $new->$f($self->$f()) if $self->$f();
   }
+  # reset the old connection object like it's done at the end of a connection
+  # to prevent leaks (like prefork/tls problem with the old SSL file handle 
+  # still around)
+  $self->reset unless $args{no_reset}; 
   # should we generate a new id here?
   return $new;
 }
@@ -196,9 +201,20 @@ set after a successful return from those hooks.
 
 Connection-wide notes, used for passing data between plugins.
 
-=head2 clone( )
+=head2 clone([%args])
 
-Returns a copy of the Qpsmtpd::Connection object.
+Returns a copy of the Qpsmtpd::Connection object. The optional args parameter
+may contain:
+
+=over 4
+
+=item no_reset (1|0) 
+
+If true, do not reset the original connection object, the author has to care
+about that: only the cloned connection object is reset at the end of the 
+connection
+
+=back
 
 =cut
 
