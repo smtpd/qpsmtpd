@@ -95,6 +95,8 @@ use Net::DNS::Resolver;
 use Time::HiRes qw(time);
 use IO::Select;
 
+use Qpsmtpd::Constants;
+
 use strict;
 use warnings;
 
@@ -323,9 +325,13 @@ sub data_handler {
             }
         }
         while ($l =~ m{
-            ([Ww]{3,3}\.[\w\-.]+\.[a-zA-Z]{2,32}|    # www.hostname
-             [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname.   ...
-               (?:com|net|org|biz|info|[a-zA-Z]{2,2}))(?!\w)  # (cc)TLD
+            ((?:www\.)?                             # www?
+             [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname
+             (?:aero|arpa|asia|biz|cat|com|coop|    # tld
+                edu|gov|info|int|jobs|mil|mobi|
+                museum|name|net|org|pro|tel|travel
+                com|net|org|biz|info|[a-zA-Z]{2})
+            )(?!\w)        
             }gix) {
             my $host = lc $1;
             my @host_domains = split /\./, $host;
@@ -352,8 +358,12 @@ sub data_handler {
         while ($l =~ m{
             \w{3,16}:/+                 # protocol
             (?:\S+@)?                   # user/pass
-            ([\w\-.]+\.[a-zA-Z]{2,32})   # hostname
-            }gx) {
+            [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname
+            (?:aero|arpa|asia|biz|cat|com|coop|    # tld
+               edu|gov|info|int|jobs|mil|mobi|
+               museum|name|net|org|pro|tel|travel
+               com|net|org|biz|info|[a-zA-Z]{2})
+            }gix) {
             my $host = lc $1;
             my @host_domains = split /\./, $host;
             $self->log(LOGDEBUG, "uribl: matched full URI hostname $host");
