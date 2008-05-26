@@ -22,7 +22,7 @@ Path to the private key file. Default: I<ssl/qpsmtpd-server.key>
 
 =item B<ca_path>
 
-Path to the certificate autority file. Default: I<ssl/qpsmtpd-ca.crt>
+Path to the certificate authority file. Default: I<ssl/qpsmtpd-ca.crt>
 
 =back
 

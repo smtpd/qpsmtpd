@@ -43,6 +43,7 @@ sub clone {
   foreach my $f ( @parameters ) {
     $new->$f($self->$f()) if $self->$f();
   }
+  $new->{_notes} = $self->{_notes} if defined $self->{_notes};
   # reset the old connection object like it's done at the end of a connection
   # to prevent leaks (like prefork/tls problem with the old SSL file handle 
   # still around)
