@@ -1,3 +1,4 @@
+#!perl -w
 
 
 sub hook_mail {
@@ -121,3 +122,30 @@ sub hook_disconnect {
   $transaction->notes('rhsbl_sockets', undef);
   return DECLINED;
 }
+
+1;
+
+=head1 NAME
+
+rhsbl - handle RHSBL lookups
+
+=head1 DESCRIPTION
+
+Pluging that checks the host part of the sender's address against a
+configurable set of RBL services.
+
+=head1 CONFIGURATION
+
+This plugin reads the lists to use from the rhsbl_zones configuration
+file. Normal domain based dns blocking lists ("RBLs") which contain TXT
+records are specified simply as:
+
+  dsn.rfc-ignorant.org
+
+To configure RBL services which do not contain TXT records in the DNS,
+but only A records, specify, after a whitespace, your own error message
+to return in the SMTP conversation e.g.
+
+  abuse.rfc-ignorant.org does not support abuse@domain
+
+=cut
