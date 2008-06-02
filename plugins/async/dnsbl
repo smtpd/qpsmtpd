@@ -3,55 +3,65 @@
 use ParaDNS;
 
 sub init {
-  my ($self, $qp, $denial ) = @_;
-  if ( defined $denial and $denial =~ /^disconnect$/i ) {
-    $self->{_dnsbl}->{DENY} = DENY_DISCONNECT;
-  }
-  else {
-    $self->{_dnsbl}->{DENY} = DENY;
-  }
+    my ($self, $qp, $denial) = @_;
+    if (defined $denial and $denial =~ /^disconnect$/i) {
+        $self->{_dnsbl}->{DENY} = DENY_DISCONNECT;
+    }
+    else {
+        $self->{_dnsbl}->{DENY} = DENY;
+    }
 
 }
 
 sub hook_connect {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  my $remote_ip = $self->connection->remote_ip;
+    my $remote_ip = $self->connection->remote_ip;
 
-  my $allow = grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) } $self->qp->config('dnsbl_allow');
-  return DECLINED if $allow;
+    my $allow =
+      grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) }
+      $self->qp->config('dnsbl_allow');
+    return DECLINED if $allow;
 
-  my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
-  return DECLINED unless %dnsbl_zones;
+    my %dnsbl_zones =
+      map { (split /:/, $_, 2)[0, 1] } $self->qp->config('dnsbl_zones');
+    return DECLINED unless %dnsbl_zones;
 
-  my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
+    my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
 
-  my $total_zones = keys %dnsbl_zones;
-  my $qp = $self->qp;
-  for my $dnsbl (keys %dnsbl_zones) {
-    # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
-    if (defined($dnsbl_zones{$dnsbl})) {
-      $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record in the background");
-      ParaDNS->new(
-        callback => sub { process_a_result($qp, $dnsbl_zones{$dnsbl}, @_) },
-        finished => sub { $total_zones--; finished($qp, $total_zones) },
-        host => "$reversed_ip.$dnsbl",
-        type => 'A',
-        client => $self->qp->input_sock,
-      );
-    } else {
-      $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record in the background");
-      ParaDNS->new(
-        callback => sub { process_txt_result($qp, @_) },
-        finished => sub { $total_zones--; finished($qp, $total_zones) },
-        host => "$reversed_ip.$dnsbl",
-        type => 'TXT',
-        client => $self->qp->input_sock,
-      );
+    my $total_zones = keys %dnsbl_zones;
+    my $qp          = $self->qp;
+    for my $dnsbl (keys %dnsbl_zones) {
+
+# fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
+        if (defined($dnsbl_zones{$dnsbl})) {
+            $self->log(LOGDEBUG,
+                 "Checking $reversed_ip.$dnsbl for A record in the background");
+            ParaDNS->new(
+                callback => sub {
+                    process_a_result($qp, $dnsbl_zones{$dnsbl}, @_);
+                },
+                finished => sub { $total_zones--; finished($qp, $total_zones) },
+                host   => "$reversed_ip.$dnsbl",
+                type   => 'A',
+                client => $self->qp->input_sock,
+                        );
+        }
+        else {
+            $self->log(LOGDEBUG,
+                 "Checking $reversed_ip.$dnsbl for TXT record in the background"
+            );
+            ParaDNS->new(
+                callback => sub { process_txt_result($qp, @_) },
+                finished => sub { $total_zones--; finished($qp, $total_zones) },
+                host   => "$reversed_ip.$dnsbl",
+                type   => 'TXT',
+                client => $self->qp->input_sock,
+                        );
+        }
     }
-  }
 
-  return YIELD;
+    return YIELD;
 }
 
 sub finished {
@@ -62,47 +72,49 @@ sub finished {
 
 sub process_a_result {
     my ($qp, $template, $result, $query) = @_;
-    
+
     $qp->log(LOGINFO, "Result for A $query: $result");
     if ($result !~ /^\d+\.\d+\.\d+\.\d+$/) {
+
         # NXDOMAIN or ERROR possibly...
         return;
     }
-    
+
     my $conn = $qp->connection;
-    my $ip = $conn->remote_ip;
+    my $ip   = $conn->remote_ip;
     $template =~ s/%IP%/$ip/g;
     $conn->notes('dnsbl', $template) unless $conn->notes('dnsbl');
 }
 
 sub process_txt_result {
     my ($qp, $result, $query) = @_;
-    
+
     $qp->log(LOGINFO, "Result for TXT $query: $result");
     if ($result !~ /[a-z]/) {
+
         # NXDOMAIN or ERROR probably...
         return;
     }
-    
+
     my $conn = $qp->connection;
     $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt) = @_;
-  my $connection = $self->qp->connection;
+    my ($self, $transaction, $rcpt) = @_;
+    my $connection = $self->qp->connection;
 
-  # RBLSMTPD being non-empty means it contains the failure message to return
-  if (defined ($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
-    my $result = $ENV{'RBLSMTPD'};
-    my $remote_ip = $self->connection->remote_ip;
-    $result =~ s/%IP%/$remote_ip/g;
-    return (DENY, join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
-  }
+    # RBLSMTPD being non-empty means it contains the failure message to return
+    if (defined($ENV{'RBLSMTPD'}) && $ENV{'RBLSMTPD'} ne '') {
+        my $result    = $ENV{'RBLSMTPD'};
+        my $remote_ip = $self->connection->remote_ip;
+        $result =~ s/%IP%/$remote_ip/g;
+        return (DENY, join(" ", $self->qp->config('dnsbl_rejectmsg'), $result));
+    }
 
-  my $note = $self->connection->notes('dnsbl');
-  return (DENY, $note) if $note;
-  return DECLINED;
+    my $note = $self->connection->notes('dnsbl');
+    return (DENY, $note) if $note;
+    return DECLINED;
 }
 
 1;
