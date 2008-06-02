@@ -261,10 +261,19 @@ sub cmd_data {
         # $self->{state} = ST_DATA;
         $self->datasend($self->{tran}->header->as_string);
         $self->{tran}->body_resetpos;
+        my $write_buf = '';
         while (my $line = $self->{tran}->body_getline) {
-            $self->log(LOGDEBUG, ">> $line");
             $line =~ s/\r?\n/\r\n/;
-            $self->datasend($line);
+            $write_buf .= $line;
+            if (length($write_buf) >= 131072) { # 128KB, arbitrary value
+                $self->log(LOGDEBUG, ">> $write_buf");
+                $self->datasend($write_buf);
+                $write_buf = '';
+            }
+        }
+        if (length($write_buf)) {
+            $self->log(LOGDEBUG, ">> $write_buf");
+            $self->datasend($write_buf);
         }
         $self->write(".\r\n");
         $self->{command} = "DATAEND";
