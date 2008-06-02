@@ -1,0 +1,144 @@
+#!/usr/bin/perl -w
+
+use Qpsmtpd::Plugin::Async::DNSBLBase;
+
+use strict;
+use warnings;
+
+sub init {
+    my ($self, $qp, %args) = @_;
+    my $class = ref $self;
+
+    $self->isa_plugin("uribl");
+    {
+        no strict 'refs';
+        push @{"${class}::ISA"}, 'Qpsmtpd::Plugin::Async::DNSBLBase';
+    }
+
+    $self->SUPER::init($qp, %args);
+}
+
+sub register {
+    my $self = shift;
+
+    $self->register_hook('data_post', 'start_data_post');
+    $self->register_hook('data_post', 'finish_data_post');
+}
+
+sub start_data_post {
+    my ($self, $transaction) = @_;
+    my $class = ref $self;
+
+    my @names;
+
+    my $queries = $self->lookup_start($transaction, sub {
+        my ($self, $name) = @_;
+        push @names, $name;
+    });
+
+    my @hosts;
+    foreach my $z (keys %{$self->{uribl_zones}}) {
+        push @hosts, map { "$_.$z" } @names;
+    }
+
+    $transaction->notes(uribl_results => {});
+    $transaction->notes(uribl_zones => $self->{uribl_zones});
+
+    return DECLINED
+        unless @hosts && $class->lookup($self->qp, [ @hosts ], [ @hosts ]);
+
+    return YIELD;
+}
+
+sub finish_data_post {
+    my ($self, $transaction) = @_;
+
+    my $matches = $self->collect_results($transaction);
+    for (@$matches) {
+        $self->log(LOGWARN, $_->{desc});
+        if ($_->{action} eq 'add-header') {
+            $transaction->header->add('X-URIBL-Match', $_->{desc});
+        } elsif ($_->{action} eq 'deny') {
+            return (DENY, $_->{desc});
+        } elsif ($_->{action} eq 'denysoft') {
+            return (DENYSOFT, $_->{desc});
+        }
+    }
+    return DECLINED;
+}
+
+sub init_resolver { }
+
+sub process_a_result {
+    my ($class, $qp, $result, $query) = @_;
+
+    my $transaction = $qp->transaction;
+    my $results = $transaction->notes('uribl_results');
+    my $zones = $transaction->notes('uribl_zones');
+
+    foreach my $z (keys %$zones) {
+        if ($query =~ /^(.*)\.$z$/) {
+            my $name = $1;
+            $results->{$z}->{$name}->{a} = $result;
+        }
+    }
+}
+
+sub process_txt_result {
+    my ($class, $qp, $result, $query) = @_;
+
+    my $transaction = $qp->transaction;
+    my $results = $transaction->notes('uribl_results');
+    my $zones = $transaction->notes('uribl_zones');
+
+    foreach my $z (keys %$zones) {
+        if ($query =~ /^(.*)\.$z$/) {
+            my $name = $1;
+            $results->{$z}->{$name}->{txt} = $result;
+        }
+    }
+}
+
+sub collect_results {
+    my ($self, $transaction) = @_;
+
+    my $results = $transaction->notes('uribl_results');
+
+    my @matches;
+    foreach my $z (keys %$results) {
+        foreach my $n (keys %{$results->{$z}}) {
+            if (exists $results->{$z}->{$n}->{a}) {
+                if ($self->evaluate($z, $results->{$z}->{$n}->{a})) {
+                    $self->log(LOGDEBUG, "match $n in $z");
+                    push @matches, {
+                        action => $self->{uribl_zones}->{$z}->{action},
+                        desc => "$n in $z: " .
+                            ($results->{$z}->{$n}->{txt} || $results->{$z}->{$n}->{a}),
+                    };
+                }
+            }
+        }
+    }
+
+    return \@matches;
+}
+
+1;
+
+=head1 NAME
+
+uribl - URIBL blocking plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+This plugin implements DNSBL lookups for URIs found in spam, such as that
+implemented by SURBL (see E<lt>http://surbl.org/E<gt>).  Incoming messages are
+scanned for URIs, which are then checked against one or more URIBLs in a
+fashion similar to DNSBL systems.
+
+=head1 CONFIGURATION
+
+See the documentation of the non-async version. The timeout config option is
+ignored, the ParaDNS timeout is used instead.
+
+=cut

@@ -24,7 +24,7 @@ parts of the SMTP conversation:
 =item whitelist_zones
 
 Any IP address listed in the whitelist_zones file is queried using
-the connecting MTA's IP address.  Any A or TXT answer is means that the
+the connecting MTA's IP address.  Any A or TXT answer means that the
 remote HOST address can be selectively exempted at other stages by plugins
 testing for a 'whitelisthost' connection note.
 
@@ -33,6 +33,10 @@ testing for a 'whitelisthost' connection note.
 NOTE: other 'connect' hooks will continue to fire (e.g. dnsbl), since the DNS
 queries happen in the background.  This plugin's 'rcpt_handler' retrieves
 the results of the query and sets the connection note if found.
+
+If you switch to qpsmtpd-async and to the async version of this plugin, then
+the 'whitelisthost' connection note will be available to the other 'connect'
+hooks, see the documentation of the async plugin.
 
 =head1 AUTHOR
 

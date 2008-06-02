@@ -1,3 +1,5 @@
+  Create async version of dns_whitelist_soft, rhsbl and uribl plugins.
+
   async: added pre- and post-connection hooks
 
   Qpsmtpd::Connection->notes are now reset on end of connection (currently

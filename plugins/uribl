@@ -137,7 +137,8 @@ my %strict_twolevel_cctlds = (
     'za' => 1,
 );
 
-sub register {
+# async version: OK
+sub init {
     my ($self, $qp, %args) = @_;
 
     $self->{action} = $args{action} || 'add-header';
@@ -181,11 +182,17 @@ sub register {
         ( map { ($_ => 1) } @whitelist )
     };
 
-    $self->{resolver} = new Net::DNS::Resolver or return undef;
-    $self->{resolver}->udp_timeout($self->{timeout});
+    $self->init_resolver;
+}
+
+# async version: not used
+sub register {
+    my $self = shift;
+
     $self->register_hook('data_post', 'data_handler');
 }
 
+# async version: not used
 sub send_query {
     my $self = shift;
     my $name = shift || return undef;
@@ -230,6 +237,7 @@ sub send_query {
     $count;
 }
 
+# async version: not used
 sub lookup_finish {
     my $self = shift;
     $self->{socket_idx} = {};
@@ -237,6 +245,7 @@ sub lookup_finish {
     undef $self->{socket_select};
 }
 
+# async version: OK
 sub evaluate {
     my $self = shift;
     my $zone = shift || return undef;
@@ -251,8 +260,10 @@ sub evaluate {
     return ($v & $mask);
 }
 
-sub data_handler {
-    my ($self, $transaction) = @_;
+# async version: OK
+sub lookup_start {
+    my ($self, $transaction, $start_query) = @_;
+
     my $l;
     my $queries = 0;
     my %pending;
@@ -297,7 +308,7 @@ sub data_handler {
             my $rev = join('.', reverse @octets);
             $self->log(LOGDEBUG, "uribl: matched pure-integer ipaddr $1 ($fwd)");
             unless (exists $pending{$rev}) {
-                $queries += $self->send_query($rev);
+                $queries += $start_query->($self, $rev);
                 $pending{$rev} = 1;
             }
         }
@@ -320,7 +331,7 @@ sub data_handler {
             my $rev = join('.', reverse @octets);
             $self->log(LOGDEBUG, "uribl: matched URI ipaddr $fwd");
             unless (exists $pending{$rev}) {
-                $queries += $self->send_query($rev);
+                $queries += $start_query->($self, $rev);
                 $pending{$rev} = 1;
             }
         }
@@ -348,7 +359,7 @@ sub data_handler {
                     my $subhost = join('.', @host_domains);
                     unless (exists $pending{$subhost}) {
                         $self->log(LOGINFO, "URIBL: checking sub-host $subhost");
-                        $queries += $self->send_query($subhost);
+                        $queries += $start_query->($self, $subhost);
                         $pending{$subhost} = 1;
                     }
                     shift @host_domains;
@@ -379,7 +390,7 @@ sub data_handler {
                     my $subhost = join('.', @host_domains);
                     unless (exists $pending{$subhost}) {
                         $self->log(LOGINFO, "URIBL: checking sub-host $subhost");
-                        $queries += $self->send_query($subhost);
+                        $queries += $start_query->($self, $subhost);
                         $pending{$subhost} = 1;
                     }
                     shift @host_domains;
@@ -389,10 +400,12 @@ sub data_handler {
     }
     $transaction->body_resetpos;
 
-    unless ($queries) {
-        $self->log(LOGINFO, "No URIs found in mail");
-        return DECLINED;
-    }
+    return $queries;
+}
+
+# async version: not used
+sub collect_results {
+    my ($self, $transaction) = @_;
 
     my $matches = 0;
     my $complete = 0;
@@ -454,7 +467,25 @@ sub data_handler {
 
     $self->lookup_finish;
 
-    for (@matches) {
+    return \@matches;
+}
+
+# async version: not used
+sub data_handler {
+    my ($self, $transaction) = @_;
+
+    my $queries = $self->lookup_start($transaction, sub {
+        my ($self, $name) = @_;
+        return $self->send_query($name);
+    });
+
+    unless ($queries) {
+        $self->log(LOGINFO, "No URIs found in mail");
+        return DECLINED;
+    }
+
+    my $matches = $self->collect_results($transaction);
+    for (@$matches) {
         $self->log(LOGWARN, $_->{desc});
         if ($_->{action} eq 'add-header') {
             $transaction->header->add('X-URIBL-Match', $_->{desc});
@@ -465,6 +496,14 @@ sub data_handler {
         }
     }
     return DECLINED;
+}
+
+# async version: not used
+sub init_resolver {
+    my $self = shift;
+
+    $self->{resolver} = new Net::DNS::Resolver or return undef;
+    $self->{resolver}->udp_timeout($self->{timeout});
 }
 
 1;
