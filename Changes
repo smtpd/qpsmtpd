@@ -1,3 +1,6 @@
+  async: Set connection remote_host only when the reverse DNS lookup is
+  successful
+
   Create async version of dns_whitelist_soft, rhsbl and uribl plugins.
 
   async: added pre- and post-connection hooks
