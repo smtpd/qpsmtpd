@@ -183,7 +183,7 @@ sub start_conversation {
     ParaDNS->new(
         finished   => sub { $self->continue_read(); $self->run_hooks("connect") },
         # NB: Setting remote_info to the same as remote_host
-        callback   => sub { $conn->remote_info($conn->remote_host($_[0])) if $_[0] !~ /^[A-Z]+$/ },
+        callback   => sub { $conn->remote_info($conn->remote_host($_[0])) },
         host       => $ip,
     );
     
