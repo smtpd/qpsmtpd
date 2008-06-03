@@ -410,6 +410,13 @@ are noted in the description of the hook. If you need examples how the
 hook can be used, see the source of the plugins, which are given as 
 example plugins.
 
+B<NOTE>: for some hooks (post-fork, post-connection, disconnect, deny, ok) the
+return values are ignored. This does B<not> mean you can return anything you
+want. It just means the return value is discarded and you can not disconnect
+a client with I<DENY_DISCONNECT>. The rule to return I<DECLINED> to run the
+next plugin for this hook (or return I<OK> / I<DONE> to stop processing) 
+still applies.
+
 =head2 hook_pre_connection
 
 Called by a controlling process (e.g. forkserver or prefork) after accepting 
