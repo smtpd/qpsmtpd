@@ -218,6 +218,13 @@ if ($PID_FILE) {
 $qpsmtpd->spool_dir;
 $qpsmtpd->size_threshold;
 
+$SIG{HUP} = sub {
+    $qpsmtpd = Qpsmtpd::TcpServer->new('restart' => 1);
+    $qpsmtpd->load_plugins;
+    $qpsmtpd->spool_dir;
+    $qpsmtpd->size_threshold;
+};
+
 while (1) {
   REAPER();
   my $running = scalar keys %childstatus;

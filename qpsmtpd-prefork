@@ -252,6 +252,7 @@ sub run {
     # Hup handler
     $SIG{HUP} = sub {
         # reload qpmstpd plugins
+	$qpsmtpd = $qpsmtpd_base = qpsmtpd_instance('restart' => 1); # reload plugins...
         $qpsmtpd->load_plugins;
         kill 'HUP' => keys %children;
         info("reload daemon requested");
@@ -457,7 +458,8 @@ sub respond_client {
 # arg0: void
 # ret0: ref to qpsmtpd_instance
 sub qpsmtpd_instance {
-    my $qpsmtpd = Qpsmtpd::TcpServer::Prefork->new();
+    my %args = @_;
+    my $qpsmtpd = Qpsmtpd::TcpServer::Prefork->new(%args);
     $qpsmtpd->load_plugins;
     $qpsmtpd->spool_dir;
     $qpsmtpd->size_threshold;

@@ -15,9 +15,27 @@ my %defaults = (
 		  timeout => 1200,
 		  );
 my $_config_cache = {};
+my %config_dir_memo;
 
 #DashProfiler->add_profile("qpsmtpd");
 #my $SAMPLER = DashProfiler->prepare("qpsmtpd");
+my $LOGGING_LOADED = 0;
+
+sub _restart { 
+  my $self = shift;
+  my %args = @_;
+  if ($args{restart}) {
+    # reset all global vars to defaults
+    $self->clear_config_cache;
+    $hooks           = {}; 
+    $LOGGING_LOADED  = 0;
+    %config_dir_memo = ();
+    $TraceLevel      = LOGWARN;
+    $Spool_dir       = undef;
+    $Size_threshold  = undef;
+  }
+}
+
 
 sub DESTROY {
     #warn $_ for DashProfiler->profile_as_text("qpsmtpd");
@@ -27,7 +45,6 @@ sub version { $VERSION };
 
 sub TRACE_LEVEL { $TraceLevel }; # leave for plugin compatibility
 
-my $LOGGING_LOADED = 0;
 
 sub hooks { $hooks; }
 
@@ -146,7 +163,6 @@ sub config {
    }
 }
 
-my %config_dir_memo;
 sub config_dir {
   my ($self, $config) = @_;
   if (exists $config_dir_memo{$config}) {

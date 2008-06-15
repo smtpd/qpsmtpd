@@ -37,6 +37,7 @@ sub new {
   my (%commands); @commands{@commands} = ('') x @commands;
   # this list of valid commands should probably be a method or a set of methods
   $self->{_commands} = \%commands;
+  $self->SUPER::_restart(%args) if $args{restart}; # calls Qpsmtpd::_restart()
   $self;
 }
 
