@@ -1,3 +1,6 @@
+  prefork, forkserver: restart on SIGHUP (reload all modules, with register() /
+  init() phase).
+
   Create async version of dns_whitelist_soft, rhsbl and uribl plugins.
 
   async: added pre- and post-connection hooks
