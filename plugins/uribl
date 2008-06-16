@@ -340,8 +340,8 @@ sub lookup_start {
              [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname
              (?:aero|arpa|asia|biz|cat|com|coop|    # tld
                 edu|gov|info|int|jobs|mil|mobi|
-                museum|name|net|org|pro|tel|travel
-                com|net|org|biz|info|[a-zA-Z]{2})
+                museum|name|net|org|pro|tel|travel|
+                [a-zA-Z]{2})
             )(?!\w)        
             }gix) {
             my $host = lc $1;
@@ -372,8 +372,8 @@ sub lookup_start {
             [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname
             (?:aero|arpa|asia|biz|cat|com|coop|    # tld
                edu|gov|info|int|jobs|mil|mobi|
-               museum|name|net|org|pro|tel|travel
-               com|net|org|biz|info|[a-zA-Z]{2})
+               museum|name|net|org|pro|tel|travel|
+               [a-zA-Z]{2})
             }gix) {
             my $host = lc $1;
             my @host_domains = split /\./, $host;
