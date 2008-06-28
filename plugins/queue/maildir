@@ -1,14 +1,79 @@
+#!perl
+
 =head1 NAME
 
 queue/maildir
 
 =head1 DESCRIPTION
 
-This plugin delivers mails to a maildir spool. 
+This plugin delivers mails to a maildir spool.
 
 =head1 CONFIG
 
 It takes one required parameter, the location of the maildir.
+
+A second optional parameter delivers the mail into a sub directory named by 
+the recipient of the mail B<for each recipient>. Some substituions take place.
+Before replacing the parts descibed below, any character of the recipient 
+address, which is not one of C<-A-Za-z0-9+_.,@=> is set to a C<_>.
+
+If a third parameter is given, it will be used as octal (!) permisson of the
+newly created files and directories, any execute bits will be stripped for 
+files: Use C<770> to create group writable directories and files with mode 
+C<0660>.
+
+=head2 Maildir spool directory substitutions
+
+=over 4
+
+=item %l
+
+Replaced by the local part of the address (i.e. the username)
+
+=item %d
+
+Replaced by the domain part of the address (i.e. the domain name)
+
+=item %u
+
+Replaced by the full address.
+
+=cut 
+
+# =item %%
+# 
+# Replaced by a single percent sign (%)
+# 
+# =cut
+
+=back
+
+Examples: if the plugin is loaded with the parameters
+
+  queue/maildir /var/spool/qpdeliver %d/%l
+
+and the recipient is C<user@example.com> the mails will be written to
+the C<new> sub directory of C</var/spool/qpdeliver/example.com/user/>.
+
+With 
+
+  queue/maildir /var/spool/qpdeliver %u
+
+and a recipient of C<user@example.org> the mail goes to
+C</var/spool/qpdeliver/user@example.org>.
+
+=head1 NOTES
+
+Names of the substitution parameters and the replaced charachters are the same
+L<spamd(8)> supports, for more info see the C<--virtual-config-dir> 
+option of L<spamd(8)>.
+
+When called with more than one parameter, this plugin is probably not usable
+with qpsmtpd-async.
+
+With the the second parameter being C<%d> it will still deliver one message 
+for each recipient: With the two recpients C<user@example.org> and 
+C<user2@example.org> you get two messages in the C<example.org/> directory.
 
 =cut
 
@@ -19,18 +84,42 @@ use Time::HiRes qw(gettimeofday);
 sub register {
   my ($self, $qp, @args) = @_;
 
-  # TODO: support per user/domain/? maildirs
-
   if (@args > 0) {
     ($self->{_maildir}) = ($args[0] =~ m!([/\w\.]+)!);
   }
+
+  if (@args > 1) {
+    ($self->{_subdirs}) = ($args[1] =~ m#^(.*\%[ldu].*)$#);
+    unless ($self->{_subdirs}) {
+      $self->log(LOGWARN, "WARNING: sub directory does not contain a "
+                         ."substitution parameter");
+      return 0;
+    }
+  }
+
+  if (@args > 2) {
+    ($self->{_perms}) = ($args[2] =~ /^([0-7]{3})$/);
+    unless ($self->{_perms}) { # 000 is unfortunately true ;-) 
+      $self->log(LOGWARN, "WARNING: mode is not an octal number");
+      return 0;
+    }
+    $self->{_perms} = oct($self->{_perms});
+  }
+
+  $self->{_perms} = 0700
+    unless $self->{_perms};
 
   unless ($self->{_maildir}) {
     $self->log(LOGWARN, "WARNING: maildir directory not specified");
     return 0;
   }
 
-  map { my $d = $self->{_maildir} . "/$_"; -e $d or mkpath $d, 0, 0700 } qw(cur tmp new); 
+  unless ($self->{_subdirs}) {
+    # mkpath is influenced by umask...
+    my $old_umask = umask 000;
+    map { my $d = $self->{_maildir} . "/$_"; -e $d or mkpath $d, 0, $self->{_perms} } qw(cur tmp new);
+    umask $old_umask;
+  }
 
   my $hostname = (hostname =~ m/([\w\._\-]+)/)[0];
   $self->{_hostname} = $hostname;
@@ -41,7 +130,30 @@ my $maildir_counter = 0;
 
 sub hook_queue {
   my ($self, $transaction) = @_;
+  my ($rc, @msg);
+  my $old_umask = umask($self->{_perms} ^ 0777);
 
+  if ($self->{_subdirs}) {
+    foreach my $addr ($transaction->recipients) {
+      ($rc, @msg) = $self->deliver_user($transaction, $addr);
+      unless($rc == OK) {
+        umask $old_umask;
+        return ($rc, @msg);
+      }
+    }
+    umask $old_umask;
+    return (OK, @msg); # last @msg is the same like any other before...
+  }
+
+  $transaction->header->add('Delivered-To', $_->address, 0)
+    for $transaction->recipients;
+  ($rc, @msg) = $self->write_file($transaction, $self->{_maildir});
+  umask $old_umask;
+  return ($rc, @msg);
+}
+
+sub write_file {
+  my ($self, $transaction, $maildir, $addr) = @_;
   my ($time, $microseconds) = gettimeofday;
 
   $time = ($time =~ m/(\d+)/)[0];
@@ -49,22 +161,19 @@ sub hook_queue {
 
   my $unique  = "P$$" . "M$microseconds" . "Q" . $maildir_counter++;
   my $file    = join ".", $time, $unique, $self->{_hostname};
-  my $maildir = $self->{_maildir};
 
-  # TODO: deliver the mail once per recipient instead 
-  $transaction->header->add('Delivered-To', $_->address, 0)
-    for $transaction->recipients;
-
-  open (MF, ">$maildir/tmp/$file") or 
+  open (MF, ">$maildir/tmp/$file") or
     $self->log(LOGWARN, "could not open $maildir/tmp/$file: $!"),
     return(DECLINED, "queue error (open)");
+
+  print MF "Delivered-To: ",$addr->address,"\n"
+    if $addr; # else it had been added before...
 
   $transaction->header->print(\*MF);
   $transaction->body_resetpos;
   while (my $line = $transaction->body_getline) {
     print MF $line;
   }
-
   close MF or
     $self->log(LOGWARN, "could not close $maildir/tmp/$file: $!")
     and return(DECLINED, "queue error (close)");
@@ -78,5 +187,26 @@ sub hook_queue {
   my $msg_id = $transaction->header->get('Message-Id') || '';
   $msg_id =~ s/[\r\n].*//s;
 
-  return (OK, "Queued! $msg_id"); 
+  return (OK, "Queued! $msg_id");
 }
+
+sub deliver_user {
+  my ($self, $transaction, $addr) = @_;
+  my $user = $addr->user; $user =~ tr/-A-Za-z0-9+_.,@=/_/c;
+  my $host = $addr->host; $host =~ tr/-A-Za-z0-9+_.,@=/_/c;
+  my $rcpt = $user.'@'.$host;
+
+  my $subdir = $self->{_subdirs};
+  $subdir =~ s/\%l/$user/g;
+  $subdir =~ s/\%d/$host/g;
+  $subdir =~ s/\%u/$rcpt/g;
+#  $subdir =~ s/\%%/%/g;
+
+  my $maildir = $self->{_maildir}."/$subdir";
+  my $old_umask = umask 000;
+  map { my $d = $maildir . "/$_"; -e $d or mkpath $d, 0, $self->{_perms} } qw(cur tmp new);
+  umask $old_umask;
+
+  return $self->write_file($transaction, $maildir, $addr);
+}
+
