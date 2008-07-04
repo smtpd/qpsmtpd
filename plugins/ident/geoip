@@ -15,11 +15,10 @@ or greylist.
 
 use Geo::IP;
 
-my $geoip = Geo::IP->new(GEOIP_STANDARD);
-
 sub hook_connect {
   my ($self) = @_;
 
+  my $geoip = Geo::IP->new(GEOIP_STANDARD);
   my $country = 
     $geoip->country_code_by_addr( $self->qp->connection->remote_ip );
 
