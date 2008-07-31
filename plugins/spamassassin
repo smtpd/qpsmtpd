@@ -28,19 +28,20 @@ the options.  Confused yet?  :-)
 
 =item reject_threshold [threshold]
 
-Set the threshold over which the plugin will reject the mail.  Some
+Set the threshold where the plugin will reject the mail.  Some
 mail servers are so useless that they ignore 55x responses not coming
 after RCPT TO, so they might just keep retrying and retrying and
 retrying until the mail expires from their queue. 
 
-I like to configure this with 15 or 20 as the threshold.  
+Depending on your spamassassin configuration a reasonable setting is
+typically somewhere between 12 to 20.
 
 The default is to never reject mail based on the SpamAssassin score.
 
 =item munge_subject_threshold [threshold]
 
-Set the threshold over which we will prefix the subject with
-'***SPAM***'.  A messed up subject is easier to filter on than the
+Set the threshold where the plugin will prefix the subject with
+'***SPAM***'.  A modified subject is easier to filter on than the
 other headers for many people with not so clever mail clients.  You
 might want to make another plugin that does this on a per user basis.
 
