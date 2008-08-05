@@ -1,3 +1,5 @@
+  Set the Return-Path header when queuing into maildir mailboxes.
+
   prefork, forkserver: restart on SIGHUP (reload all modules, with register() /
   init() phase).
 

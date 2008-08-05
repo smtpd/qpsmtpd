@@ -166,6 +166,8 @@ sub write_file {
     $self->log(LOGWARN, "could not open $maildir/tmp/$file: $!"),
     return(DECLINED, "queue error (open)");
 
+  print MF "Return-Path: ", $transaction->sender->format , "\n";
+
   print MF "Delivered-To: ",$addr->address,"\n"
     if $addr; # else it had been added before...
 
