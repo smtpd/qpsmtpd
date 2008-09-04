@@ -150,20 +150,6 @@ if ($pid_file) {
     }
 }
 
-if ($detach) {
-    open STDIN, '/dev/null' or die "/dev/null: $!";
-    open STDOUT, '>/dev/null' or die "/dev/null: $!";
-    open STDERR, '>&STDOUT' or die "open(stderr): $!";
-    defined (my $pid = fork) or die "fork: $!";
-    exit 0 if $pid;
-    POSIX::setsid or die "setsid: $!";
-}
-
-if ($pid_file) {
-    print PID $$,"\n";
-    close PID;
-}
-
 run();
 
 #start daemon
@@ -261,6 +247,20 @@ sub run {
     # setup qpsmtpd_instance(s), _base is for resetting to a known state
     # after each connection
     $qpsmtpd = $qpsmtpd_base = qpsmtpd_instance();
+
+    if ($detach) {
+        open STDIN, '/dev/null' or die "/dev/null: $!";
+        open STDOUT, '>/dev/null' or die "/dev/null: $!";
+        open STDERR, '>&STDOUT' or die "open(stderr): $!";
+        defined (my $pid = fork) or die "fork: $!";
+        exit 0 if $pid;
+        POSIX::setsid or die "setsid: $!";
+    }
+
+    if ($pid_file) {
+        print PID $$,"\n";
+        close PID;
+    }
 
     # child reaper
     $SIG{CHLD} = \&reaper;

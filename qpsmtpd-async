@@ -248,21 +248,6 @@ sub run_as_server {
     IO::Handle::blocking($CONFIG_SERVER, 0);
     binmode($CONFIG_SERVER, ':raw');
 
-    if ($DETACH) {
-     	open STDIN, '/dev/null' or die "/dev/null: $!";
-     	open STDOUT, '>/dev/null' or die "/dev/null: $!";
-     	open STDERR, '>&STDOUT' or die "open(stderr): $!";
-     	defined (my $pid = fork) or die "fork: $!";
-     	exit 0 if $pid;
-     	POSIX::setsid or die "setsid: $!";
-    }
-
-    if ($PID_FILE) {
-     	open PID, ">$PID_FILE" || die "$PID_FILE: $!";
- 	    print PID $$,"\n";
-        close PID;
-    }
- 
     # Drop priviledges
     my (undef, undef, $quid, $qgid) = getpwnam $USER or
           die "unable to determine uid/gid for $USER\n";
@@ -285,6 +270,21 @@ sub run_as_server {
     my $plugin_loader = Qpsmtpd::SMTP->new();
     $plugin_loader->load_plugins;
     
+    if ($DETACH) {
+     	open STDIN, '/dev/null' or die "/dev/null: $!";
+     	open STDOUT, '>/dev/null' or die "/dev/null: $!";
+     	open STDERR, '>&STDOUT' or die "open(stderr): $!";
+     	defined (my $pid = fork) or die "fork: $!";
+     	exit 0 if $pid;
+     	POSIX::setsid or die "setsid: $!";
+    }
+
+    if ($PID_FILE) {
+     	open PID, ">$PID_FILE" || die "$PID_FILE: $!";
+ 	    print PID $$,"\n";
+        close PID;
+    }
+ 
     $plugin_loader->log(LOGINFO, 'Running as user '.
         (getpwuid($>) || $>) .
         ', group '.

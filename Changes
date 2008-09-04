@@ -1,3 +1,7 @@
+  async, prefork: detach and daemonize only after reading the configuration
+  and loading the plugins, to give the init scripts a chance to detect
+  failed startups due to broken configuration or plugins (Diego d'Ambra)
+
   plugins/tls: close the file descriptor for the SSL socket
 
   Set the Return-Path header when queuing into maildir mailboxes.
