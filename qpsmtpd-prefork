@@ -47,6 +47,8 @@ my $chld_shmem; # shared mem to keep track of children (and their connections)
 my %children;
 my $chld_pool;
 my $chld_busy;
+my @children_term;  # terminated children, their death pending processing
+                    # by the main loop
 my $d;          # socket
 
 # default settings
@@ -284,35 +286,41 @@ sub spawn_children {
 # cleanup after child dies
 sub reaper {
     my $stiff;
-    my @stiffs;
     while (($stiff = waitpid(-1, &WNOHANG)) > 0) {
         my $res = WEXITSTATUS($?);
         info("child terminated, pid: $stiff (status $?, res: $res)");
         delete $children{$stiff};    # delete pid from children
             # add pid to array so it later can be removed from shared memory
-        push @stiffs, $stiff;
+        push @children_term, $stiff;
     }
 
-    # remove connection info from shared memory and get number
-    # of busy children (use by main_loop)
-    $chld_busy = shmem_opt(undef, \@stiffs, undef, undef);
     $SIG{CHLD} = \&reaper;
 }
 
-#main_loop: main loop (spawn new children)
+#main_loop: main loop. Either processes children that have exited or
+# periodically scans the shared memory for children that are not longer
+# alive. Spawns new children when necessary.
 #arg0: void
 #ret0: void
 sub main_loop {
     while (1) {
-        # sleep EXPR seconds or until signal (i.e. child death) is received
-        my $sleept = sleep $loop_sleep;
+        # if there is no child death to process, then sleep EXPR seconds
+        # or until signal (i.e. child death) is received
+        sleep $loop_sleep unless @children_term;
 
-        # block CHLD signals to avoid race, anyway does it matter?
+        # block CHLD signals to avoid race
         my $sigset = block_signal(SIGCHLD);
 
-        # get number of busy children, if sleep wasn't interrupted by signal
-        $chld_busy = shmem_opt(undef, undef, undef, undef, 1)
-          if ($sleept == $loop_sleep);
+        # get number of busy children
+        if (@children_term) {
+            # remove dead children info from shared memory
+            $chld_busy = shmem_opt(undef, \@children_term, undef, undef);
+            @children_term = ();
+        }
+        else {
+            # just check the shared memory
+            $chld_busy = shmem_opt(undef, undef, undef, undef, 1);
+        }
 
         # calculate children in pool (if valid busy children number)
         if (defined($chld_busy)) {

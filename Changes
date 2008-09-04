@@ -1,3 +1,6 @@
+  prefork: the children pool size was sometimes not adjusted immediately
+  after the exit of children (reported by Diego d'Ambra)
+
   async, prefork: detach and daemonize only after reading the configuration
   and loading the plugins, to give the init scripts a chance to detect
   failed startups due to broken configuration or plugins (Diego d'Ambra)
