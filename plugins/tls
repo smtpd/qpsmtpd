@@ -152,6 +152,19 @@ sub hook_connect {
     return DECLINED;
 }
 
+sub hook_post_connection {
+    my ($self, $transaction) = @_;
+
+    my $tls_socket = $self->connection->notes('tls_socket');
+    if (defined $tls_socket && $self->connection->notes('tls_socket_is_duped')) {
+        $tls_socket->close;
+        $self->connection->notes('tls_socket', undef);
+        $self->connection->notes('tls_socked_is_duped', 0);
+    }
+
+    return DECLINED;
+}
+
 sub _convert_to_ssl {
     my ($self) = @_;
 
@@ -175,6 +188,7 @@ sub _convert_to_ssl {
         $self->qp->connection($self->connection->clone());
         $self->qp->reset_transaction;
         *STDIN = *STDOUT = $self->connection->notes('tls_socket', $tlssocket);
+        $self->connection->notes('tls_socket_is_duped', 1);
         $self->connection->notes('tls_enabled', 1);
     };
     if ($@) {
