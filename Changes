@@ -1,3 +1,6 @@
+  prefork: improve shutdown of parent (and children) on very busy
+  systems (Diego d'Ambra)
+
   prefork: exit codes cleanup (based on patch by Diego d'Ambra)
 
   prefork: detect and reset locked shared memory (based on patch by

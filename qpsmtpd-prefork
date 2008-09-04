@@ -226,15 +226,18 @@ sub run {
 
         # prevent another signal and disable reaper
         $SIG{$sig} = $SIG{CHLD} = $SIG{HUP} = 'IGNORE';
-        unlink($pid_file) if $pid_file;
 
         # close socket
         $d->close();
-        my $cnt = kill 'INT' => keys %children;
 
-        # cleanup shared memory
+        # send signal to process group
+        kill $sig, -$$;
+
+        # cleanup
         IPC::Shareable->clean_up;
-        info("shutdown of daemon (and $cnt children)");
+        unlink($pid_file) if $pid_file;
+
+        info("shutdown of daemon");
         exit;
     };
 
