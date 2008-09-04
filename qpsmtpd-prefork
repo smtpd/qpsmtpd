@@ -118,6 +118,7 @@ GetOptions(
   ) || &usage;
 
 if ($user =~ /^([\w\-]+)$/) { $user = $1 } else { &usage }
+if ($d_addr =~ /^(\[.*\]|[\w\-.]+)$/) { $d_addr = $1 } else { &usage }
 
 # set max from ip to max number of children if option is set to disabled
 $maxconnip = $max_children if ($maxconnip == 0);

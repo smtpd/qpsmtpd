@@ -1,3 +1,6 @@
+  prefork: untaint the value of the --interface option (reported by
+  Diego d'Ambra)
+
   prefork: the children pool size was sometimes not adjusted immediately
   after the exit of children (reported by Diego d'Ambra)
 
