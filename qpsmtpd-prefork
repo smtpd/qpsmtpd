@@ -327,18 +327,26 @@ sub main_loop {
         if (defined($chld_busy)) {
             info("busy children: $chld_busy");
             $chld_pool = $chld_busy + $idle_children;
-        }
 
-        # ensure pool limit is max_children
-        $chld_pool = $max_children if ($chld_pool > $max_children);
+            # ensure pool limit is max_children
+            $chld_pool = $max_children if ($chld_pool > $max_children);
+            info(  "children pool: $chld_pool, spawned: "
+                 . scalar(keys %children)
+                 . ", busy: $chld_busy");
+        }
+        else {
+
+            # reset shared memory
+            warn("unable to access shared memory - resetting it");
+            IPC::Shareable->clean_up;
+            my $shmem = shmem($d_port . "qpsmtpd", 1);
+            untie $shmem;
+        }
 
         # spawn children
         for (my $i = scalar(keys %children) ; $i < $chld_pool ; $i++) {
             new_child();    # add to the child pool
         }
-        info(  "children pool: $chld_pool (currently spawned: "
-             . scalar(keys %children)
-             . ")");
 
         # unblock signals
         unblock_signal($sigset);
@@ -530,8 +538,20 @@ sub shmem_opt {
         $chld_shmem = &shmem($d_port."qpsmtpd", 0);    #connect to shared memory hash
 
         if (tied %{$chld_shmem}) {
-            # perform options
-            (tied %{$chld_shmem})->shlock(LOCK_EX);
+
+            # lock shared memory
+            eval {
+                # ensure that hung shared memory is noticed
+                local $SIG{ALRM} = sub {
+                    die "locking timed out\n";
+                };
+                alarm 15;
+
+                (tied %{$chld_shmem})->shlock(LOCK_EX);
+
+                alarm 0;
+            };
+            die $@ if $@;
 
             # delete
             if ($ref_pid_del) {
@@ -543,6 +563,8 @@ sub shmem_opt {
             $$chld_shmem{$pid_add_key} = $pid_add_value if ($pid_add_key);
             # copy
             %{$ref_shmem} = %{$chld_shmem} if ($ref_shmem);
+
+            # check
             if ($check) {
                 # loop through pid list and delete orphaned processes
                 foreach my $pid (keys %{$chld_shmem}) {
@@ -553,12 +575,17 @@ sub shmem_opt {
                 }
             }
 
-            # count number of busy children
+            # number of busy children
             $chld_busy = scalar(keys %{$chld_shmem});
+
+            # unlock shared memory
             (tied %{$chld_shmem})->shunlock;
 
             # untie from shared memory
             untie $chld_shmem || die "unable to untie from shared memory";
+        }
+        else {
+            die "failed to connect to shared memory";
         }
     };
 
@@ -669,8 +696,13 @@ sub qpsmtpd_session {
         warn("$@");
     }
 
-    # child is now idle again so remove it's pid from shared mem
-    shmem_opt(undef, [$$], undef, undef);
+    # child is now idle again
+    info("disconnect from: $nto_iaddr:$port");
 
-    info("remote host: $ENV{TCPREMOTEIP} left...");
+    # remove pid from shared memory
+    unless (defined(shmem_opt(undef, [$$], undef, undef))) {
+        # exit because parent is down or shared memory is corrupted
+        info("parent seems to be down, going to exit");
+        exit 1;
+    }
 }
