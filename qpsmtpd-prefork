@@ -401,14 +401,14 @@ sub new_child {
     my $sigset   = POSIX::SigSet->new();
     my $blockset = POSIX::SigSet->new(SIGCHLD);
     sigprocmask(SIG_UNBLOCK, $blockset, $sigset)
-      or die "Could not unblock SIGHUP signal: $!\n";
+      or die "Could not unblock SIGCHLD signal: $!\n";
     $SIG{CHLD} = $SIG{INT} = $SIG{TERM} = $SIG{ALRM} = 'DEFAULT';
 
     # child should exit if it receives HUP signal (note: blocked while child
     # is busy, but restored once done)
     $SIG{HUP} = sub {
         info("signal HUP received, going to exit");
-        exit 1;
+        exit;
     };
 
     # continue to accept connections until "old age" is reached
@@ -672,8 +672,8 @@ sub qpsmtpd_session {
         print $client "421 Connection Timed Out\n";
         info("Connection Timed Out");
 
-        # kill the child
-        exit 1;
+        # child terminates
+        exit;
     };
 
     # set enviroment variables

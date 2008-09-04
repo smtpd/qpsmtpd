@@ -1,3 +1,5 @@
+  prefork: exit codes cleanup (based on patch by Diego d'Ambra)
+
   prefork: detect and reset locked shared memory (based on patch by
   Diego d'Ambra)
 
