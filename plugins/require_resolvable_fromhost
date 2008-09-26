@@ -53,8 +53,14 @@ sub check_dns {
   $res->udp_timeout(30);
   my @mx = mx($res, $host);
   foreach my $mx (@mx) {
-    return mx_valid($self, $mx->exchange, $host);
+    # if any MX is valid, then we consider the domain
+    # resolvable
+    return 1 if mx_valid($self, $mx->exchange, $host);
   }
+  # if there are MX records, and we got here,
+  # then none of them are valid
+  return 0 if (@mx > 0);
+
   my $query = $res->search($host);
   if ($query) {
     foreach my $rrA ($query->answer) {
