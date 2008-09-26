@@ -691,7 +691,7 @@ sub qpsmtpd_session {
                                    remote_ip   => $ENV{TCPREMOTEIP},
                                    remote_port => $client->peerport,
                                   );
-        $qpsmtpd->run();
+        $qpsmtpd->run($client);
         $qpsmtpd->run_hooks("post-connection");
         $qpsmtpd->connection->reset;
     };

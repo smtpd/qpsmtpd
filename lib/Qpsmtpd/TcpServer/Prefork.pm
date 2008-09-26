@@ -48,6 +48,12 @@ sub read_input {
 
 sub respond {
   my ($self, $code, @messages) = @_;
+
+  if ( !$self->check_socket() ) {
+    $self->log(LOGERROR, "Lost connection to client, cannot send response.");
+    return(0);
+  }
+
   while (my $msg = shift @messages) {
     my $line = $code . (@messages?"-":" ").$msg;
     $self->log(LOGINFO, $line);

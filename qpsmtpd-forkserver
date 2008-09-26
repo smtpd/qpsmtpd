@@ -316,7 +316,7 @@ while (1) {
        remote_ip   => $ENV{TCPREMOTEIP},
        remote_port => $port,
       );
-    $qpsmtpd->run();
+    $qpsmtpd->run($client);
     
     $qpsmtpd->run_hooks("post-connection");
     $qpsmtpd->connection->reset;
