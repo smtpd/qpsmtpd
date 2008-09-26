@@ -279,6 +279,7 @@ sub got_data {
                 my $header = Mail::Header->new(\@header_lines,
                                                 Modify => 0, MailFrom => "COERCE");
                 $self->transaction->header($header);
+                $self->transaction->body_write($self->{header_lines});
                 $self->{header_lines} = '';
 
                 #$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
