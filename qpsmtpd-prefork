@@ -19,6 +19,9 @@ use Qpsmtpd::TcpServer::Prefork;
 use Qpsmtpd::Constants;
 use Getopt::Long;
 
+use Config;
+defined $Config{sig_name} || die "No signals?";
+
 my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
 if ($has_ipv6) {
@@ -26,6 +29,14 @@ if ($has_ipv6) {
 }
 
 #use Time::HiRes qw(gettimeofday tv_interval);
+
+#get available signals
+my %sig_num;
+my $i = 0;
+foreach my $sig_name ( split( /\s/, $Config{sig_name} ) )
+{
+    $sig_num{$sig_name} = $i++;
+}
 
 # secure shell
 $ENV{'PATH'} = '/bin:/usr/bin';
@@ -227,11 +238,15 @@ sub run {
         # prevent another signal and disable reaper
         $SIG{$sig} = $SIG{CHLD} = $SIG{HUP} = 'IGNORE';
 
+        # a notice, before the sleep below
+        info("shutting down");
+
         # close socket
         $d->close();
+        sleep 2;
 
         # send signal to process group
-        kill $sig, -$$;
+        kill -$sig_num{$sig} => $$;
 
         # cleanup
         IPC::Shareable->clean_up;
