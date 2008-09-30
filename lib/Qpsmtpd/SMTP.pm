@@ -342,7 +342,7 @@ sub mail_pre_respond {
       $from = shift @$msg;
     }
 
-    $self->log(LOGALERT, "from email address : [$from]");
+    $self->log(LOGDEBUG, "from email address : [$from]");
     return $self->respond(501, "could not parse your mail from command") 
       unless $from =~ /^<.*>$/;
 
@@ -426,7 +426,7 @@ sub rcpt_pre_respond {
   if ($rc == OK) {
     $rcpt = shift @$msg;
   }
-  $self->log(LOGALERT, "to email address : [$rcpt]");
+  $self->log(LOGDEBUG, "to email address : [$rcpt]");
   return $self->respond(501, "could not parse recipient") 
     unless $rcpt =~ /^<.*>$/;
 
