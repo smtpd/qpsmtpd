@@ -75,7 +75,7 @@ sub init {
     $self->tls_ca($ca);
     $self->tls_ciphers($self->qp->config('tls_ciphers') || 'HIGH');
     
-    $self->log(LOGINFO, "ciphers: $self->tls_ciphers");
+    $self->log(LOGINFO, "ciphers: ".$self->tls_ciphers);
 
     local $^W; # this bit is very noisy...
     my $ssl_ctx = IO::Socket::SSL::SSL_Context->new(
