@@ -18,10 +18,20 @@
 
   plugins/tls: close the file descriptor for the SSL socket
 
-  Set the Return-Path header when queuing into maildir mailboxes.
+  plugins/queue/maildir: multi user / multi domain support added
+  set the Return-Path header when queuing into maildir mailboxes
+
+  plugins/require_resolvable_fromhost: check all MX hosts, not just the first
 
   prefork, forkserver: restart on SIGHUP (reload all modules, with register() /
   init() phase).
+
+  prefork: add --detach option to daemonize like forkserver
+  use user/group switching from forkserver to support secondary groups 
+  (needed with plugins/queue/postfix-queue)
+  --pid-file now works
+
+  apache: add post-connection hook, connection->reset
 
   Create async version of dns_whitelist_soft, rhsbl and uribl plugins.
 
