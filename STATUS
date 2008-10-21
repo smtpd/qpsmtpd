@@ -7,38 +7,35 @@ quench
 pez (or pezmail)
 
 
-Near term roadmap
-=================
+Roadmap
+=======
 
-0.42:
-      - Bugfixes
-      - add module requirements to the META.yml file
+ - http://code.google.com/p/smtpd/issues
 
-0.50:
-      - Add user configuration plugin
-      - Add plugin API for checking if a local email address is valid
-      - use keyword "ESMTPA" in Received header in case of authentication to comply with RFC 3848.
+ - move repository to git?
+
+ - Bugfixes - qpsmtpd is extremely stable (in production since 2001), but
+   there are always more things to fix.
+
+ - Add user configuration plugin infrastructure
+   - Add plugin API for checking if a local email address is valid
 
 
-0.60:
-      Include the popular check_delivery[1] functionality via the 0.50 API
-      [1] until then get it from 
-          http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
+ - Include the popular check_delivery[1] functionality via the user API
+   [1] until then get it from 
+      http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
 
-      Add API to reject individual recipients after the RCPT has been
-      accepted and generate individual bounce messages.
-
-0.61: bugfixes
-
-1.0bN: bugfixes (repeat until we run out of bugs to fix) 
-1.0.0: it just might happen!
-1.1.0: new development
-
+ - Add API to reject individual recipients after the RCPT has been
+   accepted and generate individual bounce messages.
 
 Issues
 ======
 
 See http://code.google.com/p/smtpd/issues/list
+
+------ The rest of the list here might be outdated. ------
+------ Patches to remove things are welcome.        ------
+
 
 add whitelist support to the dnsbl plugin (and maybe to the rhsbl
 plugin too).  Preferably both supporting DNS based whitelists and
@@ -67,12 +64,6 @@ Make a system for configuring the plugins per user/domain/...
 plugin to reject mails from <> if it has multiple recipients.  
 
 localiphost - support foo@[a.b.c.d] addresses 
-
-support smtpgreeting (?)
-
-
-
-TRACE in Constants.pm is not actually being used.  Should it be?
 
 Move dispatch() etc from SMTP.pm to Qpsmtpd.pm to allow other similar
 protocols to use the qpsmtpd framework. 
