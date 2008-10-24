@@ -307,7 +307,6 @@ while (1) {
     # dup to STDIN/STDOUT
     POSIX::dup2(fileno($client), 0);
     POSIX::dup2(fileno($client), 1);
-    close $client;
     
     $qpsmtpd->start_connection
       (
@@ -320,6 +319,7 @@ while (1) {
     
     $qpsmtpd->run_hooks("post-connection");
     $qpsmtpd->connection->reset;
+    close $client;
     exit;                                   # child leaves
   }
 }
