@@ -159,8 +159,11 @@ sub config {
       return @config;
   } 
   else {
-      return ($config[0] || $self->get_qmail_config($c, $type) || $defaults{$c});
-   }
+      return $config[0] if defined($config[0]);
+      my $val = $self->get_qmail_config($c, $type);
+      return $val if defined($val);
+      return $defaults{$c};   
+  }
 }
 
 sub config_dir {
