@@ -168,6 +168,7 @@ sub hook_data_post { # check_spam
   $self->log(LOGDEBUG, "check_spam: finished sending to spamd");
   my $line0 = <SPAMD>; # get the first protocol lines out
   if ($line0) {
+    $line0 =~ s/\r?\n$//;
     $self->log(LOGDEBUG, "check_spam: spamd: $line0");
 
     $self->_cleanup_spam_header($transaction, 'X-Spam-Check-By');
@@ -178,6 +179,7 @@ sub hook_data_post { # check_spam
 
   my ($flag, $hits, $required);
   while (<SPAMD>) {
+    s/\r?\n$//;
     $self->log(LOGDEBUG, "check_spam: spamd: $_");
     #warn "GOT FROM SPAMD1: $_";
     last unless m/\S/;
