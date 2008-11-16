@@ -54,7 +54,7 @@ sub start_connection {
     # if the local dns resolver doesn't filter it out we might get
     # ansi escape characters that could make a ps axw do "funny"
     # things. So to be safe, cut them out.  
-    $remote_host =~ tr/a-zA-Z\.\-0-9//cd;
+    $remote_host =~ tr/a-zA-Z\.\-0-9\[\]//cd;
 
     $first_0 = $0 unless $first_0;
     my $now = POSIX::strftime("%H:%M:%S %Y-%m-%d", localtime);
