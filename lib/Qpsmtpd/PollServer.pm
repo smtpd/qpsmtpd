@@ -179,6 +179,9 @@ sub start_conversation {
     $conn->remote_ip($ip);
     $conn->remote_port($port);
     $conn->remote_info("[$ip]");
+    my ($lip,$lport) = split(':', $self->local_addr_string);
+    $conn->local_ip($lip);
+    $conn->local_port($lport);
     
     ParaDNS->new(
         finished   => sub { $self->continue_read(); $self->run_hooks("connect") },
