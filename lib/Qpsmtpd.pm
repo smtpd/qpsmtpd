@@ -21,13 +21,13 @@ my %config_dir_memo;
 #my $SAMPLER = DashProfiler->prepare("qpsmtpd");
 my $LOGGING_LOADED = 0;
 
-sub _restart { 
+sub _restart {
   my $self = shift;
   my %args = @_;
   if ($args{restart}) {
     # reset all global vars to defaults
     $self->clear_config_cache;
-    $hooks           = {}; 
+    $hooks           = {};
     $LOGGING_LOADED  = 0;
     %config_dir_memo = ();
     $TraceLevel      = LOGWARN;
@@ -49,7 +49,7 @@ sub TRACE_LEVEL { $TraceLevel }; # leave for plugin compatibility
 sub hooks { $hooks; }
 
 sub load_logging {
-  # need to do this differently that other plugins so as to 
+  # need to do this differently that other plugins so as to
   # not trigger logging activity
   return if $LOGGING_LOADED;
   my $self = shift;
@@ -65,7 +65,7 @@ sub load_logging {
     my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
     @plugin_dirs = ( "$name/plugins" );
   }
-  
+
   my @loaded;
   for my $logger (@loggers) {
     push @loaded, $self->_load_plugin($logger, @plugin_dirs);
@@ -87,7 +87,7 @@ sub load_logging {
 
   return @loggers;
 }
-  
+
 sub trace_level {
   my $self = shift;
   return $TraceLevel;
@@ -122,7 +122,7 @@ sub varlog {
   unless ( $rc and $rc == DECLINED or $rc == OK ) {
     # no logging plugins registered so fall back to STDERR
     warn join(" ", $$ .
-      (defined $plugin ? " $plugin plugin ($hook):" : 
+      (defined $plugin ? " $plugin plugin ($hook):" :
        defined $hook   ? " running plugin ($hook):"  : ""),
       @log), "\n"
     if $trace <= $TraceLevel;
@@ -145,9 +145,9 @@ sub config {
   if ($_config_cache->{$c}) {
       return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
-  
+
   $_config_cache->{$c} = [$defaults{$c}] if exists($defaults{$c});
-  
+
   #warn "SELF->config($c) ", ref $self;
 
   my ($rc, @config) = $self->run_hooks_no_respond("config", $c);
@@ -157,12 +157,12 @@ sub config {
       @config = $self->get_qmail_config($c, $type) unless @config;
       @config = $defaults{$c} if (!@config and $defaults{$c});
       return @config;
-  } 
+  }
   else {
       return $config[0] if defined($config[0]);
       my $val = $self->get_qmail_config($c, $type);
       return $val if defined($val);
-      return $defaults{$c};   
+      return $defaults{$c};
   }
 }
 
@@ -184,7 +184,7 @@ sub config_dir {
 sub plugin_dirs {
     my $self = shift;
     my @plugin_dirs = $self->config('plugin_dirs');
-    
+
     unless (@plugin_dirs) {
         my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
         @plugin_dirs = ( "$path/plugins" );
@@ -310,7 +310,7 @@ sub expand_inclusion_ {
 
 sub load_plugins {
   my $self = shift;
-  
+
   my @plugins = $self->config('plugins');
   my @loaded;
 
@@ -339,13 +339,13 @@ sub _load_plugin {
     # "full" package plugin (My::Plugin)
     $package = $plugin;
     $package =~ s/[^_a-z0-9:]+//gi;
-    my $eval = qq[require $package;\n] 
+    my $eval = qq[require $package;\n]
               .qq[sub ${plugin}::plugin_name { '$plugin' }];
     $eval =~ m/(.*)/s;
     $eval = $1;
     eval $eval;
     die "Failed loading $package - eval $@" if $@;
-    $self->log(LOGDEBUG, "Loading $package ($plugin_line)") 
+    $self->log(LOGDEBUG, "Loading $package ($plugin_line)")
       unless $plugin_line =~ /logging/;
   }
   else {
@@ -355,7 +355,7 @@ sub _load_plugin {
 
     # Escape everything into valid perl identifiers
     $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
-    
+
     # second pass cares for slashes and words starting with a digit
     $plugin_name =~ s{
         (/+)       # directory
@@ -363,16 +363,16 @@ sub _load_plugin {
        }[
          "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
         ]egx;
-    
+
     $package = "Qpsmtpd::Plugin::$plugin_name";
-    
+
     # don't reload plugins if they are already loaded
     unless ( defined &{"${package}::plugin_name"} ) {
       PLUGIN_DIR: for my $dir (@plugin_dirs) {
         if (-e "$dir/$plugin") {
           Qpsmtpd::Plugin->compile($plugin_name, $package,
             "$dir/$plugin", $self->{_test_mode}, $plugin);
-          $self->log(LOGDEBUG, "Loading $plugin_line from $dir/$plugin") 
+          $self->log(LOGDEBUG, "Loading $plugin_line from $dir/$plugin")
             unless $plugin_line =~ /logging/;
           last PLUGIN_DIR;
         }
@@ -385,7 +385,7 @@ sub _load_plugin {
 
   my $plug = $package->new();
   $plug->_register($self, @args);
-  
+
   return $plug;
 }
 
@@ -461,7 +461,7 @@ sub run_continuation {
       $cnotes->{"hook_$hook"}->{'return'} = $r[0]
         if (!defined $cnotes || ref $cnotes eq "HASH");
     }
-      
+
     if ($r[0] == YIELD) {
       $self->pause_read();
       $self->{_continuation} = [$hook, $args, @$todo];
@@ -493,11 +493,11 @@ sub run_continuation {
 
 sub hook_responder {
   my ($self, $hook, $msg, $args) = @_;
-  
+
   #my $t1 = $SAMPLER->("hook_responder", undef, 1);
 
   my $code = shift @$msg;
-  
+
   my $responder = $hook . '_respond';
   if (my $meth = $self->can($responder)) {
     return $meth->($self, $code, $msg, $args);
@@ -522,11 +522,11 @@ sub spool_dir {
 
   unless ( $Spool_dir ) { # first time through
     $self->log(LOGINFO, "Initializing spool_dir");
-    $Spool_dir = $self->config('spool_dir') 
+    $Spool_dir = $self->config('spool_dir')
                || Qpsmtpd::Utils::tildeexp('~/tmp/');
 
     $Spool_dir .= "/" unless ($Spool_dir =~ m!/$!);
-  
+
     $Spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
     $Spool_dir = $1; # cleanse the taint
     my $Spool_perms = $self->config('spool_perms') || '0700';
@@ -540,20 +540,20 @@ sub spool_dir {
         or die "Could not create spool_dir $Spool_dir: $!";
     }
   }
-    
+
   return $Spool_dir;
 }
 
 # For unique filenames. We write to a local tmp dir so we don't need
 # to make them unpredictable.
-my $transaction_counter = 0; 
+my $transaction_counter = 0;
 
 sub temp_file {
   my $self = shift;
-  my $filename = $self->spool_dir() 
+  my $filename = $self->spool_dir()
     . join(":", time, $$, $transaction_counter++);
   return $filename;
-} 
+}
 
 sub temp_dir {
   my $self = shift;
@@ -587,7 +587,7 @@ sub auth_mechanism {
   my $self = shift;
   return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "" );
 }
-  
+
 1;
 
 __END__
