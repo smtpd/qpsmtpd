@@ -59,6 +59,9 @@
   (Jared Johnson)
   http://groups.google.com/group/perl.qpsmtpd/browse_thread/thread/35e3a187d8e75cbe
 
+  New config option "spool_perms" to set permissions of spool_dir
+  (Jared Johnson)
+
 0.43 - February 5, 2008
 
   (This release was mostly done by Matt Sergeant and Hanno Hecker)

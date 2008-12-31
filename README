@@ -77,7 +77,8 @@ some other way.
 
 The smtpd user needs write access to ~smtpd/qpsmtpd/tmp/ but should
 not need to write anywhere else.  This directory can be configured
-with the "spool_dir" configuration.
+with the "spool_dir" configuration and permissions can be set with
+"spool_perms".
 
 As per version 0.25 the distributed ./run script runs tcpserver with
 the -R flag to disable identd lookups.  Remove the -R flag if that's

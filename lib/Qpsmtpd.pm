@@ -529,18 +529,16 @@ sub spool_dir {
   
     $Spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
     $Spool_dir = $1; # cleanse the taint
+    my $Spool_perms = $self->config('spool_perms') || '0700';
 
-    # Make sure the spool dir has appropriate rights
-    if (-e $Spool_dir) {
-      my $mode = (stat($Spool_dir))[2];
-      $self->log(LOGWARN, 
-          "Permissions on spool_dir $Spool_dir are not 0700")
-        if $mode & 07077;
+    if (-d $Spool_dir) { # Make sure the spool dir has appropriate rights
+      $self->log(LOGWARN,
+        "Permissions on spool_dir $Spool_dir are not $Spool_perms")
+          unless ((stat $Spool_dir)[2] & 07777) == oct($Spool_perms);
+    } else { # Or create it if it doesn't already exist
+      mkdir($Spool_dir,oct($Spool_perms))
+        or die "Could not create spool_dir $Spool_dir: $!";
     }
-
-    # And finally, create it if it doesn't already exist
-    -d $Spool_dir or mkdir($Spool_dir, 0700) 
-      or die "Could not create spool_dir $Spool_dir: $!";
   }
     
   return $Spool_dir;
