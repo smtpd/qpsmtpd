@@ -54,6 +54,11 @@
 
   Add qpsmtpd-prefork to the install targets (Robin Bowes)
 
+  Address definitions are now package vars and can be overriden for
+  sites that wish to change the definition of an email address. 
+  (Jared Johnson)
+  http://groups.google.com/group/perl.qpsmtpd/browse_thread/thread/35e3a187d8e75cbe
+
 0.43 - February 5, 2008
 
   (This release was mostly done by Matt Sergeant and Hanno Hecker)
