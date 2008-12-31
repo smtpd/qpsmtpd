@@ -21,9 +21,14 @@ $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
 $qpsmtpd->load_plugins();
 $qpsmtpd->start_connection();
-$qpsmtpd->run();
+$qpsmtpd->run(\*STDIN); # pass the "socket" like -prefork/-forkserver
 $qpsmtpd->run_hooks("post-connection");
 $qpsmtpd->connection->reset;
+
+# needed for Qpsmtpd::TcpServer::check_socket(): 
+#  emulate IO::Socket::connected on STDIN. STDIN was used instead of STDOUT
+#  because the other code also calls getpeername(STDIN).
+sub IO::Handle::connected { return getpeername(shift) }
 
 __END__
 
