@@ -239,7 +239,9 @@ sub _config_from_file {
   open CF, "<$configfile" or warn "$$ could not open configfile $configfile: $!" and return;
   my @config = <CF>;
   chomp @config;
-  @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/} @config;
+  @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/}
+            map {s/^\s+//; s/\s+$//; $_;} # trim leading/trailing whitespace
+            @config;
   close CF;
 
   my $pos = 0;

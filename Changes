@@ -62,6 +62,8 @@
   New config option "spool_perms" to set permissions of spool_dir
   (Jared Johnson)
 
+  leading/trailing whitespace in config files is ignored (Henry Baragar)
+
 0.43 - February 5, 2008
 
   (This release was mostly done by Matt Sergeant and Hanno Hecker)
