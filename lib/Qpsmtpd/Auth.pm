@@ -60,8 +60,8 @@ sub SASL {
         # rand() is not cryptographic, but we only need to generate a globally
         # unique number.  The rand() is there in case the user logs in more than
         # once in the same second, of if the clock is skewed.
-        $ticket = sprintf( "<%x.%x\@" . $session->config("me") . ">",
-            rand(1000000), time() );
+        $ticket = sprintf( '<%x.%x@%s>',
+            rand(1000000), time(), $session->config("me") );
 
         # We send the ticket encoded in Base64
         $session->respond( 334, encode_base64( $ticket, "" ) );
