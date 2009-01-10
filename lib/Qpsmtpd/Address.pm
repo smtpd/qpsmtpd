@@ -317,6 +317,20 @@ sub host {
     return $self->{_host};
 }
 
+=head2 notes($key[,$value])
+
+Get or set a note on the recipient. This is a piece of data that you wish
+to attach to the recipient and read somewhere else. For example you can
+use this to pass data between plugins.
+
+=cut
+
+sub notes {
+  my ($self,$key,$value) = @_;
+  $self->{_notes}->{$key} = $value if defined $value;
+  return $self->{_notes}->{$key};
+}
+
 sub _addr_cmp {
     require UNIVERSAL;
     my ($left, $right, $swap) = @_;
