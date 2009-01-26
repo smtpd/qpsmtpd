@@ -412,7 +412,7 @@ sub run_hooks_no_respond {
         my @r;
         for my $code (@{$hooks->{$hook}}) {
             eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-            $@ and warn("FATAL PLUGIN ERROR: ", $@) and next;
+            $@ and warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@) and next;
             if ($r[0] == YIELD) {
                 die "YIELD not valid from $hook hook";
             }
@@ -444,7 +444,7 @@ sub run_continuation {
     $self->varlog(LOGDEBUG, $hook, $code->{name});
     my $tran = $self->transaction;
     eval { (@r) = $code->{code}->($self, $tran, @$args); };
-    $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR: ", $@) and next;
+    $@ and $self->log(LOGCRIT, "FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@) and next;
 
     !defined $r[0]
         and $self->log(LOGERROR, "plugin ".$code->{name}
