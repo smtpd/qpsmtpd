@@ -664,11 +664,21 @@ sub data_respond {
 
         $buffer = "";
 
-        # FIXME - call plugins to work on just the header here; can
-        # save us buffering the mail content.
+        $self->transaction->header($header);
 
-	# Save the start of just the body itself	
-	$self->transaction->set_body_start();
+        my ($rc, $msg) = $self->run_hooks('data_headers_end');
+        if ($rc == DENY_DISCONNECT) {
+          $self->respond(554, $msg || "Message denied");
+          $self->disconnect;
+          return 1;
+        } elsif ($rc == DENYSOFT_DISCONNECT) {
+          $self->respond(421, $msg || "Message denied temporarily");
+          $self->disconnect;
+          return 1;
+        }
+
+        # Save the start of just the body itself        
+        $self->transaction->set_body_start();
 
       }
 
@@ -686,8 +696,6 @@ sub data_respond {
   }
 
   $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
-
-  $self->transaction->header($header);
 
   my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
   my $esmtp = substr($smtp,0,1) eq "E";

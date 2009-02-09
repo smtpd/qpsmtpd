@@ -150,6 +150,24 @@ Hook for the "data" command.  Defaults to '354, "go ahead"'.
              recommended)
 
 
+=head2 data_headers_end
+
+Hook fires after all header lines of the message data has been received.
+Defaults to doing nothing, just continue processing.  At this step,
+the sender is not waiting for a reply, but we can try and prevent him from
+sending the entire message by disconnecting immediately. (Although it is
+likely the packets are already in flight due to buffering and pipelining).
+
+BE CAREFUL!  If you drop the connection legal MTAs will retry again and again,
+spammers will probably not.  This is not RFC compliant and can lead to
+an unpredictable mess. Use with caution.
+
+Allowed return codes:
+
+  DENY_DISCONNECT     - Return '554 Message denied' and disconnect
+  DENYSOFT_DISCONNECT - Return '421 Message denied temporarily' and disconnect
+  DECLINED            - Do nothing
+
 =head2 data_post
 
 Hook after receiving all data; just before the message is queued.
@@ -305,6 +323,7 @@ routine is: C< s/\W/_/g; >
  config                        hook_config                      
  queue                         hook_queue                       
  data                          hook_data                        
+ data_headers_end              hook_data_headers_end
  data_post                     hook_data_post                   
  quit                          hook_quit                        
  rcpt                          hook_rcpt                        
