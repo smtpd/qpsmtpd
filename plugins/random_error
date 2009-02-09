@@ -1,0 +1,70 @@
+=head1 NAME
+
+random_error
+
+=head1 DESCRIPTION
+
+This plugin randomly disconnects and issues DENYSOFTs.
+
+=head1 CONFIG
+
+one parameter is allowed, which is how often to error, as a percentage
+of messages.  The default is 1. Use a negative number to disable.
+
+2/5 of failures are DENYSOFT_DISOCNNECT, 3/5 simply DENYSOFT.
+
+For use with other plugins, scribble the revised failure rate to
+
+   $self->qp->connection->notes('random_fail_%');
+
+=cut
+
+sub register {
+  my ($self, $qp, @args) = @_;
+
+  die "Invalid args: '@args'" unless @args < 2;
+  ($self->{__PACKAGE__.'_how'}) = $args[0] || 1;
+  
+}
+
+sub NEXT() { DECLINED }
+
+sub random_fail {
+	my $self = shift;
+	my $fpct = $self->qp->connection->notes('random_fail_%');
+	rand(100) > ($fpct / 6) and return NEXT;
+	rand(5) < 2 and return (DENYSOFT_DISCONNECT, "random failure");
+	return (DENYSOFT, "random failure");
+}
+
+
+sub hook_connect {
+    $self->qp->connection->notes('random_fail_%', $self->{__PACKAGE__.'_how'});
+    goto &random_fail
+}
+
+sub hook_helo {
+    goto &random_fail
+}
+
+sub hook_ehlo {
+    goto &random_fail
+}
+
+sub hook_mail {
+    goto &random_fail
+}
+
+sub hook_rcpt {
+    goto &random_fail
+}
+
+sub hook_data {
+    goto &random_fail
+}
+
+sub hook_data_post {
+    goto &random_fail
+}
+
+
