@@ -1,0 +1,913 @@
+#
+# This file is best read with ``perldoc plugins.pod''
+#
+
+### 
+# Conventions:
+#  plugin names:  F<myplugin>, F<qpsmtpd-async>
+#  constants:     I<LOGDEBUG>
+#  smtp commands, answers: B<HELO>, B<250 Queued!>
+#
+# Notes: 
+#  * due to restrictions of some POD parsers, no C<<$object->method()>>
+#    are allowed, use C<$object-E<gt>method()> 
+# 
+
+=head1 SMTP hooks
+
+This section covers the hooks, which are run in a normal SMTP connection. 
+The order of these hooks is like you will (probably) see them, while a mail
+is received. 
+
+Every hook receives a C<Qpsmtpd::Plugin> object of the currently 
+running plugin as the first argument. A C<Qpsmtpd::Transaction> object is 
+the second argument of the current transaction in the most hooks, exceptions 
+are noted in the description of the hook. If you need examples how the 
+hook can be used, see the source of the plugins, which are given as 
+example plugins.
+
+B<NOTE>: for some hooks (post-fork, post-connection, disconnect, deny, ok) the
+return values are ignored. This does B<not> mean you can return anything you
+want. It just means the return value is discarded and you can not disconnect
+a client with I<DENY_DISCONNECT>. The rule to return I<DECLINED> to run the
+next plugin for this hook (or return I<OK> / I<DONE> to stop processing) 
+still applies.
+
+=head2 hook_pre_connection
+
+Called by a controlling process (e.g. forkserver or prefork) after accepting 
+the remote server, but before beginning a new instance (or handing the 
+connection to the worker process).
+
+Useful for load-management and rereading large config files at some
+frequency less than once per session.
+
+This hook is available in the F<qpsmtpd-forkserver>, F<qpsmtpd-prefork> and
+F<qpsmtpd-async> flavours. 
+
+=cut 
+
+NOT FOR: apache, -server and inetd/pperl
+
+=pod
+
+B<NOTE:> You should not use this hook to do major work and / or use lookup 
+methods which (I<may>) take some time, like DNS lookups. This will slow down
+B<all> incoming connections, no other connection will be accepted while this
+hook is running!
+
+Arguments this hook receives are (B<NOTE>: currently no C<%args> for 
+F<qpsmtpd-async>):
+
+  my ($self,$transaction,%args) = @_;
+  # %args is:
+  # %args = ( remote_ip    => inet_ntoa($iaddr),
+  #           remote_port  => $port,
+  #           local_ip     => inet_ntoa($laddr),
+  #           local_port   => $lport,
+  #           max_conn_ip  => $MAXCONNIP,
+  #           child_addrs  => [values %childstatus],
+  #         );
+
+B<NOTE:> the C<$transaction> is of course C<undef> at this time.
+
+Allowed return codes are
+
+=over 4
+
+=item DENY / DENY_DISCONNECT
+
+returns a B<550> to the client and ends the connection
+
+=item DENYSOFT / DENYSOFT_DISCONNECT
+
+returns a B<451> to the client and ends the connection
+
+=back
+
+Anything else is ignored.
+
+Example plugins are F<hosts_allow> and F<connection_time>. 
+
+=head2 hook_connect
+
+It is called at the start of a connection before the greeting is sent to 
+the connecting client.
+
+Arguments for this hook are
+
+  my $self = shift;
+
+B<NOTE:> in fact you get passed two more arguments, which are C<undef> at this
+early stage of the connection, so ignore them.
+
+Allowed return codes are
+
+=over 4
+
+=item OK
+
+Stop processing plugins, give the default response
+
+=item DECLINED
+
+Process the next plugin
+
+=item DONE
+
+Stop processing plugins and dont give the default response, i.e. the plugin 
+gave the response
+
+=item DENY
+
+Return hard failure code and disconnect
+
+=item DENYSOFT
+
+Return soft failure code and disconnect
+
+=back
+
+Example plugin for this hook is the F<check_relay> plugin. 
+
+=head2 hook_helo / hook_ehlo
+
+It is called after the client sent B<EHLO> (hook_ehlo) or B<HELO> (hook_helo)
+Allowed return codes are
+
+=over 4
+
+=item DENY
+
+Return a 550 code
+
+=item DENYSOFT
+
+Return a B<450> code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+Qpsmtpd wont do anything, the plugin sent the message
+
+=item DECLINED 
+
+Qpsmtpd will send the standard B<EHLO>/B<HELO> answer, of course only 
+if all plugins hooking I<helo/ehlo> return I<DECLINED>.
+
+=back
+
+Arguments of this hook are
+
+  my ($self, $transaction, $host) = @_;
+  # $host: the name the client sent in the 
+  # (EH|HE)LO line
+
+B<NOTE:> C<$transaction> is C<undef> at this point.
+
+=head2 hook_mail_pre
+
+After the B<MAIL FROM: > line sent by the client is broken into 
+pieces by the C<hook_mail_parse()>, this hook recieves the results.
+This hook may be used to pre-accept adresses without the surrounding 
+I<E<lt>E<gt>> (by adding them) or addresses like 
+I<E<lt>user@example.com.E<gt>> or I<E<lt>user@example.com E<gt>> by 
+removing the trailing I<"."> / C<" ">.
+
+Expected return values are I<OK> and an address which must be parseable
+by C<Qpsmtpd::Address-E<gt>parse()> on success or any other constant to
+indicate failure.
+
+Arguments are 
+
+  my ($self, $transaction, $addr) = @_;
+
+=head2 hook_mail
+
+Called right after the envelope sender line is parsed (the B<MAIL FROM: >
+command). The plugin gets passed a C<Qpsmtpd::Address> object, which means 
+the parsing and verifying the syntax of the address (and just the syntax, 
+no other checks) is already done. Default is to allow the sender address. 
+The remaining arguments are the extensions defined in RFC 1869 (if sent by 
+the client).
+
+B<NOTE:> According to the SMTP protocol, you can not reject an invalid
+sender until after the B<RCPT> stage (except for protocol errors, i.e.
+syntax errors in address). So store it in an C<$transaction-E<gt>note()> and 
+process it later in an rcpt hook.
+
+Allowed return codes are
+
+=over 4
+
+=item OK
+
+sender allowed
+
+=item DENY
+
+Return a hard failure code
+
+=item DENYSOFT
+
+Return a soft failure code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DECLINED
+
+next plugin (if any)
+
+=item DONE
+
+skip further processing, plugin sent response
+
+=back
+
+Arguments for this hook are 
+
+  my ($self,$transaction, $sender, %args) = @_;
+  # $sender: an Qpsmtpd::Address object for 
+  # sender of the message
+
+Example plugins for the C<hook_mail> are F<require_resolvable_fromhost>
+and F<check_badmailfrom>.
+
+=head2 hook_rcpt_pre
+
+See C<hook_mail_pre>, s/MAIL FROM:/RCPT TO:/.
+
+=head2 hook_rcpt
+
+This hook is called after the client sent an I<RCPT TO: > command (after 
+parsing the line). The given argument is parsed by C<Qpsmtpd::Address>, 
+then this hook is called. Default is to deny the mail with a soft error 
+code. The remaining arguments are the extensions defined in RFC 1869
+(if sent by the client).
+
+Allowed return codes
+
+=over 4
+
+=item OK
+
+recipient allowed
+
+=item DENY
+
+Return a hard failure code, for example for an I<User does not exist here> 
+message.
+
+=item DENYSOFT
+
+Return a soft failure code, for example if the connect to a user lookup 
+database failed
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+skip further processing, plugin sent response
+
+=back
+
+Arguments are
+
+  my ($self, $transaction, $recipient, %args) = @_;
+  # $rcpt = Qpsmtpd::Address object with 
+  # the given recipient address
+
+Example plugin is F<rcpt_ok>.
+
+=head2 hook_data
+
+After the client sent the B<DATA> command, before any data of the message
+was sent, this hook is called. 
+
+B<NOTE:> This hook, like B<EHLO>, B<VRFY>, B<QUIT>, B<NOOP>, is an 
+endpoint of a pipelined command group (see RFC 1854) and may be used to 
+detect ``early talkers''. Since svn revision 758 the F<check_earlytalker>
+plugin may be configured to check at this hook for ``early talkers''.
+
+Allowed return codes are
+
+=over 4
+
+=item DENY
+
+Return a hard failure code
+
+=item DENYSOFT
+
+Return a soft failure code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+Plugin took care of receiving data and calling the queue (not recommended)
+
+B<NOTE:> The only real use for I<DONE> is implementing other ways of
+receiving the message, than the default... for example the CHUNKING SMTP
+extension (RFC 1869, 1830/3030) ... a plugin for this exists at 
+http://svn.perl.org/qpsmtpd/contrib/vetinari/experimental/chunking, but it
+was never tested ``in the wild''.
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_;
+
+Example plugin is F<greylisting>.
+
+=head2 hook_received_line
+
+If you wish to provide your own Received header line, do it here. You can use
+or discard any of the given arguments (see below).
+
+Allowed return codes:
+
+=over 4
+
+=item OK, $string
+
+use this string for the Received header.
+
+=item anything else
+
+use the default Received header
+
+=back
+
+Arguments are
+
+ my ($self, $transaction, $smtp, $auth, $sslinfo) = @_;
+ # $smtp - the SMTP type used (e.g. "SMTP" or "ESMTP").
+ # $auth - the Auth header additionals.
+ # $sslinfo - information about SSL for the header.
+
+=head2 data_headers_end
+
+This hook fires after all header lines of the message data has been received.
+Defaults to doing nothing, just continue processing. At this step,
+the sender is not waiting for a reply, but we can try and prevent him from
+sending the entire message by disconnecting immediately. (Although it is
+likely the packets are already in flight due to buffering and pipelining).
+
+B<NOTE:> BE CAREFUL! If you drop the connection legal MTAs will retry again 
+and again, spammers will probably not. This is not RFC compliant and can lead
+to an unpredictable mess. Use with caution.
+
+Why this hook may be useful for you, see 
+L<http://www.nntp.perl.org/group/perl.qpsmtpd/2009/02/msg8502.html>, ff.
+
+Allowed return codes:
+
+=over 4
+
+=item DENY_DISCONNECT
+
+Return B<554 Message denied> and disconnect
+
+=item DENYSOFT_DISCONNECT
+
+Return B<421 Message denied temporarily> and disconnect
+
+=item DECLINED
+
+Do nothing
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_; 
+
+B<FIXME:> check arguments
+
+=head2 hook_data_post
+
+The C<data_post> hook is called after the client sent the final C<.\r\n> 
+of a message, before the mail is sent to the queue.
+
+Allowed return codes are
+
+=over 4
+
+=item DENY
+
+Return a hard failure code
+
+=item DENYSOFT
+
+Return a soft failure code
+
+=item DENY_DISCONNECT / DENYSOFT_DISCONNECT
+
+as above but with disconnect
+
+=item DONE
+
+skip further processing (message will not be queued), plugin gave the response.
+
+B<NOTE:> just returning I<OK> from a special queue plugin does (nearly) 
+the same (i.e. dropping the mail to F</dev/null>) and you don't have to 
+send the response on your own.
+
+If you want the mail to be queued, you have to queue it manually!
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_;
+
+Example plugins: F<spamassassin>, F<virus/clamdscan>
+
+=head2 hook_queue_pre
+
+This hook is run, just before the mail is queued to the ``backend''. You 
+may modify the in-process transaction object (e.g. adding headers) or add 
+something like a footer to the mail (the latter is not recommended).
+
+Allowed return codes are 
+
+=over 4
+
+=item DONE
+
+no queuing is done
+
+=item OK / DECLINED
+
+queue the mail
+
+=back
+
+=head2 hook_queue
+
+When all C<data_post> hooks accepted the message, this hook is called. It 
+is used to queue the message to the ``backend''.
+
+Allowed return codes:
+
+=over 4
+
+=item DONE
+
+skip further processing (plugin gave response code)
+
+=item OK
+
+Return success message, i.e. tell the client the message was queued (this
+may be used to drop the message silently).
+
+=item DENY
+
+Return hard failure code
+
+=item DENYSOFT
+
+Return soft failure code, i.e. if disk full or other temporary queuing 
+problems
+
+=back
+
+Arguments:
+
+  my ($self, $transaction) = @_;
+
+Example plugins: all F<queue/*> plugins
+
+=head2 hook_queue_post
+
+This hook is called always after C<hook_queue>. If the return code is 
+B<not> I<OK>, a message (all remaining return values) with level I<LOGERROR> 
+is written to the log.
+Arguments are
+
+ my $self = shift;
+ 
+B<NOTE:> C<$transaction> is not valid at this point, therefore not mentioned.
+
+
+=head2 hook_reset_transaction
+
+This hook will be called several times. At the beginning of a transaction 
+(i.e. when the client sends a B<MAIL FROM:> command the first time), 
+after queueing the mail and every time a client sends a B<RSET> command.
+Arguments are 
+
+ my ($self, $transaction) = @_;
+
+B<NOTE:> don't rely on C<$transaction> being valid at this point.
+
+=head2 hook_quit
+
+After the client sent a B<QUIT> command, this hook is called (before the
+C<hook_disconnect>).
+
+Allowed return codes
+
+=over 4
+
+=item DONE
+
+plugin sent response
+
+=item DECLINED
+
+next plugin and / or qpsmtpd sends response
+
+=back
+
+Arguments: the only argument is C<$self>
+
+=cut 
+
+### XXX: FIXME pass the rest of the line to this hook?
+
+=pod
+
+Expample plugin is the F<quit_fortune> plugin.
+
+=head2 hook_disconnect
+
+This hook will be called from several places: After a plugin returned 
+I<DENY(|SOFT)_DISCONNECT>, before connection is disconnected or after the 
+client sent the B<QUIT> command, AFTER the quit hook and ONLY if no plugin 
+hooking C<hook_quit> returned I<DONE>.
+
+All return values are ignored, arguments are just C<$self>
+
+Example plugin is F<logging/file>
+
+=head2 hook_post_connection
+
+This is the counter part of the C<pre-connection> hook, it is called 
+directly before the connection is finished, for example, just before the 
+qpsmtpd-forkserver instance exits or if the client drops the connection 
+without notice (without a B<QUIT>). This hook is not called if the qpsmtpd
+instance is killed.
+
+=cut 
+
+FIXME: we should run this hook on a ``SIGHUP'' or some other signal?
+
+=pod 
+
+The only argument is C<$self> and all return codes are ignored, it would 
+be too late anyway :-).
+
+Example: F<connection_time>
+
+=head1 Parsing Hooks
+
+Before the line from the client is parsed by 
+C<Qpsmtpd::Command-E<gt>parse()> with the built in parser, these hooks 
+are called. They can be used to supply a parsing function for the line,
+which will be used instead of the built in parser.
+
+The hook must return two arguments, the first is (currently) ignored,
+the second argument must be a (CODE) reference to a sub routine. This sub 
+routine receives three arguments:
+
+=over 4
+
+=item $self
+
+the plugin object
+
+=item $cmd
+
+the command (i.e. the first word of the line) sent by the client
+
+=item $line
+
+the line sent by the client without the first word
+
+=back
+
+Expected return values from this sub are I<DENY> and a reason which is 
+sent to the client or I<OK> and the C<$line> broken into pieces according
+to the syntax rules for the command.
+
+B<NOTE: ignore the example from C<Qpsmtpd::Command>, the C<unrecognized_command_parse> hook was never implemented,...>
+
+=head2 hook_helo_parse / hook_ehlo_parse
+
+The provided sub routine must return two or more values. The first is 
+discarded, the second is the hostname (sent by the client as argument 
+to the B<HELO> / B<EHLO> command). All other values are passed to the 
+helo / ehlo hook. This hook may be used to change the hostname the client
+sent... not recommended, but if your local policy says only to accept
+I<HELO> hosts with FQDNs and you have a legal client which can not be 
+changed to send his FQDN, this is the right place.
+
+=head2 hook_mail_parse / hook_rcpt_parse
+
+The provided sub routine must return two or more values. The first is 
+either I<OK> to indicate that parsing of the line was successfull
+or anything else to bail out with I<501 Syntax error in command>. In
+case of failure the second argument is used as the error message for the 
+client.
+
+If parsing was successfull, the second argument is the sender's / 
+recipient's address (this may be without the surrounding I<E<lt>> and 
+I<E<gt>>, don't add them here, use the C<hook_mail_pre()> / 
+C<hook_rcpt_pre()> methods for this). All other arguments are 
+sent to the C<mail / rcpt> hook as B<MAIL> / B<RCPT> parameters (see 
+RFC 1869 I<SMTP Service Extensions> for more info). Note that 
+the mail and rcpt hooks expect a list of key/value pairs as the 
+last arguments.
+
+=head2 hook_auth_parse
+
+B<FIXME...>
+
+=head1 Special hooks
+
+Now some special hooks follow. Some of these hooks are some internal hooks, 
+which may be used to alter the logging or retrieving config values from 
+other sources (other than flat files) like SQL databases.
+
+=head2 hook_logging
+
+This hook is called when a log message is written, for example in a plugin 
+it fires if someone calls C<$self-E<gt>log($level, $msg);>. Allowed
+return codes are
+
+=over 4
+
+=item DECLINED
+
+next logging plugin
+
+=item OK
+
+(not I<DONE>, as some might expect!) ok, plugin logged the message
+
+=back
+
+Arguments are
+
+  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+  # $trace: level of message, for example 
+  #          LOGWARN, LOGDEBUG, ...
+  # $hook:  the hook in/for which this logging 
+  #          was called
+  # $plugin: the plugin calling this hook
+  # @log:   the log message
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+All F<logging/*> plugins can be used as example plugins.
+
+=head2 hook_deny
+
+This hook is called after a plugin returned I<DENY>, I<DENYSOFT>, 
+I<DENY_DISCONNECT> or I<DENYSOFT_DISCONNECT>. All return codes are ignored, 
+arguments are
+
+  my ($self, $transaction, $prev_hook, $return, $return_text) = @_;
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+Example plugin for this hook is F<logging/adaptive>.
+
+=head2 hook_ok
+
+The counter part of C<hook_deny>, it is called after a plugin B<did not>
+return I<DENY>, I<DENYSOFT>, I<DENY_DISCONNECT> or I<DENYSOFT_DISCONNECT>. 
+All return codes are ignored, arguments are
+
+  my ( $self, $transaction, $prev_hook, $return, $return_text ) = @_;
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+=head2 hook_config
+
+Called when a config file is requested, for example in a plugin it fires 
+if someone calls C<my @cfg = $self-E<gt>qp-E<gt>config($cfg_name);>. 
+Allowed return codes are
+
+=over 4
+
+=item DECLINED
+
+plugin didn't find the requested value
+
+=item OK
+
+requested values as C<@list>, example:
+
+  return (OK, @{$config{$value}}) 
+    if exists $config{$value};
+  return (DECLINED);
+
+=back
+
+Arguments:
+
+  my ($self,$transaction,$value) = @_; 
+  # $value: the requested config item(s)
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+Example plugin is F<http_config> from the qpsmtpd distribution.
+
+=head2 hook_unrecognized_command
+
+This is called if the client sent a command unknown to the core of qpsmtpd.
+This can be used to implement new SMTP commands or just count the number 
+of unknown commands from the client, see below for examples.
+Allowed return codes:
+
+=over 4
+
+=item DENY_DISCONNECT
+
+Return B<521> and disconnect the client
+
+=item DENY
+
+Return B<500>
+
+=item DONE
+
+Qpsmtpd wont do anything; the plugin responded, this is what you want to 
+return, if you are implementing new commands
+
+=item Anything else...
+
+Return B<500 Unrecognized command>
+
+=back
+
+Arguments:
+
+  my ($self, $transaction, $cmd, @args) = @_;
+  # $cmd  = the first "word" of the line 
+  #         sent by the client
+  # @args = all the other "words" of the 
+  #         line sent by the client
+  #         "word(s)": white space split() line
+
+B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
+is called. It's probably best not to try acessing it.
+
+Example plugin is F<tls>.
+
+=head2 hook_help
+
+This hook triggers if a client sends the B<HELP> command, allowed return
+codes are:
+
+=over 4
+
+=item DONE
+
+Plugin gave the answer.
+
+=item DENY
+
+The client will get a C<syntax error> message, probably not what you want, 
+better use
+
+  $self->qp->respond(502, "Not implemented.");
+  return DONE;
+
+=back
+
+Anything else will be send as help answer.
+
+Arguments are
+   my ($self, $transaction, @args) = @_;
+
+with C<@args> being the arguments from the client's command.
+
+=head2 hook_vrfy
+
+If the client sents the B<VRFY> command, this hook is called. Default is to 
+return a message telling the user to just try sending the message.
+Allowed return codes:
+
+=over 4
+
+=item OK
+
+Recipient Exists
+
+=item DENY
+
+Return a hard failure code
+
+=item DONE
+
+Return nothing and move on
+
+=item Anything Else...
+
+Return a B<252>
+
+=back
+
+Arguments are:
+
+ my ($self) = shift;
+
+=cut 
+
+FIXME: this sould be changed in Qpsmtpd::SMTP to pass the rest of the line
+as arguments to the hook
+
+=pod
+
+=head2 hook_noop 
+
+If the client sents the B<NOOP> command, this hook is called. Default is to
+return C<250 OK>.
+
+Allowed return codes are:
+
+=over 4
+
+=item DONE
+
+Plugin gave the answer
+
+=item DENY_DISCONNECT
+
+Return error code and disconnect client
+
+=item DENY
+
+Return error code.
+
+=item Anything Else...
+
+Give the default answer of B<250 OK>.
+
+=back
+
+Arguments are
+
+  my ($self,$transaction,@args) = @_;
+
+=head2 hook_post_fork
+
+B<NOTE:> This hook is only available in qpsmtpd-async.
+
+It is called while starting qpsmtpd-async. You can run more than one 
+instance of qpsmtpd-async (one per CPU probably). This hook is called 
+after forking one instance.
+
+Arguments: 
+
+ my $self = shift;
+
+The return values of this hook are discarded.
+
+=head1 Authentication hooks
+
+=cut 
+
+B<FIXME missing:> auth_parse
+
+#=head2 auth
+
+B<FIXME>
+
+#=head2 auth-plain
+
+B<FIXME>
+
+#=head2 auth-login
+
+B<FIXME>
+
+#=head2 auth-cram-md5
+
+B<FIXME>
+
+=pod
+
+See F<docs/authentication.pod>.
+
+=cut
+
+# vim: ts=2 sw=2 expandtab

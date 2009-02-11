@@ -1,5 +1,5 @@
 #
-# read this with 'perldoc README.authentication'  ...
+# read this with 'perldoc authentication.pod'  ...
 #
 
 =head1 NAME
