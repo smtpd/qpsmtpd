@@ -12,8 +12,6 @@ Roadmap
 
  - http://code.google.com/p/smtpd/issues
 
- - move repository to git?
-
  - Bugfixes - qpsmtpd is extremely stable (in production since 2001), but
    there are always more things to fix.
 
