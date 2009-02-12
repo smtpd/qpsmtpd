@@ -25,6 +25,20 @@ button to get your own repository.
 
 will check out your copy into a directory called qpsmtpd
 
+=head3 Making a branch for your change
+
+As a general rule, you'll be better off if you do your changes on a
+branch - preferably a branch per unrelated change.
+
+You can use the C<git branch> command to see which branch you are on.
+
+The easiest way to make a new branch is 
+ 
+  git checkout -b topic/my-great-change
+
+This will create a new branch with the name "topic/my-great-change"
+(and your current commit as the starting point).
+
 =head3 Committing a change
 
 Edit the appropriate files, and be sure to run the test suite.
@@ -35,9 +49,24 @@ Edit the appropriate files, and be sure to run the test suite.
 
 When you're ready to check it in...
 
-  git add lib/Qpsmtpd.pm # to let git know you changed the file
+  git add lib/Qpsmtpd.pm     # to let git know you changed the file
+  git add --patch plugin/tls # interactive choose which changes to add
+  git diff --cached          # review changes added
   git commit
-  git push origin # to send to github
+  git log -p                 # review your commit a last time
+  git push origin            # to send to github
+
+=head3 Submit patches by mail
+
+If you don't use github, or if you want to submit your patch to the
+mailing list for review (often a good idea), you can use 
+
+  git format-patch
+
+to generate "patch files".  For example "git format-patch HEAD~3" will
+give you three files with the last changes.
+
+Then use "git send-email" to send them to the mailing list for review.
 
 =head3 Merging changes back in from the master repository
 
@@ -56,8 +85,15 @@ Forward-port local commits to the updated upstream head
   git rebase abh/master
 
 If you have a change that conflicts with an upstream change (git will
-let you know) you have two options.  You can merge it and then commit
-the merge, or you can skip it entirely:
+let you know) you have two options. 
+
+Manually fix the conflict and then do 
+
+  git add some/file
+  git commit
+    
+Or if the conflicting upstream commit did the same logical change then
+you might want to just skip the local change:
 
   git rebase --skip
 
@@ -72,10 +108,23 @@ your change before applying it.
 If you get your working copy into a state you don't like, you can
 always revert to the last commit:
 
- git reset --hard HEAD
+   git reset --hard HEAD
+
+Or throw away your most recent commit:
+
+   git reset --hard HEAD^
+
+If you make a mistake with this, git is pretty good about keeping your
+commits around even as you merge, rebase and reset away.  This log of
+your git changes is called with "git reflog".
 
 =head3 Applying other peoples changes
 
-One easy way to apply other peoples changes is to use C<git am>.  That
-will go ahead and commit the change.  To modify it, you can use C<git
-commit --amend>.
+If you get a change in an email with the patch, one easy way to apply
+other peoples changes is to use C<git am>.  That will go ahead and
+commit the change.  To modify it, you can use C<git commit --amend>.
+
+If the changes are in a repository, you can add that repository with
+"git remote add" and then either merge them in with "git merge" or
+pick just the relevant commits with "git cherry-pick".
+
