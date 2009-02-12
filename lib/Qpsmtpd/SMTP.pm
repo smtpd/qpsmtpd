@@ -666,6 +666,8 @@ sub data_respond {
 
         $self->transaction->header($header);
 
+	# NOTE: This will not work properly under async.  A
+	# data_headers_end_respond needs to be created.
         my ($rc, $msg) = $self->run_hooks('data_headers_end');
         if ($rc == DENY_DISCONNECT) {
           $self->respond(554, $msg || "Message denied");
