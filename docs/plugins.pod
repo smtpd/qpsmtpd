@@ -787,6 +787,8 @@ B<NOTE:> BE CAREFUL! If you drop the connection legal MTAs will retry again
 and again, spammers will probably not. This is not RFC compliant and can lead
 to an unpredictable mess. Use with caution.
 
+B<NOTE:> This hook does not currently work in async mode.
+
 Why this head may be useful for you, see 
 L<http://www.nntp.perl.org/group/perl.qpsmtpd/2009/02/msg8502.html>, ff.
 
