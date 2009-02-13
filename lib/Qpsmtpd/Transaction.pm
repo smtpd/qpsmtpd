@@ -55,9 +55,11 @@ sub header {
 #}
 
 sub notes {
-  my ($self,$key,$value) = @_;
-  $self->{_notes}->{$key} = $value if defined $value;
-  return $self->{_notes}->{$key};
+  my $self = shift;
+  my $key  = shift;
+  @_ and $self->{_notes}->{$key} = shift;
+  #warn Data::Dumper->Dump([\$self->{_notes}], [qw(notes)]);
+  $self->{_notes}->{$key};
 }
 
 sub set_body_start {

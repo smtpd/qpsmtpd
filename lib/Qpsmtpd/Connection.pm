@@ -108,9 +108,10 @@ sub hello_host {
 }
 
 sub notes {
-  my ($self,$key,$value) = @_;
-  $self->{_notes}->{$key} = $value if defined $value;
-  return $self->{_notes}->{$key};
+  my $self = shift;
+  my $key  = shift;
+  @_ and $self->{_notes}->{$key} = shift;
+  $self->{_notes}->{$key};
 }
 
 sub reset {
@@ -199,9 +200,7 @@ set after a successful return from those hooks.
 
 =head2 notes($key [, $value])
 
-Get or set a note on the transaction. This is a piece of data that you wish
-to attach to the transaction and read somewhere else. For example you can
-use this to pass data between plugins.
+Connection-wide notes, used for passing data between plugins.
 
 =head2 clone([%args])
 
