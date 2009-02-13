@@ -21,6 +21,10 @@ Qpsmtpd is an extensible smtp engine written in Perl.  No, make that
 easily extensible!  See plugins/quit_fortune for a very useful, er,
 cute example.
 
+=head2 License
+
+Qpsmtpd is licensed under the MIT License; see the LICENSE file for
+more information.
 
 =head2 What's new in this release?
 
@@ -55,11 +59,13 @@ directory.
 Put the files there.  If you install from Subversion you can just do
 run the following command in the /home/smtpd/ directory.
 
-   svn co http://svn.perl.org/qpsmtpd/trunk .
+   git clone git://github.com/abh/qpsmtpd.git
 
-Beware that the trunk might be unstable and unsuitable for anything but development, so you might want to get a specific release, for example:
+Beware that the master branch might be unstable and unsuitable for anything
+but development, so you might want to get a specific release, for
+example (after running git clone):
 
-   svn co http://svn.perl.org/qpsmtpd/tags/0.31 .
+   git checkout -b local_branch v0.40
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
@@ -101,22 +107,10 @@ ask@develooper.com.
 
 =head1 Better Performance
 
-As of version 0.21 qpsmtpd supports "PPerl"
-http://search.cpan.org/search?dist=PPerl
-
-"PPerl turns ordinary perl scripts into long running daemons, making
-subsequent executions extremely fast. It forks several processes for
-each script, allowing many processes to call the script at once."
-
-Running under PPerl is easy - just change your "run" file to contain
-the following command:
-
-  pperl -Tw -- --prefork=$MAXCLIENTS --maxclients=$MAXCLIENTS \
-    --no-cleanup ./qpsmtpd 2>&1
-
-As an alternative to PPerl (some users find PPerl unstable) we recommend using
-the forkserver. This forks for every connection, but pre-loads all the plugins
-to reduce the overhead.
+For better performance we recommend using "qpsmtpd-forkserver" or
+running qpsmtpd under Apache 2.x.  If you need extremely high
+concurrency and all your plugins are compatible, you might want to try
+the "qpsmtpd-async" model.
 
 =head1 Plugins
 
