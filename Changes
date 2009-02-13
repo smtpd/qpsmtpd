@@ -1,3 +1,5 @@
+  Add rcpt_regexp plugin (Hanno Hecker)
+
   Add notes method to Qpsmtpd::Address objects (Jared Johnson)
 
   Add remove_recipient method to the transaction object (Jared Johnson)
