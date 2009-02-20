@@ -200,7 +200,9 @@ set after a successful return from those hooks.
 
 =head2 notes($key [, $value])
 
-Connection-wide notes, used for passing data between plugins.
+Get or set a note on the connection. This is a piece of data that you wish
+to attach to the connection and read somewhere else. For example you can
+use this to pass data between plugins.
 
 =head2 clone([%args])
 
