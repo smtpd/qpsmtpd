@@ -61,11 +61,10 @@ sub header {
 #}
 
 sub notes {
-  my $self = shift;
-  my $key  = shift;
-  @_ and $self->{_notes}->{$key} = shift;
-  #warn Data::Dumper->Dump([\$self->{_notes}], [qw(notes)]);
-  $self->{_notes}->{$key};
+  my ($self,$key) = (shift,shift);
+  # Check for any additional arguments passed by the caller -- including undef
+  return $self->{_notes}->{$key} unless @_;
+  return $self->{_notes}->{$key} = shift;
 }
 
 sub set_body_start {
