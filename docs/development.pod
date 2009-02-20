@@ -21,7 +21,7 @@ button to get your own repository.
 
 =head3 Making a working Copy
 
- git clone git@github.com:username/qpsmtpd qpsmtpd
+ git clone git@github.com:username/qpsmtpd.git qpsmtpd
 
 will check out your copy into a directory called qpsmtpd
 
