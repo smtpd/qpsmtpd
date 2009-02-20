@@ -317,6 +317,21 @@ sub host {
     return $self->{_host};
 }
 
+=head2 notes($key[,$value])
+
+Get or set a note on the address. This is a piece of data that you wish
+to attach to the address and read somewhere else. For example you can
+use this to pass data between plugins.
+
+=cut
+
+sub notes {
+  my ($self,$key) = (shift,shift);
+  # Check for any additional arguments passed by the caller -- including undef
+  return $self->{_notes}->{$key} unless @_;
+  return $self->{_notes}->{$key} = shift;
+}
+
 sub _addr_cmp {
     require UNIVERSAL;
     my ($left, $right, $swap) = @_;
