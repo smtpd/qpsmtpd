@@ -27,6 +27,12 @@ sub add_recipient {
   @_ and push @{$self->{_recipients}}, shift;
 }
 
+sub remove_recipient {
+  my ($self,$rcpt) = @_;
+  $self->{_recipients} = [grep {$_->address ne $rcpt->address}
+                               @{$self->{_recipients} || []}] if $rcpt;
+}
+
 sub recipients {
   my $self = shift;
   @_ and $self->{_recipients} = [@_];
@@ -269,6 +275,13 @@ latter is done for you by qpsmtpd.
 =head2 add_recipient($recipient)
 
 This adds a new recipient (as in RCPT TO) to the envelope of the mail.
+
+The C<$recipient> is a C<Qpsmtpd::Address> object. See L<Qpsmtpd::Address>
+for more details.
+
+=head2 remove_recipient($recipient)
+
+This removes a recipient (as in RCPT TO) from the envelope of the mail.
 
 The C<$recipient> is a C<Qpsmtpd::Address> object. See L<Qpsmtpd::Address>
 for more details.

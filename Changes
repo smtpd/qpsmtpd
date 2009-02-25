@@ -1,3 +1,5 @@
+  Add remove_recipient method to the transaction object (Jared Johnson)
+
 0.80 - February 27, 2009
 
   moved development to git repository!
