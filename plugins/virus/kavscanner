@@ -160,7 +160,7 @@ sub hook_data_post {
       # } elsif ($self->{_bcc_virusadmin}) {
       if ($self->{_bcc_virusadmin}) {
         foreach ( @{ Mail::Address->parse($self->{_bcc_virusadmin}) } ) {
-          $transaction->add_recipient($_->address);
+          $transaction->add_recipient($_);
         }
       }
     } else {
