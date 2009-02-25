@@ -1,4 +1,6 @@
 
+  Change transaction->add_recipient to skip adding "null" rcpt if passed
+
   Add logging/apache plugin for logging to the apache error log
 
   Add connection_time plugin

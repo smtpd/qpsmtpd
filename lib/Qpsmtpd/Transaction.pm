@@ -23,8 +23,8 @@ sub start {
 }
 
 sub add_recipient {
-  my $self = shift;
-  @_ and push @{$self->{_recipients}}, shift;
+    my ($self, $rcpt) = @_;
+    push @{$self->{_recipients}}, $rcpt if $rcpt;
 }
 
 sub remove_recipient {
