@@ -16,7 +16,13 @@ config.sample/size_threshold
 config.sample/tls_before_auth
 config.sample/tls_ciphers
 CREDITS
+docs/advanced.pod
+docs/authentication.pod
+docs/development.pod
+docs/hooks.pod
+docs/logging.pod
 docs/plugins.pod
+docs/writing.pod
 lib/Apache/Qpsmtpd.pm
 lib/Danga/Client.pm
 lib/Danga/TimeoutSocket.pm
@@ -96,6 +102,7 @@ plugins/queue/postfix-queue
 plugins/queue/qmail-queue
 plugins/queue/smtp-forward
 plugins/quit_fortune
+plugins/random_error
 plugins/rcpt_ok
 plugins/relay_only
 plugins/require_resolvable_fromhost
