@@ -58,15 +58,19 @@ When you're ready to check it in...
 
 =head3 Submit patches by mail
 
-If you don't use github, or if you want to submit your patch to the
-mailing list for review (often a good idea), you can use 
+The best way to submit patches to the project is to send them to the
+mailing list for review.  Use the C<git format-patch> command to
+generate patches ready to be mailed. For example:
 
-  git format-patch
+   git format-patch HEAD~3
 
-to generate "patch files".  For example "git format-patch HEAD~3" will
-give you three files with the last changes.
+will put each of the last three changes in files ready to be mailed
+with the C<git send-email> tool (it might be a good idea to send them
+to yourself first as a test).
 
-Then use "git send-email" to send them to the mailing list for review.
+Sending patches to the mailing list is the most effective way to
+submit changes, although it helps if you at the same time also commit
+them to a git repository (for example on github).
 
 =head3 Merging changes back in from the master repository
 
