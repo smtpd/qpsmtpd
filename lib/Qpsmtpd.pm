@@ -7,7 +7,7 @@ use Qpsmtpd::Constants;
 
 #use DashProfiler;
 
-$VERSION = "0.43rc1";
+$VERSION = "0.80";
 
 my $hooks = {};
 my %defaults = (
