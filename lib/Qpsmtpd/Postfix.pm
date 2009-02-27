@@ -176,7 +176,7 @@ sub inject_mail {
   }
   # add an empty message length record.
   # cleanup is supposed to understand that.
-  # see src/pickup/pickup.c 
+  # see src/pickup/pickup.c
   $strm->print_rec('REC_TYPE_MESG', "");
 
   # a received header has already been added in SMTP.pm
@@ -203,6 +203,6 @@ sub inject_mail {
   $strm->close();
   return wantarray ? ($status, $qid, $reason || "") : $status;
 }
-  
+
 1;
 # vim:sw=2

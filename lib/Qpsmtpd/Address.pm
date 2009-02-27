@@ -182,7 +182,7 @@ address).  It returns a list of (local-part, domain).
 # be overriden (in hook_pre_connection, for example) if people have
 # different needs.
 our $atom_expr = '[a-zA-Z0-9!#%&*+=?^_`{|}~\$\x27\x2D\/]+';
-our $address_literal_expr = 
+our $address_literal_expr =
   '(?:\[(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|IPv6:[0-9A-Fa-f:.]+)\])';
 our $subdomain_expr = '(?:[a-zA-Z0-9](?:[-a-zA-Z0-9]*[a-zA-Z0-9])?)';
 our $domain_expr;
