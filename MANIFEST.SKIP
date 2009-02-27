@@ -26,3 +26,4 @@ output/.*
 \#$
 \B\.svn\b
 ^\.perltidyrc$
+^\.git/.*

@@ -119,8 +119,6 @@ qpsmtpd-async
 qpsmtpd-forkserver
 qpsmtpd-prefork
 README
-README.authentication
-README.logging
 README.plugins
 run
 STATUS
