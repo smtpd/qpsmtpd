@@ -25,6 +25,8 @@
 
   plugins/require_resolvable_fromhost: check all MX hosts, not just the first
 
+  remove outdated virus/check_for_hi_virus plugin
+
   prefork, forkserver: restart on SIGHUP (reload all modules, with register() /
   init() phase).
 

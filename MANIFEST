@@ -107,7 +107,6 @@ plugins/tls_cert
 plugins/uribl
 plugins/virus/aveclient
 plugins/virus/bitdefender
-plugins/virus/check_for_hi_virus
 plugins/virus/clamav
 plugins/virus/clamdscan
 plugins/virus/hbedv
