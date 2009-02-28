@@ -35,6 +35,11 @@ sub read_input {
         or $self->respond(502, "command unrecognized: '$_'");
       alarm $timeout;
     }
+    unless ($self->connection->notes('disconnected')) {
+      $self->reset_transaction;
+      $self->run_hooks('disconnect');
+      $self->connection->notes(disconnected => 1);
+    }
   };
   if ($@ =~ /^disconnect_tcpserver/) {
   	die "disconnect_tcpserver";

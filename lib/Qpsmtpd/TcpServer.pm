@@ -115,6 +115,10 @@ sub read_input {
     alarm $timeout;
   }
   alarm(0);
+  return if $self->connection->notes('disconnected');
+  $self->reset_transaction;
+  $self->run_hooks('disconnect');
+  $self->connection->notes(disconnected => 1);
 }
 
 sub respond {

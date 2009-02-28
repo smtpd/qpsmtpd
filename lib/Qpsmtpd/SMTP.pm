@@ -576,6 +576,7 @@ sub quit_respond {
 sub disconnect {
   my $self = shift;
   $self->run_hooks("disconnect");
+  $self->connection->notes(disconnected => 1);
   $self->reset_transaction;
 }
 
