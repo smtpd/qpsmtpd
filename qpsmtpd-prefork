@@ -49,7 +49,7 @@ foreach my $sig_name ( split( /\s/, $Config{sig_name} ) )
 my $VERSION = "1.0";
 
 # qpsmtpd instances
-my ($qpsmtpd, $qpsmtpd_base);
+my ($qpsmtpd);
 
 # cmd's needed by IPC
 my $ipcrm = '/usr/bin/ipcrm';
@@ -276,15 +276,14 @@ sub run {
     # Hup handler
     $SIG{HUP} = sub {
         # reload qpmstpd plugins
-	$qpsmtpd = $qpsmtpd_base = qpsmtpd_instance('restart' => 1); # reload plugins...
+	$qpsmtpd = qpsmtpd_instance('restart' => 1); # reload plugins...
         $qpsmtpd->load_plugins;
         kill 'HUP' => keys %children;
         info("reload daemon requested");
     };
 
-    # setup qpsmtpd_instance(s), _base is for resetting to a known state
-    # after each connection
-    $qpsmtpd = $qpsmtpd_base = qpsmtpd_instance();
+    # setup qpsmtpd_instance
+    $qpsmtpd = qpsmtpd_instance();
 
     if ($detach) {
         open STDIN, '/dev/null' or die "/dev/null: $!";
@@ -462,8 +461,8 @@ sub new_child {
           "failed to create new object - $!";  # wait here until client connects
         info("connect from: " . $client->peerhost . ":" . $client->peerport);
          
-        # clear a previously running instance by cloning the base:
-        $qpsmtpd = $qpsmtpd_base;
+        # clear a previously running instance by creating a new instance
+        $qpsmtpd = qpsmtpd_instance();
 
         # set STDIN/STDOUT and autoflush
         #  ... no longer use POSIX::dup2: it failes after a few 
