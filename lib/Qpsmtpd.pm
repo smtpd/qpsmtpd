@@ -9,6 +9,14 @@ use Qpsmtpd::Constants;
 
 $VERSION = "0.80";
 
+my $git;
+
+if (-e ".git") {
+    local $ENV{PATH} = "/usr/bin:/usr/local/bin:/opt/local/bin/";
+    $git = `git describe`;
+    $git && chomp $git;
+}
+
 my $hooks = {};
 my %defaults = (
 		  me      => hostname,
@@ -41,7 +49,7 @@ sub DESTROY {
     #warn $_ for DashProfiler->profile_as_text("qpsmtpd");
 }
 
-sub version { $VERSION };
+sub version { $VERSION . ($git ? "/$git" : "") };
 
 sub TRACE_LEVEL { $TraceLevel }; # leave for plugin compatibility
 

@@ -5,6 +5,8 @@
 
   Add connection_time plugin
 
+  Add git information to version number when running from a git clone
+
   Add rcpt_regexp plugin (Hanno Hecker)
 
   Add notes method to Qpsmtpd::Address objects (Jared Johnson)
