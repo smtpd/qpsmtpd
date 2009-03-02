@@ -1,4 +1,6 @@
 
+  Add logging/apache plugin for logging to the apache error log
+
   Add connection_time plugin
 
   Add rcpt_regexp plugin (Hanno Hecker)
