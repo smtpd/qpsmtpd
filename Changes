@@ -53,7 +53,7 @@
   or init() phase).
 
   prefork: add --detach option to daemonize like forkserver
-  use user/group switching from forkserver to support secondary groups 
+  use user/group switching from forkserver to support secondary groups
   (needed with plugins/queue/postfix-queue)
   --pid-file now works
 
@@ -66,7 +66,7 @@
   improve handling of inetd/xinetd connections (Hanno Hecker)
 
   Qpsmtpd::Connection->notes are now reset on end of connection (currently
-  not in Apache). The workaround plugins/tls for -prefork is no longer 
+  not in Apache). The workaround plugins/tls for -prefork is no longer
   needed now.
 
   keep the square brackets around the IP as "remote_host" if the reverse lookup failed (Hanno Hecker)
@@ -100,7 +100,7 @@
   plugins/tls: work-around for failed connections in -prefork after
   STARTTLS connection (Stefan Priebe, Hanno Hecker)
 
-  Make the cleanup socket location parameter in the postfix plugin work 
+  Make the cleanup socket location parameter in the postfix plugin work
   (ulr...@topfen.net)
 
   Implement config caching properly (for async).
@@ -201,11 +201,11 @@
 
   Update the sample configuration to use zen.spamhaus.org
 
-  Make the badmailfrom plugin support (optional) rejection messages after the 
+  Make the badmailfrom plugin support (optional) rejection messages after the
   rejection pattern (Robin Hugh Johnson)
 
-  The ill-named $transaction->body_size() is depreceated now, use 
-  $transaction->data_size() instead. Check your logs for LOGWARN messages 
+  The ill-named $transaction->body_size() is depreceated now, use
+  $transaction->data_size() instead. Check your logs for LOGWARN messages
   about "body_size" and fix your plugins. (Hanno Hecker)
 
   Support pluggable Received headers (Matt Sergeant)
@@ -239,12 +239,12 @@
   relay_only plugin for smart relay host. (John Peacock)
 
   Enhance the spamassassin plugin to support connecting to a remote
-  spamd process (Kjetil Kjernsmo). 
+  spamd process (Kjetil Kjernsmo).
 
   Add domainkeys plugin (John Peacock)
 
   Add SSL encryption method to header to mirror other qmail/SSL patches.
-  Add tls_before_auth to suppress AUTH unless TLS has already been 
+  Add tls_before_auth to suppress AUTH unless TLS has already been
   established (Robin Johnson).
 
   Fix "help" command when there's no "smtpgreeting" configured (the default)
@@ -282,7 +282,7 @@
   Add Qpsmtpd::DSN to return extended SMTP status codes from RFC-1893 and
   patch existing plugins to use it when appropriate (Hanno Hecker).
 
-  Add plugins/tls_cert to generate appropriately shaped self-signed certs for 
+  Add plugins/tls_cert to generate appropriately shaped self-signed certs for
   TLS support.  Add explicit use of CA used to sign cert.  Abstract clone()ing
   of connection information when switching to TLS.  Fix the AUTH code to work
   correctly with TLS.
@@ -369,7 +369,7 @@
   the existing core code.  Add OK hook.
 
   Add new logging plugin, logging/adaptive, which logs at different
-  levels depending on whether the message was accepted/rejected. 
+  levels depending on whether the message was accepted/rejected.
 
   (See README.logging for information about the new logging system by
   John Peacock)
@@ -427,7 +427,7 @@
   (John Peacock).  Update clamav plugin to directly scan the spool file.
 
   New temp_file() and temp_dir() methods; when used by plugins, they create
-  a filename or directory which will last only as long as the current 
+  a filename or directory which will last only as long as the current
   transaction.  Also created a spool_dir() method which checks/creates the
   spool_dir when the application starts up.  All three methods are also
   available in the base class where the temp_* objects are not automatically
@@ -442,13 +442,13 @@
   later use by Qpsmtpd::SMTP to generate authentication header.
   (Michael Toren)
 
-  Qpsmtpd::SMTP - "MAIL FROM: <#@[]>" now works like qmail (null sender), 
+  Qpsmtpd::SMTP - "MAIL FROM: <#@[]>" now works like qmail (null sender),
   add LOGIN to default auth mechanisms, display auth user and method in
   Received: line instead of X-Qpsmtpd-Auth header.
   (Michael Toren)
 
   check_badmailfromto - NEW PLUGIN - like check_badmailfrom except matches
-  both FROM: and TO:, and effectively makes it seem like the recipient 
+  both FROM: and TO:, and effectively makes it seem like the recipient
   no longer exists for that sender (great for harassment cases).
   (John Peacock)
 
@@ -498,7 +498,7 @@
   Improve error messages from the Postfix module (Erik I. Bolsø,
   <knan at mo.himolde.no>)
 
-  make the maildir plugin record who the message was to (with a bit of improvements 
+  make the maildir plugin record who the message was to (with a bit of improvements
   this could make a decent local delivery plugin)
 
   Pass extra "stuff" to HELO/EHLO callbacks (to make it easier to
@@ -567,7 +567,7 @@
   Support for unix sockets in the spamassassin plugin (requires SA
   2.60 or higher).  Thanks to John Peacock!
 
-  Modified the dnsbl plugin to better support both A and TXT records and 
+  Modified the dnsbl plugin to better support both A and TXT records and
   support all of the RBLSMTPD functionality. (Thanks to Mark Powell)
 
   reject bare carriage-returns in addition to the  bare line-feeds
@@ -602,7 +602,7 @@
   Say Received: ... via ESMTP instead of via SMTP when the client
   speaks ESMTP.  (Hoping this can be a useful SpamAssassin rule).
 
-  Take out the X-SMTPD header. 
+  Take out the X-SMTPD header.
 
   Add pod documentation and sanity checking of the config to
   check_badmailfrom
@@ -629,7 +629,7 @@
 
   Use dup2() instead of perl open("<&") style. POSIX seems to work better.
 
-  Added SPF, sender permitted from, plugin 
+  Added SPF, sender permitted from, plugin
 
   More minor changes and probably a few big ones that we missed adding here :-)
 
@@ -669,7 +669,7 @@
   Set the process name to "qpsmtpd [1.2.3.4 : host.name.tld]"
 
   Fixed timeout bug when the client sent DATA and then stopped before
-  sending the next line. (Gergely Risko <risko@risko.hu>) 
+  sending the next line. (Gergely Risko <risko@risko.hu>)
 
   unrecognized_command hook and a count_unrecognized_commands
   plugin. (Rasjid Wilcox)
@@ -723,7 +723,7 @@
   <qpsmtpd-list@devin.com>)
 
   check_spamhelo plugin to deny mail from claimed senders from the
-  list specified in F<badhelo>.  (For example aol.com or yahoo.com) 
+  list specified in F<badhelo>.  (For example aol.com or yahoo.com)
   (Devin Carraway)
 
 
@@ -760,7 +760,7 @@
 
   Better error messages when a plugin fails
 
-  Remove some debug messages in the log 
+  Remove some debug messages in the log
 
   Fix NOOP command with perl 5.6.
 
@@ -774,7 +774,7 @@
 0.11 - 2002/10/09
 
   Make a "queue" plugin hook and move the qmail-queue functionality
-  to plugins/queue/qmail-queue.  This allows you to make qpsmtpd 
+  to plugins/queue/qmail-queue.  This allows you to make qpsmtpd
   delivery mail via smtp or lmtp or into a database or whatever you want.
 
   Reorganize most of Qpsmtpd.pm into Qpsmtpd/SMTP.pm.
