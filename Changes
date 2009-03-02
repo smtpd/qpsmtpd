@@ -1,3 +1,6 @@
+
+  Add connection_time plugin
+
   Add rcpt_regexp plugin (Hanno Hecker)
 
   Add notes method to Qpsmtpd::Address objects (Jared Johnson)

@@ -1,0 +1,58 @@
+
+=head1 NAME
+
+connection_time - log the duration of a connection 
+
+=head1 DESCRIPTION
+
+The B<connection_time> plugin records the time of a connection between the
+first and the last possible hook in qpsmtpd (I<pre-connection> and 
+I<post-connection>) and writes a C<LOGNOTICE> (default, see below) line to 
+the log.
+
+=head1 CONFIG
+
+One optional argument: the name of the log level (e.g. C<LOGNOTICE>,
+C<LOGDEBUG>, ...) the message should be logged with. Defaults to C<LOGNOTICE>.
+
+=cut
+
+use Time::HiRes qw(gettimeofday tv_interval);
+use Qpsmtpd::Constants;
+
+sub register {
+    my ($self, $qp, @args) = @_;
+    die "too many arguments"
+      if @args > 1;
+    $self->{_level} = shift @args;
+    $self->{_level} = 'LOGNOTICE'
+      unless defined $self->{_level};
+    $self->{_level} = Qpsmtpd::Constants::log_level($self->{_level});
+    $self->{_level} = LOGNOTICE
+      unless defined $self->{_level};
+}
+
+sub hook_pre_connection {
+    my ($self, @foo) = @_;
+    $self->{_connection_start} = [gettimeofday];
+    return (DECLINED);
+}
+
+sub hook_post_connection {
+    my ($self, @foo) = @_;
+    if ($self->{_connection_start}) {
+        my $remote = $self->connection->remote_ip;
+        my $elapsed = sprintf(
+                              "%.3f",
+                              tv_interval(
+                                          $self->{_connection_start},
+                                          [gettimeofday]
+                                         )
+                             );
+        $self->log($self->{_level},
+                   "Connection time from $remote: $elapsed sec.");
+    }
+    return (DECLINED);
+}
+
+# vim: ts=4 sw=4 expandtab syn=perl
