@@ -11,7 +11,10 @@ This plugin passes mails on to the postfix cleanup daemon.
 
 The first optional parameter is the location of the cleanup socket. If it does
 not start with a ``/'', it is treated as a flag for cleanup (see below).
-If set, the environment variable POSTFIXQUEUE overrides this setting.
+The 'postfix_queue' plugin can also contain a list of cleanup socket paths
+and/or remote postfix cleanup service hosts specified in the form of
+'address:port'.  If set, the environment variable POSTFIXQUEUE overrides both
+of these settings.
 
 All other parameters are flags for cleanup, no flags are enabled by default.
 See below in ``POSTFIX COMPATIBILITY'' for flags understood by your postfix
@@ -133,9 +136,6 @@ sub register {
             $self->{_queue_socket} = $1;
             shift @args;
         }
-        else {
-            $self->{_queue_socket} = "/var/spool/postfix/public/cleanup";
-        }
 
         foreach (@args) {
             if ($self->can("CLEANUP_".$_) and /^(FLAG_[A-Z0-9_]+)$/) {
@@ -152,14 +152,18 @@ sub register {
         $self->{_queue_socket} = "/var/spool/postfix/public/cleanup";
     }
 
-    $self->{_queue_socket} = $ENV{POSTFIXQUEUE} if $ENV{POSTFIXQUEUE};
+    $self->{_queue_socket_env} = $ENV{POSTFIXQUEUE} if $ENV{POSTFIXQUEUE};
 
 }
 
 sub hook_queue {
     my ($self, $transaction) = @_;
     $transaction->notes('postfix-queue-flags', $self->{_queue_flags});
-    $transaction->notes('postfix-queue-socket', $self->{_queue_socket});
+    my @queue;
+    @queue = ($self->{_queue_socket_env}) if $self->{_queue_socket_env};
+    @queue = $self->qp->config('cleanup_sockets') unless @queue;
+    @queue = ($self->{_queue_socket} // ()) unless @queue;
+    $transaction->notes('postfix-queue-sockets', \@queue) if @queue;
 
     # $self->log(LOGDEBUG, "queue-flags=".$transaction->notes('postfix-queue-flags'));
     my ($status, $qid, $reason) = Qpsmtpd::Postfix->inject_mail($transaction);

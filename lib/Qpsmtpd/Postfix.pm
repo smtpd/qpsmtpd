@@ -14,6 +14,7 @@ details.
 
 use strict;
 use IO::Socket::UNIX;
+use IO::Socket::INET;
 use vars qw(@ISA);
 @ISA = qw(IO::Socket::UNIX);
 
@@ -92,12 +93,22 @@ sub print_rec_time {
 sub open_cleanup {
   my ($class, $socket) = @_;
 
-  $socket = "/var/spool/postfix/public/cleanup"
-    unless defined $socket;
-
-  my $self = IO::Socket::UNIX->new(Type => SOCK_STREAM,
-  				   Peer => $socket);
-  die qq(Couldn't open unix socket "$socket": $!) unless ref $self;
+  my $self;
+  if ($socket =~ m#^(/.+)#) {
+    $socket = $1; # un-taint socket path
+    $self = IO::Socket::UNIX->new(Type => SOCK_STREAM,
+                                  Peer => $socket) if $socket;
+    
+  } elsif ($socket =~ /(.*):(\d+)/) {
+    my ($host,$port) = ($1,$2); # un-taint address and port
+    $self = IO::Socket::INET->new(Proto => 'tcp',
+                                  PeerAddr => $host,PeerPort => $port)
+      if $host and $port;
+  }
+  unless (ref $self) {
+    warn "Couldn't open \"$socket\": $!";
+    return;
+  }
   # allow buffered writes
   $self->autoflush(0);
   bless ($self, $class);
@@ -163,7 +174,11 @@ $transaction is supposed to be a Qpsmtpd::Transaction object.
 sub inject_mail {
   my ($class, $transaction) = @_;
 
-  my $strm = $class->open_cleanup($transaction->notes('postfix-queue-socket'));
+  my @sockets = @{$transaction->notes('postfix-queue-sockets')
+                  // ['/var/spool/postfix/public/cleanup']};
+  my $strm;
+  $strm = $class->open_cleanup($_) and last for @sockets;
+  die "Unable to open any cleanup sockets!" unless $strm;
 
   my %at = $strm->get_attr;
   my $qid = $at{queue_id};
