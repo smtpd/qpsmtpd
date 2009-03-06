@@ -12,6 +12,9 @@ matches, the return code from that line and the comment are returned to
 qpsmtpd. Return code can be any valid plugin return code from 
 L<Qpsmtpd::Constants>. Matching is always done case insenstive. 
 
+When the given map file changes on disk, it is re-read in the pre-connection
+hook.
+
 =head1 ARGUMENTS
 
 The C<file MAP> and C<domain NAME> arguments are required. The default value of
@@ -91,18 +94,13 @@ sub register {
         next unless exists $args{$arg};
         if ($arg eq "default") {
             my ($code, $msg) = split /=/, $args{$arg};
-            $code = Qpsmtpd::Constants::return_code($code);
-            unless (defined $code) {
-                $self->log(LOGERROR, "Not a valid constant for 'default' arg");
-                die "Not a valid constant for 'default' arg";
-            }
 
-            if ($msg) {
-                $msg =~ s/_/ /g;
-            }
-            else {
-                $msg = "No such user.";
-            }
+            $code = Qpsmtpd::Constants::return_code($code);
+            die "Not a valid constant for 'default' arg"
+              unless defined $code;
+
+            $msg or $msg = "No such user.";
+            $msg =~ s/_/ /g;
 
             $self->{_default} = [$code, $msg];
         }
@@ -112,14 +110,19 @@ sub register {
     }
 
     $self->{_default}
-      or $self->{_default} = [DENY, "No such user"];
+      or $self->{_default} = [DENY, "No such user."];
 
     $self->{_file} 
       or die "No map file given...";
 
-    $self->log(LOGDEBUG, "Using file ".$self->{_file});
+    $self->{_domain} 
+      or die "No domain name given...";
+    $self->{_domain} = lc $self->{_domain};
+
+    $self->log(LOGDEBUG, 
+               "Using map ".$self->{_file}." for domain ".$self->{_domain});
     %map = $self->read_map(1);
-    die "Empty map file"
+    die "Empty map file ".$self->{_file}
       unless keys %map;
 }
 
