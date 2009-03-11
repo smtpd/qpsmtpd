@@ -162,7 +162,8 @@ sub helo_respond {
   my ($self, $rc, $msg, $args) = @_;
   my ($hello_host) = @$args;
   if ($rc == DONE) {
-    # do nothing
+    # do nothing:
+    1;
   } elsif ($rc == DENY) {
     $self->respond(550, @$msg);
   } elsif ($rc == DENYSOFT) {
@@ -198,7 +199,8 @@ sub ehlo_respond {
   my ($self, $rc, $msg, $args) = @_;
   my ($hello_host) = @$args;
   if ($rc == DONE) {
-    # do nothing
+    # do nothing:
+    1; 
   } elsif ($rc == DENY) {
     $self->respond(550, @$msg);
   } elsif ($rc == DENYSOFT) {
