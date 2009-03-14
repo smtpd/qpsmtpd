@@ -210,7 +210,7 @@ sub canonify {
     return "" if $path eq "";
 
     # bare postmaster is permissible, perl RFC-2821 (4.5.1)
-    return ("postmaster", undef) if $path eq "postmaster";
+    return ("postmaster", undef) if $path =~ m/^postmaster$/i;
 
     my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
     return (undef) unless defined $localpart;
