@@ -30,16 +30,31 @@ sub register {
 sub NEXT() { DECLINED }
 
 sub random_fail {
-	my $self = shift;
-	my $fpct = $self->qp->connection->notes('random_fail_%');
-	rand(100) > ($fpct / 6) and return NEXT;
+        my $fpct = $_[0]->qp->connection->notes('random_fail_%');
+
+=head calculating the probability of failure
+
+There are six tests a message must pass to reach the queueing stage, and we wish to
+provide random failure for each one, with the combined probability being out
+configuration argument. So we want to solve this equation:
+
+       (1-x) ** 6 = ( 1 - input_number )
+
+or 
+
+       x = 1 - ( (1 - input_number ) ** (1/6) )
+
+=cut
+        my $successp = 1 - ($fpct / 100);
+        $_[0]->log(LOGINFO, "to fail, rand(1) must be more than ". ($successp ** (1 / 6)) );
+	rand(1) < ($successp ** (1 / 6)) and return NEXT;
 	rand(5) < 2 and return (DENYSOFT_DISCONNECT, "random failure");
 	return (DENYSOFT, "random failure");
 }
 
 
 sub hook_connect {
-    $self->qp->connection->notes('random_fail_%', $self->{__PACKAGE__.'_how'});
+    $_[0]->qp->connection->notes('random_fail_%', $_[0]->{__PACKAGE__.'_how'});
     goto &random_fail
 }
 
