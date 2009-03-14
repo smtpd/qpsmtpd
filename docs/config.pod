@@ -1,0 +1,156 @@
+
+=head1 Qpsmtpd configuration
+
+The default way of setting config values is placing files with the
+name of the config variable in the config directory F<config/>, like
+qmail's F</var/qmail/control/> directory. NB: F</var/qmail/control> (or 
+F<$ENV{QMAIL}/control>) is used if a file does not exist in C<config/>. 
+The location of the C<config/> directory can be set via the 
+I<QPSMTPD_CONFIG> environment variable and defaults to the current 
+working directory.
+
+Any empty line or lines starting with C<#> are ignored. You may use a
+plugin which hooks the C<config> hook to store the settings in some other
+way. See L<docs/plugins.pod> and L<docs/hooks.pod> for more info on this.
+Some settings still have to go in files, because they are loaded before
+any plugin can return something via the C<config> hook: C<me>, C<logging>,
+C<plugin_dirs> and of course C<plugins>. B<FIXME: more?>
+
+=head2 Core settings
+
+These settings are used by the qpsmtpd core. Any other setting is (hopefully)
+documented by the corresponding plugin. Some settings of important plugins
+are shown below in L</Plugin settings>.
+
+=over 4
+
+=item plugins
+
+The main config file, where all used plugins and their arguments are listed.
+
+=item me
+
+Sets the hostname which is used all over the place: in the greeting message,
+the I<Received: >header, ...
+Default is whatever Sys::Hostname's hostname() returns.
+
+=item plugin_dirs
+
+Where to search for plugins (one directory per line), defaults to F<./plugins>.
+
+=item logging
+
+Sets the primary logging destination, see F<plugins/logging/*>. Format
+is the same as it's used for the F<plugins> config file. B<NOTE:> only
+the first non empty line is used (lines starting with C<#> are counted
+as empty).
+
+=item loglevel
+
+This is not used anymore, I<only> if no F<logging/> plugin is in use. Use a
+logging plugin.
+
+=item databytes
+
+Maximum size a message may be. Without this setting, there is no limit on the 
+size. Should be something less than the backend MTA has set as it's maximum
+message size (if there is one).
+
+=item size_threshold
+
+When a message is greater than the size given in this config file, it will be
+spooled to disk. You probably want to enable spooling to disk for most virus
+scanner plugins and F<spamassassin>.
+
+=item smtpgreeting
+
+Override the default SMTP greeting with this string.
+
+=item spool_dir
+
+Where temporary files are stored, defaults to F<tmp/>. 
+B<FIXME: is this correct?>
+
+=item spool_perms
+
+Permissions of the I<spool_dir>, default is C<0700>. You probably have to
+change the defaults for some scanners (e.g. the F<clamdscan> plugin).
+
+=item timeout
+
+=item timeoutsmtpd
+
+Set the timeout for the clients, C<timeoutsmtpd> is the qmail smtpd control
+file, C<timeout> the qpsmtpd file. Default is 1200 seconds.
+
+=item tls_before_auth
+
+If set to a true value, clients will have to initiate an SSL secured 
+connection before any auth succeeds, defaults to C<0>.
+
+=back
+
+=head2 Plugin settings
+
+=over 4
+
+=item rcpthosts, morercpthosts
+
+Plugin: I<rcpt_ok>
+
+Domains listed in these files will be accepted as valid local domains,
+anything else is rejected with a C<Relaying denied> message. If an entry
+in the C<rcpthosts> file starts with a C<.>, mails to anything ending with
+this string will be accepted, e.g.:
+ 
+ example.com
+ .example.com
+
+will accept mails for C<user@example.com> and C<user@something.example.com>.
+The C<morercpthosts> file ist just checked for exact (case insensitive) 
+matches.
+
+=item hosts_allow
+
+Plugin: F<hosts_allow>.
+
+Don't use this config file. The plugin itself is required to set the
+maximum number of concurrent connections. This config setting should 
+only be used for some extremly rude clients: if list is too big it will
+slow down accepting new connections.
+
+=item relayclients
+=item morerelayclients
+
+Plugin: F<check_relay>
+
+Allow relaying for hosts listed in this file. The C<relayclients> file accepts
+IPs and CIDR entries. The C<morercpthosts> file accepts IPs and C<prefixes> 
+like C<192.168.2.> (note the trailing dot!). With the given example any host
+which IP starts with C<192.168.2.> may relay via us. 
+
+=item dnsbl_zones
+
+Plugin: F<dnsbl>
+
+This file specifies the RBL zones list, used by the dnsbl plugin. Ihe IP 
+address of each connecting host will be checked against each zone given.
+A few sample DNSBLs are listed in the sample config file, but you should
+evaluate the efficacy and listing policies of a DNSBL before using it.
+
+See also C<dnsbl_allow> and C<dnsbl_rejectmsg> in the documentation of the
+C<dnsbl> plugin
+
+=item require_resolvable_fromhost
+
+Plugin: F<require_resolvable_fromhost>
+
+Reject sender addresses where the MX is unresolvable, i.e. a boolean value
+is the only value in this file. If the MX resolves to something, reject the
+sender address if it resolves to something listed in the 
+F<invalid_resolvable_fromhost> config file. The I<invalid_resolvable_fromhost>
+expects IP addresses or CIDR (i.e. C<network/mask> values) one per line, IPv4
+only currenlty.
+
+=cut
+
