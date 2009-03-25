@@ -214,7 +214,10 @@ sub body_as_string {
 }
 
 sub body_fh {
-  return shift->{_body_file};
+  my ($self) = @_;
+  # Spool to disk if we weren't already doing so
+  $self->body_spool() unless $self->{_filename};
+  return $self->{_body_file};
 }
 
 sub dup_body_fh {
