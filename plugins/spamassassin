@@ -189,6 +189,7 @@ sub hook_data_post { # check_spam
 
   }
   my $tests = <SPAMD>;
+  close SPAMD;
   $tests =~ s/\015//;  # hack for outlook
   $flag = $flag eq 'True' ? 'Yes' : 'No';
   $self->log(LOGDEBUG, "check_spam: finished reading from spamd");

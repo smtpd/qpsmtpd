@@ -1,3 +1,5 @@
+  Close spamd socket after reading the result back (Jared Johnson)
+
   p0f plugin updates (Tom Callahan)
 
   Change transaction->add_recipient to skip adding "null" rcpt if passed
