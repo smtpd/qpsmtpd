@@ -16,10 +16,14 @@ to config/plugins
 it puts things into the 'p0f' connection notes so other plugins can do
 things based on source OS.
 
+All code heavily based upon the p0fq.pl included with the p0f distribution.
+
 =cut
 
 use IO::Socket;
 use Net::IP;
+
+my $QUERY_MAGIC = 0x0defaced;
 
 sub register {
   my ($self, $qp, $p0f_socket) = @_;
@@ -31,69 +35,65 @@ sub register {
 sub hook_connect {
   my($self, $qp) = @_;
 
-  eval {
-    my $p0f;
-    $p0f = p0fq( $self->{_args}->{p0f_socket},
-		 $self->qp->connection->remote_ip,
-		 $self->qp->connection->remote_port,
-		 $self->qp->connection->local_ip,
-		 $self->qp->connection->local_port,
-	       );
-    $self->qp->connection->notes('p0f',$p0f);
-    $self->log(LOGNOTICE, "Results: ".$p0f->{genre}." (".$p0f->{detail}.")");
-  };
-  $self->log(LOGERROR,"error: $@") if $@;
+  my $p0f_socket = $self->{_args}->{p0f_socket};
+  my $srcport    = 
+  my $destport   = $self->qp->connection->local_port;
 
-  return DECLINED;
-}
-
-
-
-=pod
-
-Heavily based on p0fq.pl from the p0f districution, and is marked as:
- Copyright (C) 2004 by Aurelien Jacobs <aurel@gnuage.org>
-
-It says:
-# If you want to query p0f from a production application, just
-# implement the same functionality in your code. It's perhaps 10
-# lines.
-
-=cut
-
-my $QUERY_MAGIC = 0x0defaced;
-sub p0fq {
-  my ($p0f_socket,$srcip,$srcport,$destip,$destport) = @_;
-
-  # Convert the IPs and pack the request message
-  my $src = new Net::IP ($srcip) or die (Net::IP::Error());
-  my $dst = new Net::IP ($destip) or die (Net::IP::Error());
-  my $query = pack("L L N N S S", $QUERY_MAGIC, 0x12345678,
-		   $src->intip(), $dst->intip(), $srcport, $destport);
+  my $src = new Net::IP ($self->qp->connection->remote_ip) 
+    or $self->log(LOGERROR, "p0f: ".Net::IP::Error()), return (DECLINED);
+  my $dst = new Net::IP ($self->qp->connection->local_ip) 
+    or $self->log(LOGERROR, "p0f: ".NET::IP::Error()), return (DECLINED);
+  my $query = pack("L L L N N S S",
+                   $QUERY_MAGIC, 
+                   1, 
+                   rand ^ 42 ^ time,
+                   $src->intip(), 
+                   $dst->intip(), 
+                   $self->qp->connection->remote_port,
+                   $self->qp->connection->local_port);
 
   # Open the connection to p0f
-  my $sock = new IO::Socket::UNIX (Peer => $p0f_socket,
-				   Type => SOCK_STREAM);
-  die "Could not create socket: $!\n" unless $sock;
+  socket(SOCK, PF_UNIX, SOCK_STREAM, 0) 
+    or $self->log(LOGERROR, "p0f: socket: $!"), return (DECLINED);
+  connect(SOCK, sockaddr_un($p0f_socket)) 
+    or $self->log(LOGERROR, "p0f: connect: $!"), return (DECLINED);
+  defined syswrite SOCK, $query 
+    or $self->log(LOGERROR, "p0f: write: $!"), close SOCK, return (DECLINED);
 
-  # Ask p0f
-  print $sock $query;
-  my $response = <$sock>;
-  close $sock;
+  my $response;
+  defined sysread SOCK, $response, 1024 
+    or $self->log(LOGERROR, "p0f: read: $!"), close SOCK, return (DECLINED);
+  close SOCK;
 
   # Extract the response from p0f
   my ($magic, $id, $type, $genre, $detail, $dist, $link, $tos, $fw,
       $nat, $real, $score, $mflags, $uptime) =
-	unpack ("L L C Z20 Z40 c Z30 Z30 C C C s S N", $response);
-  die "Bad response magic.\n" if $magic != $QUERY_MAGIC;
-  die "P0f did not honor our query.\n" if $type == 1;
-  die "This connection is not (no longer?) in the cache.\n" if $type == 2;
-  
-  return ({ genre => $genre,
-	    detail => $detail,
-	    distance => $dist,
-	    link => $link,
-	    uptime => $uptime,
-	  }
-	 );
+        unpack ("L L C Z20 Z40 c Z30 Z30 C C C s S N", $response);
+
+  if ($magic != $QUERY_MAGIC) {
+	$self->log(LOGERROR, "p0f: Bad response magic.");
+	return (DECLINED);
+  }
+  if ($type == 1) {
+	$self->log(LOGERROR, "p0f: P0f did not honor our query");
+	return (DECLINED);
+  }
+  if ($type == 2) {
+	$self->log(LOGWARN, "p0f: This connection is no longer in the cache");
+	return (DECLINED);
+  }
+
+  my $p0f = { 
+      genre    => $genre,
+      detail   => $detail,
+      distance => $dist,
+      link     => $link,
+      uptime   => $uptime,
+  };
+
+  $self->qp->connection->notes('p0f', $p0f);
+  $self->log(LOGINFO, "Results: ".$p0f->{genre}." (".$p0f->{detail}.")");
+  $self->log(LOGERROR,"error: $@") if $@;
+
+  return DECLINED;
 }
