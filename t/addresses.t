@@ -1,6 +1,7 @@
-use Test::More qw(no_plan);
+use Test::More tests => 23;
 use strict;
 use lib 't';
+
 use_ok('Test::Qpsmtpd');
 
 ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
