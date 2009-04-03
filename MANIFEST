@@ -1,3 +1,4 @@
+.gitignore
 Changes
 config.sample/badhelo
 config.sample/badrcptto_patterns
@@ -18,6 +19,7 @@ config.sample/tls_ciphers
 CREDITS
 docs/advanced.pod
 docs/authentication.pod
+docs/config.pod
 docs/development.pod
 docs/hooks.pod
 docs/logging.pod
@@ -74,6 +76,7 @@ plugins/check_loop
 plugins/check_norelay
 plugins/check_relay
 plugins/check_spamhelo
+plugins/connection_time
 plugins/content_log
 plugins/count_unrecognized_commands
 plugins/dns_whitelist_soft
@@ -87,6 +90,7 @@ plugins/http_config
 plugins/ident/geoip
 plugins/ident/p0f
 plugins/logging/adaptive
+plugins/logging/apache
 plugins/logging/connection_id
 plugins/logging/devnull
 plugins/logging/file
@@ -104,6 +108,7 @@ plugins/queue/smtp-forward
 plugins/quit_fortune
 plugins/random_error
 plugins/rcpt_ok
+plugins/rcpt_regexp
 plugins/relay_only
 plugins/require_resolvable_fromhost
 plugins/rhsbl
