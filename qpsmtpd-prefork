@@ -92,20 +92,21 @@ my $user;
 sub usage {
     print <<"EOT";
 Usage: qpsmtpd-prefork [ options ]
---quiet             : Be quiet (even errors are suppressed)
---version           : Show version information
---debug             : Enable debug output
---interface addr    : Interface daemon should listen on (default: $d_addr)
---port int          : TCP port daemon should listen on (default: $d_port)
---max-from-ip int   : Limit number of connections from single IP (default: $maxconnip, 0 to disable)
---children int      : Max number of children that can be spawned (default: $max_children)
---idle-children int : Number of idle children to spawn (default: $idle_children, 0 to disable)
---pretty-child      : Change child process name (default: 0)
---user username     : User the daemon should run as
---pid-file path	    : Path to pid file
---renice-parent int : Subtract value from parent process nice level (default: $re_nice)
---detach            : detach from controlling terminal (daemonize)
---help              : This message
+--quiet              : Be quiet (even errors are suppressed)
+--version            : Show version information
+--debug              : Enable debug output
+--listen-address addr: Listen for connections on the address 'addr' (default: $d_addr);
+                       synonymous with --interface
+--port int           : TCP port daemon should listen on (default: $d_port)
+--max-from-ip int    : Limit number of connections from single IP (default: $maxconnip, 0 to disable)
+--children int       : Max number of children that can be spawned (default: $max_children)
+--idle-children int  : Number of idle children to spawn (default: $idle_children, 0 to disable)
+--pretty-child       : Change child process name (default: 0)
+--user username      : User the daemon should run as
+--pid-file path	     : Path to pid file
+--renice-parent int  : Subtract value from parent process nice level (default: $re_nice)
+--detach             : detach from controlling terminal (daemonize)
+--help               : This message
 EOT
     exit 0;
 }
@@ -115,7 +116,7 @@ GetOptions(
     'quiet'           => \$quiet,
     'version'         => sub { print "Qpsmtpd Daemon - version $VERSION\n"; exit 0; },
     'debug'           => \$debug,
-    'interface=s'     => \$d_addr,
+    'interface|listen-address=s' => \$d_addr,
     'port=i'          => \$d_port,
     'max-from-ip=i'   => \$maxconnip,
     'children=i'      => \$max_children,
