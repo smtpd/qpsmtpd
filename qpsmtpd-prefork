@@ -10,6 +10,12 @@
 # safety guards
 use strict;
 
+BEGIN {
+    # secure shell
+    $ENV{'PATH'} = '/bin:/usr/bin';
+    delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
+}
+
 # includes
 use IO::Socket;
 use POSIX;
@@ -37,10 +43,6 @@ foreach my $sig_name ( split( /\s/, $Config{sig_name} ) )
 {
     $sig_num{$sig_name} = $i++;
 }
-
-# secure shell
-$ENV{'PATH'} = '/bin:/usr/bin';
-delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
 
 # version
 my $VERSION = "1.0";
