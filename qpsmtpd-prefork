@@ -18,9 +18,9 @@ BEGIN {
 
 # includes
 use IO::Socket;
+use IO::Select;
 use POSIX;
 use IPC::Shareable(':all');
-use lib 'lib';
 use Qpsmtpd::TcpServer::Prefork;
 use Qpsmtpd::Constants;
 use Getopt::Long;
@@ -62,18 +62,12 @@ my $chld_pool;
 my $chld_busy;
 my @children_term;  # terminated children, their death pending processing
                     # by the main loop
-my $d;          # socket
+my $select = new IO::Select;     # socket(s)
 
 # default settings
 my $pid_file;
 my $d_port          = 25;
-my $d_addr;
-if ($has_ipv6) {
-  $d_addr           = "[::]";
-}
-else {
-  $d_addr           = "0.0.0.0";
-}
+my @d_addr;                 # default applied after getopt call
 
 my $debug           = 0;
 my $max_children    = 15;   # max number of child processes to spawn
@@ -97,8 +91,10 @@ Usage: qpsmtpd-prefork [ options ]
 --quiet              : Be quiet (even errors are suppressed)
 --version            : Show version information
 --debug              : Enable debug output
---listen-address addr: Listen for connections on the address 'addr' (default: $d_addr);
-                       synonymous with --interface
+--listen-address addr: Listen for connections on the address 'addr' (either
+                       an IP address or ip:port pair).  Listens on all
+                       interfaces by default; may be specified multiple
+                       times.
 --port int           : TCP port daemon should listen on (default: $d_port)
 --max-from-ip int    : Limit number of connections from single IP (default: $maxconnip, 0 to disable)
 --children int       : Max number of children that can be spawned (default: $max_children)
@@ -118,7 +114,7 @@ GetOptions(
     'quiet'           => \$quiet,
     'version'         => sub { print "Qpsmtpd Daemon - version $VERSION\n"; exit 0; },
     'debug'           => \$debug,
-    'interface|listen-address=s' => \$d_addr,
+    'interface|listen-address=s' => \@d_addr,
     'port=i'          => \$d_port,
     'max-from-ip=i'   => \$maxconnip,
     'children=i'      => \$max_children,
@@ -131,8 +127,20 @@ GetOptions(
     'help'            => \&usage,
   ) || &usage;
 
-if ($user =~ /^([\w\-]+)$/) { $user = $1 } else { &usage }
-if ($d_addr =~ /^(\[.*\]|[\w\-.]+)$/) { $d_addr = $1 } else { &usage }
+if ($user && $user =~ /^([\w\-]+)$/) { $user = $1 } else { &usage }
+
+if (@d_addr) {
+    for my $i (0..$#d_addr) {
+        if ($d_addr[$i] =~ /^(\[.*\]|[\d\w\-.]+)(?::(\d+))?$/) {
+            $d_addr[$i] = { 'addr' => $1, 'port' => $2 || $d_port };
+        } else {
+            print STDERR "Malformed listen address '$d_addr[$i]'\n";
+            &usage;
+        }
+    }
+} else {
+    @d_addr = ( 'addr' => $has_ipv6 ? "[::]" : "0.0.0.0" );
+}
 
 # set max from ip to max number of children if option is set to disabled
 $maxconnip = $max_children if ($maxconnip == 0);
@@ -186,26 +194,32 @@ sub run {
         endgrent;
     }
 
-    my @Socket_opts = (
-                       LocalPort => $d_port,
-                       LocalAddr => $d_addr,
-                       Proto     => 'tcp',
-                       Listen    => SOMAXCONN,
-                       Reuse     => 1,
-                      );
-    # create new socket (used by clients to communicate with daemon)
-    if ($has_ipv6) {
-      $d = IO::Socket::INET6->new(@Socket_opts);
+    for my $addr (@d_addr) {
+        my @Socket_opts = (
+                           LocalPort => $addr->{port},
+                           LocalAddr => $addr->{addr},
+                           Proto     => 'tcp',
+                           Listen    => SOMAXCONN,
+                           Reuse     => 1,
+                          );
+        # create new socket (used by clients to communicate with daemon)
+        my $s;
+        if ($has_ipv6) {
+          $s = IO::Socket::INET6->new(@Socket_opts);
+        }
+        else {
+          $s = IO::Socket::INET->new(@Socket_opts);
+        }
+        die "FATAL: Failed to open socket on $addr->{addr}:$addr->{port} ($@)"
+            . "\nIt may be necessary to wait 20 secs before starting daemon"
+            . " again."
+          unless $s;
+        $select->add($s);
     }
-    else {
-      $d = IO::Socket::INET->new(@Socket_opts);
-    }
-    die "FATAL: Failed to start daemon.\nReason: $!\n(It may be nessesary to "
-      . "wait 20 secs before starting daemon again)\n"
-      unless $d;
 
-    info("qpsmtpd-prefork daemon, version: $VERSION, staring on host: " .
-            "$d_addr, port: $d_port (user: $user [$<])");
+    info("qpsmtpd-prefork daemon, version: $VERSION, staring on host: "
+            . join(', ', map { "$_->{addr}:$_->{port}"} @d_addr)
+            . " (user: $user [$<])");
 
     # reset priority
     my $old_nice = getpriority(0, 0);
@@ -244,9 +258,8 @@ sub run {
         # a notice, before the sleep below
         info("shutting down");
 
-        # close socket
-        $d->close();
-        sleep 2;
+        # close socket(s)
+        $_->close for $select->handles;
 
         # send signal to process group
         kill -$sig_num{$sig} => $$;
@@ -435,11 +448,14 @@ sub new_child {
     # continue to accept connections until "old age" is reached
     for (my $i = 0 ; $i < $child_lifetime ; $i++) {
         # accept a connection
-	if ( $pretty ) {
-	    $ENV{PROCESS} = $0 if not defined $ENV{PROCESS}; # 1st time only
-	    $0 = 'qpsmtpd child'; # set pretty child name in process listing
-	}
-        my ($client, $iinfo) = $d->accept()
+        if ( $pretty ) {
+            $ENV{PROCESS} = $0 if not defined $ENV{PROCESS}; # 1st time only
+            $0 = 'qpsmtpd child'; # set pretty child name in process listing
+        }
+        my @ready = $select->can_read();
+        next unless @ready;
+        my $socket = $ready[0];
+        my ($client, $iinfo) = $socket->accept()
           or die
           "failed to create new object - $!";  # wait here until client connects
         info("connect from: " . $client->peerhost . ":" . $client->peerport);
@@ -464,7 +480,7 @@ sub new_child {
         my $sigset = block_signal(SIGHUP);
 
         # start a session if connection looks valid
-        qpsmtpd_session($client, $iinfo, $qpsmtpd) if ($iinfo);
+        qpsmtpd_session($socket, $client, $iinfo, $qpsmtpd) if ($iinfo);
 
         # close connection and cleanup
         $client->shutdown(2);
@@ -639,12 +655,14 @@ sub info {
 # arg2: ref to qpsmtpd instance
 # ret0: void
 sub qpsmtpd_session {
-    my $client  = shift;    #arg0
-    my $iinfo   = shift;    #arg1
-    my $qpsmtpd = shift;    #arg2
+    my $socket  = shift;    #arg0
+    my $client  = shift;    #arg1
+    my $iinfo   = shift;    #arg2
+    my $qpsmtpd = shift;    #arg3
 
     # get local/remote hostname, port and ip address
-    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) = Qpsmtpd::TcpServer::lrpip($d, $client, $iinfo);
+    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) =
+        Qpsmtpd::TcpServer::lrpip($socket, $client, $iinfo);
 
     # get current connected ip addresses (from shared memory)
     my %children;
