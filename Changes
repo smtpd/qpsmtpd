@@ -1,3 +1,8 @@
+X.YY - Date
+
+  The clamdscan virus-scanning plugin now requires the ClamAV::Client
+  perl module instead of the older, deprecated Clamd module (Devin Carraway)
+
 0.81 - April 2, 2009
 
   Close spamd socket after reading the result back (Jared Johnson)
