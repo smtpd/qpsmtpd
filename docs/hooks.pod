@@ -682,7 +682,7 @@ This hook is called after a plugin returned I<DENY>, I<DENYSOFT>,
 I<DENY_DISCONNECT> or I<DENYSOFT_DISCONNECT>. All return codes are ignored, 
 arguments are
 
-  my ($self, $transaction, $prev_hook, $return, $return_text) = @_;
+  my ($self, $transaction, $prev_plugin, $return, $return_text) = @_;
 
 B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
 is called. It's probably best not to try acessing it.
@@ -695,7 +695,7 @@ The counter part of C<hook_deny>, it is called after a plugin B<did not>
 return I<DENY>, I<DENYSOFT>, I<DENY_DISCONNECT> or I<DENYSOFT_DISCONNECT>. 
 All return codes are ignored, arguments are
 
-  my ( $self, $transaction, $prev_hook, $return, $return_text ) = @_;
+  my ( $self, $transaction, $prev_plugin, $return, $return_text ) = @_;
 
 B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
 is called. It's probably best not to try acessing it.
