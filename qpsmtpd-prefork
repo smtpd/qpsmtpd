@@ -21,6 +21,7 @@ use IO::Socket;
 use IO::Select;
 use POSIX;
 use IPC::Shareable(':all');
+use lib 'lib';
 use Qpsmtpd::TcpServer::Prefork;
 use Qpsmtpd::Constants;
 use Getopt::Long;
