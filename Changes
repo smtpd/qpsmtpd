@@ -1,7 +1,14 @@
 X.YY - Date
 
+  prefork: add multi-address support
+
   The clamdscan virus-scanning plugin now requires the ClamAV::Client
   perl module instead of the older, deprecated Clamd module (Devin Carraway)
+
+  prefork: support --listen-address for consistency with forkserver
+
+  prefork: Sanitize the shell environment before loading modules
+
 
 0.81 - April 2, 2009
 
