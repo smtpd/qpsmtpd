@@ -139,7 +139,7 @@ if (@d_addr) {
         }
     }
 } else {
-    @d_addr = ( 'addr' => $has_ipv6 ? "[::]" : "0.0.0.0" );
+    @d_addr = ( { addr => $has_ipv6 ? "[::]" : "0.0.0.0", port => $d_port } );
 }
 
 # set max from ip to max number of children if option is set to disabled

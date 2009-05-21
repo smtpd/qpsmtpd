@@ -1,5 +1,7 @@
 X.YY - Date
 
+  prefork: Fix startup when no interface addresses are specified (Devin Carraway)
+
   prefork: add multi-address support
 
   The clamdscan virus-scanning plugin now requires the ClamAV::Client
