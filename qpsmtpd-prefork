@@ -291,8 +291,8 @@ sub run {
         open STDERR, '>&STDOUT' or die "open(stderr): $!";
         defined (my $pid = fork) or die "fork: $!";
         exit 0 if $pid;
-        POSIX::setsid or die "setsid: $!";
     }
+    POSIX::setsid or die "setsid: $!";
 
     if ($pid_file) {
         print PID $$,"\n";
