@@ -499,7 +499,7 @@ is written to the log.
 Arguments are
 
  my $self = shift;
- 
+
 B<NOTE:> C<$transaction> is not valid at this point, therefore not mentioned.
 
 

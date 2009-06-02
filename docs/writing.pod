@@ -34,24 +34,24 @@ Inserting this static config is done in C<register()>:
 
   sub register {
     my ($self, $qp, @args) = @_;
-  
+
     die "No QMQP server specified in qmqp-forward config"
       unless @args;
-  
+
     $self->{_qmqp_timeout} = 120;
-  
+
     if ($args[0] =~ /^([\.\w_-]+)$/) {
       $self->{_qmqp_server} = $1;
     }
     else {
       die "Bad data in qmqp server: $args[0]";
     }
-  
+
     $self->{_qmqp_port} = 628;
     if (@args > 1 and $args[1] =~ /^(\d+)$/) {
       $self->{_qmqp_port} = $1;
     }
-  
+
     $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") 
       if (@args > 2);
   }
@@ -61,7 +61,7 @@ hook.
 
   sub hook_queue {
     my ($self, $transaction) = @_;
-  
+
     $self->log(LOGINFO, "forwarding to $self->{_qmqp_server}:"
                        ."$self->{_qmqp_port}");
 
@@ -177,7 +177,7 @@ blocks and write them to the server
           $self->_disconnect($sock);
           return(DECLINED, "Failed to print to socket: $err");
         };
-  
+
       $size = read $transaction->body_fh, $buff, 4096;
       unless (defined $size) {
         my $err = $!;
@@ -225,14 +225,14 @@ We're done. Now let's see what the remote qmqpd says...
 
 The server's response is a nonempty string of 8-bit bytes, encoded as a
 netstring.
-  
+
 The first byte of the string is either K, Z, or D. K means that the
 message has been accepted for delivery to all envelope recipients. This
 is morally equivalent to the 250 response to DATA in SMTP; it is subject
 to the reliability requirements of RFC 1123, section 5.3.3. Z means
 temporary failure; the client should try again later. D means permanent
 failure.
-   
+
 Note that there is only one response for the entire message; the server
 cannot accept some recipients while rejecting others.
 
@@ -241,10 +241,10 @@ cannot accept some recipients while rejecting others.
 
     my $answer = netstring_read($sock);
     $self->_disconnect($sock);
-    
+
     if (defined $answer and netstring_verify($answer)) {
       $answer = netstring_decode($answer);
-  
+
       $answer =~ s/^K// and return(OK,
                                  "Queued! $answer");
       $answer =~ s/^Z// and return(DENYSOFT, 
