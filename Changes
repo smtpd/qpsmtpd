@@ -1,4 +1,4 @@
-X.YY - Date
+0.82 - June 2, 2009
 
   prefork: Fix problem with processes sometimes being "left behind" (Charlie Brady)
 
