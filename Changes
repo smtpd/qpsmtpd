@@ -1,6 +1,8 @@
 
   POD cleanups (Steve Kemp)
 
+  check_spamhelo disconnects after denying a 'helo' (Filippo Carletti)
+
 
 0.82 - June 2, 2009
 
