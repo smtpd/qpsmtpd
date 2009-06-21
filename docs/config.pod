@@ -68,8 +68,7 @@ Override the default SMTP greeting with this string.
 
 =item spool_dir
 
-Where temporary files are stored, defaults to F<tmp/>.
-B<FIXME: is this correct?>
+Where temporary files are stored, defaults to F<~/tmp/>.
 
 =item spool_perms
 
