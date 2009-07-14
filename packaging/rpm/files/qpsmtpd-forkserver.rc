@@ -1,0 +1,122 @@
+#! /bin/bash
+#
+# qpsmtpd-forkserver          Start/Stop the qpsmtpd forking server
+#
+# chkconfig: 2345 90 60
+# description: qpsmtpd is a flexible smtpd daemon written in Perl. \
+#              Apart from the core SMTP features, all functionality is \
+#              implemented in small "extension plugins" using the easy \
+#              to use object oriented plugin API.
+# processname: qpsmtpd-forkserver
+# config: /etc/qpsmtpd
+# pidfile: /var/run/qpsmtpd-forkserver.pid
+
+
+# Source function library.
+. /etc/init.d/functions
+. /etc/sysconfig/qpsmtpd-forkserver
+
+RETVAL=0
+
+# See how we were called.
+  
+prog="qpsmtpd-forkserver"
+
+start() {
+	# cleanup environment a bit.
+	unset PERL_UNICODE
+	unset LANG
+	unset LC_TIME
+	unset LC_ALL
+	unset BASH_ENV
+	unset ENV
+	unset CDPATH
+	unset IFS
+
+	echo -n $"Starting $prog: "
+	trap "" 1
+	daemon $prog --detach $QPSMTPD_OPTIONS
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/$prog
+	return $RETVAL
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+	killproc $prog
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/$prog
+	return $RETVAL
+}	
+
+# functions status() uses pidof, which doesn't work with (?) scripts
+qpstatus() {
+	local base=${1##*/}
+	local pid
+
+	# Test syntax.
+	if [ "$#" = 0 ] ; then
+		echo $"Usage: status {program}"
+		return 1
+	fi
+
+	# Use "/var/run/*.pid" file for pid
+	if [ -f /var/run/${base}.pid ] ; then
+	    read pid < /var/run/${base}.pid
+	    if [ -n "$pid" ]; then
+            /bin/ps -p $pid >/dev/null
+            if [ $? -eq 0 ]; then
+                echo $"${base} (pid $pid) is running..."
+                return 0
+            else                
+	            echo $"${base} dead but pid file exists"
+	            return 1
+            fi
+	    fi
+	fi
+	# See if /var/lock/subsys/${base} exists
+	if [ -f /var/lock/subsys/${base} ]; then
+		echo $"${base} dead but subsys locked"
+		return 2
+	fi
+	echo $"${base} is stopped"
+	return 3
+}
+
+restart() {
+  	stop
+	start
+}	
+
+reload() {
+  	stop
+	start
+}	
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart)
+  	restart
+	;;
+  reload)
+  	reload
+	;;
+  status)
+  	qpstatus qpsmtpd-forkserver
+	;;
+  condrestart)
+  	[ -f /var/lock/subsys/$prog ] && restart || :
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|reload|restart|condrestart}"
+	exit 1
+esac
+
+exit $?
