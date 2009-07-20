@@ -1,4 +1,6 @@
 
+  Disconnect host in rhsbl (Charlie Brady)
+
   POD cleanups (Steve Kemp)
 
   check_spamhelo disconnects after denying a 'helo' (Filippo Carletti)
