@@ -1,4 +1,6 @@
 
+  Fix spamassassin plugin log noise if spam score is 0.0
+
   Disconnect host in rhsbl (Charlie Brady)
 
   POD cleanups (Steve Kemp)
