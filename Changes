@@ -1,4 +1,6 @@
 
+  Modify plugins/virus/clamav option for ClamAV 0.95 (no-summary)
+
   Fix spamassassin plugin log noise if spam score is 0.0
 
   Disconnect host in rhsbl (Charlie Brady)
