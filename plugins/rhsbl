@@ -1,5 +1,15 @@
 #!perl -w
 
+sub register {
+  my ($self, $qp, $denial ) = @_;
+  if ( defined $denial and $denial =~ /^disconnect$/i ) {
+    $self->{_rhsbl}->{DENY} = DENY_DISCONNECT;
+  }
+  else {
+    $self->{_rhsbl}->{DENY} = DENY;
+  }
+
+}
 
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
@@ -49,12 +59,12 @@ sub hook_rcpt {
   my $result = $self->process_sockets;
   if ($result && defined($self->{_rhsbl_zones_map}{$result})) {
     if ($result =~ /^$host\./ ) {
-      return (DENY, "Mail from $host rejected because it " . $self->{_rhsbl_zones_map}{$result});
+      return ($self->{_rhsbl}->{DENY}, "Mail from $host rejected because it " . $self->{_rhsbl_zones_map}{$result});
     } else {
-      return (DENY, "Mail from HELO $hello rejected because it " . $self->{_rhsbl_zones_map}{$result});
+      return ($self->{_rhsbl}->{DENY}, "Mail from HELO $hello rejected because it " . $self->{_rhsbl_zones_map}{$result});
     }
   }
-  return (DENY, $result) if $result;
+  return ($self->{_rhsbl}->{DENY}, $result) if $result;
   return DECLINED;
 }
 

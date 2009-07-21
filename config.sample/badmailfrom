@@ -1,0 +1,5 @@
+# This is a sample config file for badmailfrom
+# - single email address
+badmailexample@microsoft.com
+# - block and entire host, and provide a custom reason
+@www.yahoo.com  yahoo never sends from www
