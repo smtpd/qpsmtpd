@@ -75,7 +75,7 @@ my $max_children    = 15;   # max number of child processes to spawn
 my $idle_children   = 5;    # number of idle child processes to spawn
 my $maxconnip       = 10;
 my $child_lifetime  = 100;  # number of times a child may be reused
-my $loop_sleep      = 30;   # seconds main_loop sleeps before checking children
+my $loop_sleep      = 15;   # seconds main_loop sleeps before checking children
 my $re_nice         = 5;    # substracted from parents current nice level
 my $d_start         = 0;
 my $quiet           = 0;
@@ -339,10 +339,11 @@ sub reaper {
 #arg0: void
 #ret0: void
 sub main_loop {
+    my $created_children = $idle_children;
     while (1) {
         # if there is no child death to process, then sleep EXPR seconds
         # or until signal (i.e. child death) is received
-        sleep $loop_sleep unless @children_term;
+        sleep $loop_sleep / ($created_children * 2 + 1) unless @children_term;
 
         # block CHLD signals to avoid race
         my $sigset = block_signal(SIGCHLD);
@@ -379,9 +380,9 @@ sub main_loop {
         }
 
         # spawn children
-        for (my $i = scalar(keys %children) ; $i < $chld_pool ; $i++) {
-            new_child();    # add to the child pool
-        }
+        $created_children = $chld_pool - keys %children;
+        $created_children = 0 if $created_children < 0;
+        new_child() for 1..$created_children;
 
         # unblock signals
         unblock_signal($sigset);
