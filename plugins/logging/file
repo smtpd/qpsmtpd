@@ -263,13 +263,15 @@ sub hook_logging {
     # - It's not already open
     # - We're allowed to split sessions across logfiles
     # - We haven't logged anything yet this session
+    # - We aren't in a session
     if (!$self->{_f} ||
         !$self->{_nosplit} ||
+        !$transaction ||
         !$transaction->notes('file-logged-this-session')) {
         unless (defined $self->maybe_reopen($transaction)) {
             return DECLINED;
         }
-        $transaction->notes('file-logged-this-session', 1);
+        $transaction->notes('file-logged-this-session', 1) if $transaction;
     }
 
     my $f = $self->{_f};

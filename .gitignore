@@ -1,16 +1,11 @@
-config/
-pm_to_blib
-blib/
-
-# only ignore top-level Makefile; we need the one in packaging/rpm!
+/config
+/config/
+/pm_to_blib
+/blib/
 /Makefile
 Makefile.[a-z]*
-
-# ignore file produced by rpm build process
-/packaging/rpm/qpsmtpd.spec
-packaging/rpm/build/
-
+ 
 *~
 *.bak
-
-cover_db/
+ 
+/cover_db/
