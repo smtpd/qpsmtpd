@@ -9,3 +9,5 @@ Makefile.[a-z]*
 *.bak
 
 /cover_db/
+
+*.tar.gz
