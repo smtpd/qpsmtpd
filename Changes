@@ -1,16 +1,29 @@
-  plugins/queue/maildir: Allow hyphens in the maildir path
 
-  Temporary deny if clamd is not running
+0.83 September 15, 2009
+
+  plugins/queue/maildir: Allow hyphens in the maildir path (Hinrik Örn Sigurðsson)
 
   Modify plugins/virus/clamav option for ClamAV 0.95 (no-summary)
 
+  Temporary deny if clamd is not running (Shad L. Lords)
+
   Fix spamassassin plugin log noise if spam score is 0.0
+
+  Fix spool_dir configuration documentation and README update (Tomas Lee)
 
   Disconnect host in rhsbl (Charlie Brady)
 
   POD cleanups (Steve Kemp)
 
+  check_badmailfrom: Fix parsing of reason messages etc (Robert Spier, Tomas Lee)
+
   check_spamhelo disconnects after denying a 'helo' (Filippo Carletti)
+
+  Log even when aren't in a transaction (Jared Johnson)
+
+  prefork: More robust child spawning (Jared Johnson)
+
+  Add dup_body_fh method to return a dup'd body FH (Jared Johnson)
 
 
 0.82 - June 2, 2009
