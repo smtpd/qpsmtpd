@@ -85,7 +85,7 @@ sub register {
   my ($self, $qp, @args) = @_;
 
   if (@args > 0) {
-    ($self->{_maildir}) = ($args[0] =~ m!([/\w\.]+)!);
+    ($self->{_maildir}) = ($args[0] =~ m!([-/\w\.]+)!);
   }
 
   if (@args > 1) {

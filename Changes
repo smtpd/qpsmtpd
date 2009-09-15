@@ -1,3 +1,4 @@
+  plugins/queue/maildir: Allow hyphens in the maildir path
 
   Temporary deny if clamd is not running
 
