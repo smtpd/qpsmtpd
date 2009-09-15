@@ -3,7 +3,7 @@
 
   plugins/queue/maildir: Allow hyphens in the maildir path (Hinrik Örn Sigurðsson)
 
-  Modify plugins/virus/clamav option for ClamAV 0.95 (no-summary)
+  Modify plugins/virus/clamav no-summary option for ClamAV 0.95 (Jonathan Martens)
 
   Temporary deny if clamd is not running (Shad L. Lords)
 
