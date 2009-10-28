@@ -72,7 +72,7 @@ sub run {
     # Set local client_socket to passed client object for testing socket state on writes
     $self->{__client_socket} = $client;
 
-    $self->load_plugins;
+    $self->load_plugins unless $self->{hooks};
 
     my $rc = $self->start_conversation;
     return if $rc != DONE;
