@@ -11,6 +11,7 @@ BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
 BuildRequires: perl >= 0:5.00503
 BuildArchitectures: noarch
 Requires: perl(Mail::Header), perl(Net::DNS) perl(Net::IP) perl(IPC::Shareable)
+Requires(pre): coreutils, shadow-utils, perl
 
 Source0: %{name}-%{version}-%{release}.tar.gz
 Source1: qpsmtpd-forkserver.rc
@@ -122,7 +123,7 @@ fi
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
 %config(noreplace) %{_sysconfdir}/xinetd.d/smtp
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
-%attr(0700,smtpd,smtpd) %dir %{_localstatedir}/spool/qpsmtpd
+%attr(2750,qpsmtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
 
 %files apache
