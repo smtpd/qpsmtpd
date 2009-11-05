@@ -40,13 +40,19 @@ The default is to never reject mail based on the SpamAssassin score.
 
 =item munge_subject_threshold [threshold]
 
-Set the threshold where the plugin will prefix the subject with
-'***SPAM***' or the value defined in the spamsubjectprefix 
-configuration file.  A modified subject is easier to filter on than the
-other headers for many people with not so clever mail clients.  You
-might want to make another plugin that does this on a per user basis.
+Set the threshold where the plugin will prefix the subject with the
+value of C<subject_prefix>. A modified subject is easier to filter on
+than the other headers for many people with not so clever mail
+clients.  You might want to make another plugin that does this on a
+per user basis.
 
 The default is to never munge the subject based on the SpamAssassin score.
+
+=item subject_prefix [prefix]
+
+What to prefix the subject with if the message is detected as spam
+(i.e. if score is greater than C<munge_subject_threshold>.  Defaults to
+C<*** SPAM ***>
 
 =item spamd_socket [/path/to/socket|spamd.host:port]
 
@@ -237,7 +243,7 @@ sub check_spam_munge_subject {
 
   return DECLINED unless $score >= $self->{_args}->{munge_subject_threshold};
 
-  my $subject_prefix = $self->qp->config('spamsubjectprefix') || '*** SPAM ***';
+  my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
   my $subject = $transaction->header->get('Subject') || '';
   $transaction->header->replace('Subject', "$subject_prefix $subject");
 
