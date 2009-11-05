@@ -22,7 +22,9 @@ The format goes like
   spamassassin  option value  [option value]
 
 Options being those listed below and the values being parameters to
-the options.  Confused yet?  :-)
+the options.  Confused yet?  :-)  It looks like this in practice:
+
+  spamassassin reject_threshold 7 leave_old_headers keep
 
 =over 4
 
