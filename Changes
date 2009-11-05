@@ -1,4 +1,9 @@
 
+  spamassasin: Custom spam tag subject munging (Jonathan Martens, Robert Spier)
+
+  clamav: Fix typo in name of default configuration file (Filippo Carletti)
+
+
 0.83 September 15, 2009
 
   plugins/queue/maildir: Allow hyphens in the maildir path (Hinrik Örn Sigurðsson)
@@ -21,7 +26,7 @@
 
   Log even when aren't in a transaction (Jared Johnson)
 
-  prefork: More robust child spawning (Jared Johnson)
+  prefork: More robust child spawning (Peter Samuelson)
 
   Add dup_body_fh method to return a dup'd body FH (Jared Johnson)
 
