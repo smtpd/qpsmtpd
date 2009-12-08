@@ -57,7 +57,7 @@ sub config_dir {
       my $configdir = $1 if -e "$1/$config";
       $cdir_memo{$config} = $configdir;
   } else {
-      $cdir_memo{$config} = SUPER::config_dir(@_);
+      $cdir_memo{$config} = $self->SUPER::config_dir(@_);
   }
   return $cdir_memo{$config};
 }
