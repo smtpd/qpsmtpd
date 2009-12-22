@@ -80,12 +80,16 @@ sub register {
 sub hook_queue {
     my ($self, $transaction) = @_;
 
+    unless ($transaction->header) {
+        $self->log(LOGERROR, "No header parsed for transaction; can't enqueue");
+        return (DENY, 'Mail unqueuable');
+    }
     my $tmp_dir = $self->qp->config('spool_dir') || '/tmp';
     $tmp_dir = $1 if ($tmp_dir =~ /(.*)/);
     my ($tmp, $tmpfn) = tempfile("exim-bsmtp.$$.XXXXXX", DIR => $tmp_dir);
     unless ($tmp && $tmpfn) {
-	$self->log(LOGERROR, "Couldn't create tempfile: $!");
-	return (DECLINED, 'Internal error enqueueing mail');
+        $self->log(LOGERROR, "Couldn't create tempfile: $!");
+        return (DECLINED, 'Internal error enqueueing mail');
     }
 
     print $tmp "HELO ", hostname(), "\n",
@@ -112,9 +116,13 @@ sub hook_queue {
     # Normally exim produces no output in BSMTP mode; anything that
     # does come out is an error worth logging.
     my $start = time;
+    my ($bsmtp_error, $bsmtp_msg);
     while (<$exim>) {
-    	chomp;
-	$self->log(LOGERROR, "exim: $_");
+        chomp;
+        $self->log(LOGERROR, "exim: $_");
+        if (/(\d\d\d)\s(\S.*)/) {
+            ($bsmtp_error, $bsmtp_msg) = ($1, $2);
+        }
     }
     $self->log(LOGDEBUG, "BSMTP finished (".(time - $start)." sec)");
     $exim->close;
@@ -122,7 +130,12 @@ sub hook_queue {
     unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
 
     $self->log(LOGDEBUG, "Exitcode from exim: $exit");
-    if (($exit >> 8) != 0) {
+    if ($bsmtp_error && $bsmtp_error >= 400 && $bsmtp_error < 600) {
+        $self->log(LOGERROR, "BSMTP enqueue failed; response $bsmtp_error".
+                             " ($bsmtp_msg)");
+        return ($bsmtp_error < 400 ? DECLINED : DENY, $bsmtp_msg);
+    }
+    elsif (($exit >> 8) != 0 || $bsmtp_error) {
         $self->log(LOGERROR, 'BSMTP enqueue failed; exitcode '.($exit >> 8).
                              " from $self->{_exim_path} -bS");
         return (DECLINED, 'Internal error enqueuing mail');
@@ -135,5 +148,4 @@ sub hook_queue {
 
 1;
 
-# vi: ts=4 sw=4 expandtab syn=perl
-
+# vi: ts=4 sw=4 expandtab syn=perl:
