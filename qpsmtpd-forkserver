@@ -47,7 +47,7 @@ usage: qpsmtpd-forkserver [ options ]
  -p, --port P              : listen on a specific port; default 2525; can be
                              specified multiple times for multiple bindings.
  -c, --limit-connections N : limit concurrent connections to N; default 15
- -u, --user U              : run as a particular user (default 'smtpd')
+ -u, --user U              : run as a particular user (default '$USER')
  -m, --max-from-ip M       : limit connections from a single IP; default 5
      --pid-file P          : print main servers PID to file P
  -d, --detach              : detach from controlling terminal (daemonize)

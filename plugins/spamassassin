@@ -22,7 +22,9 @@ The format goes like
   spamassassin  option value  [option value]
 
 Options being those listed below and the values being parameters to
-the options.  Confused yet?  :-)
+the options.  Confused yet?  :-)  It looks like this in practice:
+
+  spamassassin reject_threshold 7 leave_old_headers keep
 
 =over 4
 
@@ -40,12 +42,19 @@ The default is to never reject mail based on the SpamAssassin score.
 
 =item munge_subject_threshold [threshold]
 
-Set the threshold where the plugin will prefix the subject with
-'***SPAM***'.  A modified subject is easier to filter on than the
-other headers for many people with not so clever mail clients.  You
-might want to make another plugin that does this on a per user basis.
+Set the threshold where the plugin will prefix the subject with the
+value of C<subject_prefix>. A modified subject is easier to filter on
+than the other headers for many people with not so clever mail
+clients.  You might want to make another plugin that does this on a
+per user basis.
 
 The default is to never munge the subject based on the SpamAssassin score.
+
+=item subject_prefix [prefix]
+
+What to prefix the subject with if the message is detected as spam
+(i.e. if score is greater than C<munge_subject_threshold>.  Defaults to
+C<*** SPAM ***>
 
 =item spamd_socket [/path/to/socket|spamd.host:port]
 
@@ -188,7 +197,7 @@ sub hook_data_post { # check_spam
     }
 
   }
-  my $tests = <SPAMD>;
+  my $tests = <SPAMD>|| '';
   close SPAMD;
   $tests =~ s/\015//;  # hack for outlook
   $flag = $flag eq 'True' ? 'Yes' : 'No';
@@ -236,8 +245,9 @@ sub check_spam_munge_subject {
 
   return DECLINED unless $score >= $self->{_args}->{munge_subject_threshold};
 
+  my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
   my $subject = $transaction->header->get('Subject') || '';
-  $transaction->header->replace('Subject', "***SPAM*** $subject");
+  $transaction->header->replace('Subject', "$subject_prefix $subject");
 
   return DECLINED;
 }

@@ -1,6 +1,7 @@
 .gitignore
 Changes
 config.sample/badhelo
+config.sample/badmailfrom
 config.sample/badrcptto_patterns
 config.sample/dnsbl_zones
 config.sample/flat_auth_pw
@@ -137,6 +138,7 @@ STATUS
 t/addresses.t
 t/config.t
 t/helo.t
+t/misc.t
 t/plugin_tests.t
 t/plugin_tests/auth/auth_flat_file
 t/plugin_tests/auth/authdeny
@@ -145,6 +147,7 @@ t/plugin_tests/check_badrcptto
 t/plugin_tests/dnsbl
 t/plugin_tests/rcpt_ok
 t/qpsmtpd-address.t
+t/rset.t
 t/tempstuff.t
 t/Test/Qpsmtpd.pm
 t/Test/Qpsmtpd/Plugin.pm

@@ -33,7 +33,7 @@ branch - preferably a branch per unrelated change.
 You can use the C<git branch> command to see which branch you are on.
 
 The easiest way to make a new branch is 
- 
+
   git checkout -b topic/my-great-change
 
 This will create a new branch with the name "topic/my-great-change"
@@ -95,7 +95,7 @@ Manually fix the conflict and then do
 
   git add some/file
   git commit
-    
+
 Or if the conflicting upstream commit did the same logical change then
 you might want to just skip the local change:
 

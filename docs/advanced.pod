@@ -52,7 +52,7 @@ Note: Do not load both (B<rcpt_ok> and B<rcpt_ok_maxrelay>). This plugin
 should be configured to run I<last>, like B<rcpt_ok>.
 
  use Qpsmtpd::DSN;
- 
+
  sub init {
    my ($self, $qp, @args) = @_;
    die "too many arguments"
@@ -64,7 +64,7 @@ should be configured to run I<last>, like B<rcpt_ok>.
  sub hook_rcpt {
    my ($self, $transaction, $recipient) = @_;
    my ($rc, @msg) = $self->SUPER::hook_rcpt($transaction, $recipient);
- 
+
    return ($rc, @msg)
       unless (($rc == DENY) and $self->{_count_relay_max});
 

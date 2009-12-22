@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+# $Id$
 
 =head1 NAME
 
@@ -10,10 +11,9 @@ A qpsmtpd plugin for virus scanning using the ClamAV scan daemon, clamd.
 
 =head1 RESTRICTIONS
 
-The ClamAV scan daemon, clamd, must have at least read access to the
-qpsmtpd spool directory in order to sucessfully scan the messages.  You can
-ensure this by running clamd as the same user as qpsmtpd does (by far the
-easiest method) or by doing the following: 
+The ClamAV scan daemon, clamd, must have at least execute access to the qpsmtpd
+spool directory in order to sucessfully scan the messages.  You can ensure this
+by running clamd as the same user as qpsmtpd does, or by doing the following: 
 
 =over 4
 
@@ -23,14 +23,11 @@ user.
 
 =item * Enable the "AllowSupplementaryGroups" option in clamd.conf.
 
-=item * Change the permissions of the qpsmtpd spool directory to 0750 (this 
-will emit a warning when the qpsmtpd service starts up, but can be safely
-ignored).
+=item * Add group-execute permissions to the qpsmtpd spool directory.
 
 =item * Make sure that all directories above the spool directory (to the
 root) are g+x so that the group has directory traversal rights; it is not
-necessary for the group to have any read rights except to the spool
-directory itself.
+necessary for the group to have any read rights.
 
 =back
 
@@ -45,12 +42,14 @@ Place this plugin in the plugin/virus directory beneath the standard
 qpsmtpd installation.  If you installed clamd with the default path, you
 can use this plugin with default options (nothing specified):
 
+You must have the ClamAV::Client module installed to use the plugin.
+
 =over 4
 
 =item B<clamd_socket>
 
-Full path to the clamd socket (the recommended mode); defaults to
-/tmp/clamd and is the default method.
+Full path to the clamd socket (the recommended mode), if different from the
+ClamAV::Client defaults.
 
 =item B<clamd_port>
 
@@ -62,6 +61,14 @@ typically 3310; default disabled.  If present, overrides the clamd_socket.
 Whether the scanner will automatically delete messages which have viruses.
 Takes either 'yes' or 'no' (defaults to 'yes').  If set to 'no' it will add
 a header to the message with the virus results.
+
+=item B<defer_on_error>
+
+Whether to defer the mail (with a soft-failure error, which will incur a retry)
+if an unrecoverable error occurs during the scan.   The default is to accept
+the mail under these conditions.  This can permit viruses to be accepted when
+the clamd daemon is malfunctioning or unreadable, but will not allow mail to
+backlog or be lost if the condition persists.
 
 =item B<max_size>
 
@@ -75,17 +82,19 @@ Scan all messages, even if there are no attachments
 
 =head1 REQUIREMENTS
 
-This module requires the Clamd module, found on CPAN here:
+This module requires the ClamAV::Client module, found on CPAN here:
 
-L<http://search.cpan.org/author/MSERGEANT/Clamd-1.04>
+L<http://search.cpan.org/dist/ClamAV-Client/>
 
 =head1 AUTHOR
 
-John Peacock <jpeacock@cpan.org>
+Originally written for the Clamd module by John Peacock <jpeacock@cpan.org>;
+adjusted for ClamAV::Client by Devin Carraway <qpsmtpd/@/devin.com>.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2005 John Peacock
+Copyright (c) 2005 John Peacock,
+Copyright (c) 2007 Devin Carraway
 
 Based heavily on the clamav plugin
 
@@ -94,7 +103,10 @@ Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
 
-use Clamd;
+use ClamAV::Client;
+
+use strict;
+use warnings;
 
 sub register {
     my ( $self, $qp, @args ) = @_;
@@ -102,10 +114,14 @@ sub register {
     %{ $self->{"_clamd"} } = @args;
 
     # Set some sensible defaults
-    $self->{"_clamd"}->{"clamd_socket"} ||= "/tmp/clamd";
     $self->{"_clamd"}->{"deny_viruses"} ||= "yes";
     $self->{"_clamd"}->{"max_size"}     ||= 128;
     $self->{"_clamd"}->{"scan_all"}     ||= 0;
+    for my $setting ('deny_viruses', 'defer_on_error') {
+        next unless $self->{"_clamd"}->{$setting};
+        $self->{"_clamd"}->{$setting} = 0
+            if lc $self->{"_clamd"}->{$setting} eq 'no';
+    }
 }
 
 sub hook_data_post {
@@ -134,51 +150,75 @@ sub hook_data_post {
         return (DECLINED);    # unless $filename;
     }
 
+    # the spool directory must be readable and executable by the scanner;
+    # this generally means either group or world exec; if
+    # neither of these is set, issue a warning but try to proceed anyway
     my $mode = ( stat( $self->spool_dir() ) )[2];
-    if ( $mode & 07077 ) {   # must be sharing spool directory with external app
+    if ( $mode & 0010 || $mode & 0001 ) {
+        # match the spool file mode with the mode of the directory -- add
+        # the read bit for group, world, or both, depending on what the
+        # spool dir had, and strip all other bits, especially the sticky bit
+        my $fmode = ($mode & 0044) |
+                    ($mode & 0010 ? 0040 : 0) |
+                    ($mode & 0001 ? 0004 : 0);
+        unless ( chmod $fmode, $filename ) {
+            $self->log( LOGERROR, "chmod: $filename: $!" );
+            return DECLINED;
+        }
+    } else {
         $self->log( LOGWARN,
-            "Changing permissions on file to permit scanner access" );
-        chmod $mode, $filename;
+            "Permission on spool directory do not permit scanner access" );
     }
 
     my $clamd;
 
-    if (
-        (
-                $self->{"_clamd"}->{"clamd_port"}
-            and $self->{"_clamd"}->{"clamd_port"} =~ /(\d+)/
-        )
-        or (    $self->{"_clamd"}->{"clamd_socket"}
-            and $self->{"_clamd"}->{"clamd_socket"} =~ /([\w\/.]+)/ )
-      )
-    {
-        my $port = $1;
-        $clamd = Clamd->new( port => $port );
+    if ( ($self->{"_clamd"}->{"clamd_port"} || '') =~ /^(\d+)/ ) {
+        $clamd = new ClamAV::Client( socket_host =>
+                                     $self->{_clamd}->{clamd_host},
+                                     socket_port => $1 );
+    }
+    elsif ( ($self->{"_clamd"}->{"clamd_socket"} || '') =~ /([\w\/.]+)/ ) {
+        $clamd = new ClamAV::Client( socket_name => $1 );
     }
     else {
-        $clamd = Clamd->new();    # default unix domain socket
+        $clamd = new ClamAV::Client;
     }
 
-    unless ( $clamd->ping() ) {
-    $self->log( LOGERROR, "Cannot ping clamd server - did you provide the correct clamd port or socket?" );
-    return DENYSOFT;
+    unless ( $clamd ) {
+        $self->log( LOGERROR, "Cannot instantiate ClamAV::Client" );
+        return (DENYSOFT, "Unable to scan for viruses")
+            if $self->{"_clamd"}->{"defer_on_error"};
+        return DECLINED;
     }
 
-    if ( my %found = $clamd->scan($filename) ) {
-        my $viruses = join( ",", values(%found) );
-        $self->log( LOGERROR, "One or more virus(es) found: $viruses" );
+    unless ( eval { $clamd->ping() } ) {
+        $self->log( LOGERROR, "Cannot ping clamd server:  $@" );
+        return (DENYSOFT, "Unable to scan for viruses")
+            if $self->{"_clamd"}->{"defer_on_error"};
+        return DECLINED;
+    }
 
-        if ( lc( $self->{"_clamd"}->{"deny_viruses"} ) eq "yes" ) {
-            return ( DENY,
-                    "Virus"
-                  . ( $viruses =~ /,/ ? "es " : " " )
-                  . "Found: $viruses" );
+    my ( $path, $found ) = eval { $clamd->scan_path( $filename ) };
+    if ($@) {
+        $self->log( LOGERROR, "Error scanning mail: $@" );
+        return (DENYSOFT, "Unable to scan for viruses")
+            if $self->{"_clamd"}->{"defer_on_error"};
+        return DECLINED;
+    }
+    elsif ( $found ) {
+        $self->log( LOGERROR, "Virus found: $found" );
+
+        if ( $self->{"_clamd"}->{"deny_viruses"} ) {
+            return ( DENY, "Virus found: $found" );
         }
         else {
             $transaction->header->add( 'X-Virus-Found',   'Yes' );
-            $transaction->header->add( 'X-Virus-Details', $viruses );
+            $transaction->header->add( 'X-Virus-Details', $found );
             return (DECLINED);
         }
+    }
+    else {
+        $self->log( LOGINFO, "ClamAV scan reports clean");
     }
 
     $transaction->header->add( 'X-Virus-Checked',
@@ -186,3 +226,5 @@ sub hook_data_post {
 
     return (DECLINED);
 }
+
+# vi: set ts=4 sw=4 et:

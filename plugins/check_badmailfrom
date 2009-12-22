@@ -24,6 +24,8 @@ stage, so store it until later.
 
 =cut
 
+# TODO: add the ability to provide a custom default rejection reason
+
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
 
@@ -36,11 +38,9 @@ sub hook_mail {
   my $host = lc $sender->host;
   my $from = lc($sender->user) . '@' . $host;
 
-  for my $bad (@badmailfrom) {
-    my $reason = $bad;
-    $reason =~ s/^\s*(\S+)[\t\s]+//;
+  for my $config (@badmailfrom) {
+    my ($bad, $reason) = $config =~ /^\s*(\S+)(?:\s*(.*))?$/;
     $reason = "sorry, your envelope sender is in my badmailfrom list" unless $reason;
-    $bad =~ s/^\s*(\S+).*/$1/;
     next unless $bad;
     $bad = lc $bad;
     $self->log(LOGWARN, "Bad badmailfrom config: No \@ sign in $bad") and next unless $bad =~ m/\@/;

@@ -121,7 +121,7 @@ Plugins are loaded on startup where each of them register their
 interest in various "hooks" provided by the qpsmtpd core engine.
 
 At least one plugin MUST allow or deny the RCPT command to enable
-receiving mail.  The "check_relay" plugin is the standard plugin for
+receiving mail.  The "rcpt_ok" is one basic plugin that does
 this.  Other plugins provides extra functionality related to this; for
 example the require_resolvable_fromhost plugin described above.
 

@@ -186,7 +186,7 @@ C<init()> subroutine.
     my ($self, $qp, @args) = @_;
     $self->isa_plugin("rcpt_ok");
   }
-  
+
   sub hook_rcpt {
     my ($self, $transaction, $recipient) = @_;
     # do something special here...
@@ -273,7 +273,7 @@ FIXME: Test if this really works as inteded ;-)
  #
  #  LOGLEVEL is the log level for all other log messages
  use Qpsmtpd::Constants;
- 
+
  sub register {
    my ($self, $qp, $plugin, $loglevel) = @_;
    die "no plugin name given"
@@ -285,7 +285,7 @@ FIXME: Test if this really works as inteded ;-)
    $self->{_level}  = LOGWARN 
      unless defined $self->{_level};
  }
- 
+
  sub hook_logging {
    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
    return(OK) # drop these lines

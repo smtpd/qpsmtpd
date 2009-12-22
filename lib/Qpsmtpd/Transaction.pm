@@ -214,7 +214,16 @@ sub body_as_string {
 }
 
 sub body_fh {
-  return shift->{_body_file};
+  my ($self) = @_;
+  # Spool to disk if we weren't already doing so
+  $self->body_spool() unless $self->{_filename};
+  return $self->{_body_file};
+}
+
+sub dup_body_fh {
+  my ($self) = @_;
+  open(my $fh, '<&=', $self->body_fh);
+  return $fh;
 }
 
 sub DESTROY {
@@ -379,6 +388,13 @@ Returns a single line of data from the body of the email.
 Returns the file handle to the temporary file of the email. This will return
 undef if the file is not opened (yet). In I<hook_data( )> or later you can 
 force spooling to disk by calling I<$transaction-E<gt>body_filename>. 
+
+=head2 dup_body_fh( )
+
+Returns a dup()'d file handle to the temporary file of the email. This can be
+useful if an external module may call close() on the filehandle that is passed
+to it.  This should only be used for reads, as writing to a dup'd filehandle
+may have unintended consequences.
 
 =head1 SEE ALSO
 
