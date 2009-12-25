@@ -20,7 +20,7 @@ sub SASL {
 
     if ( $mechanism eq "plain" ) {
         if (!$prekey) {
-          $session->respond( 334, "Please continue" );
+          $session->respond( 334, " " );
           $prekey= <STDIN>;
         }
         ( $loginas, $user, $passClear ) = split /\x0/,
