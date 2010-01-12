@@ -604,7 +604,7 @@ __END__
 
 =head1 NAME
 
-Qpsmtpd
+Qpsmtpd - base class for the qpsmtpd mail server
 
 =head1 DESCRIPTION
 

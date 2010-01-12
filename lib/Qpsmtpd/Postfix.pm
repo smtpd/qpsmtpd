@@ -2,7 +2,7 @@ package Qpsmtpd::Postfix;
 
 =head1 NAME
 
-Qpsmtpd::Postfix
+Qpsmtpd::Postfix - postfix queueing support for qpsmtpd
 
 =head2 DESCRIPTION
 
