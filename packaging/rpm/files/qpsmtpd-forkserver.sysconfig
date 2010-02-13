@@ -1,0 +1,3 @@
+QPSMTPD_OPTIONS="-p 25 -l 127.0.0.1 --pid-file /var/run/qpsmtpd-forkserver.pid"
+export QPSMTPD_CONFIG=/etc/qpsmtpd
+export HOME=~smtpd
