@@ -2,9 +2,8 @@ Name:           %{_package}
 Version:        %{_version}
 Release:        %{_release}
 
-Packager: rpmbuild@yo61.net
 Summary: qpsmtpd + qpsmtpd-apache + qpsmtpd-async
-License: distributable
+License: MIT
 Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
 BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
@@ -238,8 +237,8 @@ fi
 
 * Sat Jan 28 2006 <hjp@hjp.at> 0.31.1-3
 - Use ${SOURCE*} macros to refer to source files
-- Avoid invoking rpm and other cleanup in %pre section
-- Invoke chkconfig in %post.
+- Avoid invoking rpm and other cleanup in pre section
+- Invoke chkconfig in post.
 - (Thanks to Josko Plazonic for the reporting these problems and
   suggesting fixes)
 
