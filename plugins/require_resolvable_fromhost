@@ -25,8 +25,7 @@ sub hook_mail {
       and $self->qp->config("require_resolvable_fromhost")
       and !$self->check_dns($sender->host)) {
     if ($sender->host) {
-      # default of temp_resolver_failed is DENYSOFT
-      return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $sender->host);
+	  $transaction->notes('temp_resolver_failed', $sender->host);
     } 
     else {
       # default of addr_bad_from_system is DENY, we use DENYSOFT here to
@@ -37,6 +36,17 @@ sub hook_mail {
   }
   return DECLINED;
 
+}
+
+sub hook_rcpt {
+	my ($self, $transaction, $recipient, %args) = @_;
+
+	if (my $host = $self->qp->connection->notes('temp_resolver_failed')) {
+		# default of temp_resolver_failed is DENYSOFT
+		return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $host);
+	}
+
+  return DECLINED;
 }
 
 sub check_dns {
