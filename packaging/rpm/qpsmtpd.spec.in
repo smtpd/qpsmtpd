@@ -65,14 +65,14 @@ eval `perl '-V:installarchlib'`
 mkdir -p $RPM_BUILD_ROOT/$installarchlib
 if grep -q DESTDIR Makefile
 then
-	make DESTDIR=$RPM_BUILD_ROOT
-	find blib/lib -name '*.pm.*' -exec rm -f {} \;
-	make DESTDIR=$RPM_BUILD_ROOT install
+        make DESTDIR=$RPM_BUILD_ROOT
+        find blib/lib -name '*.pm.*' -exec rm -f {} \;
+        make DESTDIR=$RPM_BUILD_ROOT install
 
 else
-	make PREFIX=$RPM_BUILD_ROOT/usr 
-	find blib/lib -name '*.pm.*' -exec rm -f {} \;
-	make PREFIX=$RPM_BUILD_ROOT/usr install
+        make PREFIX=$RPM_BUILD_ROOT/usr
+        find blib/lib -name '*.pm.*' -exec rm -f {} \;
+        make PREFIX=$RPM_BUILD_ROOT/usr install
 fi
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}
 rm -f ${RPM_BUILD_ROOT}%{_datadir}/%{name}/plugins/*.*
@@ -103,14 +103,14 @@ cp %{SOURCE7} $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
 
 find ${RPM_BUILD_ROOT}%{_prefix} \( -name perllocal.pod -o -name .packlist \) -exec rm {} \;
 find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
-	sed "s@^$RPM_BUILD_ROOT@@g"     | \
-	grep -v [Aa]sync		| \
-	grep -v packaging		| \
-	grep -v README.selinux		| \
-	grep -v /Apache                 | \
-	grep -v /Danga                  | \
-	grep -v Qpsmtpd/ConfigServer.pm | \
-	grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
+        sed "s@^$RPM_BUILD_ROOT@@g"     | \
+        grep -v [Aa]sync                | \
+        grep -v packaging               | \
+        grep -v README.selinux          | \
+        grep -v /Apache                 | \
+        grep -v /Danga                  | \
+        grep -v Qpsmtpd/ConfigServer.pm | \
+        grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
 if [ "$(cat %{name}-%{version}-%{release}-filelist)X" = "X" ] ; then
     echo "ERROR: EMPTY FILE LIST"
     exit -1
@@ -150,9 +150,9 @@ then
     # need to create smtpd user.
     if perl -e 'exit ! defined(getgrnam("postdrop"))'
     then
-	# if postfix is installed, we will probably use
-	# queue/postfix, which will need this:
-    	supp="-G postdrop"
+        # if postfix is installed, we will probably use
+        # queue/postfix, which will need this:
+        supp="-G postdrop"
     fi
     useradd -r -m $supp smtpd
 fi
