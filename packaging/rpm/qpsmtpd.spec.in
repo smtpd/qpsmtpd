@@ -1,3 +1,7 @@
+%{!?_package:%define _package @PACKAGE@}
+%{!?_version:%define _version @VERSION@}
+%{!?_release:%define _release @RELEASE@}
+
 Name:           %{_package}
 Version:        %{_version}
 Release:        %{_release}
@@ -8,6 +12,8 @@ Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
 BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
 BuildRequires: perl >= 0:5.00503
+BuildRequires: perl(Mail::Header)
+BuildRequires: perl(Net::DNS)
 BuildArchitectures: noarch
 Requires: perl(Mail::Header), perl(Net::DNS) perl(Net::IP) perl(IPC::Shareable)
 Requires(pre): coreutils, shadow-utils, perl
@@ -29,6 +35,11 @@ plugins" using the easy to use object oriented plugin API.
 qpsmtpd was originally written as a drop-in qmail-smtpd replacement, but
 now it also includes a smtp forward and a postfix "backend".
 
+%package xinetd
+Summary: xinetd support for qpsmtpd
+Group: System Environment/Daemons
+Requires: xinetd
+
 %package apache
 Requires: perl(mod_perl2)
 Summary: mod_perl-2 connection handler for qpsmtpd
@@ -37,6 +48,9 @@ Group: System Environment/Daemons
 %package async
 Summary: qpsmtpd using async I/O in a single process
 Group: System Environment/Daemons
+
+%description xinetd
+This package contains the xinetd startup files for qpsmptd.
 
 %description apache
 
@@ -106,6 +120,7 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
         grep -v [Aa]sync                | \
         grep -v packaging               | \
         grep -v README.selinux          | \
+        grep -v in.smtp                 | \
         grep -v /Apache                 | \
         grep -v /Danga                  | \
         grep -v Qpsmtpd/ConfigServer.pm | \
@@ -120,10 +135,14 @@ fi
 %doc CREDITS Changes LICENSE README README.plugins STATUS
 %{_initrddir}/qpsmtpd-forkserver
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
-%config(noreplace) %{_sysconfdir}/xinetd.d/smtp
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
 %attr(2750,qpsmtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
+
+%files xinetd
+%defattr(-,root,root)
+%config(noreplace) %{_sysconfdir}/xinetd.d/smtp
+%{_sbindir}/in.smtp
 
 %files apache
 %defattr(-,root,root)
@@ -157,6 +176,9 @@ then
 fi
 
 %changelog
+* Sat Feb 13 2010 <richard.siddall@elirion.net>
+- Split out xinetd files into separate RPM
+
 * Sun Jul 12 2009 <rpmbuild@robinbowes.com> 0.82-0.1
 - Update to latest release
 - don't add qpsmtpd to start-up by default
