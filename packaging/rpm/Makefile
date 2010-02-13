@@ -57,7 +57,7 @@ buildrpm: buildtargz
 	  --define "_package ${PACKAGE}" \
 	  --define "_version ${VERSION}" \
 	  --define "_release ${RELEASE}" \
- 	  -ta ./build/$(TARBALL).gz
+	  -ta ./build/$(TARBALL).gz
 
 buildtarball: prepbuildtarball
 	@tar \
@@ -96,7 +96,7 @@ test-export: builddir
 	    --file -
 
 git-export: builddir prepclean
-	(cd $(SCM_PATH) ; git-archive --format=tar --prefix=$(CURRENT_PACKAGE)/ HEAD) \
+	(cd $(SCM_PATH) ; git archive --format=tar --prefix=$(CURRENT_PACKAGE)/ HEAD) \
 	  | tar \
 	    --extract \
 	    --directory ./build/ \
