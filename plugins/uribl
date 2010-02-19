@@ -143,7 +143,9 @@ sub init {
 
     $self->{action} = $args{action} || 'add-header';
     $self->{timeout} = $args{timeout} || 30;
-    $self->{check_headers} = $args{'check-headers'};
+    # scan-headers was the originally documented name for this option, while
+    # check-headers actually implements it, so tolerate both.
+    $self->{check_headers} = $args{'check-headers'} || $args{'scan-headers'};
 
     $args{mask} ||= 0x00ffffff;
     $self->{mask} = 0;
@@ -270,19 +272,21 @@ sub lookup_start {
     my @qp_continuations;
 
     $transaction->body_resetpos;
-    while ($self->{check_headers} and $l = $transaction->body_getline) {
+	# if we're not looking for URIs in the headers, read past that point
+	# before starting to actually look for any
+    while (!$self->{check_headers} and $l = $transaction->body_getline) {
         chomp $l;
         last if !$l;
     }
     while ($l = $transaction->body_getline) {
         chomp $l;
 
-                if ($l =~ /(.*)=$/) {
-                        push @qp_continuations, $1;
-                } elsif (@qp_continuations) {
-                        $l = join('', @qp_continuations, $l);
-                        @qp_continuations = ();
-                }
+        if ($l =~ /(.*)=$/) {
+            push @qp_continuations, $1;
+        } elsif (@qp_continuations) {
+            $l = join('', @qp_continuations, $l);
+            @qp_continuations = ();
+        }
 
         # Undo URI escape munging
         $l =~ s/[=%]([0-9A-Fa-f]{2,2})/chr(hex($1))/ge;
