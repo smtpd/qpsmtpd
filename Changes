@@ -15,7 +15,7 @@
   Various minor spelling cleanups and such (Steve Kemp, Devin Carraway) 
 
   rpm: create .rpm files from the packaging/rpm directory (Peter J. Holzer,
-  Robin Bowes, Filippo Carletti)
+  Robin Bowes, Filippo Carletti, Richard Siddell)
 
   spamassasin: Custom spam tag subject munging (Jonathan Martens, Robert Spier)
 
