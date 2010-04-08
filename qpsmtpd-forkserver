@@ -1,5 +1,5 @@
 #!/usr/bin/perl -Tw
-# Copyright (c) 2001-2009 Ask Bjoern Hansen. See the LICENSE file for details.
+# Copyright (c) 2001-2010 Ask Bjoern Hansen. See the LICENSE file for details.
 # The "command dispatch" system is taken from colobus - http://trainedmonkey.com/colobus/
 #
 # For more information see http://smtpd.develooper.com/

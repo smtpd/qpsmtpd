@@ -625,7 +625,7 @@ L<http://smtpd.develooper.com/> and the I<README> file for more information.
 
 =head1 COPYRIGHT
 
-Copyright 2001-2009 Ask Bjørn Hansen, Develooper LLC.  See the
+Copyright 2001-2010 Ask Bjørn Hansen, Develooper LLC.  See the
 LICENSE file for more information.
 
 
