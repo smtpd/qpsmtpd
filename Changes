@@ -10,6 +10,8 @@
   require_resolvable_fromhost: Moved DENYSOFT for temp_resolver_failed
   to the RCPT TO hook. (Larry Nedry)
 
+  Note Net::IP dependency (Larry Nedry)
+
   Various minor spelling cleanups and such (Steve Kemp, Devin Carraway) 
 
   rpm: create .rpm files from the packaging/rpm directory (Peter J. Holzer,
