@@ -59,8 +59,6 @@ Make a system for configuring the plugins per user/domain/...
 
   support databytes per user / domain
 
-plugin to reject mails from <> if it has multiple recipients.  
-
 localiphost - support foo@[a.b.c.d] addresses 
 
 Move dispatch() etc from SMTP.pm to Qpsmtpd.pm to allow other similar
