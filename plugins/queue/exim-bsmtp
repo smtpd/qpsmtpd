@@ -2,8 +2,6 @@
 
 exim-bsmtp
 
-$Id$
-
 =head1 DESCRIPTION
 
 This plugin enqueues mail from qpsmtpd into Exim via BSMTP

@@ -1,5 +1,3 @@
-# $Id$
-
 package Qpsmtpd::ConfigServer;
 
 use base ('Danga::Client');

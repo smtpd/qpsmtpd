@@ -4,8 +4,6 @@
 
 uribl - URIBL blocking plugin for qpsmtpd
 
-$Id$
-
 =head1 DESCRIPTION
 
 This plugin implements DNSBL lookups for URIs found in spam, such as that
