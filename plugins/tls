@@ -143,7 +143,7 @@ sub hook_connect {
     my ($self, $transaction) = @_;
 
     my $local_port = $self->qp->connection->local_port;
-    return DECLINED unless $local_port == 465; # SMTPS
+    return DECLINED unless defined $local_port && $local_port == 465; # SMTPS
     
     unless ( _convert_to_ssl($self) ) {
         return (DENY_DISCONNECT, "Cannot establish SSL session");
