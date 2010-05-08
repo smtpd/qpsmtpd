@@ -1,0 +1,97 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use IO::Socket;
+use version; my $VERSION = qv('1.0.0');
+
+sub register {
+    my ($self, $qp, %args) = @_;
+
+    my %DEFAULT = (
+                   host => q{localhost},
+                   port => 89,
+                  );
+
+    $self->{_vpopmaild_host} =
+      defined $args{host} ? $args{host} : $DEFAULT{host};
+    $self->{_vpopmaild_port} =
+      defined $args{port} ? $args{port} : $DEFAULT{port};
+
+    $self->register_hook('auth-plain', 'auth_vpopmaild');
+    $self->register_hook('auth-login', 'auth_vpopmaild');
+}
+
+sub auth_vpopmaild {
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
+      @_;
+
+    # create socket
+    my $vpopmaild_socket =
+      IO::Socket::INET->new(
+                            PeerAddr => $self->{_vpopmaild_host},
+                            PeerPort => $self->{_vpopmaild_port},
+                            Proto    => 'tcp',
+                            Type     => SOCK_STREAM
+                           ) or return DECLINED;
+
+    # Get server greeting (+OK)
+    my $connect_response = <$vpopmaild_socket>;
+    if (!$connect_response =~ /\+OK.*/) {
+        return DECLINED;
+    }
+
+    # send login details
+    print $vpopmaild_socket "login $user $passClear\n\r";
+
+    # get response from server
+    my $login_response = <$vpopmaild_socket>;
+
+    close($vpopmaild_socket);
+
+    # check for successful login
+    if ($login_response =~ /\+OK.*/) {
+        return (OK, 'authcheckpassword');
+    }
+    else {
+        return DECLINED;
+    }
+}
+
+__END__
+
+=head1 NAME
+
+auth_vpopmaild - Authenticate to vpopmaild
+
+=head1 DESCRIPTION
+
+Authenticates the user against against vpopmaild [1] daemon.
+
+=head1 CONFIGURATION
+
+Add a line to C<config/plugins> as follows:
+
+auth_vpopmaild
+
+By default, the plugin connects to localhot on port 89. If your vpopmaild
+daemon is running on a different host or port, specify as follows:
+
+auth_vpopmaild host [host] port [port]
+
+=head1 LINKS
+
+[1] http://www.qmailwiki.org/Vpopmaild
+
+=head1 AUTHOR
+
+Robin Bowes <robin.bowes@yo61.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2010 Robin Bowes
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
