@@ -13,7 +13,7 @@ packaging/rpm/build/
 
 *~
 *.bak
- 
+
 /cover_db/
 
 *.tar.gz
