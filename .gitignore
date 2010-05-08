@@ -2,6 +2,8 @@
 /config/
 /pm_to_blib
 /blib/
+
+# only ignore top-level Makefile; we need the one in packaging/rpm!
 /Makefile
 Makefile.[a-z]*
  
@@ -9,3 +11,5 @@ Makefile.[a-z]*
 *.bak
  
 /cover_db/
+
+*.tar.gz

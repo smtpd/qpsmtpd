@@ -27,3 +27,5 @@ output/.*
 \B\.svn\b
 ^\.perltidyrc$
 ^\.git/.*
+^cover_db/
+\.(orig|rej)$

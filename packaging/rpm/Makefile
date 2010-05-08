@@ -43,6 +43,19 @@ buildrpmdist: buildtargz
 	  --define "_release ${RELEASE}" \
 	  -ta ./build/$(TARBALL).gz
 
+# -- the "srpmdist" target will build an SRPM out of the SCM, but
+#    will use the user's default build settings (which in many
+#    cases is exposed as an RPM repository)
+#
+srpmdist: buildsrpmdist
+
+buildsrpmdist: buildtargz
+	@rpmbuild \
+	  --define "_package ${PACKAGE}" \
+	  --define "_version ${VERSION}" \
+	  --define "_release ${RELEASE}" \
+	  -ts --nodeps ./build/$(TARBALL).gz
+
 # -- the "rpm" target will build out of the SCM, but will leave
 #    the resulting package in the relative ./build/ directory
 #
@@ -57,7 +70,24 @@ buildrpm: buildtargz
 	  --define "_package ${PACKAGE}" \
 	  --define "_version ${VERSION}" \
 	  --define "_release ${RELEASE}" \
- 	  -ta ./build/$(TARBALL).gz
+	  -ta ./build/$(TARBALL).gz
+
+# -- the "srpm" target will build an SRPM out of the SCM, but
+#    will leave the resulting package in the relative ./build/
+#    directory
+#
+srpm: buildsrpm $(SCM_TYPE)-clean
+
+buildsrpm: buildtargz
+	@echo ${PACKAGE} ${VERSION} ${RELEASE}
+	@rpmbuild \
+	  --define "_rpmdir ./build/" \
+	  --define "_sourcedir ./build/" \
+	  --define "_srcrpmdir ./build/" \
+	  --define "_package ${PACKAGE}" \
+	  --define "_version ${VERSION}" \
+	  --define "_release ${RELEASE}" \
+	  -ts --nodeps ./build/$(TARBALL).gz
 
 buildtarball: prepbuildtarball
 	@tar \
@@ -96,7 +126,7 @@ test-export: builddir
 	    --file -
 
 git-export: builddir prepclean
-	(cd $(SCM_PATH) ; git-archive --format=tar --prefix=$(CURRENT_PACKAGE)/ HEAD) \
+	(cd $(SCM_PATH) ; git archive --format=tar --prefix=$(CURRENT_PACKAGE)/ HEAD) \
 	  | tar \
 	    --extract \
 	    --directory ./build/ \

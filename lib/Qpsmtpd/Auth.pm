@@ -20,7 +20,7 @@ sub SASL {
 
     if ( $mechanism eq "plain" ) {
         if (!$prekey) {
-          $session->respond( 334, "Please continue" );
+          $session->respond( 334, " " );
           $prekey= <STDIN>;
         }
         ( $loginas, $user, $passClear ) = split /\x0/,
@@ -42,7 +42,7 @@ sub SASL {
           $session->respond(334, e64("Username:"));
           $user = decode_base64(<STDIN>);
           if ($user eq '*') {
-            $session->respond(501, "Authentification canceled");
+            $session->respond(501, "Authentication canceled");
             return DECLINED;
           }
         }
@@ -51,7 +51,7 @@ sub SASL {
         $passClear = <STDIN>;
         $passClear = decode_base64($passClear);
         if ($passClear eq '*') {
-          $session->respond(501, "Authentification canceled");
+          $session->respond(501, "Authentication canceled");
           return DECLINED;
         }
     }
@@ -68,7 +68,7 @@ sub SASL {
         my $line = <STDIN>;
 
         if ( $line eq '*' ) {
-            $session->respond( 501, "Authentification canceled" );
+            $session->respond( 501, "Authentication canceled" );
             return DECLINED;
         }
 
@@ -82,7 +82,7 @@ sub SASL {
 
     # Make sure that we have enough information to proceed
     unless ( $user && ($passClear || $passHash) ) {
-      $session->respond(504, "Invalid authentification string");
+      $session->respond(504, "Invalid authentication string");
       return DECLINED;
     }
 

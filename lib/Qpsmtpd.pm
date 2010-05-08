@@ -7,7 +7,7 @@ use Qpsmtpd::Constants;
 
 #use DashProfiler;
 
-$VERSION = "0.82";
+$VERSION = "0.84";
 
 my $git;
 
@@ -149,29 +149,41 @@ sub clear_config_cache {
 sub config {
   my ($self, $c, $type) = @_;
 
-  #my $timer = $SAMPLER->("config", undef, 1);
+  $self->log(LOGDEBUG, "in config($c)");
+
+  # first try the cache 
+  # XXX - is this always the right thing to do? what if a config hook
+  # can return different values on subsequent calls?
   if ($_config_cache->{$c}) {
+      $self->log(LOGDEBUG, "config($c) returning (@{$_config_cache->{$c}}) from cache");
       return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
 
-  $_config_cache->{$c} = [$defaults{$c}] if exists($defaults{$c});
-
-  #warn "SELF->config($c) ", ref $self;
-
+  # then run the hooks
   my ($rc, @config) = $self->run_hooks_no_respond("config", $c);
-  @config = () unless $rc == OK;
+  $self->log(LOGDEBUG, "config($c): hook returned ($rc, @config) ");
+  if ($rc == OK) {
+      $self->log(LOGDEBUG, "setting _config_cache for $c to [@config] from hooks and returning it");
+      $_config_cache->{$c} = \@config;
+      return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
+  }
 
-  if (wantarray) {
-      @config = $self->get_qmail_config($c, $type) unless @config;
-      @config = $defaults{$c} if (!@config and $defaults{$c});
-      return @config;
+  # and then get_qmail_config
+  @config = $self->get_qmail_config($c, $type);
+  if (@config) {
+      $self->log(LOGDEBUG, "setting _config_cache for $c to [@config] from get_qmail_config and returning it");
+      $_config_cache->{$c} = \@config;
+      return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
-  else {
-      return $config[0] if defined($config[0]);
-      my $val = $self->get_qmail_config($c, $type);
-      return $val if defined($val);
-      return $defaults{$c};
+
+  # finally we use the default if there is any:
+  if (exists($defaults{$c})) {
+      $self->log(LOGDEBUG, "setting _config_cache for $c to @{[$defaults{$c}]} from defaults and returning it");
+      $_config_cache->{$c} = [$defaults{$c}];
+      return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
+  return;
+
 }
 
 sub config_dir {
@@ -604,7 +616,7 @@ __END__
 
 =head1 NAME
 
-Qpsmtpd
+Qpsmtpd - base class for the qpsmtpd mail server
 
 =head1 DESCRIPTION
 
@@ -613,7 +625,7 @@ L<http://smtpd.develooper.com/> and the I<README> file for more information.
 
 =head1 COPYRIGHT
 
-Copyright 2001-2009 Ask Bjørn Hansen, Develooper LLC.  See the
+Copyright 2001-2010 Ask Bjørn Hansen, Develooper LLC.  See the
 LICENSE file for more information.
 
 

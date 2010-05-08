@@ -2,15 +2,15 @@ Name:           %{_package}
 Version:        %{_version}
 Release:        %{_release}
 
-Packager: rpmbuild@yo61.net
 Summary: qpsmtpd + qpsmtpd-apache + qpsmtpd-async
-License: distributable
+License: MIT
 Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
 BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
 BuildRequires: perl >= 0:5.00503
 BuildArchitectures: noarch
 Requires: perl(Mail::Header), perl(Net::DNS) perl(Net::IP) perl(IPC::Shareable)
+Requires(pre): coreutils, shadow-utils, perl
 
 Source0: %{name}-%{version}-%{release}.tar.gz
 Source1: qpsmtpd-forkserver.rc
@@ -64,14 +64,14 @@ eval `perl '-V:installarchlib'`
 mkdir -p $RPM_BUILD_ROOT/$installarchlib
 if grep -q DESTDIR Makefile
 then
-	make DESTDIR=$RPM_BUILD_ROOT
-	find blib/lib -name '*.pm.*' -exec rm -f {} \;
-	make DESTDIR=$RPM_BUILD_ROOT install
+        make DESTDIR=$RPM_BUILD_ROOT
+        find blib/lib -name '*.pm.*' -exec rm -f {} \;
+        make DESTDIR=$RPM_BUILD_ROOT install
 
 else
-	make PREFIX=$RPM_BUILD_ROOT/usr 
-	find blib/lib -name '*.pm.*' -exec rm -f {} \;
-	make PREFIX=$RPM_BUILD_ROOT/usr install
+        make PREFIX=$RPM_BUILD_ROOT/usr
+        find blib/lib -name '*.pm.*' -exec rm -f {} \;
+        make PREFIX=$RPM_BUILD_ROOT/usr install
 fi
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}
 rm -f ${RPM_BUILD_ROOT}%{_datadir}/%{name}/plugins/*.*
@@ -102,14 +102,14 @@ cp %{SOURCE7} $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
 
 find ${RPM_BUILD_ROOT}%{_prefix} \( -name perllocal.pod -o -name .packlist \) -exec rm {} \;
 find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
-	sed "s@^$RPM_BUILD_ROOT@@g"     | \
-	grep -v [Aa]sync		| \
-	grep -v packaging		| \
-	grep -v README.selinux		| \
-	grep -v /Apache                 | \
-	grep -v /Danga                  | \
-	grep -v Qpsmtpd/ConfigServer.pm | \
-	grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
+        sed "s@^$RPM_BUILD_ROOT@@g"     | \
+        grep -v [Aa]sync                | \
+        grep -v packaging               | \
+        grep -v README.selinux          | \
+        grep -v /Apache                 | \
+        grep -v /Danga                  | \
+        grep -v Qpsmtpd/ConfigServer.pm | \
+        grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
 if [ "$(cat %{name}-%{version}-%{release}-filelist)X" = "X" ] ; then
     echo "ERROR: EMPTY FILE LIST"
     exit -1
@@ -122,7 +122,7 @@ fi
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
 %config(noreplace) %{_sysconfdir}/xinetd.d/smtp
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
-%attr(0700,smtpd,smtpd) %dir %{_localstatedir}/spool/qpsmtpd
+%attr(2750,qpsmtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
 
 %files apache
@@ -149,9 +149,9 @@ then
     # need to create smtpd user.
     if perl -e 'exit ! defined(getgrnam("postdrop"))'
     then
-	# if postfix is installed, we will probably use
-	# queue/postfix, which will need this:
-    	supp="-G postdrop"
+        # if postfix is installed, we will probably use
+        # queue/postfix, which will need this:
+        supp="-G postdrop"
     fi
     useradd -r -m $supp smtpd
 fi
@@ -237,8 +237,8 @@ fi
 
 * Sat Jan 28 2006 <hjp@hjp.at> 0.31.1-3
 - Use ${SOURCE*} macros to refer to source files
-- Avoid invoking rpm and other cleanup in %pre section
-- Invoke chkconfig in %post.
+- Avoid invoking rpm and other cleanup in pre section
+- Invoke chkconfig in post.
 - (Thanks to Josko Plazonic for the reporting these problems and
   suggesting fixes)
 
