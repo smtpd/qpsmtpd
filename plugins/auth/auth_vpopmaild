@@ -57,3 +57,41 @@ sub auth_vpopmaild {
         return DECLINED;
     }
 }
+
+__END__
+
+=head1 NAME
+
+auth_vpopmaild - Authenticate to vpopmaild
+
+=head1 DESCRIPTION
+
+Authenticates the user against against vpopmaild [1] daemon.
+
+=head1 CONFIGURATION
+
+Add a line to C<config/plugins> as follows:
+
+auth_vpopmaild
+
+By default, the plugin connects to localhot on port 89. If your vpopmaild
+daemon is running on a different host or port, specify as follows:
+
+auth_vpopmaild host [host] port [port]
+
+=head1 LINKS
+
+[1] http://www.qmailwiki.org/Vpopmaild
+
+=head1 AUTHOR
+
+Robin Bowes <robin.bowes@yo61.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2010 Robin Bowes
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
