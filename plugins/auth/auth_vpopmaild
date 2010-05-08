@@ -1,0 +1,52 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use IO::Socket;
+use version; my $VERSION = qv('1.0.0');
+
+sub register {
+    my ($self, $qp) = @_;
+    $self->register_hook('auth-plain', 'auth_vpopmaild');
+    $self->register_hook('auth-login', 'auth_vpopmaild');
+}
+
+sub auth_vpopmaild {
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
+      @_;
+
+    ### FIXME - read these values from a config file
+    my $vpopmaild_host = 'localhost';
+    my $vpopmaild_port = 89;
+
+    # create socket
+    my $vpopmaild_socket =
+      IO::Socket::INET->new(
+                            PeerAddr => $vpopmaild_host,
+                            PeerPort => $vpopmaild_port,
+                            Proto    => 'tcp',
+                            Type     => SOCK_STREAM
+                           ) or return DECLINED;
+
+    # Get server greeting (+OK)
+    my $connect_response = <$vpopmaild_socket>;
+    if (!$connect_response =~ /\+OK.*/) {
+        return DECLINED;
+    }
+
+    # send login details
+    print $vpopmaild_socket "login $user $passClear\n\r";
+
+    # get response from server
+    my $login_response = <$vpopmaild_socket>;
+
+    close($vpopmaild_socket);
+
+    # check for successful login
+    if ($login_response =~ /\+OK.*/) {
+        return (OK, 'authcheckpassword');
+    }
+    else {
+        return DECLINED;
+    }
+}
