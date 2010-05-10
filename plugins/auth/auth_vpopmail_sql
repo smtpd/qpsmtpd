@@ -15,17 +15,33 @@ to compare the crypted password.
 
 =head1 CONFIGURATION
 
-Decide which authentication methods you are willing to support and uncomment
+ echo "dbi:mysql:dbname=vpopmail;host=127.0.0.1" > config/vpopmail_mysql_dsn
+ echo "vpopmailuser" > config/vpopmail_mysql_user
+ echo "vpoppasswd" > config/vpopmail_mysql_pass
+
+This can be a read-only database user since the plugin does not update the
+last accessed time (yet, see below).
+
+This module supports PLAIN, LOGIN, and CRAM-MD5 authentication methods. You
+can disable undesired methods by editing this module and uncommenting
 the lines in the register() sub.  See the POD for Qspmtpd::Auth for more
 details on the ramifications of supporting various authentication methods.
-Then, change the database information at the top of the authsql() sub so that
-the module can access the database.  This can be a read-only account since 
-the plugin does not update the last accessed time (yet, see below).
 
 The remote user must login with a fully qualified e-mail address (i.e. both
-account name and domain), even if they don't normally need to.  This is 
+account name and domain), even if they don't normally need to.  This is
 because the vpopmail table has a unique index on pw_name/pw_domain, and this
 module requires that only a single record be returned from the database.
+
+=head1 LIMITATIONS
+
+This authentication modules does not recognize domain aliases. So, if you have
+the domain example.com, with domain aliases for example.org and example.net,
+smtp-auth will only work for $user@example.com. If you have domain aliases,
+consider using the auth_checkpassword plugin.
+
+The checkpassword plugin only supports plain and login authentications, where
+this plugin also supports CRAM-MD5. I use both modules together. I use this one
+for CRAM-MD5 and the checkpassword plugin for plain and login.
 
 =head1 FUTURE DIRECTION
 
@@ -50,41 +66,38 @@ Please see the LICENSE file included with qpsmtpd for details.
 sub register {
     my ( $self, $qp ) = @_;
 
-    $self->register_hook("auth-plain", "authsql" );
-    $self->register_hook("auth-login", "authsql" );
-    $self->register_hook("auth-cram-md5", "authsql");
-
+    $self->register_hook("auth-plain", "auth_vmysql" );
+    $self->register_hook("auth-login", "auth_vmysql" );
+    $self->register_hook("auth-cram-md5", "auth_vmysql");
 }
 
-sub authsql {
+sub auth_vmysql {
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
+
     use DBI;
     use Qpsmtpd::Constants;
     use Digest::HMAC_MD5 qw(hmac_md5_hex);
 
 #    $DB::single = 1;
 
-    my $connect  = "dbi:mysql:dbname=vpopmail";
-    my $dbuser   = "vpopmailuser";
-    my $dbpasswd = "vpoppasswd";
+    my $dsn    = $self->qp->config("vpopmail_mysql_dsn") || "dbi:mysql:dbname=vpopmail;host=127.0.0.1";
+    my $dbuser = $self->qp->config("vpopmail_mysql_user") || "vpopmailuser";
+    my $dbpass = $self->qp->config("vpopmail_mysql_pass") || "vpoppasswd";
 
-    my $dbh = DBI->connect( $connect, $dbuser, $dbpasswd );
+    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass );
     $dbh->{ShowErrorStatement} = 1;
 
-    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
-      @_;
-    my ( $pw_name, $pw_domain ) = split "@", lc($user);
+    my ( $pw_name, $pw_domain ) = split '@', lc($user);
 
-    unless ( defined $pw_domain ) {
-        return DECLINED;
-    }
+    return DECLINED if ! defined $pw_domain;
 
     $self->log(LOGINFO,
 	"Authentication to vpopmail via mysql: $pw_name\@$pw_domain");
 
     my $sth = $dbh->prepare(<<SQL);
-select *
-from vpopmail
-where pw_name = ? and pw_domain = ?
+SELECT *
+FROM vpopmail
+WHERE pw_name = ? AND pw_domain = ?
 SQL
 
     $sth->execute( $pw_name, $pw_domain );
@@ -96,8 +109,8 @@ SQL
 
     # if vpopmail was not built with '--enable-clear-passwd=y'
     # then pw_clear_passwd may not even exist
-    my $pw_clear_passwd = exists $passwd_hash->{'pw_clear_passwd'} 
-                               ? $passwd_hash->{'pw_clear_passwd'} 
+    my $pw_clear_passwd = exists $passwd_hash->{'pw_clear_passwd'}
+                               ? $passwd_hash->{'pw_clear_passwd'}
 			       : undef;
     my $pw_passwd = $passwd_hash->{'pw_passwd'}; # this is always present
 
@@ -107,26 +120,26 @@ SQL
          # user doesn't exist in this domain
 	 ( not defined $pw_passwd )
        ) {
-        return ( DECLINED, "authsql/$method" );
+        return ( DECLINED, "auth_vmysql/$method" );
     }
 
     # at this point we can assume the user name matched
     if (
-        ( defined $passClear and 
+        ( defined $passClear and
 	  (
 	     ($pw_clear_passwd eq $passClear)
 	  or ($pw_passwd eq crypt( $passClear, $pw_passwd ) )
 	  )
-	) 
+	)
         or ( defined $passHash
              and $passHash eq hmac_md5_hex( $ticket, $pw_clear_passwd ) )
       )
     {
 
-        return ( OK, "authsql/$method" );
+        return ( OK, "auth_vmysql/$method" );
     }
     else {
-        return ( DENY, "authsql/$method - wrong password" );
+        return ( DENY, "auth_vmysql/$method - wrong password" );
     }
 }
 
