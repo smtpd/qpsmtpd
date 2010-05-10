@@ -17,7 +17,7 @@ mailinglist:
 
 What is Qpsmtpd?
 
-Qpsmtpd is an extensible smtp engine written in Perl.  No, make that
+Qpsmtpd is an extensible SMTP engine written in Perl.  No, make that
 easily extensible!  See plugins/quit_fortune for a very useful, er,
 cute example.
 
@@ -56,7 +56,7 @@ Make a new user and a directory where you'll install qpsmtpd.  I
 usually use "smtpd" for the user and /home/smtpd/qpsmtpd/ for the
 directory.
 
-Put the files there.  If you install from Subversion you can just do
+Put the files there.  If you install from git you can just do
 run the following command in the /home/smtpd/ directory.
 
    git clone git://github.com/abh/qpsmtpd.git
@@ -151,7 +151,7 @@ See http://www.rfc-ignorant.org/ for more examples.
 
 =item dnsbl_zones
 
-Normal ip based dns blocking lists ("RBLs"). For example:
+Normal ip based DNS blocking lists ("RBLs"). For example:
 
   relays.ordb.org
   spamsources.fabel.dk
@@ -167,7 +167,7 @@ found the mail command will return a soft rejection (450).
 =item spool_dir
 
 If this file contains a directory, it will be the spool directory
-smtpd uses during the data transactions. If this file doesnt exist, it
+smtpd uses during the data transactions. If this file doesn't exist, it
 will default to use $ENV{HOME}/tmp/. This directory should be set with
 a mode of 700 and owned by the smtpd user.
 

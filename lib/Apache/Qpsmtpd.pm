@@ -1,5 +1,3 @@
-# $Id$
-
 package Apache::Qpsmtpd;
 
 use 5.006001;

@@ -4,8 +4,6 @@
 
 clamav -- ClamAV antivirus plugin for qpsmtpd
 
-$Id$
-
 =head1 DESCRIPTION
 
 This plugin scans incoming mail with the clamav A/V scanner, and can at your

@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-# $Id$
 
 =head1 NAME
 
@@ -111,6 +110,7 @@ use warnings;
 sub register {
     my ( $self, $qp, @args ) = @_;
 
+    $self->log(LOGERROR, "Bad parameters for the clamdscan plugin") if @_ % 2;
     %{ $self->{"_clamd"} } = @args;
 
     # Set some sensible defaults
@@ -198,6 +198,9 @@ sub hook_data_post {
         return DECLINED;
     }
 
+    my @clamd_version = split(/\//, $clamd->version);
+    $self->{"_clamd"}->{'version'} = $clamd_version[0] || 'ClamAV';
+
     my ( $path, $found ) = eval { $clamd->scan_path( $filename ) };
     if ($@) {
         $self->log( LOGERROR, "Error scanning mail: $@" );
@@ -218,11 +221,12 @@ sub hook_data_post {
         }
     }
     else {
+        $transaction->header->add( 'X-Virus-Found',   'No' );
         $self->log( LOGINFO, "ClamAV scan reports clean");
     }
 
     $transaction->header->add( 'X-Virus-Checked',
-        "Checked by ClamAV on " . $self->qp->config("me") );
+        "Checked by $self->{'_clamd'}->{'version'} on " . $self->qp->config("me") );
 
     return (DECLINED);
 }

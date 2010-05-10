@@ -1,5 +1,3 @@
-# $Id$
-
 package Test::Qpsmtpd::Plugin;
 1;
 
