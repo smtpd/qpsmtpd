@@ -37,9 +37,7 @@ sub auth_vpopmaild {
 
     # Get server greeting (+OK)
     my $connect_response = <$vpopmaild_socket>;
-    if (!$connect_response =~ /\+OK.*/) {
-        return DECLINED;
-    }
+    return DECLINED unless $connect_response eq '+OK \r\n';
 
     # send login details
     print $vpopmaild_socket "login $user $passClear\n\r";
@@ -50,7 +48,7 @@ sub auth_vpopmaild {
     close($vpopmaild_socket);
 
     # check for successful login
-    if ($login_response =~ /\+OK.*/) {
+    if ($login_response eq '+OK+\r\n') {
         return (OK, 'authcheckpassword');
     }
     else {
