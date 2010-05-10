@@ -88,7 +88,7 @@ sub hook_data_post {
     # Find the sender, and return unless it wasn't a bounce.
     #
     my $sender = $transaction->sender->address || undef;
-    return DECLINED unless ($sender =~ /^<>$/);
+    return DECLINED unless ($sender eq "<>");
 
     #
     #  Get the recipients.
@@ -102,15 +102,15 @@ sub hook_data_post {
     #   1.  It is a bounce, via the null-envelope.
     #   2.  It is a bogus bounce, because there are more than one recipients.
     #
-    if ($self->{_action} =~ /^log$/i) {
+    if (lc $self->{_action} eq "log") {
         $self->log(LOGWARN,
                  $self->plugin_name() . " bogus bounce for :" . join(",", @to));
     }
-    elsif ($self->{_action} =~ /^deny$/i) {
+    elsif (lc $self->{_action} eq "deny") {
         return (DENY,
                 $self->plugin_name() . " determined this to be a bogus bounce");
     }
-    elsif ($self->{_action} =~ /^denysoft$/i) {
+    elsif (lc $self->{_action} eq "denysoft") {
         return (DENYSOFT,
                 $self->plugin_name() . " determined this to be a bogus bounce");
     }
