@@ -37,17 +37,18 @@ module requires that only a single record be returned from the database.
 This authentication modules does not recognize domain aliases. So, if you have
 the domain example.com, with domain aliases for example.org and example.net,
 smtp-auth will only work for $user@example.com. If you have domain aliases,
-consider using the auth_checkpassword plugin.
-
-The checkpassword plugin only supports plain and login authentications, where
-this plugin also supports CRAM-MD5. I use both modules together. I use this one
-for CRAM-MD5 and the checkpassword plugin for plain and login.
+consider using another plugin (see SEE ALSO).
 
 =head1 FUTURE DIRECTION
 
 The default MySQL configuration for vpopmail includes a table to log access,
 lastauth, which could conceivably be updated upon sucessful authentication.
 The addition of this feature is left as an exercise for someone who cares. ;)
+
+=head1 SEE ALSO
+
+For an overview of the vpopmail authentication plugins and their merits,
+please read the VPOPMAIL section in docs/authentication.pod
 
 =head1 AUTHOR
 

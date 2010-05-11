@@ -201,9 +201,50 @@ authentication attempts for this transaction.
 In addition, all plugins that are registered for a specific auth hook will
 be tried before any plugins which are registered for the general auth hook.
 
+=head1 VPOPMAIL
+
+There are 4 authentication (smtp-auth) plugins that can be used with
+vpopmail.
+
+=over 4
+
+=item auth_vpopmaild
+
+If you aren't sure which one to use, then use auth_vpopmaild. It
+has full support for all 3 authentication methods (PLAIN,LOGIN,CRAM-MD5),
+doesn't require the qpsmtpd process to run with special permissions, and
+can authenticate against vpopmail running on another host. It does require
+the vpopmaild server to be running.
+
+=item auth_vpopmail
+
+The next best solution is auth_vpopmail. It requires the p5-vpopmail perl
+module and it compiles against libvpopmail.a. There are two catches. The
+qpsmtpd daemon must run as the vpopmail user, and you must be running v0.09
+or higher for CRAM-MD5 support. The released version is 0.08 but my
+CRAM-MD5 patch has been added to the developers repo:
+   http://github.com/sscanlon/vpopmail
+
+=item auth_vpopmail_sql
+
+If you are using the MySQL backend for vpopmail, then this module can be
+used for smtp-auth. It has support for all three auth methods. However, it
+does not work with some vpopmail features such as alias domains, service
+restrictions, nor does it update vpopmail's last_auth information.
+
+=item auth_checkpassword
+
+The auth_checkpassword is a generic authentication module that will work
+with any DJB style checkpassword program, including ~vpopmail/bin/vchkpw.
+It only supports PLAIN and LOGIN auth methods.
+
+=back
+
 =head1 AUTHOR
 
 John Peacock <jpeacock@cpan.org>
+
+Matt Simerson <msimerson@cpan.org> (added VPOPMAIL)
 
 =head1 COPYRIGHT AND LICENSE
 
