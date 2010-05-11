@@ -5,119 +5,138 @@ SPF - plugin to implement Sender Permitted From
 
 =head1 SYNOPSIS
 
-  # in config/plugins
-  sender_permitted_from
+Prevents email sender address spoofing by checking the SPF policy of the purported senders domain.
 
-Or if you wish to issue 5xx on SPF fail:
+=head1 DESCRIPTION
+
+Sender Policy Framework (SPF) is an e-mail validation system designed to prevent spam by addressing source address spoofing. SPF allows administrators to specify which hosts are allowed to send e-mail from a given domain by creating a specific SPF record in the public DNS. Mail exchangers then use the DNS to check that mail from a given domain is being sent by a host sanctioned by that domain's administrators. -- http://en.wikipedia.org/wiki/Sender_Policy_Framework
+
+=head1 CONFIGURATION
+
+In config/plugins, add arguments to the sender_permitted_from line.
 
   sender_permitted_from spf_deny 1
 
-Other arguments are 'trust 0' and 'guess 0'. These turn off processing of 
-spf.trusted-forwarders.org and the best_guess functionality. It is unlikely 
-that you want to turn these off.
+=head2 spf_deny
 
-Adding 'spf_deny 2' will also issue a 5xx on a softfail response.
-
-You can also specify local SPF policy with 
-
-    include '<spf mechanism list>'
+Setting spf_deny to 0 will prevent emails from being rejected, even if they fail SPF checks. sfp_deny 1 is the default, and a reasonable setting. It temporarily defers connections (4xx) that have soft SFP failures and only rejects (5xx) messages when the sending domains policy suggests it. Settings spf_deny to 2 is more aggressive and will cause soft failures to be rejected permanently.
 
 See also http://spf.pobox.com/
 
+=head1 AUTHOR
+
+Matt Simerson <msimerson@cpan.org>
+
+=head1 ACKNOWLEDGEMENTS
+
+whomever wrote the original SPF plugin, upon which I based this.
+
 =cut
 
-use Mail::SPF::Query 1.991;
+use strict;
+use Mail::SPF 2.000;
+use Data::Dumper;
 
 sub register {
-  my ($self, $qp, @args) = @_;
-  %{$self->{_args}} = @args;
+    my ($self, $qp, @args) = @_;
+    %{$self->{_args}} = @args;
 }
 
 sub hook_mail {
-  my ($self, $transaction, $sender, %param) = @_;
+    my ($self, $transaction, $sender, %param) = @_;
 
-  return (DECLINED) unless ($sender->format ne "<>"
-                            and $sender->host && $sender->user);
+    my $format    = $sender->format;
+    my $host      = lc $sender->host;
+    my $user      = $sender->user;
+    my $client_ip = $self->qp->connection->remote_ip;
+    my $from      = $sender->user . '@' . $host;
+    my $helo      = $self->qp->connection->hello_host;
 
-  # If we are receving from a relay permitted host, then we are probably
-  # not the delivery system, and so we shouldn't check
+    return (DECLINED, "SPF - null sender")
+      unless ($format ne "<>" && $host && $user);
 
-  return (DECLINED) if $self->qp->connection->relay_client();
-  my @relay_clients = $self->qp->config("relayclients");
-  my $more_relay_clients = $self->qp->config("morerelayclients", "map");
-  my %relay_clients = map { $_ => 1 } @relay_clients;
-  my $client_ip = $self->qp->connection->remote_ip;
-  while ($client_ip) {
-    return (DECLINED) if exists $relay_clients{$client_ip};
-    return (DECLINED) if exists $more_relay_clients->{$client_ip};
-    $client_ip =~ s/\d+\.?$//; # strip off another 8 bits
-  }
+    # If we are receving from a relay permitted host, then we are probably
+    # not the delivery system, and so we shouldn't check
+    return (DECLINED, "SPF - relaying permitted")
+      if $self->qp->connection->relay_client();
 
-  my $host = lc $sender->host;
-  my $from = $sender->user . '@' . $host;
+    my @relay_clients      = $self->qp->config("relayclients");
+    my $more_relay_clients = $self->qp->config("morerelayclients", "map");
+    my %relay_clients      = map { $_ => 1 } @relay_clients;
+    while ($client_ip) {
+        return (DECLINED, "SPF - relaying permitted")
+          if exists $relay_clients{$client_ip};
+        return (DECLINED, "SPF - relaying permitted")
+          if exists $more_relay_clients->{$client_ip};
+        $client_ip =~ s/\d+\.?$//;    # strip off another 8 bits
+    }
 
-  my $ip = $self->qp->connection->remote_ip;
-  my $helo = $self->qp->connection->hello_host;
+    my $scope = $from ? 'mfrom' : 'helo';
+    $client_ip = $self->qp->connection->remote_ip;
+    my %req_params = (
+        versions => [1, 2],           # optional
+        scope => $scope,
+        ip_address => $client_ip,
+                     );
 
-  my $query = Mail::SPF::Query->new(ip => $ip, sender => $from, helo => $helo,
-		sanitize => 1,
-		local => $self->{_args}{local},
-		guess => defined($self->{_args}{guess}) ? $self->{_args}{guess} : 1,
-		trusted => defined($self->{_args}{trust}) ? $self->{_args}{trust} : 1) 
-    || die "Couldn't construct Mail::SPF::Query object";
-  $transaction->notes('spfquery', $query);
-               
-  return (DECLINED);
+    if ($scope =~ /mfrom|pra/) {
+        $req_params{identity} = $from;
+        $req_params{helo_identity} = $helo if $helo;
+    }
+    elsif ($scope eq 'helo') {
+        $req_params{identity}      = $helo;
+        $req_params{helo_identity} = $helo;
+    }
+
+    my $spf_server = Mail::SPF::Server->new();
+    my $request    = Mail::SPF::Request->new(%req_params);
+    my $result     = $spf_server->process($request);
+
+    $transaction->notes('spfquery', $result);
+
+    return (OK) if $result->code eq 'pass';    # this test passed
+    return (DECLINED, "SPF - $result->code");
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt, %param) = @_;
-  
-  # special addresses don't get SPF-tested.
-  return DECLINED if $rcpt and $rcpt->user and $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i;
-  
-  my $query = $transaction->notes('spfquery');
+    my ($self, $transaction, $rcpt, %param) = @_;
 
-  return DECLINED if !$query;
-  my ($result, $smtp_comment, $comment) = $query->result2($rcpt->address);
-  
-  if ($result eq "error") {
-    return (DENYSOFT, "SPF error: $smtp_comment");
-  }
+    # special addresses don't get SPF-tested.
+    return DECLINED
+      if $rcpt
+          and $rcpt->user
+          and $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i;
 
-  if ($result eq "fail" and $self->{_args}{spf_deny}) {
-    return (DENY, "SPF forgery: $smtp_comment");
-  }
+    my $result = $transaction->notes('spfquery') or return DECLINED;
+    my $code   = $result->code;
+    my $why    = $result->local_explanation;
+    my $deny   = $self->{_args}{spf_deny};
 
-  if ($result eq "softfail" and $self->{_args}{spf_deny} > 1) {
-    return (DENY, "SPF probable forgery: $smtp_comment");
-  }
+    return (DECLINED, "SPF - $code: $why")   if $code eq "pass";
+    return (DECLINED, "SPF - $code, $why")   if !$deny;
+    return (DENYSOFT, "SPF - $code: $why")   if $code eq "error";
+    return (DENY,     "SPF - forgery: $why") if $code eq 'fail';
 
-  if ($result eq 'fail' or $result eq 'softfail') {
-    $self->log(LOGDEBUG, "result for $rcpt->address was $result: $comment");
-  }
-   
-  return DECLINED;
-}
+    if ($code eq "softfail") {
+        return (DENY, "SPF probable forgery: $why") if $deny > 1;
+        return (DENYSOFT, "SPF probable forgery: $why");
+    }
 
-sub _uri_escape {
-  my $str = shift;
-  $str =~ s/([^A-Za-z0-9\-_.!~*\'()])/sprintf "%%%X", ord($1)/eg;
-  return $str;
+    $self->log(LOGDEBUG, "result for $rcpt->address was $code: $why");
+
+    return (DECLINED, "SPF - $code, $why");
 }
 
 sub hook_data_post {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  my $query = $transaction->notes('spfquery');
-  return DECLINED if !$query;
+    my $result = $transaction->notes('spfquery') or return DECLINED;
 
-  my ($result, $smtp_comment, $comment) = $query->message_result2();
+    $self->log(LOGDEBUG, "result was $result->code");
 
-  $self->log(LOGDEBUG, "result was $result: $comment") if ($result);
+    $transaction->header->add('Received-SPF' => $result->received_spf_header,
+                              0);
 
-  $transaction->header->add('Received-SPF' => "$result ($comment)", 0);
-
-  return DECLINED;
+    return DECLINED;
 }
 
