@@ -2,7 +2,7 @@
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("test_authsql", 3);
+    $self->register_test("test_auth_flat_file", 3);
 }
 
 my @u_list = qw ( good bad none );
@@ -12,13 +12,13 @@ my %u_data = (
 	      none => [ 'none@example.com', DECLINED, '' ],
 	      );
 
-sub test_authsql {
+sub test_auth_flat_file {
     my $self = shift;
     my ($tran, $ret, $note, $u, $r, $p, $a );
     $tran = $self->qp->transaction;
     for $u ( @u_list ) {
 	( $a,$r,$p ) = @{$u_data{$u}};
-	($ret, $note) = $self->authsql($tran,'CRAMMD5',$a,$p);
+	($ret, $note) = $self->auth_flat_file($tran,'CRAMMD5',$a,$p);
 	defined $note or $note='No-Message';
 	is ($ret, $r, $note);
 	# - for debugging.

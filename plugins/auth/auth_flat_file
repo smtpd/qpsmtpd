@@ -35,10 +35,10 @@ use Digest::HMAC_MD5 qw(hmac_md5_hex);
 sub register {
     my ( $self, $qp ) = @_;
 
-    $self->register_hook("auth-cram-md5", "authsql");
+    $self->register_hook("auth-cram-md5", "auth_flat_file");
 }
 
-sub authsql {
+sub auth_flat_file {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
