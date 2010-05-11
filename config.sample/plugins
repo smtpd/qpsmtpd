@@ -34,6 +34,7 @@ check_badrcptto
 check_spamhelo
 
 # sender_permitted_from
+# greylisting p0f genre,windows
 
 auth/auth_flat_file
 auth/authdeny
