@@ -62,6 +62,7 @@ plugins/async/queue/smtp-forward
 plugins/async/require_resolvable_fromhost
 plugins/async/rhsbl
 plugins/async/uribl
+plugins/auth/auth_checkpassword
 plugins/auth/auth_cvm_unix_local
 plugins/auth/auth_flat_file
 plugins/auth/auth_ldap_bind

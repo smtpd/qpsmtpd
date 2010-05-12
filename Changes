@@ -1,3 +1,19 @@
+
+Next Version
+
+  new plugin auth_vpopmaild (Robin Bowes)
+
+  new plugin auth_checkpassword (Matt Simerson)
+
+  auth_vpopmail_sql: more flexible db config (Matt Simerson)
+
+  new plugin check_bogus_bounce (Steve Kemp)
+
+  clamav: added ClamAV version to the X-Virus-Checked header, 
+  as well as noting "no virus found".  (Matt Simerson)
+
+  assorted documentation cleanups (Steve Kemp, Robert Spier)
+
 0.84 April 7, 2010
 
   uribl: fix scan-headers option (Jost Krieger, Robert Spier)
