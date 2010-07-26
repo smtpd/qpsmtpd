@@ -133,7 +133,7 @@ use something like File::NFSLock instead.
 
 Written by Gavin Carr <gavin@openfusion.com.au>.
 
-Added p0f section <mattsimerson@cpan.org> (2010-05-03)
+Added p0f section <msimerson@cpan.org> (2010-05-03)
 
 =cut
 
