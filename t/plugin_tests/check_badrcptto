@@ -5,5 +5,5 @@ sub register_tests {
 }
 
 sub test_check_badrcptto_ok {
-    ok(1);
+    ok(1, 'badrcptto, ok');
 }
