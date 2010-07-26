@@ -1,6 +1,8 @@
 
 Next Version
 
+  require_resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
+
   new plugin auth_vpopmaild (Robin Bowes)
 
   new plugin auth_checkpassword (Matt Simerson)
