@@ -16,6 +16,8 @@ Next Version
 
   assorted documentation cleanups (Steve Kemp, Robert Spier)
 
+  Revert "Spool body when $transaction->body_fh() is called"
+
 0.84 April 7, 2010
 
   uribl: fix scan-headers option (Jost Krieger, Robert Spier)
