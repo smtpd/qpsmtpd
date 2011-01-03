@@ -41,7 +41,7 @@ sub hook_mail {
 sub hook_rcpt {
 	my ($self, $transaction, $recipient, %args) = @_;
 
-	if (my $host = $self->qp->connection->notes('temp_resolver_failed')) {
+	if (my $host = $transaction->notes('temp_resolver_failed')) {
 		# default of temp_resolver_failed is DENYSOFT
 		return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $host);
 	}
