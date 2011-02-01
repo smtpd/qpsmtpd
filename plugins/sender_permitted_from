@@ -121,7 +121,6 @@ sub hook_rcpt {
 
     if ($code eq "softfail") {
         return (DENY, "SPF probable forgery: $why") if $deny > 1;
-        return (DENYSOFT, "SPF probable forgery: $why");
     }
 
     $self->log(LOGDEBUG, "result for $rcpt->address was $code: $why");
