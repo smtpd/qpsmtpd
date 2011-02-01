@@ -69,7 +69,7 @@ sub hook_mail {
           if exists $relay_clients{$client_ip};
         return (DECLINED, "SPF - relaying permitted")
           if exists $more_relay_clients->{$client_ip};
-        $client_ip =~ s/\d+\.?$//;    # strip off another 8 bits
+        $client_ip =~ s/\d+\.?$// or last;    # strip off another 8 bits
     }
 
     my $scope = $from ? 'mfrom' : 'helo';
