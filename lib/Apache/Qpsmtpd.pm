@@ -43,6 +43,25 @@ package Qpsmtpd::Apache;
 use Qpsmtpd::Constants;
 use base qw(Qpsmtpd::SMTP);
 
+my %cdir_memo;
+
+sub config_dir {
+  my ($self, $config) = @_;
+  if (exists $cdir_memo{$config}) {
+      return $cdir_memo{$config};
+  }
+
+  if (uc($ENV{QPSMTPD_CONFIG}) eq 'USE-VIRTUAL-DOMAINS') {
+      my $cdir = $self->{conn}->base_server->dir_config("qpsmtpd.config_dir");
+      $cdir =~ /^(.*)$/; # detaint
+      my $configdir = $1 if -e "$1/$config";
+      $cdir_memo{$config} = $configdir;
+  } else {
+      $cdir_memo{$config} = $self->SUPER::config_dir(@_);
+  }
+  return $cdir_memo{$config};
+}
+
 sub start_connection {
     my $self = shift;
     my %opts = @_;
@@ -183,6 +202,19 @@ Apache::Qpsmtpd - a mod_perl-2 connection handler for qpsmtpd
   PerlSetVar qpsmtpd.loglevel 4
   </VirtualHost>
 
+Using multiple instances of Qpsmtpd on the same server is also
+possible by setting:
+
+  $ENV{QPSMTPD_CONFIG} = "USE-VIRTUAL-DOMAINS";
+
+Then in the VirtualHost of each config define the configuration
+directory:
+
+  PerlSetVar qpsmtpd.config_dir /path/to/qpsmtpd/config
+
+Several different configurations can be running on the same
+server.
+
 =head1 DESCRIPTION
 
 This module implements a mod_perl/apache 2.0 connection handler
@@ -208,6 +240,7 @@ connections, but could do with some enhancements specific to SMTP.
 Matt Sergeant, <matt@sergeant.org>
 
 Some credit goes to <mock@obscurity.org> for Apache::SMTP which gave
-me the inspiration to do this.
+me the inspiration to do this.  <peter@boku.net> added the virtual
+host support.
 
 =cut

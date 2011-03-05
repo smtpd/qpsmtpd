@@ -41,7 +41,7 @@ sub hook_mail {
 sub hook_rcpt {
 	my ($self, $transaction, $recipient, %args) = @_;
 
-	if (my $host = $self->qp->connection->notes('temp_resolver_failed')) {
+	if (my $host = $transaction->notes('temp_resolver_failed')) {
 		# default of temp_resolver_failed is DENYSOFT
 		return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $host);
 	}
@@ -58,7 +58,7 @@ sub check_dns {
 
   return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
 
-  my $res = new Net::DNS::Resolver;
+  my $res = new Net::DNS::Resolver(dnsrch => 0);
   $res->tcp_timeout(30);
   $res->udp_timeout(30);
   my @mx = mx($res, $host);
@@ -116,7 +116,7 @@ sub is_valid {
 
 sub mx_valid {
   my ($self, $name, $host) = @_;
-  my $res   = new Net::DNS::Resolver;
+  my $res   = new Net::DNS::Resolver(dnsrch => 0);
   # IP in MX
   return is_valid($name) if ip_is_ipv4($name) or ip_is_ipv6($name);
 

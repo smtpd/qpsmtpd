@@ -2,7 +2,7 @@
 sub register_tests {
     my $self = shift;
     $self->register_test("test_returnval", 2);
-    $self->register_test("foo", 1);
+    $self->register_test("rcpt_ok", 1);
 }
 
 sub test_returnval {
@@ -17,6 +17,6 @@ sub test_returnval {
 #    print("# rcpt_ok result: $note\n");
 }
 
-sub foo {
+sub rcpt_ok {
     ok(1);
 }

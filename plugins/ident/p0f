@@ -1,22 +1,87 @@
 # -*- perl -*-
 
-=pod
+=head1 NAME
 
-An Identification Plugin
+p0f - A TCP Fingerprinting Identification Plugin
 
- ./p0f -u qpsmtpd -d -q -Q /tmp/.p0f_socket 'dst port 25' -o /dev/null && \
-    chown qpsmtpd /tmp/.p0f_socket
+=head1 SYNOPSIS
 
-and add 
+Use TCP fingerprint info (remote computer OS, network distance, etc) to
+implement more sophisticated anti-spam policies.
+
+=head1 DESCRIPTION
+
+This p0f module inserts a 'p0f' note that other qpsmtpd plugins can inspect.
+It includes the following information about the TCP fingerprint (link,
+detail, distance, uptime, genre). Here's an example connection note:
+
+ genre    => FreeBSD
+ detail   => 6.x (1)
+ uptime   => 1390
+ link     => ethernet/modem
+ distance => 17
+
+Which was parsed from this p0f fingerprint:
+
+  24.18.227.2:39435 - FreeBSD 6.x (1) (up: 1390 hrs)
+    -> 208.75.177.101:25 (distance 17, link: ethernet/modem)
+
+=head1 MOTIVATION
+
+This p0f plugin provides a way to make sophisticated policies for email
+messages. For example, the vast majority of email connections to my server
+from Windows computers are spam (>99%). But, I have a few clients that use
+Exchange servers so I can't just block email from all Windows computers.
+
+Same goes for greylisting. Finance companies (AmEx, BoA, etc) just love to
+send notices that they won't queue and retry. Either they deliver at that
+instant or never. When I enable greylisting, I lose valid messages. Grrr.
+
+So, while I'm not willing to use greylisting, and I'm not willing to block
+connections from Windows computers, I am quite willing to greylist all email
+from Windows computers.
+
+=head1 CONFIGURATION
+
+Create a startup script for PF that creates a communication socket when your
+server starts up.
+
+ p0f -u qpsmtpd -d -q -Q /tmp/.p0f_socket 'dst port 25' -o /dev/null
+ chown qpsmtpd /tmp/.p0f_socket
+
+add an entry to config/plugins to enable p0f:
 
  ident/p0f /tmp/.p0f_socket 
 
-to config/plugins
+=head2 local_ip
 
-it puts things into the 'p0f' connection notes so other plugins can do
-things based on source OS.
+Use the local_ip option to override the IP address of your mail server. This
+is useful if your mail server has a private IP because it is running behind
+a firewall. For example, my mail server has the IP 127.0.0.6, but the world
+knows my mail server as 208.75.177.101.
+
+Example config/plugins entry with local_ip override:
+
+  ident/p0f /tmp/.p0f_socket local_ip 208.75.177.101
 
 All code heavily based upon the p0fq.pl included with the p0f distribution.
+
+=head1 Environment requirements
+
+p0f requires four pieces of information to look up the p0f fingerprint:
+local_ip, local_port, remote_ip, and remote_port. TcpServer.pm has been
+has been updated to provide that information when running under djb's
+tcpserver. The async, forkserver, and prefork models will likely require
+some additional changes to make sure these fields are populated.
+
+=head1 ACKNOWLEDGEMENTS
+
+Heavily based upon the p0fq.pl included with the p0f distribution.
+
+=head1 AUTHORS
+
+ Matt Simerson <msimerson@cpan.org> - 5/1/2010
+ previous unnamed author
 
 =cut
 
@@ -26,22 +91,24 @@ use Net::IP;
 my $QUERY_MAGIC = 0x0defaced;
 
 sub register {
-  my ($self, $qp, $p0f_socket) = @_;
+    my ($self, $qp, $p0f_socket, %args) = @_;
 
-  $p0f_socket =~ /(.*)/; # untaint
-  $self->{_args}->{p0f_socket} = $1;
+    $p0f_socket =~ /(.*)/; # untaint
+    $self->{_args}->{p0f_socket} = $1;
+    foreach (keys %args) {
+        $self->{_args}->{$_} = $args{$_};
+    }
 }
 
 sub hook_connect {
   my($self, $qp) = @_;
 
   my $p0f_socket = $self->{_args}->{p0f_socket};
-  my $srcport    = 
-  my $destport   = $self->qp->connection->local_port;
+  my $local_ip = $self->{_args}{local_ip} || $self->qp->connection->local_ip;
 
   my $src = new Net::IP ($self->qp->connection->remote_ip) 
     or $self->log(LOGERROR, "p0f: ".Net::IP::Error()), return (DECLINED);
-  my $dst = new Net::IP ($self->qp->connection->local_ip) 
+  my $dst = new Net::IP($local_ip)
     or $self->log(LOGERROR, "p0f: ".NET::IP::Error()), return (DECLINED);
   my $query = pack("L L L N N S S",
                    $QUERY_MAGIC, 

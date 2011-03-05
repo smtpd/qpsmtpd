@@ -1,9 +1,9 @@
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("foo", 1);
+    $self->register_test("test_check_badrcptto_ok", 1);
 }
 
-sub foo {
-    ok(1);
+sub test_check_badrcptto_ok {
+    ok(1, 'badrcptto, ok');
 }

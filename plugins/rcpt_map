@@ -1,0 +1,190 @@
+
+=head1 NAME
+
+rcpt_map - check recipients against recipient map
+
+=head1 DESCRIPTION
+
+B<rcpt_map> reads a list of adresses, return codes and comments
+from the supplied config file. Adresses are compared with I<eq lc($rcpt)>.
+The recipient addresses are checked against this list, and if the first 
+matches, the return code from that line and the comment are returned to
+qpsmtpd. Return code can be any valid plugin return code from 
+L<Qpsmtpd::Constants>. Matching is always done case insenstive. 
+
+When the given map file changes on disk, it is re-read in the pre-connection
+hook.
+
+=head1 ARGUMENTS
+
+The C<file MAP> and C<domain NAME> arguments are required. The default value of
+the C<default> argument is C<DENY=No_such_user.> (see below why C<_>).
+
+=over 4
+
+=item domain NAME
+
+If the recipient address does not match this domain name NAME, this plugin will
+return C<DECLINED>
+
+=item file MAP
+
+Use the config file as map file, format as explained below
+
+=item default CODE[=MSG]
+
+Use CODE as default return code (and return MSG as message) if a recipient 
+was B<not> found in the map. Since we can't use spaces in MSG, every C<_>
+is replaced by a space, i.e. use C<DENY=User_not_found> if you want a deny
+message C<User not found>.
+
+=back
+
+=head1 CONFIG FILE
+
+The config file contains lines with an address, a return code and a comment, 
+which will be returned to the sender, if the code is not OK or DECLINED. 
+Example:
+
+  # example_org_map - config for rcpt_map plugin
+  me@example.org           OK 
+  you@example.org          OK 
+  info@example.org         DENY     User not found.
+
+=head1 NOTES 
+
+We're currently running this plugin like shown in the following example. 
+
+Excerpt from the C<plugins> config file:
+
+  ## list of valid users, config in /srv/qpsmtpd/config/rcpt_regexp
+  ## ... except for "*@example.org":
+  rcpt_regexp
+  ## only for "@example.org":
+  rcpt_map domain example.org file /srv/qpsmtpd/config/map_example_org
+
+And the C<rcpt_regexp> config file:
+
+ ### "example.org" addresses are checked later by the rcpt_map 
+ ### plugin, return DECLINED here:
+ /^.*\@example\.org$/  DECLINED
+ ### all other domains just check for valid users, the validity 
+ ### of the domain is checked by the rcpt_ok plugin => never use
+ ### something else than "DENY" or "DECLINED" here!
+ /^(abuse|postmaster)\@/    DECLINED
+ /^(me|you)\@/    DECLINED
+ /^.*$/           DENY No such user.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2009 Hanno Hecker
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use Qpsmtpd::Constants;
+
+our %map;
+
+sub register {
+    my ($self, $qp, %args) = @_;
+    foreach my $arg (qw(domain file default)) {
+        next unless exists $args{$arg};
+        if ($arg eq "default") {
+            my ($code, $msg) = split /=/, $args{$arg};
+
+            $code = Qpsmtpd::Constants::return_code($code);
+            die "Not a valid constant for 'default' arg"
+              unless defined $code;
+
+            $msg or $msg = "No such user.";
+            $msg =~ s/_/ /g;
+
+            $self->{_default} = [$code, $msg];
+        }
+        else {
+            $self->{"_$arg"} = $args{$arg};
+        }
+    }
+
+    $self->{_default}
+      or $self->{_default} = [DENY, "No such user."];
+
+    $self->{_file} 
+      or die "No map file given...";
+
+    $self->{_domain} 
+      or die "No domain name given...";
+    $self->{_domain} = lc $self->{_domain};
+
+    $self->log(LOGDEBUG, 
+               "Using map ".$self->{_file}." for domain ".$self->{_domain});
+    %map = $self->read_map(1);
+    die "Empty map file ".$self->{_file}
+      unless keys %map;
+}
+
+sub hook_pre_connection {
+    my $self = shift;
+    my ($time) = (stat($self->{_file}))[9] || 0;
+    if ($time > $self->{_time}) {
+        my %temp = $self->read_map();
+        keys %temp 
+          or return DECLINED;
+        %map = %temp;
+    }
+    return DECLINED;
+}
+
+sub read_map {
+    my $self = shift;
+    my %hash = ();
+    open F, $self->{_file}
+      or do { $_[0] ? die "ERROR opening: $!" : return (); };
+
+    ($self->{_time}) = (stat(F))[9] || 0;
+
+    my $line = 0;
+    while (<F>) {
+        ++$line;
+        s/^\s*//;
+        next if /^#/;
+        next unless $_;
+        my ($addr, $code, $msg) = split ' ', $_, 3;
+        next unless $addr;
+
+        unless ($code) {
+            $self->log(LOGERROR, 
+                      "No constant in line $line in ".$self->{_file});
+            next;
+        }
+        $code = Qpsmtpd::Constants::return_code($code);
+        unless (defined $code) {
+            $self->log(LOGERROR, 
+                       "Not a valid constant in line $line in ".$self->{_file});
+            next;
+        }
+        $msg or $msg = "No such user.";
+        $hash{$addr} = [$code, $msg];
+    }
+    return %hash;
+}
+
+sub hook_rcpt {
+    my ($self, $transaction, $recipient) = @_;
+    return (DECLINED)
+      unless $recipient->host && $recipient->user;
+
+    return (DECLINED)
+      unless lc($recipient->host) eq $self->{_domain};
+
+    my $rcpt = lc $recipient->user . '@' . lc $recipient->host;
+    return (@{$self->{_default}})
+      unless exists $map{$rcpt};
+    
+    return @{$map{$rcpt}};
+}
+
+# vim: ts=4 sw=4 expandtab syn=perl

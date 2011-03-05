@@ -1,6 +1,8 @@
 
 Next Version
 
+  require_resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
+
   new plugin auth_vpopmaild (Robin Bowes)
 
   new plugin auth_checkpassword (Matt Simerson)
@@ -13,6 +15,8 @@ Next Version
   as well as noting "no virus found".  (Matt Simerson)
 
   assorted documentation cleanups (Steve Kemp, Robert Spier)
+
+  Revert "Spool body when $transaction->body_fh() is called"
 
 0.84 April 7, 2010
 

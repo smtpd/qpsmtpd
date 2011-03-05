@@ -30,7 +30,10 @@ my $first_0;
 sub start_connection {
     my $self = shift;
 
-    my ($remote_host, $remote_info, $remote_ip);
+    my (
+        $remote_host, $remote_info, $remote_ip, $remote_port,
+        $local_ip,    $local_port,  $local_host
+       );
 
     if ($ENV{TCPREMOTEIP}) {
 	# started from tcpserver (or some other superserver which
@@ -38,6 +41,10 @@ sub start_connection {
 	$remote_ip   = $ENV{TCPREMOTEIP};
 	$remote_host = $ENV{TCPREMOTEHOST} || "[$remote_ip]";
 	$remote_info = $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$remote_host" : $remote_host;
+        $remote_port = $ENV{TCPREMOTEPORT};
+        $local_ip    = $ENV{TCPLOCALIP};
+        $local_port  = $ENV{TCPLOCALPORT};
+        $local_host  = $ENV{TCPLOCALHOST};
     } else {
 	# Started from inetd or similar. 
 	# get info on the remote host from the socket.
@@ -48,6 +55,10 @@ sub start_connection {
 	$remote_ip     = inet_ntoa($iaddr);
 	$remote_host    = gethostbyaddr($iaddr, AF_INET) || "[$remote_ip]";
 	$remote_info	= $remote_host;
+### TODO
+# set $remote_port, $local_ip, and $local_port. Those values are
+# required for the p0f plugin to function.
+### /TODO
     }
     $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
 
@@ -61,8 +72,12 @@ sub start_connection {
     $0 = "$first_0 [$remote_ip : $remote_host : $now]";
 
     $self->SUPER::connection->start(remote_info => $remote_info,
-				    remote_ip   => $remote_ip,
-				    remote_host => $remote_host,
+                                    remote_ip   => $remote_ip,
+                                    remote_host => $remote_host,
+                                    remote_port => $remote_port,
+                                    local_ip    => $local_ip,
+                                    local_port  => $local_port,
+                                    local_host  => $local_host,
 				    @_);
 }
 
@@ -100,6 +115,10 @@ sub read_input {
     alarm $timeout;
   }
   alarm(0);
+  return if $self->connection->notes('disconnected');
+  $self->reset_transaction;
+  $self->run_hooks('disconnect');
+  $self->connection->notes(disconnected => 1);
 }
 
 sub respond {

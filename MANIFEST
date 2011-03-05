@@ -66,6 +66,7 @@ plugins/auth/auth_checkpassword
 plugins/auth/auth_cvm_unix_local
 plugins/auth/auth_flat_file
 plugins/auth/auth_ldap_bind
+plugins/auth/auth_vpopmail
 plugins/auth/auth_vpopmail_sql
 plugins/auth/auth_vpopmaild
 plugins/auth/authdeny
@@ -73,6 +74,7 @@ plugins/check_badmailfrom
 plugins/check_badmailfromto
 plugins/check_badrcptto
 plugins/check_badrcptto_patterns
+plugins/check_bogus_bounce
 plugins/check_basicheaders
 plugins/check_earlytalker
 plugins/check_loop
@@ -146,6 +148,7 @@ t/plugin_tests/auth/auth_flat_file
 t/plugin_tests/auth/authdeny
 t/plugin_tests/auth/authnull
 t/plugin_tests/check_badrcptto
+t/plugin_tests/greylisting
 t/plugin_tests/dnsbl
 t/plugin_tests/rcpt_ok
 t/qpsmtpd-address.t

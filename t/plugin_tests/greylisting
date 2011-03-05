@@ -1,0 +1,111 @@
+use Qpsmtpd::Address;
+
+my $test_email = 'user@example.com';
+my $address = Qpsmtpd::Address->new( "<$test_email>" );
+
+my @greydbs = qw( denysoft_greylist.dbm denysoft_greylist.dbm.lock );
+foreach ( @greydbs ) {
+    unlink $_ if -f $_;
+};
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test("test_greylist_p0f_genre_miss", 1);
+    $self->register_test("test_greylist_p0f_genre_hit", 1);
+    $self->register_test("test_greylist_p0f_distance_hit", 1);
+    $self->register_test("test_greylist_p0f_distance_miss", 1);
+    $self->register_test("test_greylist_p0f_link_hit", 1);
+    $self->register_test("test_greylist_p0f_link_miss", 1);
+    $self->register_test("test_greylist_p0f_uptime_hit", 1);
+    $self->register_test("test_greylist_p0f_uptime_miss", 1);
+}
+
+sub test_greylist_p0f_genre_miss {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'genre,Linux';
+    $self->connection->notes('p0f'=> { genre => 'windows', link => 'dsl' } );
+    my $r = $self->rcpt_handler( $self->qp->transaction );
+
+    ok( $r == 909, 'p0f genre miss');
+}
+
+sub test_greylist_p0f_genre_hit {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'genre,Windows';
+    $self->connection->notes('p0f'=> { genre => 'windows', link => 'dsl' } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r eq 'This mail is temporarily denied', 'p0f genre hit');
+}
+
+sub test_greylist_p0f_distance_hit {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'distance,8';
+    $self->connection->notes('p0f'=> { distance=>9 } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r eq 'This mail is temporarily denied', 'p0f distance hit');
+}
+
+sub test_greylist_p0f_distance_miss {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'distance,8';
+    $self->connection->notes('p0f'=> { distance=>7 } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r == 909, 'p0f distance miss');
+}
+
+sub test_greylist_p0f_link_hit {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'link,dsl';
+    $self->connection->notes('p0f'=> { link=>'DSL' } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r eq 'This mail is temporarily denied', 'p0f link hit');
+}
+
+sub test_greylist_p0f_link_miss {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'link,dsl';
+    $self->connection->notes('p0f'=> { link=>'Ethernet' } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r == 909, 'p0f link miss');
+}
+
+sub test_greylist_p0f_uptime_hit {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'uptime,100';
+    $self->connection->notes('p0f'=> { uptime=> 99 } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r eq 'This mail is temporarily denied', 'p0f uptime hit');
+}
+
+sub test_greylist_p0f_uptime_miss {
+    my $self = shift;
+
+    $self->{_greylist_config}{'p0f'} = 'uptime,100';
+    $self->connection->notes('p0f'=> { uptime=>500 } );
+    $self->qp->transaction->sender( $address );
+    my $r = $self->rcpt_handler( $self->qp->transaction  );
+
+    ok( $r == 909, 'p0f uptime miss');
+}
+
+
+

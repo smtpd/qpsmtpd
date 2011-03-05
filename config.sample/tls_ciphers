@@ -1,4 +1,10 @@
 # Override default security using suitable string from available ciphers at 
 # L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>
 # See plugins/tls for details.
-HIGH
+#
+# HIGH is a reasonable default that should satisfy most installations
+HIGH:!SSLv2
+#
+# if you have legacy clients that require less secure connections,
+# consider using this less secure, but PCI compliant setting:
+#DEFAULT:!ADH:!LOW:!EXP:!SSLv2:+HIGH:+MEDIUM

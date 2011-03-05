@@ -106,6 +106,23 @@ directories, if determined, supercede I<db_dir>.
 
 =back
 
+=item p0f
+
+Enable greylisting only when certain p0f criteria is met. The single
+required argument is a comma delimited list of key/value pairs. The keys
+are the following p0f TCP fingerprint elements: genre, detail, uptime,
+link, and distance.
+
+To greylist emails from computers whose remote OS is windows, you'd use
+this syntax:
+
+  p0f genre,windows
+
+To greylist only windows computers on DSL links more than 3 network hops
+away:
+
+  p0f genre,windows,link,dsl,distance,3
+
 =head1 BUGS
 
 Database locking is implemented using flock, which may not work on 
@@ -116,6 +133,8 @@ use something like File::NFSLock instead.
 
 Written by Gavin Carr <gavin@openfusion.com.au>.
 
+Added p0f section <msimerson@cpan.org> (2010-05-03)
+
 =cut
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
@@ -123,22 +142,23 @@ use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock);
 use strict;
 
-my $VERSION = '0.07';
+my $VERSION = '0.08';
 
 my $DENYMSG = "This mail is temporarily denied";
 my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
 my $DB = "denysoft_greylist.dbm";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
-  black_timeout grey_timeout white_timeout deny_late mode db_dir);
+  black_timeout grey_timeout white_timeout deny_late mode db_dir p0f );
 
 my %DEFAULTS = (
-  remote_ip => 1,
-  sender => 0,
-  recipient => 0,
-  black_timeout => 50 * 60,
-  grey_timeout =>  3 * 3600 + 20 * 60,
-  white_timeout => 36 * 24 * 3600,
-  mode => 'denysoft',
+    remote_ip => 1,
+    sender => 0,
+    recipient => 0,
+    black_timeout => 50 * 60,
+    grey_timeout =>  3 * 3600 + 20 * 60,
+    white_timeout => 36 * 24 * 3600,
+    mode => 'denysoft',
+    p0f  => undef,
 );
 
 sub register {
@@ -206,6 +226,9 @@ sub denysoft_greylist {
   return DECLINED if $self->qp->connection->notes('whitelisthost');
   return DECLINED if $transaction->notes('whitelistsender');
 
+  # do not greylist if p0f matching is selected and message does not match
+  return DECLINED if $config->{'p0f'} && !$self->p0f_match( $config );
+
   if ($config->{db_dir} && $config->{db_dir} =~ m{^([-a-zA-Z0-9./_]+)$}) {
     $config->{db_dir} = $1; 
   }
@@ -214,8 +237,10 @@ sub denysoft_greylist {
   my $dbdir = $transaction->notes('per_rcpt_configdir') 
     if $config->{per_recipient_db};
   for my $d ($dbdir, $config->{db_dir}, "/var/lib/qpsmtpd/greylisting",
-             "$QPHOME/var/db", "$QPHOME/config") {
-    last if $dbdir ||= $d && -d $d && $d;
+             "$QPHOME/var/db", "$QPHOME/config", '.' ) {
+      last if $dbdir && -d $dbdir;
+      next if ( ! $d || ! -d $d );
+      $dbdir = $d;
   }
   my $db = "$dbdir/$DB";
   $self->log(LOGINFO,"using $db as greylisting database");
@@ -290,6 +315,27 @@ sub denysoft_greylist {
   untie %db;
   close LOCK;
   return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
+}
+
+sub p0f_match {
+    my $self = shift;
+    my $config = shift;
+
+    my $p0f = $self->connection->notes('p0f');
+    return if !$p0f || !ref $p0f;     # p0f fingerprint info not found
+
+    my %valid_matches = map { $_ => 1 } qw( genre detail uptime link distance );
+    my %requested_matches = split(/\,/, $config->{'p0f'} );
+
+    foreach my $key (keys %requested_matches) {
+        next if !defined $valid_matches{$key}; # discard invalid match keys
+        my $value = $requested_matches{$key};
+        return 1 if $key eq 'distance' && $p0f->{$key} > $value;
+        return 1 if $key eq 'genre'    && $p0f->{$key} =~ /$value/i;
+        return 1 if $key eq 'uptime'   && $p0f->{$key} < $value;
+        return 1 if $key eq 'link'     && $p0f->{$key} =~ /$value/i;
+    }
+    return;
 }
 
 # arch-tag: 6ef5919e-404b-4c87-bcfe-7e9f383f3901

@@ -77,6 +77,11 @@ daemon is running on a different host or port, specify as follows:
 
 auth_vpopmaild host [host] port [port]
 
+=head1 SEE ALSO
+
+For an overview of the vpopmail authentication plugins and their merits,
+please read the VPOPMAIL section in doc/authentication.pod
+
 =head1 LINKS
 
 [1] http://www.qmailwiki.org/Vpopmaild

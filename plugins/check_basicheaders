@@ -46,10 +46,11 @@ sub hook_data_post {
   return (DENY, "You have to send some data first")
     if $transaction->data_size == 0;
 
+  my $header = $transaction->header;
   return (DENY, "Mail with no From header not accepted here")
-    unless $transaction->header->get('From');
+    unless $header && $header->get('From');
 
-  my $date = $transaction->header->get('Date');
+  my $date = $header->get('Date');
 
   return (DENY, "Mail with no Date header not accepted here")
     unless $date;
