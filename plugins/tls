@@ -275,6 +275,7 @@ sub upgrade_socket {
     my UpgradeClientSSL $self = shift;
 
     unless ( $self->{_ssl_started} ) {
+        $self->{_stashed_qp}->clear_data();
         IO::Socket::SSL->start_SSL(
             $self->{_stashed_qp}->{sock}, {
                 SSL_use_cert => 1,
