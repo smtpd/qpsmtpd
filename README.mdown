@@ -1,8 +1,4 @@
-#
-#  this file is best read with `perldoc README`
-#
-
-=head1 NAME
+# NAME
 
 Qpsmtpd - qmail perl simple mail transfer protocol daemon
 
@@ -13,7 +9,8 @@ mailinglist:
   qpsmtpd-subscribe@perl.org
 
 
-=head1 DESCRIPTION
+
+# DESCRIPTION
 
 What is Qpsmtpd?
 
@@ -21,19 +18,20 @@ Qpsmtpd is an extensible SMTP engine written in Perl.  No, make that
 easily extensible!  See plugins/quit_fortune for a very useful, er,
 cute example.
 
-=head2 License
+## License
 
 Qpsmtpd is licensed under the MIT License; see the LICENSE file for
 more information.
 
-=head2 What's new in this release?
+## What's new in this release?
 
 See the Changes file! :-)
 
 
-=head1 Installation
 
-=head2 Required Perl Modules
+# Installation
+
+## Required Perl Modules
 
 The following Perl modules are required:
    Net::DNS
@@ -50,7 +48,7 @@ Run it with
 
   perl -MCPAN -e shell
 
-=head2 qpsmtpd installation
+## qpsmtpd installation
 
 Make a new user and a directory where you'll install qpsmtpd.  I
 usually use "smtpd" for the user and /home/smtpd/qpsmtpd/ for the
@@ -91,7 +89,8 @@ the -R flag to disable identd lookups.  Remove the -R flag if that's
 not what you want.
 
 
-=head2 Configuration
+
+## Configuration
 
 Configuration files can go into either /var/qmail/control or into the
 config subdirectory of the qpsmtpd installation.  Configuration should
@@ -105,14 +104,15 @@ information about what's missing) to the mailinglist or to
 ask@develooper.com.
 
 
-=head1 Better Performance
+
+# Better Performance
 
 For better performance we recommend using "qpsmtpd-forkserver" or
 running qpsmtpd under Apache 2.x.  If you need extremely high
 concurrency and all your plugins are compatible, you might want to try
 the "qpsmtpd-async" model.
 
-=head1 Plugins
+# Plugins
 
 The qpsmtpd core only implements the SMTP protocol.  No useful
 function can be done by qpsmtpd without loading plugins.
@@ -126,22 +126,23 @@ this.  Other plugins provides extra functionality related to this; for
 example the require_resolvable_fromhost plugin described above.
 
 
-=head1 Configuration files
+
+# Configuration files
 
 All the files used by qmail-smtpd should be supported; so see the man
 page for qmail-smtpd.  Extra files used by qpsmtpd includes: 
 
-=over 4
-
-=item plugins
+- plugins
 
 List of plugins, one per line, to be loaded in the order they
 appear in the file.  Plugins are in the plugins directory (or in
 a subdirectory of there).
 
 
-=item rhsbl_zones
+
+- rhsbl_zones
  
+
 Right hand side blocking lists, one per line. For example:
 
     dsn.rfc-ignorant.org does not accept bounces - http://www.rfc-ignorant.org/
@@ -149,7 +150,8 @@ Right hand side blocking lists, one per line. For example:
 See http://www.rfc-ignorant.org/ for more examples.
 
 
-=item dnsbl_zones
+
+- dnsbl_zones
 
 Normal ip based DNS blocking lists ("RBLs"). For example:
 
@@ -157,37 +159,41 @@ Normal ip based DNS blocking lists ("RBLs"). For example:
   spamsources.fabel.dk
 
 
-=item require_resolvable_fromhost
+
+- require_resolvable_fromhost
          
+
 If this file contains anything but a 0 on the first line, envelope
 senders will be checked against DNS. If an A or a MX record can't be
 found the mail command will return a soft rejection (450).
 
 
-=item spool_dir
+
+- spool_dir
 
 If this file contains a directory, it will be the spool directory
 smtpd uses during the data transactions. If this file doesn't exist, it
 will default to use $ENV{HOME}/tmp/. This directory should be set with
 a mode of 700 and owned by the smtpd user.
 
-=item tls_before_auth
+- tls_before_auth
 
 If this file contains anything except a 0 on the first noncomment line, then 
 AUTH will not be offered unless TLS/SSL are in place, either with STARTTLS, 
 or SMTP-SSL on port 465.
 
-=item everything (?) that qmail-smtpd supports. 
+- everything (?) that qmail-smtpd supports. 
 
 In my test qpsmtpd installation I have a "config/me" file containing
 the hostname I use for testing qpsmtpd (so it doesn't introduce itself
 with the normal name of the server).
      
-=back
 
 
 
-=head1 Problems
+
+
+# Problems
 
 In case of problems always first check the logfile.
 
@@ -200,6 +206,7 @@ between 1 and 3 should give you just a little bit.  If you set it to
 If the logfile doesn't give away the problem, then post to the
 mailinglist (subscription instructions above).  If possibly then put
 the logfile on a webserver and include a reference to it in the mail.
+
 
 
 
