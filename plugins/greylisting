@@ -104,7 +104,10 @@ Flag to indicate whether to use per-recipient greylisting
 databases (default is to use a shared database).  Per-recipient configuration
 directories, if determined, supercede I<db_dir>.
 
-=back
+=item nfslock <bool>
+
+Flag to indicate the database is stored on NFS.  Uses File::NFSLock
+instead of flock.
 
 =item p0f
 
@@ -123,11 +126,9 @@ away:
 
   p0f genre,windows,link,dsl,distance,3
 
-=head1 BUGS
+=back
 
-Database locking is implemented using flock, which may not work on 
-network filesystems e.g. NFS. If this is a problem, you may want to
-use something like File::NFSLock instead.
+=head1 BUGS
 
 =head1 AUTHOR
 
@@ -135,14 +136,16 @@ Written by Gavin Carr <gavin@openfusion.com.au>.
 
 Added p0f section <msimerson@cpan.org> (2010-05-03)
 
+nfslock feature added by JT Moree <jtmoree@kahalacorp.com> (2007-01-22)
+
 =cut
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
-use Fcntl qw(:DEFAULT :flock);
+use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 use strict;
 
-my $VERSION = '0.08';
+my $VERSION = '0.09';
 
 my $DENYMSG = "This mail is temporarily denied";
 my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
@@ -158,6 +161,7 @@ my %DEFAULTS = (
     grey_timeout =>  3 * 3600 + 20 * 60,
     white_timeout => 36 * 24 * 3600,
     mode => 'denysoft',
+    nfslock => 0,
     p0f  => undef,
 );
 
@@ -218,6 +222,7 @@ sub hook_data {
 
 sub denysoft_greylist {
   my ($self, $transaction, $sender, $rcpt, $config) = @_;
+  my $nfslock;  #this will go out of scope and remove the lock
   $config ||= $self->{_greylist_config};
   $self->log(LOGDEBUG, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
@@ -248,15 +253,34 @@ sub denysoft_greylist {
   my $remote_ip = $self->qp->connection->remote_ip;
   my $fmt = "%s:%d:%d:%d";
 
-  # Check denysoft db
-  unless (open LOCK, ">$db.lock") {
-    $self->log(LOGCRIT, "opening lockfile failed: $!");
-    return DECLINED;
+  if ($config->{nfslock}) {
+    require File::NFSLock;
+    ### set up a lock - lasts until object looses scope
+    unless ($nfslock = new File::NFSLock {
+      file      => "$db.lock",
+      lock_type => LOCK_EX|LOCK_NB,
+      blocking_timeout   => 10,      # 10 sec
+      stale_lock_timeout => 30 * 60, # 30 min
+    }) {
+      $self->log(LOGCRIT, "nfs lockfile failed: $!");
+      return DECLINED;
+    }
+    unless (open(LOCK, "+<$db.lock")) {
+      $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
+      return DECLINED;
+    }
   }
-  unless (flock LOCK, LOCK_EX) {
-    $self->log(LOGCRIT, "flock of lockfile failed: $!");
-    close LOCK;
-    return DECLINED;
+  else {
+      # Check denysoft db
+    unless (open LOCK, ">$db.lock") {
+      $self->log(LOGCRIT, "opening lockfile failed: $!");
+      return DECLINED;
+    }
+    unless (flock LOCK, LOCK_EX) {
+      $self->log(LOGCRIT, "flock of lockfile failed: $!");
+      close LOCK;
+      return DECLINED;
+    }
   }
   my %db = ();
   unless (tie %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) {
