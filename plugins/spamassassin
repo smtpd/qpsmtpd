@@ -266,7 +266,10 @@ sub get_spam_score {
 sub _cleanup_spam_header {
   my ($self, $transaction, $header_name) = @_;
 
-  my $action = lc($self->{_args}->{leave_old_headers}) || 'rename';
+  my $action = 'rename';
+  if ( $self->{_args}->{leave_old_headers} ) {
+    $action = lc($self->{_args}->{leave_old_headers});
+  };
 
   return unless $action eq 'drop' or $action eq 'rename';
 
