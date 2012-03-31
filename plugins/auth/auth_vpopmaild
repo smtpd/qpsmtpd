@@ -8,18 +8,12 @@ use version; my $VERSION = qv('1.0.0');
 sub register {
     my ($self, $qp, %args) = @_;
 
-    my %DEFAULT = (
-                   host => q{localhost},
-                   port => 89,
-                  );
-
-    $self->{_vpopmaild_host} =
-      defined $args{host} ? $args{host} : $DEFAULT{host};
-    $self->{_vpopmaild_port} =
-      defined $args{port} ? $args{port} : $DEFAULT{port};
+    $self->{_vpopmaild_host} = $args{host} || 'localhost';
+    $self->{_vpopmaild_port} = $args{port} || '89';
 
     $self->register_hook('auth-plain', 'auth_vpopmaild');
     $self->register_hook('auth-login', 'auth_vpopmaild');
+    $self->register_hook('auth-cram-md5', 'auth_vpopmaild');
 }
 
 sub auth_vpopmaild {
