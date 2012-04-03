@@ -145,6 +145,9 @@ t/helo.t
 t/misc.t
 t/plugin_tests.t
 t/plugin_tests/auth/auth_flat_file
+t/plugin_tests/auth/auth_vpopmail
+t/plugin_tests/auth/auth_vpopmail_sql
+t/plugin_tests/auth/auth_vpopmaild
 t/plugin_tests/auth/authdeny
 t/plugin_tests/auth/authnull
 t/plugin_tests/check_badrcptto
