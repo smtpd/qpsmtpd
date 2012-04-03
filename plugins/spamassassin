@@ -242,7 +242,6 @@ sub check_spam_reject {
   return DECLINED;
 }
 
-
 sub check_spam_munge_subject {
   my ($self, $transaction) = @_;
   my $score = $self->get_spam_score($transaction) or return DECLINED;  
@@ -258,10 +257,10 @@ sub check_spam_munge_subject {
 
 sub get_spam_score {
   my ($self, $transaction) = @_;
-  my $status  = $transaction->header->get('X-Spam-Status') or return; 
-  my ($score) = ($status =~ m/hits=(-?\d+\.\d+)/)[0];
+  my $status = $transaction->header->get('X-Spam-Status') or return; 
+  my $score  = ($status =~ m/(score|hits)=(-?\d+\.\d+)/)[1];
   return $score;
-
+}
 
 sub _cleanup_spam_header {
   my ($self, $transaction, $header_name) = @_;
@@ -271,7 +270,7 @@ sub _cleanup_spam_header {
     $action = lc($self->{_args}->{leave_old_headers});
   };
 
-  return unless $action eq 'drop' or $action eq 'rename';
+  return unless $action eq 'drop' || $action eq 'rename';
 
   my $old_header_name = $header_name;
   $old_header_name = ($old_header_name =~ s/^X-//) ? "X-Old-$old_header_name" : "Old-$old_header_name";
@@ -280,9 +279,4 @@ sub _cleanup_spam_header {
       $transaction->header->add($old_header_name, $header) if $action eq 'rename';
       $transaction->header->delete($header_name);
   }
-  
-        
-}
-
-
 }
