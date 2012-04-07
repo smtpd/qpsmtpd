@@ -1,30 +1,26 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 use strict;
 use warnings;
 use IO::Socket;
-use version; my $VERSION = qv('1.0.0');
+use version; 
+my $VERSION = qv('1.0.1');
 
 sub register {
     my ($self, $qp, %args) = @_;
 
-    my %DEFAULT = (
-                   host => q{localhost},
-                   port => 89,
-                  );
-
-    $self->{_vpopmaild_host} =
-      defined $args{host} ? $args{host} : $DEFAULT{host};
-    $self->{_vpopmaild_port} =
-      defined $args{port} ? $args{port} : $DEFAULT{port};
+    $self->{_vpopmaild_host} = $args{host} || 'localhost';
+    $self->{_vpopmaild_port} = $args{port} || '89';
 
     $self->register_hook('auth-plain', 'auth_vpopmaild');
     $self->register_hook('auth-login', 'auth_vpopmaild');
+    $self->register_hook('auth-cram-md5', 'auth_vpopmaild');
 }
 
 sub auth_vpopmaild {
-    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
-      @_;
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) = @_;
+
+    use Qpsmtpd::Constants;
 
     # create socket
     my $vpopmaild_socket =
@@ -35,9 +31,15 @@ sub auth_vpopmaild {
                             Type     => SOCK_STREAM
                            ) or return DECLINED;
 
+    #$self->log(LOGINFO, "Attempting $method auth via vpopmaild");
+
     # Get server greeting (+OK)
     my $connect_response = <$vpopmaild_socket>;
-    return DECLINED unless $connect_response eq '+OK \r\n';
+    if ( $connect_response !~ /^\+OK/ ) {
+        $self->log(LOGINFO, "Failed to receive vpopmaild connection response: $connect_response");
+        close($vpopmaild_socket);
+        return DECLINED;
+    };
 
     # send login details
     print $vpopmaild_socket "login $user $passClear\n\r";
@@ -47,13 +49,12 @@ sub auth_vpopmaild {
 
     close($vpopmaild_socket);
 
-    # check for successful login
-    if ($login_response eq '+OK+\r\n') {
-        return (OK, 'authcheckpassword');
-    }
-    else {
-        return DECLINED;
-    }
+    # check for successful login (single line (+OK) or multiline (+OK+))
+    return (OK, 'auth_vpopmaild') if $login_response =~ /^\+OK/;
+
+    $self->log(LOGINFO, "Failed vpopmaild authentication response: $login_response");
+
+    return DECLINED;
 }
 
 __END__
@@ -89,6 +90,8 @@ please read the VPOPMAIL section in doc/authentication.pod
 =head1 AUTHOR
 
 Robin Bowes <robin.bowes@yo61.com>
+
+Matt Simerson (4/2012: added CRAM-MD5 support, updated response parsing)
 
 =head1 COPYRIGHT AND LICENSE
 
