@@ -40,8 +40,6 @@ sub hook_logging {
   return DECLINED;
 }
 
-=cut
-
 =head1 NAME
 
 warn - Default logging plugin for qpsmtpd

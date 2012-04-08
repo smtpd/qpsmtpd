@@ -1,7 +1,5 @@
 #!perl -Tw
 
-=pod
-
 =head1 SYNOPSIS
 
 This plugin checks the badmailfrom_patterns config. This allows

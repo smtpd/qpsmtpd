@@ -257,7 +257,7 @@ sub get_spam_score {
   my $status  = $transaction->header->get('X-Spam-Status') or return; 
   my ($score) = ($status =~ m/hits=(-?\d+\.\d+)/)[0];
   return $score;
-
+}
 
 sub _cleanup_spam_header {
   my ($self, $transaction, $header_name) = @_;
@@ -273,9 +273,4 @@ sub _cleanup_spam_header {
       $transaction->header->add($old_header_name, $header) if $action eq 'rename';
       $transaction->header->delete($header_name);
   }
-  
-        
-}
-
-
 }

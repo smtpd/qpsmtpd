@@ -1,9 +1,16 @@
 #!perl -Tw
-#
-#  This plugin doesn't actually check anything and will fail any
-#  user no matter what they type.  It is strictly a proof of concept for
-#  the Qpsmtpd::Auth module.  Don't run this in production!!!
-#
+
+=head1 NAME
+
+auth_deny
+
+=head1 SYNOPSIS
+
+This plugin doesn't actually check anything and will fail any
+user no matter what they type.  It is strictly a proof of concept for
+the Qpsmtpd::Auth module.  Don't run this in production!!!
+
+=cut
 
 sub hook_auth {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =

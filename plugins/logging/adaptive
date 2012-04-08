@@ -94,9 +94,6 @@ sub hook_reset_transaction { # slog
     return DECLINED;
 }
 
-=cut
-
-
 =head1 NAME
 
 adaptive - An adaptive logging plugin for qpsmtpd

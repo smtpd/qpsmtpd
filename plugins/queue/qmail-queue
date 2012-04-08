@@ -1,4 +1,5 @@
-# -*- perl -*-
+#!perl -Tw
+
 =head1 NAME
 
 qmail-queue

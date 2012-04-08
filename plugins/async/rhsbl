@@ -66,8 +66,6 @@ sub hook_rcpt {
     return DECLINED;
 }
 
-1;
-
 =head1 NAME
 
 rhsbl - handle RHSBL lookups

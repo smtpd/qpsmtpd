@@ -99,8 +99,6 @@ sub hook_rcpt {
     return DECLINED;
 }
 
-1;
-
 =head1 NAME
 
 dnsbl - handle DNS BlackList lookups

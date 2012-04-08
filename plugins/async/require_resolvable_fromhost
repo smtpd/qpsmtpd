@@ -169,5 +169,3 @@ sub is_valid {
     }
     return 1;
 }
-
-# vim: ts=4 sw=4 expandtab syn=perl

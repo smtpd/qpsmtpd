@@ -1,7 +1,15 @@
-# 
-# dont_require_anglebrackets - accept addresses in MAIL FROM:/RCPT TO: 
-#        commands without surrounding <>
-#
+#!perl -Tw
+ 
+=head1 NAME
+
+dont_require_anglebrackets 
+
+=head1 SYNOPSIS
+
+accept addresses in MAIL FROM:/RCPT TO: commands without surrounding <>
+
+=cut
+
 sub hook_mail_pre {
     my ($self,$transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {

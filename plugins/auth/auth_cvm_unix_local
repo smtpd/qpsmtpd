@@ -44,8 +44,7 @@ use Socket;
 use constant SMTP_PORT => getservbyname("smtp", "tcp") || 25;
 use constant SSMTP_PORT => getservbyname("ssmtp", "tcp") || 465;
 
-sub register 
-{
+sub register {
     my ( $self, $qp, %arg ) = @_;
 
     unless ($arg{cvm_socket})
@@ -78,8 +77,7 @@ sub register
 #    $self->register_hook("auth-cram-md5", "authcvm_hash");
 }
 
-sub authcvm_plain
-{
+sub authcvm_plain {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 

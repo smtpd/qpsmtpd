@@ -40,6 +40,10 @@ Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
 
+use strict;
+
+use Qpsmtpd::Constants;
+
 sub register {
     my ($self, $qp) = @_;
 
@@ -50,7 +54,6 @@ sub register {
 
 sub auth_vpopmail {
     use vpopmail;
-    use Qpsmtpd::Constants;
     use Digest::HMAC_MD5 qw(hmac_md5_hex);
 
     my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =

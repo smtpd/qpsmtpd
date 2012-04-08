@@ -510,6 +510,3 @@ sub init_resolver {
     $self->{resolver}->udp_timeout($self->{timeout});
 }
 
-1;
-
-# vi: ts=4 sw=4 expandtab syn=perl

@@ -133,6 +133,3 @@ sub hook_mail {
   return DECLINED;
 }
 
-
-1;
-

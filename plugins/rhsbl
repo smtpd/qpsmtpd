@@ -133,7 +133,6 @@ sub hook_disconnect {
   return DECLINED;
 }
 
-1;
 
 =head1 NAME
 

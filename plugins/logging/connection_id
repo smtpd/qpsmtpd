@@ -42,8 +42,6 @@ sub hook_logging {
   return DECLINED;
 }
 
-=cut
-
 =head1 NAME
 
 connection_id - plugin to demo use of the connection id

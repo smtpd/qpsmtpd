@@ -121,6 +121,7 @@ use warnings;
 use IO::File;
 use Sys::Hostname;
 use POSIX qw(strftime);
+use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp, @args) = @_;
@@ -279,4 +280,3 @@ sub hook_logging {
     return DECLINED;
 }
 
-# vi: tabstop=4 shiftwidth=4 expandtab:

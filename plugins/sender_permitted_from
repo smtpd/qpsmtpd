@@ -37,6 +37,7 @@ whomever wrote the original SPF plugin, upon which I based this.
 use strict;
 use Mail::SPF 2.000;
 use Data::Dumper;
+use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp, @args) = @_;

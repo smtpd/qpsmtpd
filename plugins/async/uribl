@@ -123,8 +123,6 @@ sub collect_results {
     return \@matches;
 }
 
-1;
-
 =head1 NAME
 
 uribl - URIBL blocking plugin for qpsmtpd

@@ -50,8 +50,6 @@ sub hook_rcpt {
     return DECLINED;
 }
 
-1;
-
 =head1 NAME
 
 dns_whitelist_soft - dns-based whitelist override for other qpsmtpd plugins

@@ -56,10 +56,11 @@ The default is I<check-at CONNECT> only.
 
 =cut
 
-use IO::Select;
-
-use warnings;
 use strict;
+use warnings;
+
+use IO::Select;
+use Qpsmtpd::Constants;
 
 sub register {
   my ($self, $qp, @args) = @_;
@@ -208,7 +209,6 @@ sub mail_handler {
   return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
   return DECLINED;
 }
-
 
 1;
 

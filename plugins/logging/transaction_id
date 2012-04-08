@@ -41,8 +41,6 @@ sub hook_logging {
   return DECLINED;
 }
 
-=cut
-
 =head1 NAME
 
 transaction_id - plugin to demo use of the transaction id

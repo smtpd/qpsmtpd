@@ -27,6 +27,7 @@ This plugin has so far only been tested with Brightmail's milter module.
 =cut
 
 use Net::Milter;
+use Qpsmtpd::Constants;
 no warnings;
 
 sub register {
@@ -233,4 +234,3 @@ sub hook_data_post {
     
     return DECLINED;
 }
-

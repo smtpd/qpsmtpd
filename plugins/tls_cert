@@ -1,4 +1,6 @@
 #!perl -Tw
+use warnings;
+
 # Very basic script to create TLS certificates for qpsmtpd
 use File::Temp qw/ tempfile tempdir /;
 use Getopt::Long;

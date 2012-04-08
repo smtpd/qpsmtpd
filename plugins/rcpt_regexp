@@ -96,5 +96,3 @@ sub hook_rcpt {
     }
     return (DECLINED);
 }
-
-# vim: ts=4 sw=4 expandtab syn=perl
