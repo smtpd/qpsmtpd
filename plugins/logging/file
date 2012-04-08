@@ -20,10 +20,10 @@ logging/file [loglevel I<level>] [reopen] [nosplit] [tsformat I<format>] I<path>
 
 For example:
 
-logging/file loglevel LOGINFO /var/log/qpsmtpd.log
-logging/file /var/log/qpsmtpd.log.%Y-%m-%d
-logging/file loglevel LOGCRIT reopen |/usr/local/sbin/page-sysadmin
-logging/file loglevel LOGDEBUG tsformat %FT%T /var/log/qpsmtpd.log
+ logging/file loglevel LOGINFO /var/log/qpsmtpd.log
+ logging/file /var/log/qpsmtpd.log.%Y-%m-%d
+ logging/file loglevel LOGCRIT reopen |/usr/local/sbin/page-sysadmin
+ logging/file loglevel LOGDEBUG tsformat %FT%T /var/log/qpsmtpd.log
 
 =back
 
