@@ -59,7 +59,7 @@ directory.
 Put the files there.  If you install from git you can just do
 run the following command in the /home/smtpd/ directory.
 
-   git clone git://github.com/abh/qpsmtpd.git
+   git clone git://github.com/smtpd/qpsmtpd.git
 
 Beware that the master branch might be unstable and unsuitable for anything
 but development, so you might want to get a specific release, for
