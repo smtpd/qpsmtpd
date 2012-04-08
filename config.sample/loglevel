@@ -7,4 +7,6 @@
 # LOGCRIT    = 2
 # LOGALERT   = 1
 # LOGEMERG   = 0
+#
+# This setting controls the built-in qpsmtpd logging.
 4
