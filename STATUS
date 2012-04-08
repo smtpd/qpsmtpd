@@ -18,11 +18,6 @@ Roadmap
  - Add user configuration plugin infrastructure
    - Add plugin API for checking if a local email address is valid
 
-
- - Include the popular check_delivery[1] functionality via the user API
-   [1] until then get it from 
-      http://www.openminddev.net/files/qpsmtpd/plugins/check_delivery/
-
  - Add API to reject individual recipients after the RCPT has been
    accepted and generate individual bounce messages.
 
