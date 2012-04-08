@@ -59,7 +59,7 @@ directory.
 Put the files there.  If you install from git you can just do
 run the following command in the /home/smtpd/ directory.
 
-   git clone git://github.com/abh/qpsmtpd.git
+   git clone git://github.com/smtpd/qpsmtpd.git
 
 Beware that the master branch might be unstable and unsuitable for anything
 but development, so you might want to get a specific release, for
@@ -192,7 +192,7 @@ with the normal name of the server).
 In case of problems always first check the logfile.
 
 As default it goes into log/main/current.  Qpsmtpd can log a lot of
-debug information.  You can get more or less by adjusting $TRACE_LEVEL
+debug information.  You can get more or less by adjusting $TraceLevel
 in lib/Qpsmtpd.pm (sorry, no easy switch for that yet).  Something
 between 1 and 3 should give you just a little bit.  If you set it to
 10 or higher you will get lots of information in the logs.
