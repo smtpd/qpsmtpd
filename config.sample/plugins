@@ -20,7 +20,8 @@ dont_require_anglebrackets
 # parse_addr_withhelo
 
 quit_fortune
-
+# tls should load before count_unrecognized_commands
+#tls
 check_earlytalker
 count_unrecognized_commands 4
 check_relay
