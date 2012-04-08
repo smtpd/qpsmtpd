@@ -106,6 +106,11 @@ Flag to indicate whether to use per-recipient greylisting
 databases (default is to use a shared database).  Per-recipient configuration
 directories, if determined, supercede I<db_dir>.
 
+=item nfslock <bool>
+
+Flag to indicate the database is stored on NFS.  Uses File::NFSLock
+instead of flock.
+
 =item p0f
 
 Enable greylisting only when certain p0f criteria is met. The single
@@ -127,31 +132,28 @@ away:
 
 =head1 BUGS
 
-Database locking is implemented using flock, which may not work on 
-network filesystems e.g. NFS. If this is a problem, you may want to
-use something like File::NFSLock instead.
-
 =head1 AUTHOR
 
 Written by Gavin Carr <gavin@openfusion.com.au>.
 
 Added p0f section <msimerson@cpan.org> (2010-05-03)
 
+nfslock feature added by JT Moree <jtmoree@kahalacorp.com> (2007-01-22)
+
 =cut
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
-use Fcntl qw(:DEFAULT :flock);
+use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 use strict;
-use Qpsmtpd::Constants;
 
-my $VERSION = '0.08';
+my $VERSION = '0.09';
 
 my $DENYMSG = "This mail is temporarily denied";
 my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
 my $DB = "denysoft_greylist.dbm";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
-  black_timeout grey_timeout white_timeout deny_late mode db_dir p0f );
+  black_timeout grey_timeout white_timeout deny_late mode db_dir nfslock p0f );
 
 my %DEFAULTS = (
     remote_ip => 1,
@@ -161,6 +163,7 @@ my %DEFAULTS = (
     grey_timeout =>  3 * 3600 + 20 * 60,
     white_timeout => 36 * 24 * 3600,
     mode => 'denysoft',
+    nfslock => 0,
     p0f  => undef,
 );
 
@@ -221,6 +224,7 @@ sub hook_data {
 
 sub denysoft_greylist {
   my ($self, $transaction, $sender, $rcpt, $config) = @_;
+  my $nfslock;  #this will go out of scope and remove the lock
   $config ||= $self->{_greylist_config};
   $self->log(LOGDEBUG, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
@@ -251,15 +255,34 @@ sub denysoft_greylist {
   my $remote_ip = $self->qp->connection->remote_ip;
   my $fmt = "%s:%d:%d:%d";
 
-  # Check denysoft db
-  unless (open LOCK, ">$db.lock") {
-    $self->log(LOGCRIT, "opening lockfile failed: $!");
-    return DECLINED;
+  if ($config->{nfslock}) {
+    require File::NFSLock;
+    ### set up a lock - lasts until object looses scope
+    unless ($nfslock = new File::NFSLock {
+      file      => "$db.lock",
+      lock_type => LOCK_EX|LOCK_NB,
+      blocking_timeout   => 10,      # 10 sec
+      stale_lock_timeout => 30 * 60, # 30 min
+    }) {
+      $self->log(LOGCRIT, "nfs lockfile failed: $!");
+      return DECLINED;
+    }
+    unless (open(LOCK, "+<$db.lock")) {
+      $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
+      return DECLINED;
+    }
   }
-  unless (flock LOCK, LOCK_EX) {
-    $self->log(LOGCRIT, "flock of lockfile failed: $!");
-    close LOCK;
-    return DECLINED;
+  else {
+      # Check denysoft db
+    unless (open LOCK, ">$db.lock") {
+      $self->log(LOGCRIT, "opening lockfile failed: $!");
+      return DECLINED;
+    }
+    unless (flock LOCK, LOCK_EX) {
+      $self->log(LOGCRIT, "flock of lockfile failed: $!");
+      close LOCK;
+      return DECLINED;
+    }
   }
   my %db = ();
   unless (tie %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) {
@@ -275,12 +298,12 @@ sub denysoft_greylist {
   my ($ts, $new, $black, $white) = (0,0,0,0);
   if ($db{$key}) {
     ($ts, $new, $black, $white) = split /:/, $db{$key};
-    $self->log(LOGERROR, "ts: " . localtime($ts) . ", now: " . localtime);
+    $self->log(LOGINFO, "ts: " . localtime($ts) . ", now: " . localtime);
     if (! $white) {
       # Black IP - deny, but don't update timestamp
       if (time - $ts < $config->{black_timeout}) {
         $db{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
-        $self->log(LOGCRIT, "key $key black DENYSOFT - $black failed connections");
+        $self->log(LOGWARN, "key $key black DENYSOFT - $black failed connections");
         untie %db;
         close LOCK;
         return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
@@ -288,33 +311,33 @@ sub denysoft_greylist {
       # Grey IP - accept unless timed out
       elsif (time - $ts < $config->{grey_timeout}) {
         $db{$key} = sprintf $fmt, time, $new, $black, 1;
-        $self->log(LOGCRIT, "key $key updated grey->white");
+        $self->log(LOGWARN, "key $key updated grey->white");
         untie %db;
         close LOCK;
         return DECLINED;
       }
       else {
-        $self->log(LOGERROR, "key $key has timed out (grey)");
+        $self->log(LOGWARN, "key $key has timed out (grey)");
       }
     }
     # White IP - accept unless timed out
     else {
       if (time - $ts < $config->{white_timeout}) {
         $db{$key} = sprintf $fmt, time, $new, $black, ++$white;
-        $self->log(LOGCRIT, "key $key is white, $white deliveries");
+        $self->log(LOGWARN, "key $key is white, $white deliveries");
         untie %db;
         close LOCK;
         return DECLINED;
       }
       else {
-        $self->log(LOGERROR, "key $key has timed out (white)");
+        $self->log(LOGWARN, "key $key has timed out (white)");
       }
     }
   }
 
   # New ip or entry timed out - record new and return DENYSOFT
   $db{$key} = sprintf $fmt, time, ++$new, $black, 0;
-  $self->log(LOGCRIT, "key $key initial DENYSOFT, unknown");
+  $self->log(LOGWARN, "key $key initial DENYSOFT, unknown");
   untie %db;
   close LOCK;
   return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
@@ -342,3 +365,4 @@ sub p0f_match {
 }
 
 # arch-tag: 6ef5919e-404b-4c87-bcfe-7e9f383f3901
+
