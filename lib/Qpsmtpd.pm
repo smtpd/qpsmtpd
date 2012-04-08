@@ -57,7 +57,7 @@ sub TRACE_LEVEL { $TraceLevel }; # leave for plugin compatibility
 sub hooks { $hooks; }
 
 sub load_logging {
-  # need to do this differently that other plugins so as to
+  # need to do this differently than other plugins so as to
   # not trigger logging activity
   return if $LOGGING_LOADED;
   my $self = shift;
@@ -123,7 +123,7 @@ sub varlog {
     ($hook, $plugin, @log) = @_;
   }
 
-  $self->load_logging; # in case we already don't have this loaded yet
+  $self->load_logging; # in case we don't have this loaded yet
 
   my ($rc) = $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log);
 
@@ -183,7 +183,6 @@ sub config {
       return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
   }
   return;
-
 }
 
 sub config_dir {
@@ -411,9 +410,7 @@ sub _load_plugin {
   return $plug;
 }
 
-sub transaction {
-    return {}; # base class implements empty transaction
-}
+sub transaction { return {}; } # base class implements empty transaction
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
@@ -553,14 +550,14 @@ sub spool_dir {
     $Spool_dir = $1; # cleanse the taint
     my $Spool_perms = $self->config('spool_perms') || '0700';
 
-    if (-d $Spool_dir) { # Make sure the spool dir has appropriate rights
-      $self->log(LOGWARN,
-        "Permissions on spool_dir $Spool_dir are not $Spool_perms")
-          unless ((stat $Spool_dir)[2] & 07777) == oct($Spool_perms);
-    } else { # Or create it if it doesn't already exist
+    if (! -d $Spool_dir) { # create it if it doesn't exist
       mkdir($Spool_dir,oct($Spool_perms))
         or die "Could not create spool_dir $Spool_dir: $!";
-    }
+    };
+    # Make sure the spool dir has appropriate rights
+    $self->log(LOGWARN,
+       "Permissions on spool_dir $Spool_dir are not $Spool_perms")
+         unless ((stat $Spool_dir)[2] & 07777) == oct($Spool_perms);
   }
 
   return $Spool_dir;
@@ -625,8 +622,8 @@ L<http://smtpd.develooper.com/> and the I<README> file for more information.
 
 =head1 COPYRIGHT
 
-Copyright 2001-2010 Ask Bjørn Hansen, Develooper LLC.  See the
+Copyright 2001-2012 Ask Bjørn Hansen, Develooper LLC.  See te
 LICENSE file for more information.
 
-
+=cut
 
