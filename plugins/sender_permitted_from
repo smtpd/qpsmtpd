@@ -48,14 +48,13 @@ sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
 
     my $format    = $sender->format;
-    my $host      = lc $sender->host;
-    my $user      = $sender->user;
-    my $client_ip = $self->qp->connection->remote_ip;
-    my $from      = $sender->user . '@' . $host;
-    my $helo      = $self->qp->connection->hello_host;
-
+    return (DECLINED, "SPF - null sender") if $format eq '<>';
     return (DECLINED, "SPF - null sender")
-      unless ($format ne "<>" && $host && $user);
+        unless ($sender->host && $sender->user);
+
+    my $client_ip = $self->qp->connection->remote_ip;
+    my $from      = $sender->user . '@' . lc($sender->host);
+    my $helo      = $self->qp->connection->hello_host;
 
     # If we are receving from a relay permitted host, then we are probably
     # not the delivery system, and so we shouldn't check
