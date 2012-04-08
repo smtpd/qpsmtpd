@@ -1,7 +1,17 @@
-# this plugin checks the standard rcpthosts config
-#
-# It should be configured to be run _LAST_!
-#
+#!/usr/bin/perl
+
+=head1 NAME
+
+rcpt_ok
+
+=head1 SYNOPSIS
+
+this plugin checks the standard rcpthosts config
+
+It should be configured to be run _LAST_!
+
+=cut
+
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {

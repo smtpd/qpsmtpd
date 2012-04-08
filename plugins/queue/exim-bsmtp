@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 =head1 NAME
 
 exim-bsmtp
@@ -30,8 +32,6 @@ actually redundant with rsmtp, but harmless).
 
 =back
 
-=cut
-
 =head1 LICENSE
 
 Copyright (c) 2004 by Devin Carraway <qpsmtpd@devin.com>
@@ -62,6 +62,7 @@ use warnings;
 use IO::File;
 use Sys::Hostname qw(hostname);
 use File::Temp qw(tempfile);
+use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp, %args) = @_;
@@ -143,7 +144,3 @@ sub hook_queue {
     return (OK, "Queued!");
 }
 
-
-1;
-
-# vi: ts=4 sw=4 expandtab syn=perl:

@@ -1,4 +1,4 @@
-#!perl -w
+#!/usr/bin/perl
 
 =head1 NAME
 
@@ -10,7 +10,7 @@ tls - plugin to support STARTTLS
 
 tls [B<cert_path priv_key_path ca_path>]
 
-=over indentlevel
+=over 4
 
 =item B<cert_path>
 
@@ -325,5 +325,3 @@ sub event_read {
         $qp->disconnect();
     }
 }
-
-1;

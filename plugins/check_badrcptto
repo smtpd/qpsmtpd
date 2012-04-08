@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 # this plugin checks the badrcptto config (like badmailfrom, but for rcpt address
 # rather than sender address)
 use Qpsmtpd::DSN;

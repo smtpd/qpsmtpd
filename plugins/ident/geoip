@@ -1,6 +1,6 @@
-# -*- perl -*-
+#!/usr/bin/perl
 
-=pod
+=head1 SYNOPSIS
 
 This plugin uses MaxMind's GeoIP service and the Geo::IP perl module to
 do a lookup on incoming connections and record the country of origin.

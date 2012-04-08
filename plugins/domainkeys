@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 sub init {
     my ($self, $qp, %args) = @_;
 
@@ -88,7 +90,6 @@ sub hook_data_post {
     }
 }
 
-=cut
 
 =head1 NAME
 
@@ -114,3 +115,5 @@ Copyright (C) 2005-2006 John Peacock.
 Portions Copyright (C) 2004 Anthony D. Urso.  All rights reserved.  This
 program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
+
+=cut

@@ -1,4 +1,4 @@
-#!perl -w
+#!/usr/bin/perl
 
 =head1 NAME
 
@@ -195,7 +195,6 @@ sub hook_rcpt {
     }
   }
   return DECLINED;
-
 }
 
 sub hook_disconnect {
@@ -206,7 +205,6 @@ sub hook_disconnect {
   return DECLINED;
 }
 
-1;
 
 =head1 Usage
 

@@ -1,4 +1,5 @@
-# -*- perl -*-
+#!/usr/bin/perl
+
 =head1 NAME
 
 count_unrecognized_commands - Count unrecognized commands and disconnect when we have too many

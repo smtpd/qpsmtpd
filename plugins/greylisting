@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 =head1 NAME
 
 denysoft_greylist
@@ -104,8 +106,6 @@ Flag to indicate whether to use per-recipient greylisting
 databases (default is to use a shared database).  Per-recipient configuration
 directories, if determined, supercede I<db_dir>.
 
-=back
-
 =item p0f
 
 Enable greylisting only when certain p0f criteria is met. The single
@@ -122,6 +122,8 @@ To greylist only windows computers on DSL links more than 3 network hops
 away:
 
   p0f genre,windows,link,dsl,distance,3
+
+=back
 
 =head1 BUGS
 
@@ -141,6 +143,7 @@ BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock);
 use strict;
+use Qpsmtpd::Constants;
 
 my $VERSION = '0.08';
 
@@ -339,4 +342,3 @@ sub p0f_match {
 }
 
 # arch-tag: 6ef5919e-404b-4c87-bcfe-7e9f383f3901
-

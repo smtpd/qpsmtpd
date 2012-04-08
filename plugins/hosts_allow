@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 
 =head1 NAME 
 
@@ -76,5 +77,3 @@ sub hook_pre_connection {
 
     return (DECLINED);
 }
-
-# vim: sw=4 ts=4 expandtab syn=perl

@@ -1,4 +1,4 @@
-#!perl -w
+#!/usr/bin/perl
 
 use Qpsmtpd::Plugin::Async::DNSBLBase;
 
@@ -65,8 +65,6 @@ sub hook_rcpt {
     return (DENY, "Mail from $host rejected because it $note") if $note;
     return DECLINED;
 }
-
-1;
 
 =head1 NAME
 

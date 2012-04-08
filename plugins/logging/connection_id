@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+
 # this is a simple 'connection_id' plugin like the default builtin logging
 #
 # It demonstrates that a logging plugin can call ->log itself as well
@@ -41,8 +42,6 @@ sub hook_logging {
 
   return DECLINED;
 }
-
-=cut
 
 =head1 NAME
 

@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 =head1 NAME
 
 random_error
@@ -32,7 +34,7 @@ sub NEXT() { DECLINED }
 sub random_fail {
         my $fpct = $_[0]->qp->connection->notes('random_fail_%');
 
-=head calculating the probability of failure
+=head1 calculating the probability of failure
 
 There are six tests a message must pass to reach the queueing stage, and we wish to
 provide random failure for each one, with the combined probability being out
@@ -81,5 +83,4 @@ sub hook_data {
 sub hook_data_post {
     goto &random_fail
 }
-
 

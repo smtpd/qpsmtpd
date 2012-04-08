@@ -1,6 +1,5 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 # H+B EDV-AV plugin.
-#
 
 =head1 NAME
 

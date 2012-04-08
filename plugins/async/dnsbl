@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 use Qpsmtpd::Plugin::Async::DNSBLBase;
 
@@ -98,8 +98,6 @@ sub hook_rcpt {
     return (DENY, $note) if $note;
     return DECLINED;
 }
-
-1;
 
 =head1 NAME
 
