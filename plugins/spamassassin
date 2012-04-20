@@ -59,7 +59,7 @@ C<*** SPAM ***>
 =item spamd_socket [/path/to/socket|spamd.host:port]
 
 Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix
-domain sockets for spamd.  This is faster and more secure than using a
+domain sockets for spamd. This is faster and more secure than using a
 TCP connection, but if you run spamd on a remote machine, you need to
 use a TCP connection.
 
@@ -74,6 +74,18 @@ what you are doing, you can also leave them intact (parameter 'keep').
 =item spamd_user [username]
 
 The username to pass to spamd, if different from the user qpsmtpd runs as.
+
+=item relayclient skip
+
+What special treatment is offered to connection with relay permission? Relay
+permissions are granted when the connecting IP is listed in the relayclients
+file and/or when the user has authenticated. The only valid option at present
+is 'skip', which skips SA scoring.
+
+If SpamAssasin has certain network tests enabled, users may get elevated spam
+scores because their dynamic IP space is properly listed on DUL blocking lists.
+If the user is authenticated or coming from a trusted IP, odds are we don't
+want to be reject their messages. Especially when running qpsmtpd on port 587.
 
 =back
 
@@ -146,6 +158,9 @@ sub hook_data_post {
 
     $self->log(LOGDEBUG, "check_spam");
     return (DECLINED) if $transaction->data_size > 500_000;
+    return (DECLINED) if $self->{_args}->{relayclient} 
+                      && $self->{_args}->{relayclient} eq 'skip' 
+                      && $self->qp->connection->relay_client();
 
     my $SPAMD = $self->connect_to_spamd() or return (DECLINED);
     $SPAMD->autoflush(1);
@@ -156,7 +171,7 @@ sub hook_data_post {
 
     $self->print_to_spamd( $SPAMD, $message, $length, $username );
     shutdown($SPAMD, 1); # close our side of the socket (tell spamd we're done)
-        my $headers = $self->parse_spamd_response( $SPAMD ) or return (DECLINED);
+    my $headers = $self->parse_spamd_response( $SPAMD ) or return (DECLINED);
 
     $self->insert_spam_headers( $transaction, $headers, $username );
     return (DECLINED);
