@@ -54,7 +54,7 @@ sub hook_mail {
     my $from      = $sender->user . '@' . lc($sender->host);
     my $helo      = $self->qp->connection->hello_host;
 
-    # If we are receving from a relay permitted host, then we are probably
+    # If we are receiving from a relay permitted host, then we are probably
     # not the delivery system, and so we shouldn't check
     return (DECLINED, "SPF - relaying permitted")
       if $self->qp->connection->relay_client();
@@ -92,6 +92,7 @@ sub hook_mail {
     my $result     = $spf_server->process($request);
 
     $transaction->notes('spfquery', $result);
+    $transaction->notes('spfcode', $result->code);
 
     return (OK) if $result->code eq 'pass';    # this test passed
     return (DECLINED, "SPF - $result->code");
