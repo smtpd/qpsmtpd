@@ -57,6 +57,8 @@ spamassassin
 #
 #   spamassassin reject_threshold 20 munge_subject_threshold 10
 
+# dspam must run after spamassassin for the learn_from_sa feature to work
+dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
 # virus/clamav
