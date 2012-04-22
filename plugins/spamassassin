@@ -11,6 +11,9 @@ from the SpamAssassin package.  F<http://www.spamassassin.org>
 
 SpamAssassin 2.6 or newer is required.
 
+Stores the results in a note named spamass (for other plugins). The note
+format is 3 fields joined with a colon: is_spam:score:autolearn
+
 =head1 CONFIG
 
 Configured in the plugins file without any parameters, the
@@ -242,6 +245,12 @@ sub insert_spam_headers {
         if ( $name eq 'X-Spam-Report' ) {
             next;   # Mail::Header mangles this prefolded header
 #           $self->log(LOGDEBUG, $new_headers->{$name} );
+        };
+        if ( $name eq 'X-Spam-Status' ) {
+            my ( $is_spam,undef,$score,$autolearn ) = $new_headers->{$name}
+                =~ /^(yes|no), (score|hits)=([\d\.\-]+)\s.*?autolearn=([\w]+)/i;
+            $self->log(LOGINFO, "SA: $is_spam; $score; $autolearn");
+            $transaction->notes('spamass', "$is_spam:$score:$autolearn");
         };
         $new_headers->{$name} =~ s/\015//; # hack for outlook (still necessary?)
         $self->_cleanup_spam_header($transaction, $name);
