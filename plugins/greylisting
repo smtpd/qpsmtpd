@@ -249,7 +249,7 @@ sub denysoft_greylist {
       $dbdir = $d;
   }
   my $db = "$dbdir/$DB";
-  $self->log(LOGINFO,"using $db as greylisting database");
+  $self->log(LOGDEBUG,"using $db as greylisting database");
 
   my $remote_ip = $self->qp->connection->remote_ip;
   my $fmt = "%s:%d:%d:%d";
@@ -297,7 +297,7 @@ sub denysoft_greylist {
   my ($ts, $new, $black, $white) = (0,0,0,0);
   if ($db{$key}) {
     ($ts, $new, $black, $white) = split /:/, $db{$key};
-    $self->log(LOGINFO, "ts: " . localtime($ts) . ", now: " . localtime);
+    $self->log(LOGDEBUG, "ts: " . localtime($ts) . ", now: " . localtime);
     if (! $white) {
       # Black IP - deny, but don't update timestamp
       if (time - $ts < $config->{black_timeout}) {
