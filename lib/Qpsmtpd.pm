@@ -130,8 +130,9 @@ sub varlog {
   unless ( $rc and $rc == DECLINED or $rc == OK ) {
     # no logging plugins registered so fall back to STDERR
     warn join(" ", $$ .
-      (defined $plugin ? " $plugin plugin ($hook):" :
-       defined $hook   ? " running plugin ($hook):"  : ""),
+      (defined $plugin && defined $hook ? " $plugin plugin ($hook):" :
+       defined $plugin ? " $plugin plugin:" :
+       defined $hook   ? " running plugin ($hook):" : ""),
       @log), "\n"
     if $trace <= $TraceLevel;
   }
@@ -543,7 +544,7 @@ sub spool_dir {
   my $self = shift;
 
   unless ( $Spool_dir ) { # first time through
-    $self->log(LOGINFO, "Initializing spool_dir");
+    $self->log(LOGDEBUG, "Initializing spool_dir");
     $Spool_dir = $self->config('spool_dir')
                || Qpsmtpd::Utils::tildeexp('~/tmp/');
 
