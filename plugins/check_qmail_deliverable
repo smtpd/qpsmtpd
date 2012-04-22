@@ -149,14 +149,14 @@ sub rcpt_handler {
     my ($self, $transaction, $rcpt) = @_;
 
     my $address = $rcpt->address;
-    $self->log(LOGINFO, "Checking deliverability for recipient '$address'");
+    $self->log(LOGDEBUG, "Checking deliverability for recipient '$address'");
 
     $shared_domain = $rcpt->host;
 
     my $rv = deliverable $address;
 
     if (not defined $rv or not length $rv) {
-        $self->log(LOGWARN, "Unknown error.");
+        $self->log(LOGWARN, "Unknown error checking deliverability of '$address'");
         return DECLINED;
     }
 
