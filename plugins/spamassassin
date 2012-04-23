@@ -250,7 +250,7 @@ sub insert_spam_headers {
             my ( $is_spam,undef,$score,$autolearn ) = $new_headers->{$name}
                 =~ /^(yes|no), (score|hits)=([\d\.\-]+)\s.*?autolearn=([\w]+)/i;
             $self->log(LOGINFO, "SA: $is_spam; $score; $autolearn");
-            $transaction->notes('spamass', "$is_spam:$score:$autolearn");
+            $transaction->notes('spamassassin', "$is_spam:$score:$autolearn");
         };
         $new_headers->{$name} =~ s/\015//; # hack for outlook (still necessary?)
         $self->_cleanup_spam_header($transaction, $name);
