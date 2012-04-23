@@ -320,8 +320,8 @@ sub get_dspam_results {
 sub get_spamassassin_results {
     my ($self, $transaction) = @_;
 
-    if ( $transaction->notes('spamass' ) ) {
-        return split(':', $transaction->notes('spamass' ) );
+    if ( $transaction->notes('spamassassin' ) ) {
+        return split(':', $transaction->notes('spamassassin' ) );
     };
 
     my $sa_status = $transaction->header->get('X-Spam-Status') or do {
@@ -335,7 +335,7 @@ sub get_spamassassin_results {
 
     $self->log(LOGINFO, "SA: $is_spam; $score; $autolearn");
 
-    $transaction->notes('spamass', "$is_spam:$score:$autolearn");
+    $transaction->notes('spamassassin', "$is_spam:$score:$autolearn");
 
     return ($is_spam, $score, $autolearn);
 };
