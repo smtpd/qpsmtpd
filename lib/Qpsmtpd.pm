@@ -623,7 +623,7 @@ L<http://smtpd.develooper.com/> and the I<README> file for more information.
 
 =head1 COPYRIGHT
 
-Copyright 2001-2012 Ask Bjørn Hansen, Develooper LLC.  See te
+Copyright 2001-2012 Ask Bjørn Hansen, Develooper LLC.  See the
 LICENSE file for more information.
 
 =cut
