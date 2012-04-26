@@ -33,7 +33,7 @@ sub hook_mail {
     $bad =~ s/^\s*(\S+).*/$1/;
     next unless $bad;
     $bad = lc $bad;
-    $self->log(LOGWARN, "Bad badmailfromto config: No \@ sign in $bad") and next unless $bad =~ m/\@/;
+    $self->log(LOGWARN, "badmailfromto: Bad config: No \@ sign in $bad") and next unless $bad =~ m/\@/;
     $transaction->notes('badmailfromto', "$bad")
       if ($bad eq $from)
       || (substr($bad,0,1) eq '@' && $bad eq "\@$host");

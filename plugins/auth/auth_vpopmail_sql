@@ -91,8 +91,7 @@ sub auth_vmysql {
 
     return DECLINED if ! defined $pw_domain;
 
-    $self->log(LOGINFO,
-	"Authentication to vpopmail via mysql: $pw_name\@$pw_domain");
+    $self->log(LOGINFO, "auth_vpopmail_sql: authenticating $pw_name\@$pw_domain");
 
     my $sth = $dbh->prepare(<<SQL);
 SELECT *
