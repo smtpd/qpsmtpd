@@ -31,12 +31,12 @@ sub auth_vpopmaild {
                             Type     => SOCK_STREAM
                            ) or return DECLINED;
 
-    #$self->log(LOGINFO, "Attempting $method auth via vpopmaild");
+    #$self->log(LOGINFO, "auth_vpopmaild: attempting $method auth");
 
     # Get server greeting (+OK)
     my $connect_response = <$vpopmaild_socket>;
     if ( $connect_response !~ /^\+OK/ ) {
-        $self->log(LOGINFO, "Failed to receive vpopmaild connection response: $connect_response");
+        $self->log(LOGINFO, "auth_vpopmaild: No connection response: $connect_response");
         close($vpopmaild_socket);
         return DECLINED;
     };
@@ -52,7 +52,7 @@ sub auth_vpopmaild {
     # check for successful login (single line (+OK) or multiline (+OK+))
     return (OK, 'auth_vpopmaild') if $login_response =~ /^\+OK/;
 
-    $self->log(LOGINFO, "Failed vpopmaild authentication response: $login_response");
+    $self->log(LOGINFO, "auth_vpopmaild: no authentication response: $login_response");
 
     return DECLINED;
 }

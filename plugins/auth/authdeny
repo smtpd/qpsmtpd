@@ -18,7 +18,7 @@ sub hook_auth {
 
     #  $DB::single = 1;
 
-    $self->log( LOGWARN, "Cannot authenticate using authdeny" );
+    $self->log( LOGWARN, "auth_deny: Cannot authenticate" );
 
     return ( DECLINED, "$user is not free to abuse my relay" );
 }
