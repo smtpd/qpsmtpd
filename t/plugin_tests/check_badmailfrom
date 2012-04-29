@@ -7,9 +7,9 @@ use Qpsmtpd::Address;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_badmailfrom_match", 1);
-    $self->register_test("test_badmailfrom_hook_mail", 1);
-    $self->register_test("test_badmailfrom_hook_rcpt", 1);
+    $self->register_test("test_badmailfrom_match", 7);
+    $self->register_test("test_badmailfrom_hook_mail", 4);
+    $self->register_test("test_badmailfrom_hook_rcpt", 2);
 }
 
 sub test_badmailfrom_hook_mail {
@@ -30,7 +30,7 @@ sub test_badmailfrom_hook_mail {
 
     $self->{_badmailfrom_config} = ['matt@test.net','matt@test.com Yer a spammin bastert'];
     $transaction->notes('badmailfrom', '');
-    my ($r) = $self->hook_mail( $transaction, $address );
+    ($r) = $self->hook_mail( $transaction, $address );
     ok( $r == 909, "badmailfrom hook_mail");
     ok( $transaction->notes('badmailfrom') eq 'Yer a spammin bastert', 
         "badmailfrom hook_mail: custom reason");
