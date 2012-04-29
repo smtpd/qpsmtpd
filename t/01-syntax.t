@@ -34,7 +34,7 @@ sub test_syntax {
   return if ! -f $f;
   return if $skip_syntax{$f};
   return if $f =~ /async/;   # requires ParaDNS
-  my $r = `$this_perl -c $f 2>&1`;
+  my $r = `$this_perl -Tc $f 2>&1`;
   my $exit_code = sprintf ("%d", $CHILD_ERROR >> 8);
   ok( $exit_code == 0, "syntax $f");
 };
