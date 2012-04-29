@@ -8,6 +8,17 @@ dont_require_anglebrackets
 
 accept addresses in MAIL FROM:/RCPT TO: commands without surrounding <>
 
+=head1 DESCRIPTION
+
+RFC821 requires that email addresses presented during the SMTP conversation
+be enclosed in angle brackets. Like this:
+
+MAIL FROM:<user@example.com>
+
+This plugin relaxes that requirement, accepting messages in this format:
+
+MAIL FROM:user@example.com
+
 =cut
 
 sub hook_mail_pre {
