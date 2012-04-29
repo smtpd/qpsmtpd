@@ -1,3 +1,4 @@
+#!perl -Tw
 =head1 NAME
 
 denysoft_greylist

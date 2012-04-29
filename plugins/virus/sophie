@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -Tw
 use IO::Socket;
 
 sub register {

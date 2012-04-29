@@ -1,4 +1,4 @@
-#!perl -w
+#!perl -Tw
 
 sub register {
   my ($self, $qp, $denial ) = @_;

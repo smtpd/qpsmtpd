@@ -1,4 +1,4 @@
-#!/usr/bin/perl -Tw
+#!perl -Tw
 
 sub register {
   my ( $self, $qp, @args ) = @_;

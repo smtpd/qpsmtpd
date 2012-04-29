@@ -1,3 +1,4 @@
+#!perl -Tw
 use Qpsmtpd::DSN;
 use Net::DNS qw(mx);
 use Socket;

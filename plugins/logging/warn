@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -Tw
 # this is a simple 'warn' plugin like the default builtin logging
 #
 # It demonstrates that a logging plugin can call ->log itself as well

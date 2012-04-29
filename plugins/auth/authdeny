@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -Tw
 #
 #  This plugin doesn't actually check anything and will fail any
 #  user no matter what they type.  It is strictly a proof of concept for
