@@ -26,11 +26,9 @@ See also http://spf.pobox.com/
 
 =head1 AUTHOR
 
-Matt Simerson <msimerson@cpan.org>
+Matt Simerson - 2011 - rewrote using Mail::SPF
 
-=head1 ACKNOWLEDGEMENTS
-
-whomever wrote the original SPF plugin, upon which I based this.
+Matt Sergeant - 2003 - initial plugin
 
 =cut
 
