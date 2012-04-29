@@ -2,9 +2,11 @@
 
 use strict;
 use warnings;
+
+use Qpsmtpd::Constants;
 use IO::Socket;
 use version; 
-my $VERSION = qv('1.0.1');
+my $VERSION = qv('1.0.2');
 
 sub register {
     my ($self, $qp, %args) = @_;
@@ -14,13 +16,16 @@ sub register {
 
     $self->register_hook('auth-plain', 'auth_vpopmaild');
     $self->register_hook('auth-login', 'auth_vpopmaild');
-    $self->register_hook('auth-cram-md5', 'auth_vpopmaild');
+    #$self->register_hook('auth-cram-md5', 'auth_vpopmaild'); # not supported
 }
 
 sub auth_vpopmaild {
     my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) = @_;
 
-    use Qpsmtpd::Constants;
+    if ( ! $passClear ) {
+        $self->log(LOGINFO, "vpopmaild does not support cram-md5");
+        return DECLINED;
+    }
 
     # create socket
     my $vpopmaild_socket =
@@ -31,12 +36,12 @@ sub auth_vpopmaild {
                             Type     => SOCK_STREAM
                            ) or return DECLINED;
 
-    #$self->log(LOGINFO, "auth_vpopmaild: attempting $method auth");
+    $self->log(LOGDEBUG, "auth_vpopmaild: attempting $method");
 
     # Get server greeting (+OK)
     my $connect_response = <$vpopmaild_socket>;
     if ( $connect_response !~ /^\+OK/ ) {
-        $self->log(LOGINFO, "auth_vpopmaild: No connection response: $connect_response");
+        $self->log(LOGERROR, "auth_vpopmaild: no connection response: $connect_response");
         close($vpopmaild_socket);
         return DECLINED;
     };
@@ -52,7 +57,7 @@ sub auth_vpopmaild {
     # check for successful login (single line (+OK) or multiline (+OK+))
     return (OK, 'auth_vpopmaild') if $login_response =~ /^\+OK/;
 
-    $self->log(LOGINFO, "auth_vpopmaild: no authentication response: $login_response");
+    $self->log(LOGNOTICE, "auth_vpopmaild: failed authentication response: $login_response");
 
     return DECLINED;
 }
