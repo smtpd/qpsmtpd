@@ -16,6 +16,10 @@ my @skip_syntax = qw(
   plugins/auth/auth_ldap_bind
   plugins/ident/geoip
   plugins/logging/apache
+  plugins/auth/auth_vpopmail
+  plugins/virus/clamdscan
+  plugins/sender_permitted_from
+  plugins/domainkeys
   lib/Apache/Qpsmtpd.pm
   lib/Danga/Client.pm
   lib/Danga/TimeoutSocket.pm
@@ -33,8 +37,9 @@ sub test_syntax {
   chomp $f;
   return if ! -f $f;
   return if $skip_syntax{$f};
+  return if $f =~ m/(~|\.(bak|orig|rej))/;
   return if $f =~ /async/;   # requires ParaDNS
-  my $r = `$this_perl -Tc $f 2>&1`;
+  my $r = `$this_perl -Ilib -MQpsmtpd::Constants -c $f 2>&1`;
   my $exit_code = sprintf ("%d", $CHILD_ERROR >> 8);
   ok( $exit_code == 0, "syntax $f");
 };

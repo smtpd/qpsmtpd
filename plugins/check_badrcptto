@@ -1,4 +1,4 @@
-#!perl -Tw
+#!perl -w
 
 # this plugin checks the badrcptto config (like badmailfrom, but for rcpt address
 # rather than sender address)

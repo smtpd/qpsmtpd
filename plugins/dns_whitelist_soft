@@ -1,4 +1,4 @@
-#!perl -Tw
+#!perl -w
 =head1 NAME
 
 dns_whitelist_soft - dns-based whitelist override for other qpsmtpd plugins

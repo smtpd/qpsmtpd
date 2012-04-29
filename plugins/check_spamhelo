@@ -1,4 +1,4 @@
-#!perl -Tw
+#!perl -w
 =head1 NAME
 
 check_spamhelo - Check a HELO message delivered from a connecting host.

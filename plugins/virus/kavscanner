@@ -1,4 +1,4 @@
-#!perl -Tw
+#!perl -w
 # Kasperski-AV plugin.
 
 =head1 NAME

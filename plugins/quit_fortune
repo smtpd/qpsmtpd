@@ -1,4 +1,4 @@
-#!perl -Tw
+#!perl -w
 
 sub hook_quit {
   my $qp = shift->qp;
