@@ -332,7 +332,7 @@ sub print_to_spamd {
 sub check_spam_reject {
     my ($self, $transaction) = @_;
 
-    my $score = $self->get_spam_score($transaction) or return DECLINED;
+    my ($score) = $self->get_spam_score($transaction) or return DECLINED;
 
     $self->log(LOGDEBUG, "reject_threshold=" . $self->{_args}->{reject_threshold} . ", score=$score");
 
@@ -346,9 +346,10 @@ sub check_spam_reject {
 
 sub check_spam_munge_subject {
     my ($self, $transaction) = @_;
-    my $score = $self->get_spam_score($transaction) or return DECLINED;
+    my ($score, $required) = $self->get_spam_score($transaction) or return DECLINED;
 
-    return DECLINED unless $score >= $self->{_args}->{munge_subject_threshold};
+    $required ||= $self->{_args}->{munge_subject_threshold};
+    return DECLINED unless $score > $required;
 
     my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
     my $subject = $transaction->header->get('Subject') || '';
@@ -358,16 +359,23 @@ sub check_spam_munge_subject {
 }
 
 sub get_spam_score {
-  my ($self, $transaction) = @_;
-  my $status  = $transaction->header->get('X-Spam-Status') or return; 
-  my ($score) = ($status =~ m/hits=(-?\d+\.\d+)/)[0];
-  return $score;
+    my ($self, $transaction) = @_;
+
+    my $status = $transaction->header->get('X-Spam-Status') or return;
+
+    my ( $is_spam,undef,$score,$required,$autolearn ) =
+            $status =~ /^(yes|no), (score|hits)=([\d\.\-]+) required=([\d\.\-]+) autolearn=([\w]+)/i;
+
+    return ($score, $required);
 }
 
 sub _cleanup_spam_header {
-  my ($self, $transaction, $header_name) = @_;
+    my ($self, $transaction, $header_name) = @_;
 
-  my $action = lc($self->{_args}->{leave_old_headers}) || 'rename';
+    my $action = 'rename';
+    if ( $self->{_args}->{leave_old_headers} ) {
+        $action = lc($self->{_args}->{leave_old_headers});
+    };
 
     return unless $action eq 'drop' || $action eq 'rename';
 
