@@ -2,7 +2,14 @@ use Config qw/ myconfig /;
 use Data::Dumper;
 use English qw/ -no_match_vars /;
 use File::Find;
-use Test::More 'no_plan';
+use Test::More;
+
+if ( $ENV{'QPSMTPD_DEVELOPER'} ) {
+	'no_plan';
+}
+else {
+	plan skip_all => "not a developer, skipping POD tests";
+};
 
 use lib 'lib';
 
@@ -35,7 +42,6 @@ my @files = find( {wanted=>\&test_syntax, no_chdir=>1}, 'plugins', 'lib' );
 sub test_syntax { 
   my $f = $File::Find::name;
   chomp $f;
-  return if $f =~ m{^plugins/};
   return if ! -f $f;
   return if $skip_syntax{$f};
   return if $f =~ m/(~|\.(bak|orig|rej))/;
@@ -45,4 +51,5 @@ sub test_syntax {
   ok( $exit_code == 0, "syntax $f");
 };
 
+done_testing();
 
