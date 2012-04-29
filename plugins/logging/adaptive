@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-
+#!perl -w
 # Adaptive logging plugin - logs at one level for successful messages and
 # one level for DENY'd messages
 

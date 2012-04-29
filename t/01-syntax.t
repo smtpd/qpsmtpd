@@ -16,6 +16,10 @@ my @skip_syntax = qw(
   plugins/auth/auth_ldap_bind
   plugins/ident/geoip
   plugins/logging/apache
+  plugins/auth/auth_vpopmail
+  plugins/virus/clamdscan
+  plugins/sender_permitted_from
+  plugins/domainkeys
   lib/Apache/Qpsmtpd.pm
   lib/Danga/Client.pm
   lib/Danga/TimeoutSocket.pm
@@ -31,10 +35,12 @@ my @files = find( {wanted=>\&test_syntax, no_chdir=>1}, 'plugins', 'lib' );
 sub test_syntax { 
   my $f = $File::Find::name;
   chomp $f;
+  return if $f =~ m{^plugins/};
   return if ! -f $f;
   return if $skip_syntax{$f};
+  return if $f =~ m/(~|\.(bak|orig|rej))/;
   return if $f =~ /async/;   # requires ParaDNS
-  my $r = `$this_perl -c $f 2>&1`;
+  my $r = `$this_perl -Ilib -MQpsmtpd::Constants -c $f 2>&1`;
   my $exit_code = sprintf ("%d", $CHILD_ERROR >> 8);
   ok( $exit_code == 0, "syntax $f");
 };

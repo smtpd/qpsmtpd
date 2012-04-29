@@ -1,4 +1,5 @@
-#!/usr/bin/perl
+#!perl -w
+use strict;
 
 =head1 NAME
 

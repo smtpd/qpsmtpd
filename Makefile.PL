@@ -14,6 +14,7 @@ WriteMakefile(
         'File::Temp'   => 0,
         'Time::HiRes'  => 0,
         'Net::IP'      => 0,
+        'Date::Parse'  => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',

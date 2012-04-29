@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -w
 
 # this plugin checks the relayclients config file and
 # $ENV{RELAYCLIENT} to see if relaying is allowed.

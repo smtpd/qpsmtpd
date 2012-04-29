@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-
+#!perl -w
 # Kasperski-AV plugin.
 
 =head1 NAME

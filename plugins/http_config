@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-
+#!perl -w
 =head1 NAME
 
 http_config

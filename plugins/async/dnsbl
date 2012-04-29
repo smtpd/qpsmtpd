@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -w
 
 use Qpsmtpd::Plugin::Async::DNSBLBase;
 

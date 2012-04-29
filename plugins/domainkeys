@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-
+#!perl -w
 sub init {
     my ($self, $qp, %args) = @_;
 

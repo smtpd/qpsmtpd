@@ -1,5 +1,4 @@
-#!/usr/bin/perl
-
+#!perl -w
 =head1 NAME
 
 check_earlytalker - Check that the client doesn't talk before we send the SMTP banner

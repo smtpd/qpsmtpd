@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -w
 use warnings;
 
 # Very basic script to create TLS certificates for qpsmtpd
