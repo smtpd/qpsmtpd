@@ -179,8 +179,8 @@ sub hook_data_post {
         return (DECLINED);
     };
 
-    # X-DSPAM-Result: alan@alannowell.com; result="Spam";     class="Spam";     probability=1.0000; confidence=1.00; signature=N/A
-    # X-DSPAM-Result: smtpd;               result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
+    # X-DSPAM-Result: user@test.com; result="Spam"; class="Spam"; probability=1.0000; confidence=1.00; signature=N/A
+    # X-DSPAM-Result: smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
     my ($result,$prob,$conf,$sig) = $response =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
     my $header_str = "$result, probability=$prob, confidence=$conf";
     $self->log(LOGWARN, $header_str);
