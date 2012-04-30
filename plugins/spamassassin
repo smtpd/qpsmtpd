@@ -151,6 +151,11 @@ sub register {
 
     %{$self->{_args}} = @args;
 
+    # backwards compatibility with previous config syntax
+    if ( ! defined $self->{_args}{reject} && defined $self->{_args}{reject_threshold} ) {
+        $self->{_args}{reject} = $self->{_args}{reject_threshold};
+    };
+
     $self->register_hook("data_post", "check_spam_reject")
         if $self->{_args}->{reject};
 
