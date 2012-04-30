@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -w
 
 =head1 NAME
 
@@ -11,8 +11,9 @@ from the SpamAssassin package.  F<http://www.spamassassin.org>
 
 SpamAssassin 2.6 or newer is required.
 
-Stores the results in a note named spamass (for other plugins). The note
-format is 3 fields joined with a colon: is_spam:score:autolearn
+Stores the results in a note named spamassassin (for other plugins). The note
+is a hashref with whatever fields are defined in your spamassassin config.
+These are the common ones: score,required,autolearn,tests,version
 
 =head1 CONFIG
 
@@ -27,11 +28,11 @@ The format goes like
 Options being those listed below and the values being parameters to
 the options.  Confused yet?  :-)  It looks like this in practice:
 
-  spamassassin reject_threshold 7 leave_old_headers keep
+  spamassassin reject 7 leave_old_headers keep
 
 =over 4
 
-=item reject_threshold [threshold]
+=item reject [threshold]
 
 Set the threshold where the plugin will reject the mail.  Some
 mail servers are so useless that they ignore 55x responses not coming
@@ -94,7 +95,7 @@ want to be reject their messages. Especially when running qpsmtpd on port 587.
 
 With both of the first options the configuration line will look like the following
 
- spamasssasin  reject_threshold 18  munge_subject_threshold 8
+ spamasssasin  reject 18  munge_subject_threshold 8
 
 
 =head1 MULTIPLE RECIPIENT BEHAVIOR
@@ -126,7 +127,7 @@ Make the "subject munge string" configurable
 
   * refactored for ease of maintenance
   * added support for per-user SpamAssassin preferences
-  * updated get_spam_score so that score=N.N works (as well as hits=N.N)
+  * updated get_spam_results so that score=N.N works (as well as hits=N.N)
   * rewrote the X-Spam-* header additions so that SA generated headers are
     not discarded. Admin can alter SA headers with add_header in their SA
     config. Subverting their changes there is unexpected. Making them read
@@ -136,6 +137,7 @@ Make the "subject munge string" configurable
 =cut
 
 use strict;
+use warnings;
 
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
@@ -150,7 +152,7 @@ sub register {
     %{$self->{_args}} = @args;
 
     $self->register_hook("data_post", "check_spam_reject")
-        if $self->{_args}->{reject_threshold};
+        if $self->{_args}->{reject};
 
     $self->register_hook("data_post", "check_spam_munge_subject")
         if $self->{_args}->{munge_subject_threshold};
@@ -247,10 +249,7 @@ sub insert_spam_headers {
 #           $self->log(LOGDEBUG, $new_headers->{$name} );
         };
         if ( $name eq 'X-Spam-Status' ) {
-            my ( $is_spam,undef,$score,$autolearn ) = $new_headers->{$name}
-                =~ /^(yes|no), (score|hits)=([\d\.\-]+)\s.*?autolearn=([\w]+)/i;
-            $self->log(LOGINFO, "SA: $is_spam; $score; $autolearn");
-            $transaction->notes('spamassassin', "$is_spam:$score:$autolearn");
+            $self->parse_spam_header( $new_headers->{$name} );
         };
         $new_headers->{$name} =~ s/\015//; # hack for outlook (still necessary?)
         $self->_cleanup_spam_header($transaction, $name);
@@ -332,24 +331,36 @@ sub print_to_spamd {
 sub check_spam_reject {
     my ($self, $transaction) = @_;
 
-    my ($score) = $self->get_spam_score($transaction) or return DECLINED;
+    my $sa_results = $self->get_spam_results($transaction) or do {
+        $self->log(LOGERROR, "error getting spamassassin results");
+        return DECLINED;
+    };
+    my $score  = $sa_results->{score} or do {
+        $self->log(LOGERROR, "error getting spamassassin score");
+        return DECLINED;
+    };
+    my $reject = $self->{_args}->{reject} or do {
+        $self->log(LOGERROR, "reject threshold not set, default pass");
+        return DECLINED;
+    };
 
-    $self->log(LOGDEBUG, "reject_threshold=" . $self->{_args}->{reject_threshold} . ", score=$score");
+    if ( $score < $reject ) {
+        $self->log(LOGINFO, "score $score < $reject: passed");
+        return DECLINED;
+    };
 
 # default of media_unsupported is DENY, so just change the message
-    return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold")
-        if $score >= $self->{_args}->{reject_threshold};
-
-    $self->log(LOGDEBUG, "check_spam_reject: passed");
-    return DECLINED;
+    $self->log(LOGINFO, "score $score > $reject: deny");
+    return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold");
 }
 
 sub check_spam_munge_subject {
     my ($self, $transaction) = @_;
-    my ($score, $required) = $self->get_spam_score($transaction) or return DECLINED;
 
-    $required ||= $self->{_args}->{munge_subject_threshold};
-    return DECLINED unless $score > $required;
+    my $sa = $self->get_spam_results($transaction) or return DECLINED;
+
+    my $required = $sa->{required} || $self->{_args}->{munge_subject_threshold};
+    return DECLINED unless $sa->{score} > $required;
 
     my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
     my $subject = $transaction->header->get('Subject') || '';
@@ -358,16 +369,47 @@ sub check_spam_munge_subject {
     return DECLINED;
 }
 
-sub get_spam_score {
+sub get_spam_results {
     my ($self, $transaction) = @_;
 
-    my $status = $transaction->header->get('X-Spam-Status') or return;
+    if ( defined $transaction->notes('spamassassin') ) {
+        return $transaction->notes('spamassassin');
+    };
 
-    my ( $is_spam,undef,$score,$required,$autolearn ) =
-            $status =~ /^(yes|no), (score|hits)=([\d\.\-]+) required=([\d\.\-]+) autolearn=([\w]+)/i;
+    my $header = $transaction->header->get('X-Spam-Status') or return;
+    my $r = $self->parse_spam_header( $header );
 
-    return ($score, $required);
+    $self->log(LOGINFO, "SA: $r->{is_spam}; $r->{score}; $r->{autolearn}");
+    $transaction->notes('spamassassin', $r);
+
+    return $r;
 }
+
+sub parse_spam_header {
+    my ($self, $string) = @_;
+
+# the X-Spam-Score header contents vary based on the settings in
+# the spamassassin *.cf files. Rather than parse via regexp, split
+# on the consistent whitespace and = delimiters. More reliable and
+# likely faster.
+    my @parts = split(/\s+/, $string);
+    my $is_spam = shift @parts;
+    chomp @parts;
+    chop $is_spam;  # remove trailing ,
+
+    my %r;
+    foreach ( @parts ) {
+        my ($key,$val) = split(/=/, $_);
+        $r{$key} = $val;
+    }
+    $r{is_spam} = $is_spam;
+
+    # backwards compatibility for SA versions < 3
+    if ( defined $r{hits} && ! defined $r{score} ) {
+        $r{score} = delete $r{hits};
+    };
+    return \%r;
+};
 
 sub _cleanup_spam_header {
     my ($self, $transaction, $header_name) = @_;
