@@ -1,0 +1,10 @@
+
+When upgrading from:
+
+v 0.84 or below
+
+p0f plugin: now defaults to p0f v3
+
+Upgrade p0f to version 3 or add 'version 2' to your p0f line in config/plugins. perldoc plugins/ident/p0f for more details.
+
+
