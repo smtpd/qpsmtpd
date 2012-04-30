@@ -12,7 +12,14 @@ train dspam.
 Adds the X-DSPAM-Result and X-DSPAM-Signature headers to messages. The latter is essential for
 training dspam and the former is useful to MDAs, MUAs, and humans.
 
+Adds a transaction note to the qpsmtpd transaction. The notes is a hashref
+with at least the 'class' field (Spam,Innocent,Whitelisted). It will normally
+contain a probability and confidence ratings as well.
+
 =head1 TRAINING DSPAM
+
+Do not just enable dspam! Its false positive rate when untrained is high. The
+good news is; dspam learns very, very fast.
 
 To get dspam into a useful state, it must be trained. The best method way to
 train dspam is to feed it two large equal sized corpuses of spam and ham from
@@ -171,7 +178,7 @@ sub hook_data_post {
     my $username = $self->select_username( $transaction );
     my $message  = $self->assemble_message($transaction);
     my $filtercmd = $self->get_filter_cmd( $transaction, $username );
-    $self->log(LOGINFO, $filtercmd);
+    $self->log(LOGDEBUG, $filtercmd);
 
     my $response = $self->dspam_process( $filtercmd, $message );
     if ( ! $response ) {
@@ -267,53 +274,80 @@ sub dspam_process_open2 {
 sub dspam_reject {
     my ($self, $transaction) = @_;
 
-    my $reject = $self->{_args}->{reject} or return (DECLINED);
+    my $reject = $self->{_args}->{reject} or do {
+        $self->log(LOGWARN, "reject disabled");
+        return DECLINED;
+    };
 
-    my ($class, $probability, $confidence) = $self->get_dspam_results( $transaction );
+    my $d = $self->get_dspam_results( $transaction );
 
     if ( $reject eq 'agree' ) {
         my $sa = $transaction->notes('spamassassin' );
 
-        if ( ! $sa->{is_spam} && ! $class ) {
+        if ( ! $sa->{is_spam} && ! $d->{class} ) {
             $self->log(LOGWARN, "cannot agree: SA or dspam results missing");
-            return (DECLINED)
+            return DECLINED
         };
 
-        if ( $class eq 'Spam' && $sa->{is_spam} eq 'Yes' ) {
-            $self->log(LOGWARN, "agreement: SA: $sa->{is_spam}, dspam: $class");
-            return Qpsmtpd::DSN->media_unsupported('dspam says, no spam please')
+        if ( $d->{class} eq 'Spam' && $sa->{is_spam} eq 'Yes' ) {
+            $self->log(LOGDEBUG, "agreement: SA: $sa->{is_spam}, dspam: $d->{class}");
+            return Qpsmtpd::DSN->media_unsupported(DENY,'we agree, no spam please')
         };
 
-        return (DECLINED);
+        return DECLINED;
     };
 
-    return DECLINED if ! $class;
-    return DECLINED if $class eq 'Innocent';
+    if ( ! $d->{class} ) {
+        $self->log(LOGWARN, "no dspam class detected");
+        return DECLINED;
+    };
+    return DECLINED if $d->{class} eq 'Innocent';
 
     if ( $self->qp->connection->relay_client ) {
         $self->log(LOGWARN, "allowing spam since user authenticated");
         return DECLINED;
     };
-    return DECLINED if $probability >= $reject;
-    return DECLINED if $confidence != 1;
-# dspam is 100% sure this message is spam
-# default of media_unsupported is DENY, so just change the message
-    return Qpsmtpd::DSN->media_unsupported('dspam says, no spam please');
+    if ( $d->{probability} <= $reject ) {
+        $self->log(LOGINFO, "probability is too low ($d->{probability} < $reject)");
+        return DECLINED;
+    };
+    if ( $d->{confidence} != 1 ) {
+        $self->log(LOGINFO, "confidence is too low ($d->{confidence})");
+        return DECLINED;
+    };
+
+# dspam is more than $reject percent sure this message is spam
+    return Qpsmtpd::DSN->media_unsupported(DENY,'dspam says, no spam please');
 }
 
 sub get_dspam_results {
     my ( $self, $transaction ) = @_;
+
+    if ( $transaction->notes('dspam') ) {
+        return $transaction->notes('dspam');
+    };
 
     my $string = $transaction->header->get('X-DSPAM-Result') or do {
         $self->log(LOGWARN, "dspam_reject: failed to find the dspam header");
         return;
     };
 
-    my ($class,$probability,$confidence) =
-        $string =~ m/^([\w]+), probability=([\d\.]+), confidence=([\d\.]+)/i;
+    my @bits  = split(/,\s+/, $string); chomp @bits;
+    my $class = shift @bits;
+    my %d;
+    foreach (@bits) {
+        my ($key,$val) = split(/=/, $_);
+        $d{$key} = $val;
+    };
+    $d{class} = $class;
 
-    $self->log(LOGDEBUG, "$class, prob: $probability, conf: $confidence");
-    return ($class, $probability, $confidence);
+    my $message = $d{class};
+    if ( defined $d{probability} && defined $d{confidence} ) {
+        $message .= ", prob: $d{probability}, conf: $d{confidence}";
+    };
+    $self->log(LOGDEBUG, $message);
+    $transaction->notes('dspam', \%d);
+    return \%d;
 };
 
 sub get_filter_cmd {
