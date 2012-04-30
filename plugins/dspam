@@ -272,16 +272,15 @@ sub dspam_reject {
     my ($class, $probability, $confidence) = $self->get_dspam_results( $transaction );
 
     if ( $reject eq 'agree' ) {
-        my ($sa_is_spam, $sa_score, $sa_autolearn)
-            = $self->get_spamassassin_results($transaction);
+        my $sa = $transaction->notes('spamassassin' );
 
-        if ( ! $sa_is_spam && ! $class ) {
+        if ( ! $sa->{is_spam} && ! $class ) {
             $self->log(LOGWARN, "cannot agree: SA or dspam results missing");
             return (DECLINED)
         };
 
-        if ( $class eq 'Spam' && $sa_is_spam eq 'Yes' ) {
-            $self->log(LOGWARN, "agreement: SA: $sa_is_spam, dspam: $class");
+        if ( $class eq 'Spam' && $sa->{is_spam} eq 'Yes' ) {
+            $self->log(LOGWARN, "agreement: SA: $sa->{is_spam}, dspam: $class");
             return Qpsmtpd::DSN->media_unsupported('dspam says, no spam please')
         };
 
@@ -317,29 +316,6 @@ sub get_dspam_results {
     return ($class, $probability, $confidence);
 };
 
-sub get_spamassassin_results {
-    my ($self, $transaction) = @_;
-
-    if ( $transaction->notes('spamassassin' ) ) {
-        return split(':', $transaction->notes('spamassassin' ) );
-    };
-
-    my $sa_status = $transaction->header->get('X-Spam-Status') or do {
-        $self->log(LOGERROR, "no X-Spam-Status header");
-        return;
-    };
-    chomp $sa_status;
-
-    my ( $is_spam,undef,$score,$required,$autolearn ) =
-        $sa_status =~ /^(yes|no), (score|hits)=([\d\.\-]+) required=([\d\.\-]+) autolearn=([\w]+)/i;
-
-    $self->log(LOGINFO, "SA: $is_spam; $score of $required; $autolearn");
-
-    $transaction->notes('spamassassin', "$is_spam:$score:$autolearn:$required");
-
-    return ($is_spam, $score, $autolearn, $required);
-};
-
 sub get_filter_cmd {
     my ($self, $transaction, $user) = @_;
 
@@ -349,18 +325,18 @@ sub get_filter_cmd {
 
     #$self->log(LOGDEBUG, "attempting to learn from SA");
 
-    my ($is_spam, $score, $autolearn) = $self->get_spamassassin_results($transaction);
-    return $default if ! $is_spam;
+    my $sa = $transaction->notes('spamassassin' );
+    return $default if ! $sa || ! $sa->{is_spam};
 
-    if ( $is_spam eq 'Yes' && $score < $min_score ) {
-        $self->log(LOGNOTICE, "SA spam score of $score is less than $min_score, skipping autolearn");
+    if ( $sa->{is_spam} eq 'Yes' && $sa->{score} < $min_score ) {
+        $self->log(LOGNOTICE, "SA spam score of $sa->{score} is less than $min_score, skipping autolearn");
         return $default;
     };
 
-    if ( $is_spam eq 'Yes' && $autolearn eq 'spam' ) {
+    if ( $sa->{is_spam} eq 'Yes' && $sa->{autolearn} eq 'spam' ) {
         return "$dspam_bin --user $user --mode=tum --source=corpus --class=spam --deliver=summary --stdout";
     }
-    elsif ( $is_spam eq 'No' && $autolearn eq 'ham' ) {
+    elsif ( $sa->{is_spam} eq 'No' && $sa->{autolearn} eq 'ham' ) {
         return "$dspam_bin --user $user --mode=tum --source=corpus --class=innocent --deliver=summary --stdout";
     };
 
