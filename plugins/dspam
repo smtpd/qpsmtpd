@@ -190,7 +190,7 @@ sub hook_data_post {
     # X-DSPAM-Result: smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
     my ($result,$prob,$conf,$sig) = $response =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
     my $header_str = "$result, probability=$prob, confidence=$conf";
-    $self->log(LOGWARN, $header_str);
+    $self->log(LOGINFO, $header_str);
     $self->_cleanup_spam_header($transaction, 'X-DSPAM-Result');
     $transaction->header->add('X-DSPAM-Result', $header_str, 0);
 
@@ -363,7 +363,7 @@ sub get_filter_cmd {
     return $default if ! $sa || ! $sa->{is_spam};
 
     if ( $sa->{is_spam} eq 'Yes' && $sa->{score} < $min_score ) {
-        $self->log(LOGNOTICE, "SA spam score of $sa->{score} is less than $min_score, skipping autolearn");
+        $self->log(LOGNOTICE, "SA score $sa->{score} < $min_score, skip autolearn");
         return $default;
     };
 
