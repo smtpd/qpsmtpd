@@ -350,12 +350,12 @@ sub check_spam_reject {
     };
 
     if ( $score < $reject ) {
-        $self->log(LOGINFO, "score $score < $reject: passed");
+        $self->log(LOGINFO, "pass, $score < $reject");
         return DECLINED;
     };
 
 # default of media_unsupported is DENY, so just change the message
-    $self->log(LOGINFO, "score $score > $reject: deny");
+    $self->log(LOGINFO, "deny, $score > $reject");
     return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold");
 }
 
@@ -384,7 +384,7 @@ sub get_spam_results {
     my $header = $transaction->header->get('X-Spam-Status') or return;
     my $r = $self->parse_spam_header( $header );
 
-    $self->log(LOGINFO, "SA: $r->{is_spam}; $r->{score}; $r->{autolearn}");
+    $self->log(LOGDEBUG, "$r->{is_spam}, $r->{score}");
     $transaction->notes('spamassassin', $r);
 
     return $r;
