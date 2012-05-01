@@ -390,6 +390,8 @@ sub event_err {
     $self->cont;
 }
 
+#!/usr/bin/perl
+
 sub event_hup {
     my ($self) = @_;
     eval { $self->read(1); }; # gives us the correct error in errno

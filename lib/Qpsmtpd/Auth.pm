@@ -26,10 +26,20 @@ sub SASL {
         ( $loginas, $user, $passClear ) = split /\x0/,
           decode_base64($prekey);
           
+        if ( ! $user ) {
+            if ( $loginas ) {
+                $session->respond(535, "Authentication invalid ($loginas)");
+            }
+            else {
+                $session->respond(535, "Authentication invalid");
+            }
+            return DECLINED;
+        };
+
         # Authorization ID must not be different from
         # Authentication ID
         if ( $loginas ne '' && $loginas ne $user ) {
-          $session->respond(535, "Authentication invalid");
+          $session->respond(535, "Authentication invalid for $user");
           return DECLINED;
         }
     }
@@ -59,7 +69,7 @@ sub SASL {
 
         # rand() is not cryptographic, but we only need to generate a globally
         # unique number.  The rand() is there in case the user logs in more than
-        # once in the same second, of if the clock is skewed.
+        # once in the same second, or if the clock is skewed.
         $ticket = sprintf( '<%x.%x@%s>',
             rand(1000000), time(), $session->config("me") );
 

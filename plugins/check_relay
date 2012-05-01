@@ -1,8 +1,14 @@
 #!perl -w
 
-# this plugin checks the relayclients config file and
-# $ENV{RELAYCLIENT} to see if relaying is allowed.
-#
+=head1 NAME
+
+check_relay
+
+=head1 SYNOPSIS
+
+Checks the relayclients config file and $ENV{RELAYCLIENT} to see if relaying is allowed.
+
+=cut
 
 use Net::IP qw(:PROC);
 
