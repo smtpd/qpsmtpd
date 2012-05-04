@@ -51,8 +51,8 @@ sub SASL {
     }
 
     if ( $rc == OK ) {
-        $msg = "Authentication successful for $user" .
-            ( defined $msg ? " - " . $msg : "" );
+        $msg = uc($mechanism) . " authentication successful for $user" .
+            ( $msg ? " - $msg" : '');
         $session->respond( 235, $msg );
         $session->connection->relay_client(1);
         $session->log( LOGINFO, $msg );
@@ -64,8 +64,8 @@ sub SASL {
         return OK;
     }
     else {
-        $msg = "Authentication failed for $user" .
-            ( defined $msg ? " - " . $msg : "" );
+        $msg = uc($mechanism) . " authentication failed for $user" .
+            ( $msg ? " - $msg" : '');
         $session->respond( 535, $msg );
         $session->log( LOGERROR, $msg );
         return DENY;
