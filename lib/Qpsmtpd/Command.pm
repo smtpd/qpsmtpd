@@ -53,10 +53,11 @@ Inside a plugin
 
 =cut
 
+use strict;
+
 use Qpsmtpd::Constants;
 use vars qw(@ISA);
 @ISA = qw(Qpsmtpd::SMTP);
-use strict;
 
 sub parse {
     my ($me,$cmd,$line,$sub) = @_;
