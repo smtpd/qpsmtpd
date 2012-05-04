@@ -211,7 +211,7 @@ vpopmail.
 =item auth_vpopmaild
 
 If you aren't sure which one to use, then use auth_vpopmaild. It
-has full support for all 3 authentication methods (PLAIN,LOGIN,CRAM-MD5),
+supports the PLAIN and LOGIN authentication methods,
 doesn't require the qpsmtpd process to run with special permissions, and
 can authenticate against vpopmail running on another host. It does require
 the vpopmaild server to be running.
@@ -228,7 +228,7 @@ CRAM-MD5 patch has been added to the developers repo:
 =item auth_vpopmail_sql
 
 If you are using the MySQL backend for vpopmail, then this module can be
-used for smtp-auth. It has support for all three auth methods. However, it
+used for smtp-auth. It supports LOGIN, PLAIN, and CRAM-MD5. However, it
 does not work with some vpopmail features such as alias domains, service
 restrictions, nor does it update vpopmail's last_auth information.
 
