@@ -84,8 +84,10 @@ sub auth_vmysql {
     my $dbuser = $self->qp->config("vpopmail_mysql_user") || "vpopmailuser";
     my $dbpass = $self->qp->config("vpopmail_mysql_pass") || "vpoppasswd";
 
-    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass );
-
+    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass ) or do {
+            $self->log(LOGERROR, "auth_vpopmail_sql: db connection failed");
+            return DECLINED;
+        };
     $dbh->{ShowErrorStatement} = 1;
 
     my ( $pw_name, $pw_domain ) = split '@', lc($user);
