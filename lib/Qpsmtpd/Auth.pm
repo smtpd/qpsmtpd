@@ -1,11 +1,13 @@
+package Qpsmtpd::Auth;
 # See the documentation in 'perldoc README.authentication' 
 
-package Qpsmtpd::Auth;
-use Qpsmtpd::Constants;
-use MIME::Base64;
+use strict;
+use warnings;
 
-sub e64
-{
+use MIME::Base64;
+use Qpsmtpd::Constants;
+
+sub e64 {
   my ($arg) = @_;
   my $res = encode_base64($arg);
   chomp($res);
@@ -18,72 +20,22 @@ sub SASL {
     my ( $session, $mechanism, $prekey ) = @_;
     my ( $user, $passClear, $passHash, $ticket, $loginas );
 
-    if ( $mechanism eq "plain" ) {
-        if (!$prekey) {
-          $session->respond( 334, " " );
-          $prekey= <STDIN>;
-        }
-        ( $loginas, $user, $passClear ) = split /\x0/,
-          decode_base64($prekey);
-          
-        # Authorization ID must not be different from
-        # Authentication ID
-        if ( $loginas ne '' && $loginas ne $user ) {
-          $session->respond(535, "Authentication invalid");
-          return DECLINED;
-        }
+    if ( $mechanism eq 'plain' ) {
+        ($loginas, $user, $passClear) = get_auth_details_plain($session,$prekey);
+        return DECLINED if ! $user || ! $passClear;
     }
-    elsif ($mechanism eq "login") {
-
-        if ( $prekey ) {
-          $user = decode_base64($prekey);
-        }
-        else {
-          $session->respond(334, e64("Username:"));
-          $user = decode_base64(<STDIN>);
-          if ($user eq '*') {
-            $session->respond(501, "Authentication canceled");
-            return DECLINED;
-          }
-        }
-    
-        $session->respond(334, e64("Password:"));
-        $passClear = <STDIN>;
-        $passClear = decode_base64($passClear);
-        if ($passClear eq '*') {
-          $session->respond(501, "Authentication canceled");
-          return DECLINED;
-        }
+    elsif ( $mechanism eq 'login' ) {
+        ($user, $passClear) = get_auth_details_login($session,$prekey);
+        return DECLINED if ! $user || ! $passClear;
     }
-    elsif ( $mechanism eq "cram-md5" ) {
-
-        # rand() is not cryptographic, but we only need to generate a globally
-        # unique number.  The rand() is there in case the user logs in more than
-        # once in the same second, of if the clock is skewed.
-        $ticket = sprintf( '<%x.%x@%s>',
-            rand(1000000), time(), $session->config("me") );
-
-        # We send the ticket encoded in Base64
-        $session->respond( 334, encode_base64( $ticket, "" ) );
-        my $line = <STDIN>;
-
-        if ( $line eq '*' ) {
-            $session->respond( 501, "Authentication canceled" );
-            return DECLINED;
-        }
-
-        ( $user, $passHash ) = split( ' ', decode_base64($line) );
+    elsif ( $mechanism eq 'cram-md5' ) {
+        ( $ticket, $user, $passHash ) = get_auth_details_cram_md5($session);
+        return DECLINED if ! $user || ! $passHash;
     }
     else {
         #this error is now caught in SMTP.pm's sub auth
         $session->respond( 500, "Internal server error" );
         return DECLINED;
-    }
-
-    # Make sure that we have enough information to proceed
-    unless ( $user && ($passClear || $passHash) ) {
-      $session->respond(504, "Invalid authentication string");
-      return DECLINED;
     }
 
     # try running the specific hooks first
@@ -119,6 +71,93 @@ sub SASL {
         return DENY;
     }
 }
+
+sub get_auth_details_plain {
+    my ( $session, $prekey ) = @_;
+
+    if ( ! $prekey) {
+        $session->respond( 334, ' ' );
+        $prekey= <STDIN>;
+    }
+
+    my ( $loginas, $user, $passClear ) = split /\x0/, decode_base64($prekey);
+
+    if ( ! $user ) {
+        if ( $loginas ) {
+            $session->respond(535, "Authentication invalid ($loginas)");
+        }
+        else {
+            $session->respond(535, "Authentication invalid");
+        }
+        return;
+    };
+
+    # Authorization ID must not be different from Authentication ID
+    if ( $loginas ne '' && $loginas ne $user ) {
+        $session->respond(535, "Authentication invalid for $user");
+        return;
+    }
+
+    return ($loginas, $user, $passClear);
+};
+
+sub get_auth_details_login {
+    my ( $session, $prekey ) = @_;
+
+    my $user;
+
+    if ( $prekey ) {
+        $user = decode_base64($prekey);
+    }
+    else {
+        $user = get_base64_response($session,'Username:') or return;
+    }
+
+    my $passClear = get_base64_response($session,'Password:') or return;
+
+    return ($user, $passClear);
+};
+
+sub get_auth_details_cram_md5 {
+    my ( $session, $ticket ) = @_;
+
+    if ( ! $ticket ) {  # ticket is only passed in during testing
+    # rand() is not cryptographic, but we only need to generate a globally
+    # unique number.  The rand() is there in case the user logs in more than
+    # once in the same second, or if the clock is skewed.
+        $ticket = sprintf( '<%x.%x@%s>',
+            rand(1000000), time(), $session->config('me') );
+    };
+
+    # send the base64 encoded ticket
+    $session->respond( 334, encode_base64( $ticket, '' ) );
+    my $line = <STDIN>;
+
+    if ( $line eq '*' ) {
+        $session->respond( 501, "Authentication canceled" );
+        return;
+    };
+
+    my ( $user, $passHash ) = split( ' ', decode_base64($line) );
+    unless ( $user && $passHash ) {
+        $session->respond(504, "Invalid authentication string");
+        return;
+    }
+
+    return ($ticket, $user, $passHash);
+};
+
+sub get_base64_response {
+    my ($session, $question) = @_;
+
+    $session->respond(334, e64($question));
+    my $answer = decode_base64( <STDIN> );
+    if ($answer eq '*') {
+        $session->respond(501, "Authentication canceled");
+        return;
+    }
+    return $answer;
+};
 
 # tag: qpsmtpd plugin that sets RELAYCLIENT when the user authentifies
 
