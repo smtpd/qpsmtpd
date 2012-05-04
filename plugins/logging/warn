@@ -34,7 +34,7 @@ sub hook_logging {
 
     my $prefix = defined $plugin && defined $hook ? " $plugin plugin ($hook):" :
                  defined $plugin ? " $plugin plugin:" :
-                 defined $hook   ? " running plugin ($hook):" : ''),
+                 defined $hook   ? " running plugin ($hook):" : '';
 
     warn join(' ', $$ . $prefix, @log), "\n";
 
