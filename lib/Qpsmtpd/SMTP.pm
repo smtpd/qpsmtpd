@@ -54,18 +54,14 @@ sub dispatch {
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     $self->run_hooks("unrecognized_command", $cmd, @_);
-    return 1
+    return 1;
   }
   $cmd = $1;
 
-  if (1 or $self->{_commands}->{$cmd} and $self->can($cmd)) {
     my ($result) = eval { $self->$cmd(@_) };
     $self->log(LOGERROR, "XX: $@") if $@;
     return $result if defined $result;
     return $self->fault("command '$cmd' failed unexpectedly");
-  }
-
-  return;
 }
 
 sub unrecognized_command_respond {
