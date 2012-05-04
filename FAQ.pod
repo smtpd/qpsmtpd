@@ -1,0 +1,47 @@
+# best read with perldoc: perldoc FAQ.pod
+
+=head1 FAQ
+
+=head2 Q: Do I need to enable a logging plugin?
+
+=head2 A: No.
+
+When zero logging plugins are configured, logs are directed to STDERR. This
+is the 'default' logging and logs are piped to multilog and stored in
+log/main/current.
+
+When more than zero logging plugins are enabled, builtin logging is disabled
+and logs are sent to every logging plugin configured in config/plugins.
+
+
+=head2 Q: How do I watch the logs?
+
+=head2 A: Here's a few examples:
+
+The default log files can be watched in real time lik this:
+
+ tail -F ~smtpd/log/main/current
+
+To convert the tai timestamps to human readable date time:
+
+ tail -F ~smtpd/log/main/current | tai64nlocal
+
+To exclude the dates entirely, use this command:
+
+ tail -F ~smtpd/smtpd/log/main/current | cut -d' ' -f2-3
+
+
+=head2 Q: How do I get alerts when qpsmtpd has a problem?
+
+=head2 A: Send logs with levels below LOGERROR to syslog.
+
+This can be done by adding the following lines to config/plugins:
+
+  logging/syslog loglevel LOGERROR
+  logging/warn LOGINFO
+
+The warn logging plugin replicates the builtin logging, directing log messages to STDERR. The syslog plugin directs errors to syslog where standard monitoring tools can pick them up and act on them.
+
+With these settings, errors will still get sent to STDERR as well.
+
+=cut
