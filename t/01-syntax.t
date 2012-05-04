@@ -35,7 +35,7 @@ my @files = find( {wanted=>\&test_syntax, no_chdir=>1}, 'plugins', 'lib' );
 sub test_syntax { 
   my $f = $File::Find::name;
   chomp $f;
-  return if $f =~ m{^plugins/};
+  return if $f =~ m{^plugins/} && ! $ENV{QPSMTPD_DEVELOPER};
   return if ! -f $f;
   return if $skip_syntax{$f};
   return if $f =~ m/(~|\.(bak|orig|rej))/;
