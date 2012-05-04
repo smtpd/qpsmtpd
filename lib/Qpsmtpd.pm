@@ -125,17 +125,18 @@ sub varlog {
 
   $self->load_logging; # in case we don't have this loaded yet
 
-  my ($rc) = $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log);
+    my ($rc) = $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log)
+        or return;
 
-  unless ( $rc and $rc == DECLINED or $rc == OK ) {
-    # no logging plugins registered so fall back to STDERR
-    warn join(" ", $$ .
-      (defined $plugin && defined $hook ? " $plugin plugin ($hook):" :
-       defined $plugin ? " $plugin plugin:" :
-       defined $hook   ? " running plugin ($hook):" : ""),
-      @log), "\n"
-    if $trace <= $TraceLevel;
-  }
+    return if $rc == DECLINED || $rc == OK;  # plugin success
+    return if $trace > $TraceLevel;
+
+    # no logging plugins registered, fall back to STDERR
+    my $prefix = defined $plugin && defined $hook ? " $plugin plugin ($hook):" :
+                 defined $plugin ? " $plugin plugin:" :
+                 defined $hook   ? " running plugin ($hook):" : '';
+
+    warn join(' ', $$ . $prefix, @log), "\n";
 }
 
 sub clear_config_cache {
@@ -415,6 +416,9 @@ sub transaction { return {}; } # base class implements empty transaction
 
 sub run_hooks {
   my ($self, $hook) = (shift, shift);
+#if ( $hook =~ /^auth/i ) {
+#warn sprintf( "run_hooks called by %s, %s, %s\n", (caller) );
+#};
   if ($hooks->{$hook}) {
     my @r;
     my @local_hooks = @{$hooks->{$hook}};
@@ -515,7 +519,9 @@ sub hook_responder {
   my ($self, $hook, $msg, $args) = @_;
 
   #my $t1 = $SAMPLER->("hook_responder", undef, 1);
-
+#if ( $hook =~ /^auth/i ) {
+#warn sprintf( "hook_responder called by %s, %s, %s\n", (caller) );
+#};
   my $code = shift @$msg;
 
   my $responder = $hook . '_respond';
