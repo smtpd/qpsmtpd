@@ -35,41 +35,45 @@ use Digest::HMAC_MD5 qw(hmac_md5_hex);
 sub register {
     my ( $self, $qp ) = @_;
 
-    $self->register_hook("auth-cram-md5", "auth_flat_file");
+    $self->register_hook('auth-plain',    'auth_flat_file');
+    $self->register_hook('auth-login',    'auth_flat_file');
+    $self->register_hook('auth-cram-md5', 'auth_flat_file');
 }
 
 sub auth_flat_file {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    my ( $pw_name, $pw_domain ) = split "@", lc($user);
+    if ( ! defined $passClear && ! defined $passHash ) {
+        return ( DENY, "authflat - missing password" );
+    }
+
+    my ( $pw_name, $pw_domain ) = split '@', lc($user);
 
     unless ( defined $pw_domain ) {
         return DECLINED;
     }
 
-    $self->log(LOGINFO, "Authentication for: $pw_name\@$pw_domain");
-
     my ($auth_line) = grep {/^$pw_name\@$pw_domain:/} $self->qp->config('flat_auth_pw');
     
-    unless (defined $auth_line) {
+    if ( ! defined $auth_line) {
+        $self->log(LOGINFO, "User not found: $pw_name\@$pw_domain");
         return DECLINED;
     }
     
+    $self->log(LOGINFO, "Authentication for: $pw_name\@$pw_domain");
+
     my ($auth_user, $auth_pass) = split(/:/, $auth_line, 2);
     
     # at this point we can assume the user name matched
-    if (
-        ( defined $passClear
-            and $auth_pass eq $passClear ) or
-        ( defined $passHash
-            and $passHash eq hmac_md5_hex($ticket, $auth_pass) )
-      )
-    {
-        return ( OK, "authflat/$method" );
-    }
-    else {
-        return ( DENY, "authflat/$method - wrong password" );
-    }
+    if ( defined $passClear && $auth_pass eq $passClear ) {
+        return ( OK, "authflat" );
+    };
+
+    if ( defined $passHash && $passHash eq hmac_md5_hex($ticket, $auth_pass) ) {
+        return ( OK, "authflat" );
+    };
+
+    return ( DENY, "authflat - wrong password" );
 }
 
