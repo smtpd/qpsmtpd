@@ -55,7 +55,7 @@ sub SASL {
             ( $msg ? " - $msg" : '');
         $session->respond( 235, $msg );
         $session->connection->relay_client(1);
-        $session->log( LOGINFO, $msg );
+        $session->log( LOGDEBUG, $msg );  # already logged by $session->respond
 
         $session->{_auth_user} = $user;
         $session->{_auth_mechanism} = $mechanism;
@@ -67,7 +67,7 @@ sub SASL {
         $msg = uc($mechanism) . " authentication failed for $user" .
             ( $msg ? " - $msg" : '');
         $session->respond( 535, $msg );
-        $session->log( LOGERROR, $msg );
+        $session->log( LOGDEBUG, $msg );  # already logged by $session->respond
         return DENY;
     }
 }
