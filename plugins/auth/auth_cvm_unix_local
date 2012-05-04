@@ -47,8 +47,7 @@ use constant SSMTP_PORT => getservbyname("ssmtp", "tcp") || 465;
 sub register {
     my ( $self, $qp, %arg ) = @_;
 
-    unless ($arg{cvm_socket})
-    {
+    unless ($arg{cvm_socket}) {
         $self->log(LOGERROR, "authcvm - requires cvm_socket argument");
         return 0;
     }
@@ -61,15 +60,13 @@ sub register {
     return 0 if ($port == SMTP_PORT and $self->{_enable_smtp} ne 'yes');
     return 0 if ($port == SSMTP_PORT and $self->{_enable_ssmtp} ne 'yes');
 
-    if ($arg{cvm_socket} =~ /^([\w\/.-]+)$/)
-    {
+    if ($arg{cvm_socket} =~ /^([\w\/.-]+)$/) {
         $self->{_cvm_socket} = $1;
     }
 
-    unless (-S $self->{_cvm_socket})
-    {
-	$self->log(LOGERROR, "authcvm - cvm_socket missing or not usable");
-	return 0;
+    unless (-S $self->{_cvm_socket}) {
+        $self->log(LOGERROR, "authcvm - cvm_socket missing or not usable");
+        return 0;
     }
 
     $self->register_hook("auth-plain", "authcvm_plain");
@@ -81,13 +78,12 @@ sub authcvm_plain {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    $self->log(LOGINFO, "authcvm/$method authentication attempt for: $user");
+    $self->log(LOGINFO, "authcvm authentication attempt for: $user");
 
-    socket(SOCK, PF_UNIX, SOCK_STREAM, 0) 
-        or return (DENY, "authcvm/$method");
+    socket(SOCK, PF_UNIX, SOCK_STREAM, 0) or return (DENY, "authcvm");
 
     connect(SOCK, sockaddr_un($self->{_cvm_socket}))
-        or return (DENY, "authcvm/$method");
+        or return (DENY, "authcvm");
 
     my $o = select(SOCK); $| = 1; select($o);
 
@@ -100,8 +96,5 @@ sub authcvm_plain {
 
     my $ret = <SOCK>;
     my ($s) = unpack ("C", $ret);
-    return (
-	($s ? $s == 100 ? DENY : DECLINED
-	    : OK), 
-	"authcvm/$method");
+    return ( ($s ? $s == 100 ? DENY : DECLINED : OK), 'authcvm');
 }
