@@ -1,9 +1,37 @@
 #!perl -w
+
+=head1 NAME
+
+domainkeys: validate a DomainKeys signature on an incoming mail
+
+=head1 SYNOPSIS
+
+  domainkeys [warn_only 1]
+
+Performs a DomainKeys validation on the message.  Takes a single
+configuration
+
+  warn_only 1
+
+which means that messages which are not correctly signed (i.e. signed but
+modified or deliberately forged) will not be DENY'd, but an error will still
+be issued to the logfile.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2005-2006 John Peacock.
+
+Portions Copyright (C) 2004 Anthony D. Urso.  All rights reserved.  This
+program is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
+
+=cut
+
 sub init {
     my ($self, $qp, %args) = @_;
 
     foreach my $key ( %args ) {
-	$self->{$key} = $args{$key};
+        $self->{$key} = $args{$key};
     }
 }
 
@@ -89,30 +117,3 @@ sub hook_data_post {
     }
 }
 
-
-=head1 NAME
-
-domainkeys: validate a DomainKeys signature on an incoming mail
-
-=head1 SYNOPSIS
-
-  domainkeys [warn_only 1]
-
-Performs a DomainKeys validation on the message.  Takes a single
-configuration
-
-  warn_only 1
-
-which means that messages which are not correctly signed (i.e. signed but
-modified or deliberately forged) will not be DENY'd, but an error will still
-be issued to the logfile.
-
-=head1 COPYRIGHT
-
-Copyright (C) 2005-2006 John Peacock.
-
-Portions Copyright (C) 2004 Anthony D. Urso.  All rights reserved.  This
-program is free software; you can redistribute it and/or modify it under
-the same terms as Perl itself.
-
-=cut
