@@ -32,9 +32,9 @@ sub hook_logging {
 
     return DECLINED if $trace > $self->{_level};
 
-    my $prefix = defined $plugin && defined $hook ? " $plugin plugin ($hook):" :
-                 defined $plugin ? " $plugin plugin:" :
-                 defined $hook   ? " running plugin ($hook):" : ''),
+    my $prefix = defined $plugin && defined $hook ? " ($hook) $plugin:" :
+                 defined $plugin ? " $plugin:" :
+                 defined $hook   ? " ($hook) running plugin:" : '';
 
     warn join(' ', $$ . $prefix, @log), "\n";
 

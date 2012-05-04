@@ -132,9 +132,9 @@ sub varlog {
     return if $trace > $TraceLevel;
 
     # no logging plugins registered, fall back to STDERR
-    my $prefix = defined $plugin && defined $hook ? " $plugin plugin ($hook):" :
-                 defined $plugin ? " $plugin plugin:" :
-                 defined $hook   ? " running plugin ($hook):" : '';
+    my $prefix = defined $plugin && defined $hook ? " ($hook) $plugin:" :
+                 defined $plugin ? " $plugin:" :
+                 defined $hook   ? " ($hook) running plugin:" : '';
 
     warn join(' ', $$ . $prefix, @log), "\n";
 }
