@@ -308,7 +308,7 @@ sub mail {
     return $self->respond(503, "please say hello first ...");
   }
   else {
-    $self->log(LOGINFO, "full from_parameter: $line");
+    $self->log(LOGDEBUG, "full from_parameter: $line");
     $self->run_hooks("mail_parse", $line);
   }
 }
@@ -383,7 +383,7 @@ sub mail_respond {
       $self->disconnect;
     }
     else { # includes OK
-      $self->log(LOGINFO, "getting mail from ".$from->format);
+      $self->log(LOGDEBUG, "getting mail from ".$from->format);
       $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
       $self->transaction->sender($from);
     }
