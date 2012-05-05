@@ -58,15 +58,13 @@ sub hook_mail {
         @badmailfrom = @{$self->{_badmailfrom_config}};
     };
 
-    return DECLINED if ! scalar @badmailfrom;
-    return DECLINED if $sender->format eq '<>';
-    return DECLINED if ! $sender->host || ! $sender->user;
+    return DECLINED if $self->is_immune( $sender, \@badmailfrom );
 
     my $host = lc $sender->host;
     my $from = lc($sender->user) . '@' . $host;
 
     for my $config (@badmailfrom) {
-        $config =~ s/^\s+//g;   # trim any leading whitespace
+        $config =~ s/^\s+//g;   # trim leading whitespace
         my ($bad, $reason) = split /\s+/, $config, 2;
         next unless $bad;
         next unless $self->is_match( $from, $bad, $host );
@@ -105,3 +103,24 @@ sub hook_rcpt {
     $self->log(LOGINFO, $note);
     return (DENY, $note);
 }
+
+sub is_immune {
+    my ($self, $sender, $badmf ) = @_;
+
+    if ( ! scalar @$badmf ) {
+        $self->log(LOGDEBUG, 'skip: empty list');
+        return 1;
+    };
+
+    if ( ! $sender || $sender->format eq '<>' ) {
+        $self->log(LOGDEBUG, 'skip: null sender');
+        return 1;
+    };
+
+    if ( ! $sender->host || ! $sender->user ) {
+        $self->log(LOGDEBUG, 'skip: missing user or host');
+        return 1;
+    };
+
+    return;
+};
