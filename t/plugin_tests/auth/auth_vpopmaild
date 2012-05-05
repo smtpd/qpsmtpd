@@ -1,4 +1,4 @@
-# -*-perl-*- [emacs]
+#!perl -w
 
 warn "loaded test auth_vpopmaild\n";
 

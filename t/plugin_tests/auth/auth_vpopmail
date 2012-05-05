@@ -1,4 +1,4 @@
-# -*-perl-*- [emacs]
+#!perl -w
 
 sub register_tests {
     my $self = shift;
