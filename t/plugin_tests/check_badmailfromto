@@ -1,0 +1,36 @@
+#!perl -w
+
+use strict;
+use Data::Dumper;
+
+use Qpsmtpd::Address;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("test_badmailfromto_is_sender_immune", 5);
+}
+
+sub test_badmailfromto_is_sender_immune {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $test_email = 'matt@test.com';
+    $transaction->sender( Qpsmtpd::Address->new( "<$test_email>" ) );
+    ok( $self->is_sender_immune( $transaction->sender, [] ), "is_immune, empty list");
+
+    $transaction->sender( Qpsmtpd::Address->new( '<>' ) );
+    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, null sender");
+
+    my $address = Qpsmtpd::Address->new( '<matt@>' );
+    $transaction->sender($address);
+    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing host");
+
+    $address = Qpsmtpd::Address->new( '<@example.com>' );
+    $transaction->sender($address);
+    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing user");
+
+    $transaction->sender( Qpsmtpd::Address->new( '<matt@example.com>' ) );
+    ok( ! $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, false");
+};
+
