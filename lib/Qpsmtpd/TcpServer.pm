@@ -25,7 +25,7 @@ sub has_ipv6 {
     return $has_ipv6;
 }
 
-my $first_0; 
+my $first_0;
 
 sub start_connection {
     my $self = shift;
@@ -46,25 +46,21 @@ sub start_connection {
         $local_port  = $ENV{TCPLOCALPORT};
         $local_host  = $ENV{TCPLOCALHOST};
     } else {
-	# Started from inetd or similar. 
+	# Started from inetd or similar.
 	# get info on the remote host from the socket.
 	# ignore ident/tap/...
-	my $hersockaddr    = getpeername(STDIN) 
+	my $hersockaddr    = getpeername(STDIN)
 	    or die "getpeername failed: $0 must be called from tcpserver, (x)inetd or a similar program which passes a socket to stdin";
 	my ($port, $iaddr) = sockaddr_in($hersockaddr);
 	$remote_ip     = inet_ntoa($iaddr);
 	$remote_host    = gethostbyaddr($iaddr, AF_INET) || "[$remote_ip]";
 	$remote_info	= $remote_host;
-### TODO
-# set $remote_port, $local_ip, and $local_port. Those values are
-# required for the p0f plugin to function.
-### /TODO
     }
     $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
 
     # if the local dns resolver doesn't filter it out we might get
     # ansi escape characters that could make a ps axw do "funny"
-    # things. So to be safe, cut them out.  
+    # things. So to be safe, cut them out.
     $remote_host =~ tr/a-zA-Z\.\-0-9\[\]//cd;
 
     $first_0 = $0 unless $first_0;
@@ -169,7 +165,7 @@ sub tcpenv {
 
   my $TCPLOCALIP  = $nto_laddr;
   my $TCPREMOTEIP = $nto_iaddr;
-  
+
   if ($no_rdns) {
     return ($TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]");
   }
@@ -191,7 +187,7 @@ sub check_socket() {
   my $self = shift;
 
   return 1 if ( $self->{__client_socket}->connected );
- 
+
   return 0;
 }
 

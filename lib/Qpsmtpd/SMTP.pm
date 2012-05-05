@@ -54,18 +54,14 @@ sub dispatch {
 
   if ($cmd !~ /^(\w{1,12})$/ or !exists $self->{_commands}->{$1}) {
     $self->run_hooks("unrecognized_command", $cmd, @_);
-    return 1
+    return 1;
   }
   $cmd = $1;
 
-  if (1 or $self->{_commands}->{$cmd} and $self->can($cmd)) {
     my ($result) = eval { $self->$cmd(@_) };
     $self->log(LOGERROR, "XX: $@") if $@;
     return $result if defined $result;
     return $self->fault("command '$cmd' failed unexpectedly");
-  }
-
-  return;
 }
 
 sub unrecognized_command_respond {
@@ -265,26 +261,25 @@ sub auth_parse_respond {
       unless ($ok == OK);
 
     $mechanism = lc($mechanism);
-    
 
     #they AUTH'd once already
     return $self->respond( 503, "but you already said AUTH ..." )
-      if ( defined $self->{_auth}
-        and $self->{_auth} == OK );
+      if ( defined $self->{_auth} && $self->{_auth} == OK );
+
     return $self->respond( 503, "AUTH not defined for HELO" )
       if ( $self->connection->hello eq "helo" );
+
     return $self->respond( 503, "SSL/TLS required before AUTH" )
       if ( ($self->config('tls_before_auth'))[0] 
-      	and $self->transaction->notes('tls_enabled') );
+        && $self->transaction->notes('tls_enabled') );
 
-    # if we don't have a plugin implementing this auth mechanism, 504
+    # we don't have a plugin implementing this auth mechanism, 504
     if( exists $auth_mechanisms{uc($mechanism)} ) {
       return $self->{_auth} = Qpsmtpd::Auth::SASL( $self, $mechanism, @stuff );
-    } else {
-      $self->respond( 504, "Unimplemented authentification mechanism: $mechanism" );
-      return DENY;
-    } 
+    };
 
+    $self->respond( 504, "Unimplemented authentification mechanism: $mechanism" );
+    return DENY;
 }
 
 sub mail {
@@ -313,7 +308,7 @@ sub mail {
     return $self->respond(503, "please say hello first ...");
   }
   else {
-    $self->log(LOGINFO, "full from_parameter: $line");
+    $self->log(LOGDEBUG, "full from_parameter: $line");
     $self->run_hooks("mail_parse", $line);
   }
 }
@@ -388,7 +383,7 @@ sub mail_respond {
       $self->disconnect;
     }
     else { # includes OK
-      $self->log(LOGINFO, "getting mail from ".$from->format);
+      $self->log(LOGDEBUG, "getting mail from ".$from->format);
       $self->respond(250, $from->format . ", sender OK - how exciting to get mail from you!");
       $self->transaction->sender($from);
     }
