@@ -16,7 +16,7 @@ sub hook_auth {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    $self->log( LOGWARN, "authdeny: cannot authenticate" );
+    $self->log( LOGWARN, "fail: authdeny cannot authenticate" );
 
     return ( DECLINED, "$user is not free to abuse my relay" );
 }
