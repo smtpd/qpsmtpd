@@ -15,7 +15,7 @@ use lib 'lib';
 
 my $this_perl = $Config{'perlpath'} || $EXECUTABLE_NAME;
 
-my @files = find( {wanted=>\&test_syntax, no_chdir=>1}, 'plugins', 'lib' );
+my @files = find( {wanted=>\&test_syntax, no_chdir=>1}, 'plugins', 'lib', 't' );
 
 sub test_syntax { 
     my $f = $File::Find::name;
