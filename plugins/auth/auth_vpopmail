@@ -45,10 +45,12 @@ use warnings;
 use Qpsmtpd::Constants;
 
 use Digest::HMAC_MD5 qw(hmac_md5_hex);
-use vpopmail;
+#use vpopmail;    # we eval this in $test_vpopmail
 
 sub register {
     my ($self, $qp) = @_;
+
+    return (DECLINED) if ! $self->test_vpopmail_module();
 
     $self->register_hook("auth-plain", "auth_vpopmail" );
     $self->register_hook("auth-login", "auth_vpopmail" );
@@ -61,9 +63,6 @@ sub auth_vpopmail {
     my ($pw_name, $pw_domain) = split "@", lc($user);
 
     $self->log(LOGINFO, "Authenticating against vpopmail: $user");
-
-    return (DECLINED, "auth_vpopmail - plugin not configured correctly")
-      if !test_vpopmail();
 
     my $pw              = vauth_getpw($pw_name, $pw_domain);
     my $pw_clear_passwd = $pw->{pw_clear_passwd};
@@ -104,17 +103,20 @@ sub auth_vpopmail {
     return (DENY, "auth_vpopmail - unknown error");
 }
 
-sub test_vpopmail {
-
+sub test_vpopmail_module {
+    my $self = shift;
 # vpopmail will not allow vauth_getpw to succeed unless the requesting user is vpopmail or root.
 # by default, qpsmtpd runs as the user 'qpsmtpd' and does not have permission.
     eval "use vpopmail";
     if ( $@ ) {
-        warn "vpopmail perl module not installed.\n";
+        $self->log(LOGERROR, "skip: is vpopmail perl module installed?");
         return;
     };
+
     my ($domain) = vpopmail::vlistdomains();
-    my $r = vauth_getpw('postmaster', $domain);
-    return if !$r;
+    my $r = vauth_getpw('postmaster', $domain) or do {
+            $self->log(LOGERROR, "skip: could not query vpopmail");
+            return;
+        };
     return 1;
 }
