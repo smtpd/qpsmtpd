@@ -26,17 +26,14 @@ See also http://spf.pobox.com/
 
 =head1 AUTHOR
 
-Matt Simerson <msimerson@cpan.org>
+Matt Simerson - 2011 - rewrote using Mail::SPF
 
-=head1 ACKNOWLEDGEMENTS
-
-whomever wrote the original SPF plugin, upon which I based this.
+Matt Sergeant - 2003 - initial plugin
 
 =cut
 
 use strict;
 use Mail::SPF 2.000;
-use Data::Dumper;
 use Qpsmtpd::Constants;
 
 sub register {
@@ -48,9 +45,10 @@ sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
 
     my $format    = $sender->format;
-    return (DECLINED, "SPF - null sender") if $format eq '<>';
-    return (DECLINED, "SPF - null sender")
-        unless ($sender->host && $sender->user);
+    if ( $format eq '<>' || ! $sender->host || ! $sender->user ) {
+        $self->log( LOGDEBUG, "pass: null sender" );
+        return (DECLINED, "SPF - null sender");
+    };
 
     my $client_ip = $self->qp->connection->remote_ip;
     my $from      = $sender->user . '@' . lc($sender->host);
@@ -58,18 +56,21 @@ sub hook_mail {
 
     # If we are receiving from a relay permitted host, then we are probably
     # not the delivery system, and so we shouldn't check
-    return (DECLINED, "SPF - relaying permitted")
-      if $self->qp->connection->relay_client();
+    if ( $self->qp->connection->relay_client() ) {
+        $self->log( LOGDEBUG, "pass: relaying permitted (connection)" );
+        return (DECLINED, "SPF - relaying permitted")
+    };
 
     my @relay_clients      = $self->qp->config("relayclients");
     my $more_relay_clients = $self->qp->config("morerelayclients", "map");
     my %relay_clients      = map { $_ => 1 } @relay_clients;
     while ($client_ip) {
-        return (DECLINED, "SPF - relaying permitted")
-          if exists $relay_clients{$client_ip};
-        return (DECLINED, "SPF - relaying permitted")
-          if exists $more_relay_clients->{$client_ip};
-        $client_ip =~ s/\d+\.?$// or last;    # strip off another 8 bits
+        if ( exists $relay_clients{$client_ip} ||
+             exists $more_relay_clients->{$client_ip} ) {
+            $self->log( LOGDEBUG, "pass: relaying permitted (config)" );
+            return (DECLINED, "SPF - relaying permitted");
+        };
+        $client_ip =~ s/\d+\.?$//;    # strip off another 8 bits
     }
 
     my $scope = $from ? 'mfrom' : 'helo';
@@ -96,7 +97,12 @@ sub hook_mail {
     $transaction->notes('spfquery', $result);
     $transaction->notes('spfcode', $result->code);
 
-    return (OK) if $result->code eq 'pass';    # this test passed
+    if ( $result->code eq 'pass' ) {    # this test passed
+        $self->log( LOGINFO, "pass" );
+        return (OK);
+    };
+
+    $self->log( LOGINFO, "fail: " . $result );
     return (DECLINED, "SPF - $result->code");
 }
 
@@ -121,6 +127,7 @@ sub hook_rcpt {
 
     if ($code eq "softfail") {
         return (DENY, "SPF probable forgery: $why") if $deny > 1;
+        return (DENYSOFT, "SPF probable forgery: $why");
     }
 
     $self->log(LOGDEBUG, "result for $rcpt->address was $code: $why");
@@ -135,8 +142,7 @@ sub hook_data_post {
 
     $self->log(LOGDEBUG, "result was $result->code");
 
-    $transaction->header->add('Received-SPF' => $result->received_spf_header,
-                              0);
+    $transaction->header->add('Received-SPF' => $result->received_spf_header, 0);
 
     return DECLINED;
 }
