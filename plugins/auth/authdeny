@@ -16,9 +16,7 @@ sub hook_auth {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    #  $DB::single = 1;
-
-    $self->log( LOGWARN, "Cannot authenticate using authdeny" );
+    $self->log( LOGWARN, "fail: authdeny cannot authenticate" );
 
     return ( DECLINED, "$user is not free to abuse my relay" );
 }

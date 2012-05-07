@@ -1,0 +1,156 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+check_qmail_deliverable - Check that the recipient address is deliverable
+
+=head1 DESCRIPTION
+
+See the description of Qmail::Deliverable.
+
+This B<qpsmtpd plugin> uses the client/server interface and needs a running
+qmail-deliverabled. If no connection can be made, deliverability is simply
+assumed.
+
+The modules LWP (libwww-perl) and HTTP::Daemon, available from CPAN, are
+required for qmail-deliverabled and Qmail::Deliverable::Client.
+
+=head1 CONFIGURATION
+
+=over 4
+
+=item server host:port
+
+Hostname (or IP address), and port (both!) of the qmail-deliverabled server. If
+none is specified, the default (127.0.0.1:8998) is used.
+
+=item server smtproutes:host:port
+
+If the specification is prepended by the literal text C<smtproutes:>, then for
+recipient domains listed in your /var/qmail/control/smtproutes use their
+respective hosts for the check. For other domains, the given host is used. The
+port has to be the same across all servers.
+
+Example:
+
+    check_qmail_deliverable server smtproutes:127.0.0.1:8998
+
+Use "smtproutes:8998" (no second colon) to simply skip the deliverability
+check for domains not listed in smtproutes.
+
+=back
+
+=head1 CAVEATS
+
+Given a null host in smtproutes, the normal MX lookup should be used. This
+plugin does not do this, because we don't want to harrass arbitrary servers.
+
+Connection failure is *faked* when there is no smtproute.
+
+=head1 LEGAL
+
+This software is released into the public domain, and does not come with
+warranty or guarantee of any kind. Use it at your own risk.
+
+=head1 AUTHOR
+
+Juerd <#####@juerd.nl>
+
+=head1 SEE ALSO
+
+L<Qmail::Deliverable>, L<qmail-deliverabled>, L<Qmail::Deliverable::Client>
+
+=cut
+
+use Qmail::Deliverable::Client qw(deliverable);
+use strict;
+
+my %smtproutes;
+my $shared_domain;  # global variable to be closed over by the SERVER callback
+
+sub register {
+    my ($self, $qp, @args) = @_;
+    if (@args % 2) {
+        $self->log(LOGWARN, "Odd number of arguments, using default config");
+    } else {
+        my %args = @args;
+        if ($args{server} =~ /^smtproutes:/) {
+
+            my ($fallback, $port) = $args{server} =~ /:(?:(.*?):?)(\d+)/;
+
+            open my $fh, "/var/qmail/control/smtproutes"
+                or warn "Could not read smtproutes";
+            for (readline $fh) {
+                my ($domain, $mx) = /^(.*?) : \[? ( [^\]:\s]* )/x;
+                $smtproutes{$domain} = $mx;
+            }
+
+            $Qmail::Deliverable::Client::SERVER = sub {
+                my $server = _smtproute($shared_domain);
+                return "$server:$port"   if defined $server;
+                return "$fallback:$port" if defined $fallback;
+                return;
+            };
+
+        } elsif ($args{server}) {
+            $Qmail::Deliverable::Client::SERVER = $args{server};
+        }
+    }
+    $self->register_hook("rcpt", "rcpt_handler");
+}
+
+sub rcpt_handler {
+    my ($self, $transaction, $rcpt) = @_;
+
+    my $address = $rcpt->address;
+    $self->log(LOGDEBUG, "Checking deliverability for recipient '$address'");
+
+    $shared_domain = $rcpt->host;
+
+    my $rv = deliverable $address;
+
+    if (not defined $rv or not length $rv) {
+        $self->log(LOGWARN, "Unknown error checking deliverability of '$address'");
+        return DECLINED;
+    }
+
+    my $k = 0;  # known status code
+    $self->log(LOGINFO, "Permission failure"),              $k++ if $rv == 0x11;
+    $self->log(LOGINFO, "qmail-command in dot-qmail"),      $k++ if $rv == 0x12;
+    $self->log(LOGINFO, "bouncesaying with program"),       $k++ if $rv == 0x13;
+    $self->log(LOGINFO, "Temporarily undeliverable: group/world writable"), $k++
+                                                                 if $rv == 0x21;
+    $self->log(LOGINFO, "Temporarily undeliverable: sticky home directory"),$k++
+                                                                 if $rv == 0x22;
+    $self->log(LOGINFO, "Error: $Qmail::Deliverable::Client::ERROR"), $k++
+                                                                 if $rv == 0x2f;
+    $self->log(LOGINFO, "Normal delivery"),                 $k++ if $rv == 0xf1;
+    $self->log(LOGINFO, "Deliverable through vpopmail"),    $k++ if $rv == 0xf2;
+    $self->log(LOGINFO, "SHOULD NOT HAPPEN"),               $k++ if $rv == 0xfe;
+    $self->log(LOGINFO, "Address is not local"),            $k++ if $rv == 0xff;
+
+    $self->log(LOGINFO, sprintf("Unknown: 0x%02x", $rv)) if $rv and not $k;
+
+    return DECLINED if $rv;
+    return DENY, "Sorry, no mailbox here by that name. qd (#5.1.1)";
+}
+
+sub _smtproute {
+    my ($domain) = @_;
+    my @parts = split /\./, $domain;
+    if (exists $smtproutes{$domain}) {
+        return undef if $smtproutes{$domain} eq "";
+        return $smtproutes{$domain};
+    }
+    for (reverse 1 .. @parts) {
+        my $wildcard = join "", map ".$_", @parts[-$_ .. -1];
+        if (exists $smtproutes{$wildcard}) {
+            return undef if $smtproutes{$wildcard} eq "";
+            return $smtproutes{$wildcard};
+        }
+    }
+    return undef if not exists $smtproutes{""};
+    return undef if $smtproutes{""} eq "";
+    return $smtproutes{""};
+}
+

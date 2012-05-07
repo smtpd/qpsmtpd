@@ -1,8 +1,41 @@
 #!perl -w
-# this is a simple 'warn' plugin like the default builtin logging
-#
-# It demonstrates that a logging plugin can call ->log itself as well
-# as how to ignore log entries from itself
+
+=head1 NAME
+
+warn - Default logging plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+A qpsmtpd plugin which replicates the built in logging functionality, which
+is to send all logging messages to STDERR below a specific log level.
+
+It demonstrates that a logging plugin can call ->log itself as well
+as how to ignore log entries from itself
+
+=head1 INSTALL AND CONFIG
+
+Place this plugin in the plugin/logging directory beneath the standard
+qpsmtpd installation.  Edit the config/logging file and add a line like
+this:
+
+  logging/warn [loglevel]
+
+where the optional parameters C<loglevel> is either the numeric or text
+representation of the maximum log level, as shown in the
+L<config.sample/loglevel> file.
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2005 John Peacock
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
 
 sub register {
   my ($self, $qp, $loglevel) = @_;
@@ -40,38 +73,4 @@ sub hook_logging {
 
     return DECLINED;
 }
-
-=head1 NAME
-
-warn - Default logging plugin for qpsmtpd
-
-=head1 DESCRIPTION
-
-A qpsmtpd plugin which replicates the built in logging functionality, which
-is to send all logging messages to STDERR below a specific log level.
-
-=head1 INSTALL AND CONFIG
-
-Place this plugin in the plugin/logging directory beneath the standard
-qpsmtpd installation.  Edit the config/logging file and add a line like
-this:
-
-  logging/warn [loglevel]
-
-where the optional parameters C<loglevel> is either the numeric or text
-representation of the maximum log level, as shown in the
-L<config.sample/loglevel> file.
-
-=head1 AUTHOR
-
-John Peacock <jpeacock@cpan.org>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (c) 2005 John Peacock
-
-This plugin is licensed under the same terms as the qpsmtpd package itself.
-Please see the LICENSE file included with qpsmtpd for details.
-
-=cut
 
