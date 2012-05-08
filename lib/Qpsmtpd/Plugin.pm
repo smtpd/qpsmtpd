@@ -1,12 +1,16 @@
 package Qpsmtpd::Plugin;
-use Qpsmtpd::Constants;
+
 use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+use Digest::HMAC_MD5 qw(hmac_md5_hex);
 
 # more or less in the order they will fire
 our @hooks = qw(
     logging config post-fork pre-connection connect ehlo_parse ehlo
     helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
-    rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre 
+    rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre
     data data_headers_end data_post queue_pre queue queue_post vrfy noop
     quit reset_transaction disconnect post-connection
     unrecognized_command deny ok received_line help
@@ -19,7 +23,7 @@ sub new {
   bless ({}, $class);
 }
 
-sub hook_name { 
+sub hook_name {
   return shift->{_hook};
 }
 
@@ -138,10 +142,10 @@ sub isa_plugin {
 # why isn't compile private?  it's only called from Plugin and Qpsmtpd.
 sub compile {
     my ($class, $plugin, $package, $file, $test_mode, $orig_name) = @_;
-    
+
     my $sub;
     open F, $file or die "could not open $file: $!";
-    { 
+    {
       local $/ = undef;
       $sub = <F>;
     }

@@ -66,9 +66,10 @@ Please see the LICENSE file included with qpsmtpd for details.
 use strict;
 use warnings;
 
-use DBI;
+use Qpsmtpd::Auth;
 use Qpsmtpd::Constants;
-use Digest::HMAC_MD5 qw(hmac_md5_hex);
+
+use DBI;
 
 sub register {
     my ( $self, $qp ) = @_;
@@ -122,45 +123,27 @@ sub auth_vmysql {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
 
     my $dbh = $self->get_db_handle() or return DECLINED;
-    my $db_user = $self->get_vpopmail_user($dbh, $user) or return DECLINED;
+    my $u = $self->get_vpopmail_user($dbh, $user) or return DECLINED;
 
     # if vpopmail was not built with '--enable-clear-passwd=y'
     # then pw_clear_passwd may not even exist
-    my $pw_clear_passwd = $db_user->{'pw_clear_passwd'};
-    my $pw_passwd = $db_user->{'pw_passwd'}; # always present
+    # my $pw_clear_passwd = $db_user->{'pw_clear_passwd'};
 
-    if ( ! $pw_passwd && ! $pw_clear_passwd ) {
+    if ( ! $u->{pw_passwd} && ! $u->{pw_clear_passwd} ) {
         $self->log(LOGINFO, "fail: no such user");
         return ( DENY, "auth_vmysql - no such user" );
     };
 
     # at this point, the user name has matched
 
-    if ( ! $pw_clear_passwd && $method =~ /CRAM-MD5/i ) {
-        $self->log(LOGINFO, "skip: cram-md5 not supported w/o clear pass");
-        return ( DECLINED, "auth_vmysql" );
-    }
-
-    if ( defined $passClear ) {
-        if ( $pw_clear_passwd && $pw_clear_passwd eq $passClear ) {
-            $self->log(LOGINFO, "pass: clear match");
-            return ( OK, "auth_vmysql" );
-        };
-
-        if ( $pw_passwd eq crypt( $passClear, $pw_passwd ) ) {
-            $self->log(LOGINFO, "pass: crypt match");
-            return ( OK, "auth_vmysql" );
-        }
-    };
-
-    if ( defined $passHash && $pw_clear_passwd &&
-         $passHash eq hmac_md5_hex( $ticket, $pw_clear_passwd )
-         ) {
-        $self->log(LOGINFO, "pass: hash match");
-        return ( OK, "auth_vmysql" );
-    };
-
-    $self->log(LOGINFO, "fail: wrong password");
-    return ( DENY, "auth_vmysql - wrong password" );
+    return Qpsmtpd::Auth::validate_password( $self,
+            src_clear     => $u->{pw_clear_passwd},
+            src_crypt     => $u->{pw_passwd},
+            attempt_clear => $passClear,
+            attempt_hash  => $passHash,
+            method        => $method,
+            ticket        => $ticket,
+            deny          => DENY,
+        );
 }
 

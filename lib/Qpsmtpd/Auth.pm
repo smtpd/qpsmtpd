@@ -4,8 +4,10 @@ package Qpsmtpd::Auth;
 use strict;
 use warnings;
 
-use MIME::Base64;
 use Qpsmtpd::Constants;
+
+use Digest::HMAC_MD5 qw(hmac_md5_hex);
+use MIME::Base64;
 
 sub e64 {
   my ($arg) = @_;
@@ -144,6 +146,7 @@ sub get_auth_details_cram_md5 {
         return;
     }
 
+    $session->{auth}{ticket} = $ticket;
     return ($ticket, $user, $passHash);
 };
 
@@ -159,6 +162,58 @@ sub get_base64_response {
     return $answer;
 };
 
-# tag: qpsmtpd plugin that sets RELAYCLIENT when the user authentifies
+sub validate_password {
+    my ( $self, %a ) = @_;
+
+    my ($pkg, $file, $line) = caller();
+    $file = (split '/', $file)[-1];     # strip off the path
+
+    my $src_clear     = $a{src_clear};
+    my $src_crypt     = $a{src_crypt};
+    my $attempt_clear = $a{attempt_clear};
+    my $attempt_hash  = $a{attempt_hash};
+    my $method        = $a{method} or die "missing method";
+    my $ticket        = $a{ticket} || $self->{auth}{ticket};
+    my $deny          = $a{deny} || DENY;
+
+    if ( ! $src_crypt && ! $src_clear ) {
+        $self->log(LOGINFO, "fail: missing password");
+        return ( $deny, "$file - no such user" );
+    };
+
+    if ( ! $src_clear && $method =~ /CRAM-MD5/i ) {
+        $self->log(LOGINFO, "skip: cram-md5 not supported w/o clear pass");
+        return ( DECLINED, $file );
+    }
+
+    if ( defined $attempt_clear ) {
+        if ( $src_clear && $src_clear eq $attempt_clear ) {
+            $self->log(LOGINFO, "pass: clear match");
+            return ( OK, $file );
+        };
+
+        if ( $src_crypt && $src_crypt eq crypt( $attempt_clear, $src_crypt ) ) {
+            $self->log(LOGINFO, "pass: crypt match");
+            return ( OK, $file );
+        }
+    };
+
+    if ( defined $attempt_hash && $src_clear ) {
+        if ( ! $ticket ) {
+            $self->log(LOGERROR, "skip: missing ticket");
+            return ( DECLINED, $file );
+        };
+
+        if ( $attempt_hash eq hmac_md5_hex( $ticket, $src_clear ) ) {
+            $self->log(LOGINFO, "pass: hash match");
+            return ( OK, $file );
+        };
+    };
+
+    $self->log(LOGINFO, "fail: wrong password");
+    return ( $deny, "$file - wrong password" );
+};
+
+# tag: qpsmtpd plugin that sets RELAYCLIENT when the user authenticates
 
 1;
