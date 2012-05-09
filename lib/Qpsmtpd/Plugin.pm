@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use Qpsmtpd::Constants;
-use Digest::HMAC_MD5 qw(hmac_md5_hex);
 
 # more or less in the order they will fire
 our @hooks = qw(

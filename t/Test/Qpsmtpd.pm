@@ -1,6 +1,7 @@
 package Test::Qpsmtpd;
 use strict;
 use lib 't';
+use lib 'lib';
 use Carp qw(croak);
 use base qw(Qpsmtpd::SMTP);
 use Test::More;
