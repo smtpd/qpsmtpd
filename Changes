@@ -1,6 +1,8 @@
 
 Next Version
 
+  sender_permitted_from. see UPGRADING (Matt Simerson)
+
   dspam plugin added (Matt Simerson)
 
   p0f version 3 supported and new default. see UPGRADING (Matt Simerson)

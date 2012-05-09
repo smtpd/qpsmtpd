@@ -3,6 +3,8 @@ When upgrading from:
 
 v 0.84 or below
 
+SPF plugin: spf_deny setting deprecated. Use reject N setting instead, which provides administrators with more granular control over SPF. For backward compatibility, a spf_deny setting of 1 is mapped to 'reject 3' and a 'spf_deny 2' is mapped to 'reject 4'.
+
 p0f plugin: now defaults to p0f v3
 
 Upgrade p0f to version 3 or add 'version 2' to your p0f line in config/plugins. perldoc plugins/ident/p0f for more details.
