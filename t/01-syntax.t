@@ -4,10 +4,7 @@ use English qw/ -no_match_vars /;
 use File::Find;
 use Test::More;
 
-if ( $ENV{'QPSMTPD_DEVELOPER'} ) {
-	'no_plan';
-}
-else {
+if ( ! $ENV{'QPSMTPD_DEVELOPER'} ) {
 	plan skip_all => "not a developer, skipping POD tests";
 };
 
