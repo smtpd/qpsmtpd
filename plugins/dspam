@@ -284,7 +284,7 @@ sub dspam_process_open2 {
 sub dspam_reject {
     my ($self, $transaction) = @_;
 
-    my $d = $self->get_dspam_results( $transaction ) or return;
+    my $d = $self->get_dspam_results( $transaction ) or return DECLINED;
 
     if ( ! $d->{class} ) {
         $self->log(LOGWARN, "skip: no dspam class detected");
