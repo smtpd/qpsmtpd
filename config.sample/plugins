@@ -1,4 +1,4 @@
-# 
+#
 #  Example configuration file for plugins
 #
 
@@ -6,6 +6,9 @@
 # plugins/http_config for details.
 #   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
 
+# hosts_allow does not work with the tcpserver deployment model!
+#   perldoc plugins/hosts_allow for an alternative.
+#
 # The hosts_allow module must be loaded if you want the -m / --max-from-ip /
 # my $MAXCONNIP = 5; # max simultaneous connections from one IP
 # settings... without this it will NOT refuse more than $MAXCONNIP connections
@@ -48,12 +51,12 @@ virus/klez_filter
 
 
 # You can run the spamassassin plugin with options.  See perldoc
-# plugins/spamassassin for details. 
+# plugins/spamassassin for details.
 #
 spamassassin
 
 # rejects mails with a SA score higher than 20 and munges the subject
-# of the score is higher than 10.  
+# of the score is higher than 10.
 #
 #   spamassassin reject_threshold 20 munge_subject_threshold 10
 
