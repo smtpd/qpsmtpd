@@ -147,7 +147,7 @@ sub register {
 sub hook_connect {
     my($self, $qp) = @_;
 
-    my $p0f_version = $self->{_args}->{version} || 3;
+    my $p0f_version = $self->{_args}{version} || 3;
     if ( $p0f_version == 3 ) {
         my $response = $self->query_p0f_v3() or return DECLINED;
         $self->test_v3_response( $response ) or return DECLINED;
@@ -167,18 +167,18 @@ sub get_v2_query {
 
     my $local_ip = $self->{_args}{local_ip} || $self->qp->connection->local_ip;
 
-    my $src = new Net::IP ($self->qp->connection->remote_ip) 
+    my $src = new Net::IP ($self->qp->connection->remote_ip)
         or $self->log(LOGERROR, "p0f: ".Net::IP::Error()), return;
 
     my $dst = new Net::IP($local_ip)
         or $self->log(LOGERROR, "p0f: ".NET::IP::Error()), return;
 
     return pack("L L L N N S S",
-                   $QUERY_MAGIC_V2, 
-                   1, 
+                   $QUERY_MAGIC_V2,
+                   1,
                    rand ^ 42 ^ time,
-                   $src->intip(), 
-                   $dst->intip(), 
+                   $src->intip(),
+                   $dst->intip(),
                    $self->qp->connection->remote_port,
                    $self->qp->connection->local_port);
 };
@@ -186,7 +186,10 @@ sub get_v2_query {
 sub get_v3_query {
     my $self = shift;
 
-    my $src_ip = $self->qp->connection->remote_ip;
+    my $src_ip = $self->qp->connection->remote_ip or do {
+        $self->log( LOGERROR, "unable to determine remote IP");
+        return;
+    };
 
     if ( $src_ip =~ /:/ ) {   # IPv6
         my @bits = split(/\:/, $src_ip );
@@ -200,8 +203,11 @@ sub get_v3_query {
 sub query_p0f_v3 {
     my $self = shift;
 
-    my $p0f_socket = $self->{_args}->{p0f_socket} or return;
-    my $query = $self->get_v3_query();
+    my $p0f_socket = $self->{_args}{p0f_socket} or do {
+        $self->log(LOGERROR, "socket not defined in config.");
+        return;
+    };
+    my $query = $self->get_v3_query() or return;
 
 # Open the connection to p0f
     my $sock;
@@ -243,15 +249,15 @@ sub query_p0f_v2 {
     my $query = $self->get_v2_query() or return;
 
     # Open the connection to p0f
-    socket(SOCK, PF_UNIX, SOCK_STREAM, 0) 
+    socket(SOCK, PF_UNIX, SOCK_STREAM, 0)
         or $self->log(LOGERROR, "p0f: socket: $!"), return;
-    connect(SOCK, sockaddr_un($p0f_socket)) 
+    connect(SOCK, sockaddr_un($p0f_socket))
         or $self->log(LOGERROR, "p0f: connect: $!"), return;
-    defined syswrite SOCK, $query 
+    defined syswrite SOCK, $query
         or $self->log(LOGERROR, "p0f: write: $!"), close SOCK, return;
 
     my $response;
-    defined sysread SOCK, $response, 1024 
+    defined sysread SOCK, $response, 1024
         or $self->log(LOGERROR, "p0f: read: $!"), close SOCK, return;
     close SOCK;
     return $response;
@@ -314,7 +320,7 @@ sub store_v2_results {
         $nat, $real, $score, $mflags, $uptime) =
             unpack ("L L C Z20 Z40 c Z30 Z30 C C C s S N", $response);
 
-    my $p0f = { 
+    my $p0f = {
         genre    => $genre,
         detail   => $detail,
         distance => $dist,
@@ -325,6 +331,7 @@ sub store_v2_results {
     $self->qp->connection->notes('p0f', $p0f);
     $self->log(LOGINFO, $genre." (".$detail.")");
     $self->log(LOGERROR,"error: $@") if $@;
+    return $p0f;
 };
 
 sub store_v3_results {
@@ -341,10 +348,16 @@ sub store_v3_results {
         next if ! defined $values[$i];
         $r{ $labels[$i] } = $values[$i];
     };
+    if ( $r{os_name} ) {                             # compat with p0f v2
+        $r{genre}  = "$r{os_name} $r{os_flavor}";
+        $r{link}   = $r{link_type} if $r{link_type};
+        $r{uptime} = $r{uptime_min} if $r{uptime_min};
+    };
 
     $self->qp->connection->notes('p0f', \%r);
-    $self->log(LOGINFO, "$values[12] $values[13]");
+    $self->log(LOGINFO, "$r{os_name} $r{os_flavor}");
     $self->log(LOGDEBUG, join(' ', @values ));
     $self->log(LOGERROR,"error: $@") if $@;
+    return \%r;
 };
 
