@@ -375,18 +375,21 @@ sub check_spam_reject {
         $self->log(LOGERROR, "skip: error getting spamassassin score");
         return DECLINED;
     };
+
+    my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
+
     my $reject = $self->{_args}{reject} or do {
-        $self->log(LOGERROR, "skip: reject threshold not set, default pass ($score)");
+        $self->log(LOGERROR, "skip: reject not set ($ham_or_spam, $score)");
         return DECLINED;
     };
 
     if ( $score < $reject ) {
-        $self->log(LOGINFO, "pass, $score < $reject");
+        $self->log(LOGINFO, "pass, $ham_or_spam, $score < $reject");
         return DECLINED;
     };
 
 # default of media_unsupported is DENY, so just change the message
-    $self->log(LOGINFO, "deny, $score > $reject");
+    $self->log(LOGINFO, "deny, $ham_or_spam, $score > $reject");
     return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold");
 }
 

@@ -82,13 +82,13 @@ sub test_check_spam_reject {
 
     # message scored a 10, should pass
     $self->{_args}{reject} = 12;
-    $transaction->notes('spamassassin', { score => 10 } );
+    $transaction->notes('spamassassin', { is_spam => 'Yes', score => 10 } );
     my $r = $self->check_spam_reject($transaction);
     cmp_ok( DECLINED, '==', $r, "check_spam_reject, $r");
     
     # message scored a 15, should fail
     $self->{_args}{reject} = 12;
-    $transaction->notes('spamassassin', { score => 15 } );
+    $transaction->notes('spamassassin', { is_spam => 'Yes', score => 15 } );
     ($r) = $self->check_spam_reject($transaction);
     cmp_ok( DENY, '==', $r, "check_spam_reject, $r");
 };
