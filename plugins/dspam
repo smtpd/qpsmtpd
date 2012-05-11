@@ -377,9 +377,9 @@ sub get_dspam_results {
 sub get_filter_cmd {
     my ($self, $transaction, $user) = @_;
 
-    my $dspam_bin = $self->{_args}->{dspam_bin} || '/usr/local/bin/dspam';
+    my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
     my $default = "$dspam_bin --user $user --mode=tum --process --deliver=summary --stdout";
-    my $min_score = $self->{_args}->{learn_from_sa} or return $default;
+    my $min_score = $self->{_args}{learn_from_sa} or return $default;
 
     #$self->log(LOGDEBUG, "attempting to learn from SA");
 
@@ -390,6 +390,8 @@ sub get_filter_cmd {
         $self->log(LOGNOTICE, "SA score $sa->{score} < $min_score, skip autolearn");
         return $default;
     };
+
+    return $default if ! $sa->{autolearn};
 
     if ( $sa->{is_spam} eq 'Yes' && $sa->{autolearn} eq 'spam' ) {
         return "$dspam_bin --user $user --mode=tum --source=corpus --class=spam --deliver=summary --stdout";
