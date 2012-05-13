@@ -1,0 +1,63 @@
+#!perl -w
+
+use strict;
+use Data::Dumper;
+
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("test_hook_data_post", 5);
+}
+
+sub test_hook_data_post {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $test_email = 'matt@example.com';
+    my $address = Qpsmtpd::Address->new( "<$test_email>" );
+    my $header  = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
+    my $now    = `date`;
+    my $future = `date -v +6d`;
+    my $past   = `date -v -6d`;
+    $self->{_args}{days} = 5;
+
+    $transaction->sender($address);
+    $transaction->header($header);
+    $transaction->header->add('From', "<$test_email>");
+    $transaction->header->add('Date', $now );
+    $transaction->body_write( "test message body " );
+
+    my ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DECLINED, '==', $code, "okay" );
+
+    $transaction->header->delete('Date');
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DENY, '==', $code, "missing date ( $mess )" );
+
+    $transaction->header->delete('From');
+    $transaction->header->add('Date', $now );
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DENY, '==', $code, "missing from ( $mess )" );
+
+    if ( $future ) {
+        $transaction->header->replace('Date', $future );
+        ($code, $mess) = $self->hook_data_post( $transaction );
+        cmp_ok( DENY, '==', $code, "too new ( $mess )" );
+
+        $transaction->header->replace('Date', $past );
+        ($code, $mess) = $self->hook_data_post( $transaction );
+        cmp_ok( DENY, '==', $code, "too old ( $mess )" );
+
+    }
+    else {
+        ok( 1, "skip: unable to use 'date' output");
+        ok( 1, "skip: unable to use 'date' output");
+    }
+
+    $self->{_args}{reject_type} = 'temp';
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DENYSOFT, '==', $code, "defer, not deny ( $mess )" );
+};
