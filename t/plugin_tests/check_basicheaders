@@ -11,7 +11,7 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_hook_data_post", 5);
+    $self->register_test("test_hook_data_post", 7);
 }
 
 sub test_hook_data_post {
