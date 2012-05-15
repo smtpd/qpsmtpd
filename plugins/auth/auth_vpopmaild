@@ -6,7 +6,7 @@ use warnings;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use version; 
-my $VERSION = qv('1.0.2');
+my $VERSION = qv('1.0.3');
 
 sub register {
     my ($self, $qp, %args) = @_;
@@ -23,31 +23,33 @@ sub auth_vpopmaild {
     my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) = @_;
 
     if ( ! $passClear ) {
-        $self->log(LOGINFO, "vpopmaild does not support cram-md5");
+        $self->log(LOGINFO, "skip: vpopmaild does not support cram-md5");
         return DECLINED;
     }
 
     # create socket
-    my $vpopmaild_socket =
-      IO::Socket::INET->new(
+    my $vpopmaild_socket = IO::Socket::INET->new(
                             PeerAddr => $self->{_vpopmaild_host},
                             PeerPort => $self->{_vpopmaild_port},
                             Proto    => 'tcp',
                             Type     => SOCK_STREAM
-                           ) or return DECLINED;
+                           ) or do {
+        $self->log(LOGERROR, "skip: socket connection to vpopmaild failed");
+        return DECLINED;
+    };
 
     $self->log(LOGDEBUG, "attempting $method");
 
     # Get server greeting (+OK)
     my $connect_response = <$vpopmaild_socket>;
     if ( ! $connect_response ) {
-        $self->log(LOGERROR, "no connection response");
+        $self->log(LOGERROR, "skip: no connection response");
         close($vpopmaild_socket);
         return DECLINED;
     };
 
     if ( $connect_response !~ /^\+OK/ ) {
-        $self->log(LOGERROR, "bad connection response: $connect_response");
+        $self->log(LOGERROR, "skip: bad connection response: $connect_response");
         close($vpopmaild_socket);
         return DECLINED;
     };
@@ -57,18 +59,18 @@ sub auth_vpopmaild {
     close($vpopmaild_socket);
 
     if ( ! $login_response ) {
-        $self->log(LOGERROR, "no login response");
+        $self->log(LOGERROR, "skip: no login response");
         return DECLINED;
     };
 
     # check for successful login (single line (+OK) or multiline (+OK+))
     if ( $login_response =~ /^\+OK/ ) {
-        $self->log(LOGDEBUG, "auth success");
+        $self->log(LOGINFO, "pass: clear");
         return (OK, 'auth_vpopmaild');
     };
 
-    $self->log(LOGNOTICE, "failed authentication response: $login_response");
-
+    chomp $login_response;
+    $self->log(LOGNOTICE, "fail: $login_response");
     return DECLINED;
 }
 
@@ -106,7 +108,7 @@ please read the VPOPMAIL section in doc/authentication.pod
 
 Robin Bowes <robin.bowes@yo61.com>
 
-Matt Simerson (4/2012: added CRAM-MD5 support, updated response parsing)
+Matt Simerson (updated response parsing, added logging)
 
 =head1 COPYRIGHT AND LICENSE
 
