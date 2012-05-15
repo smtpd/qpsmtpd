@@ -346,7 +346,7 @@ C<$data> can be either a plain scalar, or a reference to a scalar.
 
 =head2 body_size( )
 
-B<Depreceated>, Use I<data_size()> instead.
+B<Deprecated>, Use I<data_size()> instead.
 
 =head2 data_size( )
 
