@@ -126,7 +126,7 @@ sub apr_connect_handler {
         }
     }
     else {
-        $self->log(LOGINFO, "remote host said nothing spontaneous, proceeding");
+        $self->log(LOGINFO, "pass: remote host said nothing spontaneous");
     }
 }
 
@@ -149,7 +149,7 @@ sub apr_data_handler {
         return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
     }
     else {
-        $self->log(LOGINFO, "remote host said nothing spontaneous, proceeding");
+        $self->log(LOGINFO, "pass: remote host said nothing spontaneous");
     }
 }
 
@@ -173,7 +173,7 @@ sub connect_handler {
       return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
     }
   } else {
-    $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
+    $self->log(LOGINFO, 'pass: remote host said nothing spontaneous');
   }
   return DECLINED;
 }
@@ -195,7 +195,7 @@ sub data_handler {
     return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
   }
   else {
-    $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
+    $self->log(LOGINFO, 'pass: remote host said nothing spontaneous');
   }
   return DECLINED;
 }
