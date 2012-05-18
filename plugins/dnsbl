@@ -250,7 +250,7 @@ the same answer for a short period of time (the minimum DNS cache period).
 
 =head2 loglevel
 
-Adjust the quantity of logging for this plugin. See docs/logging.pl
+Adjust the quantity of logging for this plugin. See docs/logging.pod
 
 =head1 CONFIG FILES
 
