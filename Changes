@@ -1,6 +1,8 @@
 
 Next Version
 
+  check_basicheaders. see UPGRADING (Matt Simerson)
+
   sender_permitted_from. see UPGRADING (Matt Simerson)
 
   dspam plugin added (Matt Simerson)
