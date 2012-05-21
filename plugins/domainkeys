@@ -68,7 +68,22 @@ sub init {
     };
 }
 
-sub hook_data_post {
+sub register {
+    my $self = shift;
+
+    for my $m ( qw/ Mail::DomainKeys::Message Mail::DomainKeys::Policy / ) {
+        eval "use $m";
+        if ( $@ ) {
+            warn "skip: plugin disabled, could not load $m\n";
+            $self->log(LOGERROR, "skip: plugin disabled, is $m installed?");
+            return;
+        };
+    };
+
+    $self->register_hook('data_post', 'data_post_handler');
+};
+
+sub data_post_handler {
     my ($self, $transaction) = @_;
 
     if ( ! $transaction->header->get('DomainKey-Signature') ) {
