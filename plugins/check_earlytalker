@@ -1,4 +1,5 @@
 #!perl -w
+
 =head1 NAME
 
 check_earlytalker - Check that the client doesn't talk before we send the SMTP banner
@@ -16,9 +17,7 @@ on all mail/rcpt commands in the transaction.
 
 =head1 CONFIGURATION
 
-=over 4
-
-=item wait [integer]
+=head2 wait [integer]
 
 The number of seconds to delay the initial greeting to see if the connecting
 host speaks first.  The default is 1.  Do not select a value that is too high,
@@ -27,32 +26,40 @@ greeting timeouts -- these are known to range as low as 30 seconds, and may
 in some cases be configured lower by mailserver admins.  Network transit time
 must also be allowed for.
 
-=item action [string: deny, denysoft, log]
+=head2 reject <boolean>
 
-What to do when matching an early-talker -- the options are I<deny>,
-I<denysoft> or I<log>.
+Do we reject/deny connections to early talkers?
 
-If I<log> is specified, the connection will be allowed to proceed as normal,
-and only a warning will be logged.
+  check_earlytalker reject [ 0 | 1 ]
 
-The default is I<denysoft>.
+Default: I<reject 1>
 
-=item defer-reject [boolean]
+=head2 reject_type [ temp | perm ]
+
+What type of rejection to send. A temporary rejection tells the remote server to try again later. A permanent error tells it to give up permanently.
+
+Default I<reject_type temp>.
+
+=head2 defer-reject [boolean]
 
 When an early-talker is detected, if this option is set to a true value, the
 SMTP greeting will be issued as usual, but all RCPT/MAIL commands will be
-issued a deny or denysoft (depending on the value of I<action>).  The default
+issued a deny or denysoft (depending on the value of I<reject_type>). The default
 is to react at the SMTP greeting stage by issuing the apropriate response code
 and terminating the SMTP connection.
 
-=item check-at [ CONNECT | DATA ]
+  check_earlytalker defer-reject [ 0 | 1 ]
+
+=head2 check-at [ CONNECT | DATA ]
 
 Specifies when to check for early talkers. You can specify this option
 multiple times to check more than once.
 
 The default is I<check-at CONNECT> only.
 
-=back
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
 
 =cut
 
@@ -67,7 +74,7 @@ sub register {
 
   if (@args % 2) {
         $self->log(LOGERROR, "Unrecognized/mismatched arguments");
-        return undef;
+        return;
   }
   my %check_at;
   for (0..$#args) {
@@ -82,11 +89,17 @@ sub register {
   }
   $self->{_args} = {
         'wait' => 1,
-        'action' => 'denysoft',
-        'defer-reject' => 0,
         @args,
         'check-at' => \%check_at,
   };
+# backwards compat with old 'action' argument
+  if ( defined $self->{_args}{action} && ! defined $self->{_args}{reject} ) {
+       $self->{_args}{reject} = $self->{_args}{action} =~ /^deny/i ? 1 : 0;
+  };
+  if ( defined $self->{_args}{'defer-reject'} && ! defined $self->{_args}{reject_type} ) {
+       $self->{_args}{reject_type} = $self->{_args}{action} == 'denysoft' ? 'temp' : 'perm';
+  };
+# /end compat
   if ( $qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
       require APR::Const;
       APR::Const->import(qw(POLLIN SUCCESS));
@@ -98,117 +111,115 @@ sub register {
       $self->register_hook('data', 'data_handler');
   }
   $self->register_hook('mail', 'mail_handler')
-    if $self->{_args}->{'defer-reject'};
-  1;
+    if $self->{_args}{'defer-reject'};
+  $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
 }
 
 sub apr_connect_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
-    return DECLINED if ($self->connection->notes('whitelisthost'));
-    my $ip = $self->qp->connection->remote_ip;
+    return DECLINED if $self->qp->connection->notes('whitelisthost');
 
-    my $c = $self->qp->{conn};
-    my $socket = $c->client_socket;
-    my $timeout = $self->{_args}->{'wait'} * 1_000_000;
+    my $c = $self->qp->{conn} or return DECLINED;
+    my $socket = $c->client_socket or return DECLINED;
+    my $timeout = $self->{_args}{'wait'} * 1_000_000;
 
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
-        $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
-        if ($self->{_args}->{'defer-reject'}) {
-            $self->connection->notes('earlytalker', 1);
-        }
-        else {
-            my $msg = 'Connecting host started transmitting before SMTP greeting';
-            return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
-            return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
-        }
-    }
-    else {
-        $self->log(LOGINFO, "pass: remote host said nothing spontaneous");
-    }
+        if ($self->{_args}{'defer-reject'}) {
+            $self->qp->connection->notes('earlytalker', 1);
+            return DECLINED;
+        };
+        return $self->log_and_deny();
+    };
+    return $self->log_and_pass();
 }
 
 sub apr_data_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
-    return DECLINED if ($self->connection->notes('whitelisthost'));
-    my $ip = $self->qp->connection->remote_ip;
+    return DECLINED if $self->qp->connection->notes('whitelisthost');
 
-    my $c = $self->qp->{conn};
-    my $socket = $c->client_socket;
-    my $timeout = $self->{_args}->{'wait'} * 1_000_000;
+    my $c = $self->qp->{conn} or return DECLINED;
+    my $socket = $c->client_socket or return DECLINED;
+    my $timeout = $self->{_args}{'wait'} * 1_000_000;
 
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
-        $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
-        my $msg = 'Connecting host started transmitting before SMTP greeting';
-        return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
-        return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
-    }
-    else {
-        $self->log(LOGINFO, "pass: remote host said nothing spontaneous");
-    }
+        return $self->log_and_deny();
+    };
+    return $self->log_and_pass();
 }
 
 sub connect_handler {
-  my ($self, $transaction) = @_;
-  my $in = new IO::Select;
-  my $ip = $self->qp->connection->remote_ip;
+    my ($self, $transaction) = @_;
+    my $in = new IO::Select;
 
-  return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
-  return DECLINED
-      if ($self->connection->notes('whitelisthost'));
+    return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
+    return DECLINED if $self->qp->connection->notes('whitelisthost');
 
-  $in->add(\*STDIN) || return DECLINED;
-  if ($in->can_read($self->{_args}->{'wait'})) {
-    $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
-    if ($self->{_args}->{'defer-reject'}) {
-        $self->connection->notes('earlytalker', 1);
-    } else {
-      my $msg = 'Connecting host started transmitting before SMTP greeting';
-      return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
-      return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
-    }
-  } else {
-    $self->log(LOGINFO, 'pass: remote host said nothing spontaneous');
-  }
-  return DECLINED;
+    $in->add(\*STDIN) or return DECLINED;
+    if (! $in->can_read($self->{_args}{'wait'})) {
+        return $self->log_and_pass();
+    };
+
+    if ( ! $self->{_args}{'defer-reject'}) {
+        return $self->log_and_deny();
+    };
+
+    $self->qp->connection->notes('earlytalker', 1);
+    return DECLINED;
 }
 
 sub data_handler {
-  my ($self, $transaction) = @_;
-  my $in = new IO::Select;
-  my $ip = $self->qp->connection->remote_ip;
+    my ($self, $transaction) = @_;
+    my $in = new IO::Select;
 
-  return DECLINED unless $self->{_args}{'check-at'}{DATA};
-  return DECLINED
-      if ($self->connection->notes('whitelisthost'));
+    return DECLINED unless $self->{_args}{'check-at'}{DATA};
+    return DECLINED if $self->qp->connection->notes('whitelisthost');
 
-  $in->add(\*STDIN) || return DECLINED;
-  if ($in->can_read($self->{_args}->{'wait'})) {
-    $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
+    $in->add(\*STDIN) or return DECLINED;
+    if ( ! $in->can_read($self->{_args}{'wait'})) {
+        return $self->log_and_pass();
+    };
+
+    return $self->log_and_deny();
+};
+
+sub log_and_pass {
+    my $self = shift;
+    my $ip = $self->qp->connection->remote_ip || 'remote host';
+    $self->log(LOGINFO, "pass: $ip said nothing spontaneous");
+    return DECLINED;
+}
+
+sub log_and_deny {
+    my $self = shift;
+
+    my $ip = $self->qp->connection->remote_ip || 'remote host';
     my $msg = 'Connecting host started transmitting before SMTP greeting';
-    return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
-    return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
-  }
-  else {
-    $self->log(LOGINFO, 'pass: remote host said nothing spontaneous');
-  }
-  return DECLINED;
+
+    $self->qp->connection->notes('earlytalker', 1);
+    $self->log(LOGNOTICE, "fail: $ip started talking before we said hello");
+
+    return ( $self->get_reject_type(), $msg ) if $self->{_args}{reject};
+    return DECLINED;
 }
 
 sub mail_handler {
   my ($self, $transaction) = @_;
-  my $msg = 'Connecting host started transmitting before SMTP greeting';
 
-  return DECLINED unless $self->connection->notes('earlytalker');
-  return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
-  return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
-  return DECLINED;
+  return DECLINED unless $self->qp->connection->notes('earlytalker');
+  return $self->log_and_deny();
 }
 
-1;
+sub get_reject_type {
+    my $self = shift;
+    my $deny = $self->{_args}{reject_type} or return DENY;
 
+    return $deny eq 'temp'       ? DENYSOFT
+         : $deny eq 'disconnect' ? DENY_DISCONNECT
+         : DENY;
+};
