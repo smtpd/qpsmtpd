@@ -20,7 +20,7 @@ is($smtpd->config('me'), 'some.host.example.org', 'config("me")');
 # test for ignoring leading/trailing whitespace (relayclients has a
 # line with both)
 my $relayclients = join ",", sort $smtpd->config('relayclients');
-is($relayclients, '127.0.0.1,192.168.', 'config("relayclients") are trimmed');
+is($relayclients, '127.0.0.1,192.0.', 'config("relayclients") are trimmed');
 
 unlink "./config.sample/me";
 
