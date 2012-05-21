@@ -54,8 +54,11 @@ sub test_hook_data {
 sub test_is_immune {
     my $self = shift;
 
+    $self->_reset_transaction();
+
     $self->qp->connection->relay_client(1);
     ok( $self->is_immune(), 'relayclient');
+
     $self->qp->connection->relay_client(0);
     ok( ! $self->is_immune(), "nope -" );
 
@@ -178,4 +181,14 @@ sub test_greylist_p0f_uptime {
     ok( ! $self->p0f_match(), 'p0f uptime miss');
 }
 
+sub _reset_transaction {
+    my $self = shift;
+
+    $self->qp->connection->relay_client(0);
+    $self->qp->transaction->notes('whitelistsender',0);
+    $self->qp->connection->notes('whitelisthost',0);
+    $self->qp->transaction->notes('tls_enabled',0);
+    $self->{_args}{p0f} = undef;
+    $self->{_args}{geoip} = undef;
+};
 
