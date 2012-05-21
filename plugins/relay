@@ -85,11 +85,11 @@ I<config/plugins> as shown:
 
 2012 - Matt Simerson - Merged check_relay, check_norelay, and relayonly
 
+2006 - relay_only  - John Peackock
+
 2005 - check_norelay - Copyright Gordon Rowell <gordonr@gormand.com.au>
 
-200? - check_relay plugin
-
-200? - relay_only plugin
+2002 - check_relay - Ask Bjorn Hansen
 
 =head1 LICENSE
 
