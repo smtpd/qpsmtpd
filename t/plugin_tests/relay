@@ -33,24 +33,24 @@ sub test_is_octet_match {
 
     $self->populate_relayclients();
 
-    $self->qp->connection->remote_ip('192.168.1.1');
+    $self->qp->connection->remote_ip('192.0.1.1');
     ok( $self->is_octet_match(), "match, +");
 
-    $self->qp->connection->remote_ip('192.169.1.1');
+    $self->qp->connection->remote_ip('192.51.1.1');
     ok( ! $self->is_octet_match(), "nope, -");
 
-    $self->qp->connection->remote_ip('10.10.10.10');
+    $self->qp->connection->remote_ip('203.0.113.0');
     ok( ! $self->is_octet_match(), "nope, -");
 };
 
 sub test_is_in_cidr_block {
     my $self = shift;
 
-    $self->qp->connection->remote_ip('192.168.1.1');
-    $self->{_cidr_blocks} = [ '192.168.1.0/24' ];
+    $self->qp->connection->remote_ip('192.0.1.1');
+    $self->{_cidr_blocks} = [ '192.0.1.0/24' ];
     ok( $self->is_in_cidr_block(), "match, +" );
 
-    $self->{_cidr_blocks} = [ '192.168.0.0/24' ];
+    $self->{_cidr_blocks} = [ '192.0.0.0/24' ];
     ok( ! $self->is_in_cidr_block(), "nope, -" );
 
 
@@ -65,8 +65,8 @@ sub test_is_in_cidr_block {
 sub test_is_in_norelayclients {
     my $self = shift;
 
-    my @matches = qw/ 192.168.99.5 192.168.98.1 192.168.98.255 /;
-    my @false = qw/ 192.168.99.7 192.168.109.7 /;
+    my @matches = qw/ 192.0.99.5 192.0.98.1 192.0.98.255 /;
+    my @false = qw/ 192.0.99.7 192.0.109.7 /;
 
     foreach ( @matches ) {
         $self->qp->connection->remote_ip($_);
