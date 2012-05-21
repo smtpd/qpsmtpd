@@ -119,6 +119,7 @@ only be used for some extremly rude clients: if list is too big it will
 slow down accepting new connections.
 
 =item relayclients
+
 =item morerelayclients
 
 Plugin: F<check_relay>
