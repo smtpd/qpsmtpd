@@ -45,6 +45,10 @@ check_spamhelo
 # sender_permitted_from
 # greylisting p0f genre,windows
 
+auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
+auth/auth_vpopmail
+auth/auth_vpopmaild
+auth/auth_vpopmail_sql
 auth/auth_flat_file
 auth/authdeny
 
