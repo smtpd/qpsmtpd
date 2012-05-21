@@ -16,20 +16,23 @@ before we disconnect the client.  Defaults to 4.
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp ) = shift, shift;
 
-  if (@args > 0) {
-    $self->{_unrec_cmd_max} = $args[0];
-    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
-  } else {
-    $self->{_unrec_cmd_max} = 4;
-  }
+    $self->{_unrec_cmd_max} = shift || 4;
 
+    if ( scalar @_ ) {
+        $self->log(LOGWARN, "Ignoring additional arguments.");
+    }
 }
 
 sub hook_connect {
-  my ($self, $transaction) = @_;
+  my $self = shift;
 
   $self->qp->connection->notes('unrec_cmd_count', 0);
   return DECLINED;
@@ -46,8 +49,9 @@ sub hook_unrecognized_command {
     );
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {
-    $self->log(LOGINFO, "Closing connection. Too many unrecognized commands.");
-    return (DENY_DISCONNECT, "Closing connection. $badcmdcount unrecognized commands.  Perhaps you should read RFC 2821?");
+    my $msg = "Closing connection, $badcmdcount unrecognized commands.";
+    $self->log(LOGINFO, "fail: $msg");
+    return (DENY_DISCONNECT, "$msg Perhaps you should read RFC 2821?");
   }
 
   return DECLINED;
