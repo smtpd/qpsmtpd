@@ -13,6 +13,7 @@ sub register_tests {
     $self->register_test('test_ip_whitelisted', 3);
     $self->register_test('test_is_set_rblsmtpd', 4);
     $self->register_test('test_hook_disconnect', 1);
+    $self->register_test('test_reject_type', 3);
 }
 
 sub test_ip_whitelisted {
@@ -21,13 +22,13 @@ sub test_ip_whitelisted {
     $self->qp->connection->remote_ip('10.1.1.1');
 
     $self->qp->connection->relay_client(1);
-    ok( $self->ip_whitelisted('10.1.1.1'), "ip_whitelisted, +");
+    ok( $self->ip_whitelisted('10.1.1.1'), "yes, +");
 
     $self->qp->connection->relay_client(0);
-    ok( ! $self->ip_whitelisted('10.1.1.1'), "ip_whitelisted, -");
+    ok( ! $self->ip_whitelisted('10.1.1.1'), "no, -");
 
     $self->qp->connection->notes('whitelisthost', 'hello honey!');
-    ok( $self->ip_whitelisted('10.1.1.1'), "ip_whitelisted, +");
+    ok( $self->ip_whitelisted('10.1.1.1'), "yes, +");
     $self->qp->connection->notes('whitelisthost', undef);
 };
 
@@ -35,29 +36,30 @@ sub test_is_set_rblsmtpd {
     my $self = shift;
 
     $self->qp->connection->remote_ip('10.1.1.1');
-    ok( ! defined $self->is_set_rblsmtpd('10.1.1.1'), "is_set_rblsmtpd, undef");
+    ok( ! defined $self->is_set_rblsmtpd('10.1.1.1'), "undef");
 
     $ENV{RBLSMTPD} = "Yes we can!";
-    cmp_ok( 'Yes we can!','eq',$self->is_set_rblsmtpd('10.1.1.1'), "is_set_rblsmtpd, value");
+    cmp_ok( 'Yes we can!','eq',$self->is_set_rblsmtpd('10.1.1.1'), "value");
 
     $ENV{RBLSMTPD} = "Oh yeah?";
-    cmp_ok( 'Oh yeah?','eq',$self->is_set_rblsmtpd('10.1.1.1'), "is_set_rblsmtpd, value");
+    cmp_ok( 'Oh yeah?','eq',$self->is_set_rblsmtpd('10.1.1.1'), "value");
 
     $ENV{RBLSMTPD} = '';
-    cmp_ok( 1,'==',$self->is_set_rblsmtpd('10.1.1.1'), "is_set_rblsmtpd, empty");
+    cmp_ok( 1,'==',$self->is_set_rblsmtpd('10.1.1.1'), "empty");
 };
 
 sub test_hook_connect {
     my $self = shift;
 
     my $connection = $self->qp->connection;
+    $connection->relay_client(0);        # other tests may leave it enabled
     $connection->remote_ip('127.0.0.2'); # standard dnsbl test value
 
     cmp_ok( DECLINED, '==', $self->hook_connect($self->qp->transaction),
-        "hook_connect +");
+        "connect +");
 
-    ok($connection->notes('dnsbl_sockets'), "hook_connect, sockets");
-    ok($connection->notes('dnsbl_domains'), "hook_connect, domains");
+    ok($connection->notes('dnsbl_sockets'), "sockets +");
+    ok($connection->notes('dnsbl_domains'), "domains +");
 }
 
 sub test_hook_rcpt {
@@ -75,3 +77,15 @@ sub test_hook_disconnect {
         "hook_disconnect +");
 }
 
+sub test_reject_type {
+    my $self = shift;
+
+    $self->{_args}{reject_type} = undef;
+    cmp_ok( $self->get_reject_type(), '==', DENY, "default");
+
+    $self->{_args}{reject_type} = 'temp';
+    cmp_ok( $self->get_reject_type(), '==', DENYSOFT, "defer");
+
+    $self->{_args}{reject_type} = 'disconnect';
+    cmp_ok( $self->get_reject_type(), '==', DENY_DISCONNECT, "disconnect");
+};
