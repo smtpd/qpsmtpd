@@ -1,5 +1,5 @@
-# sample entries, used for testing
-192.168.99.5
-192.168.99.6
-192.168.98.
+# test entries - http://tools.ietf.org/html/rfc5737
+192.0.99.5
+192.0.99.6
+192.0.98.
 # add your own entries below...
