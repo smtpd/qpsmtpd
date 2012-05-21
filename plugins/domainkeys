@@ -50,9 +50,6 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-use Mail::DomainKeys::Message;
-use Mail::DomainKeys::Policy;
-
 sub init {
     my ($self, $qp, %args) = @_;
 
