@@ -78,8 +78,7 @@ plugins/check_bogus_bounce
 plugins/check_basicheaders
 plugins/check_earlytalker
 plugins/check_loop
-plugins/check_norelay
-plugins/check_relay
+plugins/relay
 plugins/check_spamhelo
 plugins/connection_time
 plugins/content_log
@@ -114,7 +113,6 @@ plugins/quit_fortune
 plugins/random_error
 plugins/rcpt_ok
 plugins/rcpt_regexp
-plugins/relay_only
 plugins/require_resolvable_fromhost
 plugins/rhsbl
 plugins/sender_permitted_from
