@@ -129,6 +129,7 @@ sub hook_data_post {
         $self->log(LOGINFO, "fail: no date");
         return ($deny, "We require a valid Date header");
     };
+    chomp $date;
 
     my $err_msg = $self->invalid_date_range($date);
     if ( $err_msg ) {
