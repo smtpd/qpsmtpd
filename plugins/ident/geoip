@@ -7,27 +7,48 @@ do a lookup on incoming connections and record the country of origin.
 
 Thats all it does.
 
-It logs the 2 char country code to note 'geoip_country'.
-It logs the country name to the connection note 'geoip_country_name'.
+It logs the 2 char country code to connection note I<geoip_country>.
+It logs the country name to the connection note I<geoip_country_name>.
 
 Other plugins can use that info to do things to the connection, like
 reject or greylist.
 
 =cut
 
-use Geo::IP;
+use strict;
+use warnings;
 
-sub hook_connect {
-    my ($self) = @_;
+use Qpsmtpd::Constants;
+#use Geo::IP;  # eval'ed in register()
 
-    my $geoip = Geo::IP->new(GEOIP_STANDARD);
+sub register {
+    my $self = shift;
+    eval 'use Geo::IP';
+    if ( $@ ) {
+        warn "could not load Geo::IP";
+        $self->log( LOGERROR, "could not load Geo::IP" );
+        return;
+    };
+
+    $self->register_hook( 'connect', 'connect_handler' );
+};
+
+sub connect_handler {
+    my $self = shift;
+
+    my $geoip = Geo::IP->new();
     my $remote_ip = $self->qp->connection->remote_ip;
 
-    my $c_code = $geoip->country_code_by_addr( $remote_ip )
-        or return DECLINED;  # if this fails, so too will name
-    my $c_name = $geoip->country_name_by_addr( $remote_ip );
+    my $c_code = $geoip->country_code_by_addr( $remote_ip ) or do {
+        $self->log( LOGINFO, "fail: no results" );
+        return DECLINED;
+    };
 
-    $self->qp->connection->notes('geoip_country_name', $c_name);
+    my $c_name = $geoip->country_name_by_addr( $remote_ip );
+    if ( $c_name ) {
+        $self->qp->connection->notes('geoip_country_name', $c_name);
+    };
+
     $self->qp->connection->notes('geoip_country', $c_code);
 
     my $message  = $c_code;
