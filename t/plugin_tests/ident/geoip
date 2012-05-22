@@ -11,7 +11,6 @@ sub register_tests {
     eval 'use Geo::IP';
     if ( $@ ) {
         warn "could not load Geo::IP\n";
-        $self->log(LOGERROR, "could not load Geo::IP");
         return;
     };
 
