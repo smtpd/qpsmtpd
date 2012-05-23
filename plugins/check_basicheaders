@@ -31,14 +31,6 @@ I would be surprised if a valid message ever had a date header older than a week
 
   check_basicheaders [ past 5 ]
 
-=head2 days
-
-Deprecated. Use I<past> and I<future> instead.
-
-The number of days in the future or past beyond which messages are invalid.
-
-  check_basicheaders [ days 3 ]
-
 =head2 reject
 
 Determine if the connection is denied. Use the I<reject 0> option when first enabling the plugin, and then watch your logs to see what would have been rejected. When you are no longer concerned that valid messages will be rejected, enable with I<reject 1>.
@@ -85,7 +77,6 @@ sub register {
     my ($self, $qp, @args) = @_;
 
     if ( @args == 1 ) {
-        $self->log(LOGWARN, "deprecated arguments. Update your config.");
         $self->{_args}{days} = $args[0];
     }
     elsif ( @args % 2 ) {
@@ -94,9 +85,8 @@ sub register {
     else {
         $self->{_args} = { @args };
     };
-# provide backwards comptibility with the old 'days' argument
+# provide backwards comptibility with the previous unnamed 'days' argument
     if ( $self->{_args}{days} ) {
-        $self->log(LOGWARN, "deprecated argument 'days', update your config.");
         if ( ! defined $self->{_args}{future} ) {
             $self->{_args}{future} = $self->{_args}{days};
         };
