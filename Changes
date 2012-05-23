@@ -1,7 +1,7 @@
 
 Next Version
 
-  check_basicheaders. see UPGRADING (Matt Simerson)
+  check_basicheaders. New arguments available: past, future, reject, reject_type
 
   sender_permitted_from. see UPGRADING (Matt Simerson)
 
