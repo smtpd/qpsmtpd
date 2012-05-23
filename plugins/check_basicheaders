@@ -11,6 +11,8 @@ Checks for missing or empty values in the From or Date headers.
 Optionally test if the Date header is too many days in the past or future. If
 I<future> or I<past> are not defined, they are not tested.
 
+If the remote IP is whitelisted, header validation is skipped.
+
 =head1 CONFIGURATION
 
 The following optional settings exist:
@@ -120,6 +122,8 @@ sub hook_data_post {
         return ($deny, "missing header");
     };
 
+    return DECLINED if $self->is_immune();
+
     if ( ! $header->get('From') ) {
         $self->log(LOGINFO, "fail: no from");
         return ($deny, "We require a valid From header")
@@ -162,3 +166,24 @@ sub invalid_date_range {
     $self->log(LOGINFO, "pass");
     return;
 }
+
+sub is_immune {
+    my $self = shift;
+
+    if ( $self->qp->connection->relay_client() ) {
+        $self->log(LOGINFO, "skip: relay client");
+        return 1;
+    };
+
+    if ( $self->qp->connection->notes('whitelisthost') ) {
+        $self->log(LOGINFO, "skip: whitelisted host");
+        return 1;
+    };
+
+    if ( $self->qp->transaction->notes('whitelistsender') ) {
+        $self->log(LOGINFO, "skip: whitelisted sender");
+        return 1;
+    };
+
+    return;
+};
