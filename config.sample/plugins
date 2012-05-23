@@ -15,6 +15,11 @@
 # from one IP!
 hosts_allow
 
+# information plugins
+ident/geoip
+#ident/p0f /tmp/.p0f_socket version 3
+#connection_time
+
 # enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
 dont_require_anglebrackets
 
