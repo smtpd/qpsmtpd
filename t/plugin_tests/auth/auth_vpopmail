@@ -1,5 +1,10 @@
 #!perl -w
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 sub register_tests {
     my $self = shift;
 
@@ -17,7 +22,7 @@ sub test_auth_vpopmail {
     my $self = shift;
 
     if ( ! $self->test_vpopmail_module ) {
-        $self->log(LOGERROR, "vpopmail plugin not configured" );
+        warn "vpopmail plugin not configured\n";
         foreach ( 0..2) { ok( 1, "test_auth_vpopmail, skipped") };
         return;
     };
