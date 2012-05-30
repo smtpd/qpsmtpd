@@ -11,9 +11,9 @@ implement more sophisticated anti-spam policies.
 
 =head1 DESCRIPTION
 
-This p0f module inserts a 'p0f' note that other qpsmtpd plugins can inspect.
-It includes the following information about the TCP fingerprint (link,
-detail, distance, uptime, genre). Here's an example connection note:
+This p0f module inserts a I<p0f> connection note with information deduced
+from the TCP fingerprint. The note typically includes at least the link,
+detail, distance, uptime, genre. Here's a p0f v2 example:
 
  genre    => FreeBSD
  detail   => 6.x (1)
@@ -26,20 +26,29 @@ Which was parsed from this p0f fingerprint:
   24.18.227.2:39435 - FreeBSD 6.x (1) (up: 1390 hrs)
     -> 208.75.177.101:25 (distance 17, link: ethernet/modem)
 
+When using p0f v3, the following additional values may also be available in
+the I<p0f> connection note:
+
+=over 4
+
+magic, status, first_seen, last_seen, total_conn, uptime_min, up_mod_days, last_nat, last_chg, distance, bad_sw, os_match_q, os_name, os_flavor, http_name, http_flavor, link_type, and language.
+
+=back
+
 =head1 MOTIVATION
 
 This p0f plugin provides a way to make sophisticated policies for email
 messages. For example, the vast majority of email connections to my server
-from Windows computers are spam (>99%). But, I have a few clients that use
-Exchange servers so I can't just block email from all Windows computers.
+from Windows computers are spam (>99%). But, I have clients with
+Exchange servers so I can't block email from all Windows computers.
 
-Same goes for greylisting. Finance companies (AmEx, BoA, etc) just love to
-send notices that they won't queue and retry. Either they deliver at that
-instant or never. When I enable greylisting, I lose valid messages. Grrr.
+Same goes for greylisting. Finance companies (AmEx, BoA, etc) send notices
+that they don't queue and retry. They deliver immediately or never. Enabling
+greylisting means maintaining manual whitelists or losing valid messages.
 
-So, while I'm not willing to use greylisting, and I'm not willing to block
-connections from Windows computers, I am quite willing to greylist all email
-from Windows computers.
+While I'm not willing to use greylisting for every connection, and I'm not
+willing to block connections from Windows computers, I am willing to greylist
+all email from Windows computers.
 
 =head1 CONFIGURATION
 
@@ -47,7 +56,7 @@ Configuration consists of two steps: starting p0f and configuring this plugin.
 
 =head2 start p0f
 
-Create a startup script for PF that creates a communication socket when your
+Create a startup script for p0f that creates a communication socket when your
 server starts up.
 
 p0f v2 example:
@@ -73,10 +82,9 @@ It's even possible to run both versions of p0f simultaneously:
 
 =head2 local_ip
 
-Use the local_ip option to override the IP address of your mail server. This
-is useful if your mail server has a private IP because it is running behind
-a firewall. For example, my mail server has the IP 127.0.0.6, but the world
-knows my mail server as 208.75.177.101.
+Use I<local_ip> to override the IP address of your mail server. This is useful
+if your mail server runs on a private IP behind a firewall. My mail server has
+the IP 127.0.0.6, but the world knows my mail server as 208.75.177.101.
 
 Example config/plugins entry with local_ip override:
 
@@ -107,15 +115,11 @@ Version 2 code heavily based upon the p0fq.pl included with the p0f distribution
 
 =head1 AUTHORS
 
-Robert Spier ( original author )
+2004 - Robert Spier ( original author )
 
-Matt Simerson
+2010 - Matt Simerson - added local_ip option
 
-=head1 CHANGES
-
-Added local_ip option - Matt Simerson (5/2010)
-
-Refactored and added p0f v3 support - Matt Simerson (4/2012)
+2012 - Matt Simerson - refactored, v3 support
 
 =cut
 
