@@ -116,8 +116,7 @@ sub read_now {
 sub check_talker_post {
   my ($self, $transaction) = @_;
 
-  my $conn = $self->qp->connection;
-  return DECLINED unless $conn->notes('earlytalker');
+  return DECLINED unless $self->connection->notes('earlytalker');
   return DECLINED if $self->{'defer-reject'};
   return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
   return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';

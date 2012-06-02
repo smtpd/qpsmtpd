@@ -34,7 +34,7 @@ sub register {
 sub hook_connect {
   my $self = shift;
 
-  $self->qp->connection->notes('unrec_cmd_count', 0);
+  $self->connection->notes('unrec_cmd_count', 0);
   return DECLINED;
 }
 
@@ -44,8 +44,8 @@ sub hook_unrecognized_command {
   $self->log(LOGINFO, "Unrecognized command '$cmd'");
 
   my $badcmdcount = 
-    $self->qp->connection->notes( 'unrec_cmd_count',
-        ($self->qp->connection->notes('unrec_cmd_count') || 0) + 1
+    $self->connection->notes( 'unrec_cmd_count',
+        ($self->connection->notes('unrec_cmd_count') || 0) + 1
     );
 
   if ($badcmdcount >= $self->{_unrec_cmd_max}) {

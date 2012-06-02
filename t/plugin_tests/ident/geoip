@@ -23,7 +23,7 @@ sub test_geoip_lookup {
     $self->qp->connection->remote_ip('24.24.24.24');
     cmp_ok( $self->connect_handler(), '==', DECLINED, "exit code");
 
-    cmp_ok( $self->qp->connection->notes('geoip_country'), 'eq', 'US', "note");
+    cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "note");
 };
 
 

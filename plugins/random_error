@@ -16,7 +16,7 @@ of messages.  The default is 1. Use a negative number to disable.
 
 For use with other plugins, scribble the revised failure rate to
 
-   $self->qp->connection->notes('random_fail_%');
+   $self->connection->notes('random_fail_%');
 
 =cut
 
@@ -31,7 +31,7 @@ sub register {
 sub NEXT() { DECLINED }
 
 sub random_fail {
-        my $fpct = $_[0]->qp->connection->notes('random_fail_%');
+        my $fpct = $_[0]->connection->notes('random_fail_%');
 
 =head1 calculating the probability of failure
 
@@ -55,7 +55,7 @@ or
 
 
 sub hook_connect {
-    $_[0]->qp->connection->notes('random_fail_%', $_[0]->{__PACKAGE__.'_how'});
+    $_[0]->connection->notes('random_fail_%', $_[0]->{__PACKAGE__.'_how'});
     goto &random_fail
 }
 

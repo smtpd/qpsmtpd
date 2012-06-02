@@ -27,7 +27,7 @@ sub hook_mail_start {
     my ( $self, $transaction, $sender ) = @_;
     
     return DECLINED
-      if ( $self->qp->connection->notes('whitelisthost') );
+      if ( $self->connection->notes('whitelisthost') );
 
     if ( $sender ne "<>" ) {
         
@@ -55,7 +55,7 @@ sub hook_mail_done {
     my ( $self, $transaction, $sender ) = @_;
     
     return DECLINED
-      if ( $self->qp->connection->notes('whitelisthost') );
+      if ( $self->connection->notes('whitelisthost') );
 
     if ( $sender ne "<>" && !$transaction->notes('resolvable_fromhost') ) {
         # default of temp_resolver_failed is DENYSOFT
