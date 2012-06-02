@@ -324,7 +324,7 @@ sub is_immune {
         $self->log(LOGINFO, "skip: relay client");
         return 1;
     };
-    if ( $self->qp->connection->notes('whitelisthost') ) {
+    if ( $self->connection->notes('whitelisthost') ) {
         $self->log(LOGINFO, "skip: whitelisted host");
         return 1;
     };

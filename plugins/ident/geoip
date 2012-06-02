@@ -46,10 +46,10 @@ sub connect_handler {
 
     my $c_name = $geoip->country_name_by_addr( $remote_ip );
     if ( $c_name ) {
-        $self->qp->connection->notes('geoip_country_name', $c_name);
+        $self->connection->notes('geoip_country_name', $c_name);
     };
 
-    $self->qp->connection->notes('geoip_country', $c_code);
+    $self->connection->notes('geoip_country', $c_code);
 
     my $message  = $c_code;
        $message .= ", $c_name" if $c_name;

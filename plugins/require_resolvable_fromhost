@@ -11,8 +11,7 @@ my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
 
-  return DECLINED
-        if ($self->qp->connection->notes('whitelisthost'));
+  return DECLINED if $self->connection->notes('whitelisthost');
 
   foreach my $i ($self->qp->config("invalid_resolvable_fromhost")) {
     $i =~ s/^\s*//;

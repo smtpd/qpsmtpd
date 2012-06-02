@@ -305,8 +305,8 @@ sub event_read {
     if (defined $sock) {
         $qp->connection( $qp->connection->clone );
         $qp->reset_transaction;
-        $qp->connection->notes('tls_socket', $sock);
-        $qp->connection->notes('tls_enabled', 1);
+        $self->connection->notes('tls_socket', $sock);
+        $self->connection->notes('tls_enabled', 1);
         $qp->watch_read(1);
         return 1;
     }

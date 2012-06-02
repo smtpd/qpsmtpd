@@ -63,9 +63,9 @@ sub test_is_immune {
     ok( ! $self->is_immune(), "nope -" );
 
     foreach ( qw/ whitelisthost / ) {
-        $self->qp->connection->notes($_, 1);
+        $self->connection->notes($_, 1);
         ok( $self->is_immune(), $_);
-        $self->qp->connection->notes($_, undef);
+        $self->connection->notes($_, undef);
     };
 
     foreach ( qw/ whitelistsender tls_enabled / ) {
@@ -186,7 +186,7 @@ sub _reset_transaction {
 
     $self->qp->connection->relay_client(0);
     $self->qp->transaction->notes('whitelistsender',0);
-    $self->qp->connection->notes('whitelisthost',0);
+    $self->connection->notes('whitelisthost',0);
     $self->qp->transaction->notes('tls_enabled',0);
     $self->{_args}{p0f} = undef;
     $self->{_args}{geoip} = undef;

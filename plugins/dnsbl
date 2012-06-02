@@ -170,8 +170,8 @@ sub hook_connect {
     }
   }
 
-  $self->qp->connection->notes('dnsbl_sockets', $sel);
-  $self->qp->connection->notes('dnsbl_domains', $dom);
+  $self->connection->notes('dnsbl_sockets', $sel);
+  $self->connection->notes('dnsbl_domains', $dom);
 
   return DECLINED;
 }
@@ -199,7 +199,7 @@ sub ip_whitelisted {
     my ($self) = @_;
 
     my $remote_ip = $self->qp->connection->remote_ip;
-    my $white = $self->qp->connection->notes('whitelisthost');
+    my $white = $self->connection->notes('whitelisthost');
     if ( $white ) {
         $self->log(LOGDEBUG, "skip: whitelist overrode blacklist: $white");
         return 1;
@@ -219,7 +219,7 @@ sub ip_whitelisted {
 sub process_sockets {
   my ($self) = @_;
 
-  my $conn = $self->qp->connection;
+  my $conn = $self->connection;
 
   return $conn->notes('dnsbl') if $conn->notes('dnsbl');
 
@@ -334,13 +334,15 @@ sub hook_rcpt {
 sub hook_disconnect {
   my ($self, $transaction) = @_;
 
-  $self->qp->connection->notes('dnsbl_sockets', undef);
+  $self->connection->notes('dnsbl_sockets', undef);
 
   return DECLINED;
 }
 
 sub get_reject_type {
     my $self = shift;
+    my $default = shift || DENY;
+    my $deny = $self->{_args}{reject_type} or return $default;
 
     return   $self->{_args}{reject_type} eq 'temp'       ? DENYSOFT
            : $self->{_args}{reject_type} eq 'disconnect' ? DENY_DISCONNECT
