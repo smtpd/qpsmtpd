@@ -210,6 +210,40 @@ sub compile {
     die "eval $@" if $@;
 }
 
+sub get_reject {
+    my $self = shift;
+    my $message = shift || "why didn't you pass an error message?";
+
+    my $reject = $self->{_args}{reject};
+    if ( defined $reject && ! $reject ) {
+        $self->log(LOGINFO, 'fail, reject disabled');
+        return DECLINED;
+    };
+
+    # the naughty plugin will reject later
+    if ( $reject eq 'naughty' ) {
+        $self->log(LOGINFO, 'fail, NAUGHTY');
+        $self->connection->notes('naughty', $message);
+        return (DECLINED);
+    };
+
+    # they asked for reject, we give them reject
+    $self->log(LOGINFO, 'fail');
+    return ( $self->get_reject_type(), $message);
+};
+
+sub get_reject_type {
+    my $self = shift;
+    my $default = shift || DENY;
+    my $deny = $self->{_args}{reject_type} or return $default;
+
+    return $deny =~ /^(temp|soft)$/i  ? DENYSOFT
+         : $deny =~ /^(perm|hard)$/i  ? DENY
+         : $deny eq 'disconnect'      ? DENY_DISCONNECT
+         : $deny eq 'temp_disconnect' ? DENYSOFT_DISCONNECT
+         : $default;
+};
+
 sub _register_standard_hooks {
   my ($plugin, $qp) = @_;
 
