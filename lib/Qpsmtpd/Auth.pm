@@ -57,7 +57,10 @@ sub SASL {
             ( $msg ? " - $msg" : '');
         $session->respond( 235, $msg );
         $session->connection->relay_client(1);
-        $session->connection->notes('naughty',0);
+        if ( $session->connection->notes('naughty' ) ) {
+            $session->log( LOGINFO, "auth success cleared naughty" );
+            $session->connection->notes('naughty',0);
+        };
         $session->log( LOGDEBUG, $msg );  # already logged by $session->respond
 
         $session->{_auth_user} = $user;
