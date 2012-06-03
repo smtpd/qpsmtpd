@@ -1,0 +1,4 @@
+# these domains never uses their domain when greeting us, so reject transactions
+aol.com
+yahoo.com
+
