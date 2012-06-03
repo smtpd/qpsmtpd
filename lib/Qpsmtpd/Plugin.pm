@@ -228,9 +228,9 @@ sub is_immune {
         $self->log(LOGINFO, "skip, whitelisted sender");
         return 1;
     };
-    if ( $self->connection->notes('zombie') ) {
-        # see plugins/reaper
-        $self->log(LOGINFO, "skip, zombie");
+    if ( $self->connection->notes('naughty') ) {
+        # see plugins/naughty
+        $self->log(LOGINFO, "skip, naughty");
         return 1;
     };
     if ( $self->connection->notes('rejected') ) {
