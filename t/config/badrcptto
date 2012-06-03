@@ -1,0 +1,9 @@
+######## entries used for testing ###
+bad@example.com
+@bad.example.com
+########    Example patterns   #######
+# Format is pattern\s+Response
+# Don't forget to anchor the pattern if required
+!       Sorry, bang paths not accepted here
+@.*@    Sorry, multiple at signs not accepted here
+%       Sorry, percent hack not accepted here 

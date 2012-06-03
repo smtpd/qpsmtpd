@@ -1,0 +1,94 @@
+#
+#  Example configuration file for plugins
+#
+
+# enable this to get configuration via http; see perldoc
+# plugins/http_config for details.
+#   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
+
+# hosts_allow does not work with the tcpserver deployment model!
+#   perldoc plugins/hosts_allow for an alternative.
+#
+# The hosts_allow module must be loaded if you want the -m / --max-from-ip /
+# my $MAXCONNIP = 5; # max simultaneous connections from one IP
+# settings... without this it will NOT refuse more than $MAXCONNIP connections
+# from one IP!
+hosts_allow
+
+# information plugins
+ident/geoip
+#ident/p0f /tmp/.p0f_socket version 3
+connection_time
+
+# enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
+dont_require_anglebrackets
+
+# enable to reject MAIL FROM:/RCPT TO: parameters if client helo was HELO
+# (strict RFC 821)... this is not used in EHLO ...
+parse_addr_withhelo
+
+quit_fortune
+# tls should load before count_unrecognized_commands
+#tls
+check_earlytalker
+count_unrecognized_commands 4
+check_relay
+
+require_resolvable_fromhost
+
+rhsbl
+dnsbl
+check_badmailfrom
+check_badrcptto
+check_spamhelo
+
+sender_permitted_from
+greylisting p0f genre,windows
+
+auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
+auth/auth_vpopmail
+auth/auth_vpopmaild
+auth/auth_vpopmail_sql
+auth/auth_flat_file
+auth/authdeny
+
+# this plugin needs to run after all other "rcpt" plugins
+rcpt_ok
+
+check_basicheaders days 5 reject_type temp
+domainkeys
+
+# content filters
+virus/klez_filter
+
+
+# You can run the spamassassin plugin with options.  See perldoc
+# plugins/spamassassin for details.
+#
+spamassassin
+
+# rejects mails with a SA score higher than 20 and munges the subject
+# of the score is higher than 10.
+#
+#   spamassassin reject_threshold 20 munge_subject_threshold 10
+
+# dspam must run after spamassassin for the learn_from_sa feature to work
+dspam learn_from_sa 7 reject 1
+
+# run the clamav virus checking plugin
+virus/clamav
+
+# You must enable a queue plugin - see the options in plugins/queue/ - for example:
+
+# queue to a maildir
+# queue/maildir /home/spamtrap/mail
+
+# queue the mail with qmail-queue
+queue/qmail-queue
+
+
+# If you need to run the same plugin multiple times, you can do
+# something like the following
+#    check_relay
+#    check_relay:0 somearg
+#    check_relay:1 someotherarg
