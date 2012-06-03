@@ -1,150 +1,318 @@
 #!perl -w
+
+=head1 NAME
+
+resolvable_fromhost
+
+=head1 SYNOPSIS
+
+Determine if the from host resolves to a valid MX or host.
+
+=head1 DESCRIPTION
+
+The fromhost is the part of the email address after the @ symbol, provided by
+the sending server during the SMTP conversation. This is usually, but not
+always, the same as the hostname in the From: header.
+
+B<resolvable_fromhost> tests to see if the fromhost resolves. It saves the 
+results in the transaction note I<resolvable_fromhost> where other plugins can
+use that information. Typical results are:
+
+ a  - fromhost resolved as an A record
+ mx - fromhost has valid MX record(s)
+ ip - fromhost was an IP
+ whitelist - skipped checks due to whitelisting
+ null - null sender
+ config - fromhost not resolvable, but I<reject 0> was set.
+
+Any other result is an error message with details of the failure.
+
+If B<resolvable_fromhost> is enabled, the from hostname is also stored in
+I<resolvable_fromhost_host>, making it accessible when $sender is not.
+
+=head1 CONFIGURATION
+
+=head2 reject <bool>
+
+If I<reject 1> is set, the old require_resolvable_fromhost plugin behavior of
+temporary rejection is the default.
+
+ resolvable_fromhost reject [ 0 | 1 ]
+
+Default: 1
+
+=head2 reject_type
+
+ reject_type [ perm | temp ]
+
+Set I<reject_type perm> to reject mail instead of deferring it.
+
+Default: temp (temporary, aka soft, aka 4xx).
+
+=head1 EXAMPLE LOG ENTRIES
+
+ 80072 (mail) resolvable_fromhost: googlegroups.com has valid MX at gmr-smtp-in.l.google.com
+ 80108 (mail) resolvable_fromhost: zerobarriers.net has valid MX at zerobarriers.net
+ 80148 (mail) resolvable_fromhost: uhin.com has valid MX at filter.itsafemail.com
+ 86627 (mail) resolvable_fromhost: no MX records for palmalar.com
+ 86627 (mail) resolvable_fromhost: fail: palmalar.com (SERVFAIL)
+
+=head1 AUTHORS
+
+2012 - Matt Simerson - refactored, added: POD, tests, reject, reject_type
+
+2002 - Ask Bjørn Hansen - intial plugin
+
+=cut
+
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
-use Net::DNS qw(mx);
-use Socket;
-use Net::IP qw(:PROC);
 use Qpsmtpd::TcpServer;
 
-my %invalid = ();
+use Socket;
+use Net::DNS qw(mx);
+use Net::IP qw(:PROC);
+
+my %invalid  = ();
 my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
 
+sub register {
+    my ($self, $qp, %args) = @_;
+
+    foreach (keys %args) {
+        $self->{_args}->{$_} = $args{$_};
+    }
+    if ( ! defined $self->{_args}{reject} ) {
+        $self->{_args}{reject} = 1;
+    };
+    $self->{_args}{reject_type} ||= 'soft';
+}
+
 sub hook_mail {
-  my ($self, $transaction, $sender, %param) = @_;
+    my ($self, $transaction, $sender, %param) = @_;
 
-  return DECLINED
-        if ($self->qp->connection->notes('whitelisthost'));
+    $self->populate_invalid_networks();
 
-  foreach my $i ($self->qp->config("invalid_resolvable_fromhost")) {
-    $i =~ s/^\s*//;
-    $i =~ s/\s*$//;
-    if ($i =~ m#^((\d{1,3}\.){3}\d{1,3})/(\d\d?)#) {
-      $invalid{$1} = $3;
-    }
-  }
+    # check first, so results are noted for other plugins
+    my $resolved = $self->check_dns($sender->host, $transaction);
 
-  if ($sender ne "<>" 
-      and $self->qp->config("require_resolvable_fromhost")
-      and !$self->check_dns($sender->host)) {
-    if ($sender->host) {
-	  $transaction->notes('temp_resolver_failed', $sender->host);
-    } 
-    else {
-      # default of addr_bad_from_system is DENY, we use DENYSOFT here to
-      # get the same behaviour as without Qpsmtpd::DSN...
-      return Qpsmtpd::DSN->addr_bad_from_system(DENYSOFT, 
-                               "FQDN required in the envelope sender");
-    }
-  }
-  return DECLINED;
+    return DECLINED if $resolved;  # success, no need to continue
+    return DECLINED if $self->is_immune( $sender, $transaction );
+    return DECLINED if ! $self->{_args}{reject};
 
+    return DECLINED if $sender->host;  # reject later
+
+    $self->log(LOGWARN, "FQDN required in envelope sender");
+    return Qpsmtpd::DSN->addr_bad_from_system( $self->get_reject_type(),
+                            "FQDN required in the envelope sender");
 }
 
 sub hook_rcpt {
-	my ($self, $transaction, $recipient, %args) = @_;
+    my ($self, $transaction, $recipient, %args) = @_;
 
-	if (my $host = $transaction->notes('temp_resolver_failed')) {
-		# default of temp_resolver_failed is DENYSOFT
-		return Qpsmtpd::DSN->temp_resolver_failed("Could not resolve " . $host);
-	}
+    my $result = $transaction->notes('resolvable_fromhost');
+    return DECLINED if ! $self->{_args}{reject};         # no reject policy
+    return DECLINED if $result =~ /^(a|ip|mx)$/;         # success
+    return DECLINED if $result =~ /^(whitelist|null|config)$/; # immunity
 
-  return DECLINED;
+    $self->log(LOGINFO, $result ); # log error
+    return Qpsmtpd::DSN->temp_resolver_failed( $self->get_reject_type(), $result );
 }
 
 sub check_dns {
-  my ($self, $host) = @_;
-  my @host_answers;
+    my ($self, $host, $transaction) = @_;
 
-  # for stuff where we can't even parse a hostname out of the address
-  return 0 unless $host;
+    # we can't even parse a hostname out of the address
+    if ( ! $host ) {
+        $transaction->notes('resolvable_fromhost', 'unparsable host');
+        return;
+    };
 
-  return 1 if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+    $transaction->notes('resolvable_fromhost_host', $host);
 
-  my $res = new Net::DNS::Resolver(dnsrch => 0);
-  $res->tcp_timeout(30);
-  $res->udp_timeout(30);
-  my @mx = mx($res, $host);
-  foreach my $mx (@mx) {
-    # if any MX is valid, then we consider the domain
-    # resolvable
-    return 1 if mx_valid($self, $mx->exchange, $host);
-  }
-  # if there are MX records, and we got here,
-  # then none of them are valid
-  return 0 if (@mx > 0);
+    if ( $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/ ) {
+        $self->log(LOGINFO, "skip: $host is an IP");
+        $transaction->notes('resolvable_fromhost', 'ip');
+        return 1;
+    };
 
-  my $query = $res->search($host);
-  if ($query) {
-    foreach my $rrA ($query->answer) {
-      push(@host_answers, $rrA);
-    }
-  }
-  if ($has_ipv6) {
-    my $query = $res->search($host, 'AAAA');
-    if ($query) {
-      foreach my $rrAAAA ($query->answer) {
-        push(@host_answers, $rrAAAA);
-      }
-    }
-  } 
-  if (@host_answers) {
+    my $res = new Net::DNS::Resolver(dnsrch => 0);
+    $res->tcp_timeout(30);
+    $res->udp_timeout(30);
+
+    my $has_mx = $self->get_and_validate_mx( $res, $host, $transaction );
+    return 1 if $has_mx == 1;  # success!
+    return if $has_mx == -1;   # has invalid MX records
+
+    my @host_answers = $self->get_host_records( $res, $host, $transaction );
     foreach my $rr (@host_answers) {
-      return is_valid($rr->address) if $rr->type eq "A" or $rr->type eq "AAAA";
-      return mx_valid($self, $rr->exchange, $host) if $rr->type eq "MX";
+        if ( $rr->type eq 'A' || $rr->type eq 'AAAA' ) {
+            $self->log(LOGINFO, "pass: found valid A for $host");
+            $transaction->notes('resolvable_fromhost', 'a');
+            return $self->ip_is_valid($rr->address);
+        };
+        if ( $rr->type eq 'MX' ) {
+            $self->log(LOGINFO, "pass: found valid MX for $host");
+            $transaction->notes('resolvable_fromhost', 'mx');
+            return $self->mx_address_resolves($rr->exchange, $host);
+        };
     }
-  }
-  else {
-    $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
-      unless $res->errorstring eq "NXDOMAIN";
-  }
-  return 0;
+    return;
 }
 
-sub is_valid {
-  my $ip = shift;
-  my ($net,$mask);
-  ### while (($net,$mask) = each %invalid) {
-  ###         ... does NOT reset to beginning, will start on
-  ###         2nd invocation after where it denied the first time..., so
-  ###         2nd time the same "MAIL FROM" would be accepted!
-  foreach $net (keys %invalid) {
-    $mask = $invalid{$net};
-    $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
-    return 0 
-      if join(".", unpack("C4", inet_aton($ip) & $mask)) eq $net;
-  }
-  return 1; 
+sub ip_is_valid {
+    my ($self, $ip) = @_;
+    my ($net, $mask);
+    ### while (($net,$mask) = each %invalid) {
+    ###      ... does NOT reset to beginning, will start on
+    ###      2nd invocation after where it denied the first time..., so
+    ###      2nd time the same "MAIL FROM" would be accepted!
+    foreach $net (keys %invalid) {
+        $mask = $invalid{$net};
+        $mask = pack "B32", "1" x ($mask) . "0" x (32 - $mask);
+        return if $net eq join('.', unpack("C4", inet_aton($ip) & $mask));
+    }
+    return 1;
 }
 
-sub mx_valid {
-  my ($self, $name, $host) = @_;
-  my $res   = new Net::DNS::Resolver(dnsrch => 0);
-  # IP in MX
-  return is_valid($name) if ip_is_ipv4($name) or ip_is_ipv6($name);
+sub get_and_validate_mx {
+    my ($self, $res, $host, $transaction ) = @_;
 
-  my @mx_answers;
-  my $query = $res->search($name, 'A');
-  if ($query) {
-    foreach my $rrA ($query->answer) {
-      push(@mx_answers, $rrA);
+    my @mx = mx($res, $host);
+    if ( ! scalar @mx ) {    # no mx records
+        $self->log(LOGINFO, "no MX records for $host");
+        return 0;
+    };
+
+    foreach my $mx (@mx) {
+        # if any MX is valid, then we consider the domain resolvable
+        if ( $self->mx_address_resolves($mx->exchange, $host) ) {
+            $self->log(LOGINFO, "pass: $host has valid MX at " . $mx->exchange);
+            $transaction->notes('resolvable_fromhost', 'mx');
+            return 1;
+        };
     }
-  }
-  if ($has_ipv6) {
-    my $query = $res->search($name, 'AAAA');
+
+    # if there are MX records, and we got here, none are valid
+    $self->log(LOGINFO, "fail: invalid MX for $host");
+    $transaction->notes('resolvable_fromhost', "invalid MX for $host");
+    return -1;
+};
+
+sub get_host_records {
+    my ($self, $res, $host, $transaction ) = @_;
+
+    my @answers;
+    my $query = $res->search($host);
+
     if ($query) {
-      foreach my $rrAAAA ($query->answer) {
-        push(@mx_answers, $rrAAAA);
-      }
+        foreach my $rrA ($query->answer) {
+            push(@answers, $rrA);
+        }
     }
-  }
-  if (@mx_answers) {
+
+    if ($has_ipv6) {
+        $query = $res->search($host, 'AAAA');
+        if ($query) {
+            foreach my $rrAAAA ($query->answer) {
+                push(@answers, $rrAAAA);
+            }
+        }
+    }
+
+    if ( ! scalar @answers) {
+        if ( $res->errorstring ne 'NXDOMAIN' ) {
+            $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring);
+        };
+        return;
+    };
+
+    return @answers;
+};
+
+sub mx_address_resolves {
+    my ($self, $name, $fromhost) = @_;
+
+    # IP in MX
+    return $self->ip_is_valid($name) if ip_is_ipv4($name) || ip_is_ipv6($name);
+
+    my $res = new Net::DNS::Resolver(dnsrch => 0);
+    my @mx_answers;
+    my $query = $res->search($name, 'A');
+    if ($query) {
+        foreach my $rrA ($query->answer) {
+            push(@mx_answers, $rrA);
+        }
+    }
+    if ($has_ipv6) {
+        my $query = $res->search($name, 'AAAA');
+        if ($query) {
+            foreach my $rrAAAA ($query->answer) {
+                push(@mx_answers, $rrAAAA);
+            }
+        }
+    }
+    if (! @mx_answers) {
+        $self->log(LOGWARN, "query for $fromhost failed: ", $res->errorstring)
+            unless $res->errorstring eq "NXDOMAIN";
+        return;
+    }
+
     foreach my $rr (@mx_answers) {
-      next unless $rr->type eq "A" or $rr->type eq "AAAA";
-      return is_valid($rr->address);
+        next if ( $rr->type ne 'A' && $rr->type ne 'AAAA' );
+        return $self->ip_is_valid($rr->address);
     }
-  }
-  else {
-    $self->log(LOGWARN, "$$ query for $host failed: ", $res->errorstring)
-      unless $res->errorstring eq "NXDOMAIN";
-  }
-  return 0;
+
+    return;
 }
+
+sub populate_invalid_networks {
+    my $self = shift;
+
+    foreach my $i ($self->qp->config("invalid_resolvable_fromhost")) {
+        $i =~ s/^\s*//;  # trim leading spaces
+        $i =~ s/\s*$//;  # trim trailing spaces
+        if ($i =~ m#^((\d{1,3}\.){3}\d{1,3})/(\d\d?)#) {
+            $invalid{$1} = $3;
+        }
+    }
+};
+
+sub is_immune {
+    my ($self, $sender, $transaction) = @_;
+
+    if ( $self->qp->connection->notes('whitelisthost') ) {
+        $transaction->notes('resolvable_fromhost', 'whitelist');
+        $self->log(LOGINFO, "pass: whitelisted");
+        return 1;
+    };
+
+    if ( $sender eq '<>' ) {
+        $transaction->notes('resolvable_fromhost', 'null');
+        $self->log(LOGINFO, "pass: null sender");
+        return 1;
+    };
+
+    if ( ! $self->{_args}{reject} ) {
+        $transaction->notes('resolvable_fromhost', 'config');
+        $self->log(LOGINFO, "skip: reject not enabled in config.");
+        return;
+    };
+
+    return;
+};
+
+sub get_reject_type {
+    my $self = shift;
+    my $default = shift || DENYSOFT;
+    my $deny = $self->{_args}{reject_type} or return $default;
+
+    return $deny =~ /^(temp|soft)$/i ? DENYSOFT
+         : $deny =~ /^(perm|hard)$/i ? DENY
+         : $deny eq 'disconnect' ? DENY_DISCONNECT
+         : $default;
+};
