@@ -119,7 +119,7 @@ sub apr_connect_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
-    return DECLINED if $self->qp->connection->notes('whitelisthost');
+    return DECLINED if $self->is_immune();
 
     my $c = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;
@@ -140,7 +140,7 @@ sub apr_data_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
-    return DECLINED if $self->qp->connection->notes('whitelisthost');
+    return DECLINED if $self->is_immune();
 
     my $c = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;

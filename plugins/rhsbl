@@ -25,6 +25,10 @@ to return in the SMTP conversation e.g.
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 
 sub register {
   my ($self, $qp, $denial ) = @_;
@@ -34,11 +38,24 @@ sub register {
   else {
     $self->{_rhsbl}->{DENY} = DENY;
   }
-
 }
 
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
+
+    return DECLINED if $self->is_immune();
+
+    if ($sender->format eq '<>') {
+        $self->log(LOGINFO, 'skip, null sender');
+        return DECLINED;
+    };
+
+    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
+
+    if ( ! %rhsbl_zones ) {
+        $self->log(LOGINFO, 'skip, no zones');
+        return DECLINED;
+    };
 
   my $res = new Net::DNS::Resolver;
   my $sel = IO::Select->new();
@@ -48,9 +65,6 @@ sub hook_mail {
   # here and pick up any results in the RCPT handler.
   # MTAs gets confused when you reject mail during MAIL FROM:
 
-    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
-
-  if ($sender->format ne '<>' and %rhsbl_zones) {
     push(my @hosts, $sender->host);
     #my $helo = $self->qp->connection->hello_host;
     #push(@hosts, $helo) if $helo && $helo ne $sender->host;
@@ -70,28 +84,29 @@ sub hook_mail {
 
     %{$self->{_rhsbl_zones_map}} = %rhsbl_zones_map;
     $transaction->notes('rhsbl_sockets', $sel);
-  } else {
-    $self->log(LOGDEBUG, 'no RHS checks necessary');
-  }
 
   return DECLINED;
 }
 
 sub hook_rcpt {
   my ($self, $transaction, $rcpt) = @_;
-  my $host = $transaction->sender->host;
-  my $hello = $self->qp->connection->hello_host;
 
-  my $result = $self->process_sockets;
-  if ($result && defined($self->{_rhsbl_zones_map}{$result})) {
+  my $result = $self->process_sockets or do {
+    $self->log(LOGINFO, "pass");
+    return DECLINED;
+  };
+
+
+  if ( defined($self->{_rhsbl_zones_map}{$result}) ) {
+    my $host = $transaction->sender->host;
     if ($result =~ /^$host\./ ) {
       return ($self->{_rhsbl}->{DENY}, "Mail from $host rejected because it " . $self->{_rhsbl_zones_map}{$result});
     } else {
+      my $hello = $self->qp->connection->hello_host;
       return ($self->{_rhsbl}->{DENY}, "Mail from HELO $hello rejected because it " . $self->{_rhsbl_zones_map}{$result});
     }
   }
-  return ($self->{_rhsbl}->{DENY}, $result) if $result;
-  return DECLINED;
+  return ($self->{_rhsbl}->{DENY}, $result);
 }
 
 sub process_sockets {

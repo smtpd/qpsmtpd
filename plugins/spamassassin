@@ -163,13 +163,10 @@ sub register {
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
+    return (DECLINED) if $self->is_immune();
+
     if ( $transaction->data_size > 500_000 ) {
         $self->log(LOGINFO, "skip: too large (".$transaction->data_size.")");
-        return (DECLINED);
-    };
-    if ( $self->{_args}{relayclient} && $self->{_args}{relayclient} eq 'skip'
-            && $self->qp->connection->relay_client() ) {
-        $self->log(LOGINFO, "skip: relayclient" );
         return (DECLINED);
     };
 
