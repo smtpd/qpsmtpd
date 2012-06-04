@@ -32,7 +32,7 @@ quit_fortune
 #tls
 check_earlytalker
 count_unrecognized_commands 4
-check_relay
+relay
 
 require_resolvable_fromhost
 
@@ -89,6 +89,6 @@ queue/qmail-queue
 
 # If you need to run the same plugin multiple times, you can do
 # something like the following
-#    check_relay
-#    check_relay:0 somearg
-#    check_relay:1 someotherarg
+#    relay
+#    relay:0 somearg
+#    relay:1 someotherarg
