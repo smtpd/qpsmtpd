@@ -60,7 +60,7 @@ sub hook_rcpt {
         $line =~ s/^\s+//g; # trim leading whitespace
         my ($bad, $reason) = split /\s+/, $line, 2;
         next if ! $bad;
-        if ( $self->is_match( $to, lc($bad), $host ) ) {;
+        if ( $self->is_match( $to, lc($bad), $host ) ) {
             if ( $reason ) {
                 return (DENY, "mail to $bad not accepted here");
             }
