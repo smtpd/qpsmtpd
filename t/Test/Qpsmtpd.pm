@@ -69,6 +69,7 @@ sub input {
 }
 
 sub config_dir {
+    return './t/config' if $ENV{QPSMTPD_DEVELOPER};
     './config.sample';
 }
 

@@ -18,21 +18,21 @@ hosts_allow
 # information plugins
 ident/geoip
 #ident/p0f /tmp/.p0f_socket version 3
-#connection_time
+connection_time
 
 # enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
 dont_require_anglebrackets
 
 # enable to reject MAIL FROM:/RCPT TO: parameters if client helo was HELO
 # (strict RFC 821)... this is not used in EHLO ...
-# parse_addr_withhelo
+parse_addr_withhelo
 
 quit_fortune
 # tls should load before count_unrecognized_commands
 #tls
 check_earlytalker
 count_unrecognized_commands 4
-relay
+check_relay
 
 require_resolvable_fromhost
 
@@ -42,13 +42,13 @@ check_badmailfrom
 check_badrcptto
 check_spamhelo
 
-# sender_permitted_from
-# greylisting p0f genre,windows
+sender_permitted_from
+greylisting p0f genre,windows
 
-#auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
-#auth/auth_vpopmail
-#auth/auth_vpopmaild
-#auth/auth_vpopmail_sql
+auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
+auth/auth_vpopmail
+auth/auth_vpopmaild
+auth/auth_vpopmail_sql
 auth/auth_flat_file
 auth/authdeny
 
@@ -76,7 +76,7 @@ spamassassin
 dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
-# virus/clamav
+virus/clamav
 
 # You must enable a queue plugin - see the options in plugins/queue/ - for example:
 
@@ -84,11 +84,11 @@ dspam learn_from_sa 7 reject 1
 # queue/maildir /home/spamtrap/mail
 
 # queue the mail with qmail-queue
-# queue/qmail-queue
+queue/qmail-queue
 
 
 # If you need to run the same plugin multiple times, you can do
 # something like the following
-#    relay
-#    relay:0 somearg
-#    relay:1 someotherarg
+#    check_relay
+#    check_relay:0 somearg
+#    check_relay:1 someotherarg

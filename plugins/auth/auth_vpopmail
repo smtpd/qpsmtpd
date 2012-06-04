@@ -45,7 +45,7 @@ use warnings;
 use Qpsmtpd::Auth;
 use Qpsmtpd::Constants;
 
-#use vpopmail;    # we eval this in $test_vpopmail
+#use vpopmail;    # we eval this in $test_vpopmail_module
 
 sub register {
     my ($self, $qp) = @_;
@@ -86,7 +86,7 @@ sub test_vpopmail_module {
     my $self = shift;
 # vpopmail will not allow vauth_getpw to succeed unless the requesting user is vpopmail or root.
 # by default, qpsmtpd runs as the user 'qpsmtpd' and does not have permission.
-    eval "use vpopmail";
+    eval 'use vpopmail';
     if ( $@ ) {
         $self->log(LOGERROR, "skip: is vpopmail perl module installed?");
         return;
