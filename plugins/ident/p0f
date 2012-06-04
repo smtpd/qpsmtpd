@@ -328,7 +328,7 @@ sub store_v2_results {
         uptime   => $uptime,
     };
 
-    $self->qp->connection->notes('p0f', $p0f);
+    $self->connection->notes('p0f', $p0f);
     $self->log(LOGINFO, $genre." (".$detail.")");
     $self->log(LOGERROR,"error: $@") if $@;
     return $p0f;
@@ -354,7 +354,7 @@ sub store_v3_results {
         $r{uptime} = $r{uptime_min} if $r{uptime_min};
     };
 
-    $self->qp->connection->notes('p0f', \%r);
+    $self->connection->notes('p0f', \%r);
     $self->log(LOGINFO, "$r{os_name} $r{os_flavor}");
     $self->log(LOGDEBUG, join(' ', @values ));
     $self->log(LOGERROR,"error: $@") if $@;
