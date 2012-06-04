@@ -26,8 +26,9 @@ Adjust the quantity of logging for this plugin. See docs/logging.pod
 use strict;
 use warnings;
 
-use Time::HiRes qw(gettimeofday tv_interval);
 use Qpsmtpd::Constants;
+
+use Time::HiRes qw(gettimeofday tv_interval);
 
 sub register {
     my ($self, $qp) = shift, shift;
@@ -43,18 +44,27 @@ sub register {
     }
     else {
         $self->{_args} = { @_ };     # named args, inherits loglevel
-    }
+    };
 }
 
 sub hook_pre_connection {
-    my ($self, @foo) = @_;
+    my $self = shift;
+    $self->{_connection_start} = [gettimeofday];
+    $self->log(LOGDEBUG, "started at " . $self->{_connection_start} );
+    return (DECLINED);
+}
+
+sub hook_connect {
+    my $self = shift;
+# this method is needed to function with the tcpserver deployment model
+    return (DECLINED) if defined $self->{_connection_start};
     $self->{_connection_start} = [gettimeofday];
     $self->log(LOGDEBUG, "started at " . $self->{_connection_start} );
     return (DECLINED);
 }
 
 sub hook_post_connection {
-    my ($self, @foo) = @_;
+    my $self = shift;
 
     if ( ! $self->{_connection_start} ) {
         $self->log(LOGERROR, "Start time not set?!");
