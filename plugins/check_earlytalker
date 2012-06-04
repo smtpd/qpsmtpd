@@ -99,6 +99,9 @@ sub register {
   if ( defined $self->{_args}{'defer-reject'} && ! defined $self->{_args}{reject_type} ) {
        $self->{_args}{reject_type} = $self->{_args}{action} == 'denysoft' ? 'temp' : 'perm';
   };
+  if ( ! defined $self->{_args}{reject_type} ) {
+       $self->{_args}{reject_type} = 'perm';
+  };
 # /end compat
   if ( $qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
       require APR::Const;
@@ -158,7 +161,7 @@ sub connect_handler {
     my $in = new IO::Select;
 
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
-    return DECLINED if $self->qp->connection->notes('whitelisthost');
+    return DECLINED if $self->is_immune();
 
     $in->add(\*STDIN) or return DECLINED;
     if (! $in->can_read($self->{_args}{'wait'})) {
@@ -178,7 +181,7 @@ sub data_handler {
     my $in = new IO::Select;
 
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
-    return DECLINED if $self->qp->connection->notes('whitelisthost');
+    return DECLINED if $self->is_immune();
 
     $in->add(\*STDIN) or return DECLINED;
     if ( ! $in->can_read($self->{_args}{'wait'})) {
