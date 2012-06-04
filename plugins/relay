@@ -10,10 +10,10 @@ relay - check the following places to see if relaying is allowed:
 
 I<$ENV{RELAYCLIENT}>
 
-I<config/norelayclients>, I<config/relayclients>, I<config/morerelayclients> 
+I<config/norelayclients>, I<config/relayclients>, I<config/morerelayclients>
 
 The search order is as shown and cascades until a match is found or the list
-is exhausted. 
+is exhausted.
 
 Note that I<norelayclients> is the first file checked. A match there will
 override matches in the subsequent files.
@@ -159,7 +159,7 @@ sub is_in_cidr_block {
 # expand the client address (zero pad it) before converting to binary
         my $bin_ip = ip_iptobin(ip_expand_address($ip, $cversion), $cversion);
 
-        if (    ip_bincomp($bin_ip, 'gt', ip_iptobin($begin, $rversion)) 
+        if (    ip_bincomp($bin_ip, 'gt', ip_iptobin($begin, $rversion))
              && ip_bincomp($bin_ip, 'lt', ip_iptobin($end,   $rversion))
            ) {
             $self->log(LOGINFO, "pass: cidr match ($ip)");
