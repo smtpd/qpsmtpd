@@ -3,20 +3,19 @@
 use strict;
 use warnings;
 
-use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
 
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_register', 3);
+    eval 'use ClamAV::Client';
+    if ( ! $@ ) {
+        $self->register_test('test_register', 3);
+        $self->register_test('test_get_clamd', 1);
+    };
     $self->register_test('test_err_and_return', 2);
     $self->register_test('test_get_filename', 1);
     $self->register_test('test_set_permission', 1);
-    eval 'use ClamAV::Client';
-    if ( ! $@ ) {
-        $self->register_test('test_get_clamd', 1);
-    };
     $self->register_test('test_is_too_big', 2);
     $self->register_test('test_is_not_multipart', 2);
 }
