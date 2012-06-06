@@ -154,7 +154,7 @@ sub connect_handler {
 
     my $message  = $c_code;
        $message .= ", $c_name" if $c_name;
-       $message .= ", $continent_code" if $continent_code;
+       $message .= ", $continent_code" if $continent_code && $continent_code ne '--';
        $message .= ", \t$distance km" if $distance;
     $self->log(LOGINFO, $message);
 
@@ -196,7 +196,7 @@ sub set_country_code {
     return $self->get_country_code_gc() if $self->{_geoip_city};
     my $remote_ip = $self->qp->connection->remote_ip;
     my $code = $self->get_country_code();
-    $self->qp->connection->notes('geoip_country_name', $code);
+    $self->qp->connection->notes('geoip_country', $code);
     return $code;
 };
 
@@ -204,7 +204,7 @@ sub get_country_code {
     my $self = shift;
     my $ip = shift || $self->qp->connection->remote_ip;
     return $self->get_country_code_gc( $ip ) if $self->{_geoip_city};
-    return $self->{_geoip}->country_name_by_addr( $ip );
+    return $self->{_geoip}->country_code_by_addr( $ip );
 };
 
 sub get_country_code_gc {
