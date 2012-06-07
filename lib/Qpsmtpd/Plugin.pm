@@ -213,6 +213,8 @@ sub compile {
 sub get_reject {
     my $self = shift;
     my $message = shift || "why didn't you pass an error message?";
+    my $log_info = shift || '';
+    $log_info = ", $log_info" if $log_info;
 
     my $reject = $self->{_args}{reject};
     if ( defined $reject && ! $reject ) {
@@ -228,7 +230,7 @@ sub get_reject {
     };
 
     # they asked for reject, we give them reject
-    $self->log(LOGINFO, 'fail');
+    $self->log(LOGINFO, 'fail'.$log_info);
     return ( $self->get_reject_type(), $message);
 };
 
