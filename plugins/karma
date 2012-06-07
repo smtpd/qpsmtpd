@@ -42,10 +42,10 @@ Default: 1
 
 Examples:
 
- negative 1:  0 nice - 1 naughty = karma -1, penalize
- negative 1:  1 nice - 1 naughty = karma  0, okay
- negative 2:  1 nice - 2 naughty = karma -1, okay
- negative 2:  1 nice - 3 naughty = karma -2, penalize
+   negative 1:  0 nice - 1 naughty = karma -1, penalize
+   negative 1:  1 nice - 1 naughty = karma  0, okay
+   negative 2:  1 nice - 2 naughty = karma -1, okay
+   negative 2:  1 nice - 3 naughty = karma -2, penalize
 
 With the default negative limit of one, there's a very small chance you could
 penalize a "mostly good" sender. Raising it to 2 reduces that possibility to
@@ -62,7 +62,7 @@ Default: 1
 
 =head2 reject
 
-  karma reject [ 0 | 1 | connect | zombie ]
+  karma reject [ 0 | 1 | connect | naughty ]
 
 I<0> will not reject any connections.
 
@@ -70,8 +70,8 @@ I<1> will reject naughty senders.
 
 I<connect> is the most efficient setting. 
 
-To reject at any other connection hook, use the I<zombie> setting and the
-B<reaper> plugin.
+To reject at any other connection hook, use the I<naughty> setting and the
+B<naughty> plugin.
 
 =head2 db_dir <path>
 
@@ -95,9 +95,8 @@ Adjust the quantity of logging for this plugin. See docs/logging.pod
 
 =head1 BENEFITS
 
-Karma reduces the resources wasted by naughty mailers. 
-When used with the 
-I<reject connect> setting, naughty senders are disconnected in about 0.1 seconds.
+Karma reduces the resources wasted by naughty mailers.  When used with
+I<reject connect>, naughty senders are disconnected in about 0.1 seconds.
 
 The biggest gains to be had are by having heavy plugins (spamassassin, dspam,
 virus filters) set the B<karma> transaction note (see KARMA) when they encounter
@@ -138,11 +137,22 @@ an example connection from an IP in the penalty box:
  73122 click, disconnecting
  73122 (post-connection) connection_time: 1.048 s.
 
-If we only sets negative karma, we will almost certainly penalize servers we
+If we only set negative karma, we will almost certainly penalize servers we
 want to receive mail from. For example, a Yahoo user sends an egregious spam
 to a user on our server. Now nobody on our server can receive email from that
 Yahoo server for I<penalty_days>. This should happen approximately 0% of
 the time if we are careful to also set positive karma.
+
+=head1 KARMA HISTORY
+
+Karma maintains a history for each IP. When a senders history has decreased
+below -5 and they have never sent a good message, they get a karma bonus.
+The bonus tacks on an extra day of blocking for every naughty message they
+sent us.
+
+Example: an unknown sender delivers a spam. They get a one day penalty_box.
+After 5 days, 5 spams, 5 penalties, and 0 nice messages, they get a six day
+penalty. The next offence gets a 7 day penalty, and so on.
 
 =head1 USING KARMA
 
@@ -170,11 +180,11 @@ use the senders karma to be more gracious or rude to senders. The value of
 I<karma_history> is the number the nice connections minus naughty
 ones. The higher the number, the better you should treat the sender.
 
-When I<reject zombie> is set and a naughty sender is encountered, most
+When I<reject naughty> is set and a naughty sender is encountered, most
 plugins should skip processing. However, if you wish to toy with spammers by
 teergrubing, extending banner delays, limiting connections, limiting
 recipients, random disconnects, handoffs to rblsmtpd, and other fun tricks, 
-then connections with the I<zombie> note set are for you!
+then connections with the I<naughty> note set are for you!
 
 =head1 EFFECTIVENESS
 
@@ -238,7 +248,7 @@ sub register {
     $self->{_args}{reject_type}  ||= 'disconnect';
 
     if ( ! defined $self->{_args}{reject} ) {
-        $self->{_args}{reject} = 'zombie';
+        $self->{_args}{reject} = 'naughty';
     };
     #$self->prune_db();    # keep the DB compact
     $self->register_hook('connect',           'connect_handler');
@@ -264,16 +274,10 @@ sub connect_handler {
 
     my ($penalty_start_ts, $naughty, $nice, $connects) = $self->parse_value( $tied->{$key} );
     my $summary = "$naughty naughty, $nice nice, $connects connects";
-    my $karma = 0;
-    if ( $naughty || $nice ) {
-        $karma = $nice || 0 - $naughty || 0;
-        $self->connection->notes('karma_history', $karma );
-    };
+    my $karma = $self->calc_karma($naughty, $nice);
 
-    my $happy_return = $karma > 3 ? DONE : DECLINED;  # skip other connection tests?
     if ( ! $penalty_start_ts ) {
         $self->log(LOGINFO, "pass, no penalty ($summary)");
-        return $self->cleanup_and_return($tied, $lock, $happy_return );
         return $self->cleanup_and_return($tied, $lock );
     };
 
@@ -289,7 +293,7 @@ sub connect_handler {
     my $left = sprintf "%.2f", $self->{_args}{penalty_days} - $days_old;
     my $mess = "You were naughty. You are penalized for $left more days.";
 
-    return $self->get_reject( $mess );
+    return $self->get_reject( $mess, $karma );
 }
 
 sub disconnect_handler {
@@ -310,10 +314,16 @@ sub disconnect_handler {
     if ( $karma < 0 ) {
         $naughty++;
         my $negative_limit = 0 - $self->{_args}{negative};
-        my $karma_history  = ($nice || 0) - $naughty;
-        if ( $karma_history <= $negative_limit ) {
-            $self->log(LOGINFO, "negative, sent to penalty box");
-            $penalty_start_ts = sprintf "%s", time;
+        my $history  = ($nice || 0) - $naughty;
+        if ( $history <= $negative_limit ) {
+            if ( $nice == 0 && $history < -5 ) {
+                $self->log(LOGINFO, "penalty box bonus!");
+                $penalty_start_ts = sprintf "%s", time + abs($history) * 86400;
+            }
+            else {
+                $penalty_start_ts = sprintf "%s", time;
+            };
+            $self->log(LOGINFO, "negative, sent to penalty box ($history)");
         }
         else {
             $self->log(LOGINFO, "negative");
@@ -340,6 +350,15 @@ sub parse_value {
         $connects ||= 0;
     };
     return ($penalty_start_ts, $naughty, $nice, $connects );
+};
+
+sub calc_karma {
+    my ($self, $naughty, $nice) = @_;
+    return 0 if ( ! $naughty && ! $nice );
+
+    my $karma = ( $nice || 0 ) - ( $naughty || 0 );
+    $self->connection->notes('karma_history', $karma );
+    return $karma;
 };
 
 sub cleanup_and_return {
