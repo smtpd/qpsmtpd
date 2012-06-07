@@ -69,10 +69,17 @@ use warnings;
 use Qpsmtpd::Auth;
 use Qpsmtpd::Constants;
 
-use DBI;
+#use DBI;  # done in ->register
 
 sub register {
     my ( $self, $qp ) = @_;
+
+    eval 'use DBI';
+    if ( $@ ) {
+        warn "plugin disabled. is DBI installed?\n";
+        $self->log(LOGERROR, "skip: plugin disabled. is DBI installed?\n");
+        return;
+    };
 
     $self->register_hook('auth-plain',    'auth_vmysql');
     $self->register_hook('auth-login',    'auth_vmysql');
