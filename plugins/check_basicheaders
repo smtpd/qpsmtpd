@@ -35,9 +35,9 @@ I would be surprised if a valid message ever had a date header older than a week
 
 Determine if the connection is denied. Use the I<reject 0> option when first enabling the plugin, and then watch your logs to see what would have been rejected. When you are no longer concerned that valid messages will be rejected, enable with I<reject 1>.
 
-  check_basicheaders [ reject 0 | 1 ]
+  check_basicheaders reject [ 0 | 1 ]
 
-Default policy is to reject.
+Default: 1
 
 =head2 reject_type
 
@@ -47,7 +47,7 @@ Whether to issue a permanent or temporary rejection. The default is permanent.
 
 Using a temporary rejection is a cautious way to enable rejections. It allows an administrator to watch for a trial period and assure no valid messages are rejected. If a deferral of valid mail is noticed, I<reject 0> can be set to permit the deferred message to be delivered.
 
-Default policy is a permanent rejection.
+Default: perm
 
 =head2 loglevel
 
@@ -94,40 +94,44 @@ sub register {
             $self->{_args}{past} = $self->{_args}{days};
         };
     };
+# set explicit defaults
+    $self->{_args}{reject_type} ||= 'perm';
+    if ( ! defined $self->{_args}{reject} ) {
+        $self->{_args}{reject} = 1;
+    };
 }
 
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
-    my $deny = $self->{_args}{reject_type} eq 'temp' ? DENYSOFT : DENY;
-    $deny = DECLINED if defined $self->{_args}{reject} && ! $self->{_args}{reject};
+    my $type = $self->get_reject_type();
 
     if ( $transaction->data_size == 0 ) {
         $self->log(LOGINFO, "fail: no data");
-        return ($deny, "You must send some data first");
+        return ($type, "You must send some data first");
     };
 
     my $header = $transaction->header or do {
         $self->log(LOGINFO, "fail: no headers");
-        return ($deny, "missing header");
+        return ($type, "missing header");
     };
 
     return DECLINED if $self->is_immune();
 
     if ( ! $header->get('From') ) {
         $self->log(LOGINFO, "fail: no from");
-        return ($deny, "We require a valid From header")
+        return ($type, "We require a valid From header");
     };
 
     my $date = $header->get('Date') or do {
         $self->log(LOGINFO, "fail: no date");
-        return ($deny, "We require a valid Date header");
+        return ($type, "We require a valid Date header");
     };
     chomp $date;
 
     my $err_msg = $self->invalid_date_range($date);
     if ( $err_msg ) {
-        return ($deny, $err_msg );
+        return ($type, $err_msg );
     };
 
     return (DECLINED);
