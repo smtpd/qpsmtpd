@@ -134,13 +134,21 @@ only supports storing the signature in the headers. If you want to train dspam
 after delivery (ie, users moving messages to/from spam folders), then the
 dspam signature must be in the headers.
 
-When using the dspam MySQL backend, use InnoDB tables. Dspam training
+When using the dspam MySQL backend, use InnoDB tables. DSPAM training
 is dramatically slowed by MyISAM table locks and dspam requires lots
 of training. InnoDB has row level locking and updates are much faster.
 
+=head1 DSPAM periodic maintenance
+
+Install this cron job to clean up your DSPAM database.
+
+http://dspam.git.sourceforge.net/git/gitweb.cgi?p=dspam/dspam;a=tree;f=contrib/dspam_maintenance;hb=HEAD
+
+
+
 =head1 SPAMASSASSIN
 
-Dspam can be trained by SpamAssassin. This relationship between them requires
+DSPAM can be trained by SpamAssassin. This relationship between them requires
 attention to several important details:
 
 =over 4
@@ -180,6 +188,9 @@ B<must> add the username that qpsmtpd is running to to the dspamd.conf file.
 ie, (Trust smtpd).
 
 =head1 CHANGES
+
+2012-06 - Matt Simerson - added karma & naughty learning support
+                        - worked around the DESTROY bug in dspam_process
 
 =head1 AUTHOR
 
@@ -480,12 +491,15 @@ sub attach_headers {
     my ($result,$prob,$conf,$sig) = $response =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
     my $header_str = "$result, probability=$prob, confidence=$conf";
     $self->log(LOGDEBUG, $header_str);
-    $transaction->header->replace('X-DSPAM-Result', $header_str, 0);
+    my $name = 'X-DSPAM-Result';
+    $transaction->header->delete($name) if $transaction->header->get($name);
+    $transaction->header->add($name, $header_str, 0);
 
     # the signature header is required if you intend to train dspam later.
     # In dspam.conf, set: Preference "signatureLocation=headers"
     $transaction->header->add('X-DSPAM-Signature', $sig, 0);
 };
+
 sub learn_as_ham {
     my $self = shift;
     my $transaction = shift;
