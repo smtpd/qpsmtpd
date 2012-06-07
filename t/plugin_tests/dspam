@@ -13,48 +13,49 @@ sub register_tests {
 
     $self->register_test('test_get_filter_cmd', 5);
     $self->register_test('test_get_dspam_results', 6);
-    $self->register_test('test_dspam_reject', 6);
+    $self->register_test('test_log_and_return', 6);
+    $self->register_test('test_reject_type', 3);
 }
 
-sub test_dspam_reject {
+sub test_log_and_return {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
 
     # reject not set
     $transaction->notes('dspam', { class=> 'Spam', probability => .99, confidence=>1 } );
-    ($r) = $self->dspam_reject( $transaction );
-    cmp_ok( $r, '==', DECLINED, "dspam_reject ($r)");
+    ($r) = $self->log_and_return( $transaction );
+    cmp_ok( $r, '==', DECLINED, "($r)");
 
     # reject exceeded
-    $self->{_args}->{reject} = .95;
+    $self->{_args}{reject} = .95;
     $transaction->notes('dspam', { class=> 'Spam', probability => .99, confidence=>1 } );
-    ($r) = $self->dspam_reject( $transaction );
-    cmp_ok( $r, '==', DENY, "dspam_reject ($r)");
+    ($r) = $self->log_and_return( $transaction );
+    cmp_ok( $r, '==', DENY, "($r)");
 
     # below reject threshold
     $transaction->notes('dspam', { class=> 'Spam', probability => .94, confidence=>1 } );
-    ($r) = $self->dspam_reject( $transaction );
-    cmp_ok( $r, '==', DECLINED, "dspam_reject ($r)");
+    ($r) = $self->log_and_return( $transaction );
+    cmp_ok( $r, '==', DECLINED, "($r)");
 
     # requires agreement
-    $self->{_args}->{reject} = 'agree';
+    $self->{_args}{reject} = 'agree';
     $transaction->notes('spamassassin', { is_spam => 'Yes', score => 25 } );
     $transaction->notes('dspam', { class=> 'Spam', probability => .90, confidence=>1 } );
-    ($r) = $self->dspam_reject( $transaction );
-    cmp_ok( $r, '==', DENY, "dspam_reject ($r)");
+    ($r) = $self->log_and_return( $transaction );
+    cmp_ok( $r, '==', DENY, "($r)");
 
     # requires agreement
     $transaction->notes('spamassassin', { is_spam => 'No', score => 15 } );
     $transaction->notes('dspam', { class=> 'Spam', probability => .96, confidence=>1 } );
-    ($r) = $self->dspam_reject( $transaction );
-    cmp_ok( $r, '==', DECLINED, "dspam_reject ($r)");
+    ($r) = $self->log_and_return( $transaction );
+    cmp_ok( $r, '==', DECLINED, "($r)");
 
     # requires agreement
     $transaction->notes('spamassassin', { is_spam => 'Yes', score => 10 } );
     $transaction->notes('dspam', { class=> 'Innocent', probability => .96, confidence=>1 } );
-    ($r) = $self->dspam_reject( $transaction );
-    cmp_ok( $r, '==', DECLINED, "dspam_reject ($r)");
+    ($r) = $self->log_and_return( $transaction );
+    cmp_ok( $r, '==', DECLINED, "($r)");
 };
 
 sub test_get_dspam_results {
@@ -77,7 +78,7 @@ sub test_get_dspam_results {
         $transaction->header->delete('X-DSPAM-Result');
         $transaction->header->add('X-DSPAM-Result', $header);
         my $r = $self->get_dspam_results($transaction);
-        ok( ref $r, "get_dspam_results ($header)" );
+        ok( ref $r, "r: ($header)" );
         #warn Data::Dumper::Dumper($r);
     };
 };
@@ -88,26 +89,39 @@ sub test_get_filter_cmd {
     my $transaction = $self->qp->transaction;
     my $dspam = "/usr/local/bin/dspam";
     $self->{_args}{dspam_bin} = $dspam;
+    $self->{_args}{autolearn} = 'spamassassin';
 
     foreach my $user ( qw/ smtpd matt@example.com / ) {
         my $answer = "$dspam --user smtpd --mode=tum --process --deliver=summary --stdout";
         my $r = $self->get_filter_cmd($transaction, 'smtpd');
-        cmp_ok( $r, 'eq', $answer, "get_filter_cmd $user" );
+        cmp_ok( $r, 'eq', $answer, "$user" );
     };
 
     $transaction->notes('spamassassin', { is_spam => 'No', autolearn => 'ham' } );
     my $r = $self->get_filter_cmd($transaction, 'smtpd');
     cmp_ok( $r, 'eq', "$dspam --user smtpd --mode=tum --source=corpus --class=innocent --deliver=summary --stdout",
-        "get_filter_cmd smtpd, ham" );
+        "smtpd, ham" );
 
     $transaction->notes('spamassassin', { is_spam => 'Yes', autolearn => 'spam', score => 110 } );
     $r = $self->get_filter_cmd($transaction, 'smtpd');
     cmp_ok( $r, 'eq', "$dspam --user smtpd --mode=tum --source=corpus --class=spam --deliver=summary --stdout",
-        "get_filter_cmd smtpd, spam" );
+        "smtpd, spam" );
 
     $transaction->notes('spamassassin', { is_spam => 'No', autolearn => 'spam' } );
     $r = $self->get_filter_cmd($transaction, 'smtpd');
     cmp_ok( $r, 'eq', "$dspam --user smtpd --mode=tum --process --deliver=summary --stdout",
-        "get_filter_cmd smtpd, spam" );
+        "smtpd, spam" );
 };
 
+sub test_reject_type {
+    my $self = shift;
+
+    $self->{_args}{reject_type} = undef;
+    cmp_ok( $self->get_reject_type(), '==', DENY, "default");
+
+    $self->{_args}{reject_type} = 'temp';
+    cmp_ok( $self->get_reject_type(), '==', DENYSOFT, "defer");
+
+    $self->{_args}{reject_type} = 'disconnect';
+    cmp_ok( $self->get_reject_type(), '==', DENY_DISCONNECT, "disconnect");
+};
