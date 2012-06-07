@@ -6,6 +6,11 @@ use warnings;
 sub register_tests {
     my $self = shift;
 
+    eval 'use DBI';
+    if ( $@ ) {
+        warn "skipping auth_vpopmail_sql tests, is DBI installed?\n";
+        return;
+    };
     $self->register_test("auth_vpopmail_sql", 3);
 }
 
@@ -15,7 +20,7 @@ sub auth_vpopmail_sql {
 
     my $dbh = $self->get_db_handle() or do {
             foreach ( 0..2 ) {
-                ok( 1, "auth_vpopmail_sql, skipped (no DB)" );
+                ok( 1, "skipped (no DB)" );
             };
             return;
         };
@@ -24,11 +29,11 @@ sub auth_vpopmail_sql {
     my $vuser = $self->get_vpopmail_user( $dbh, 'postmaster@example.com' );
     if ( ! $vuser || ! $vuser->{pw_passwd} ) {
         foreach ( 0..1 ) {
-            ok( 1, "auth_vpopmail_sql, no example.com domain" );
+            ok( 1, "no example.com domain" );
         };
         return;
     };
-    ok( ref $vuser, "auth_vpopmail_sql, found example.com domain" );
+    ok( ref $vuser, "found example.com domain" );
 
     ok( $self->auth_vmysql(
             $self->qp->transaction,
@@ -38,6 +43,6 @@ sub auth_vpopmail_sql {
             $vuser->{pw_passwd},
             $ticket,
         ),
-        "auth_vpopmail_sql, postmaster"
+        "postmaster"
     );
 }
