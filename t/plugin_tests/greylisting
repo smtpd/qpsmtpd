@@ -17,7 +17,6 @@ sub register_tests {
     my $self = shift;
 
     $self->register_test('test_hook_data', 4);
-    $self->register_test('test_is_immune', 6);
     $self->register_test('test_get_db_key', 4);
     $self->register_test('test_get_db_location', 1);
     $self->register_test("test_greylist_geoip", 7);
@@ -49,32 +48,6 @@ sub test_hook_data {
     $transaction->notes('whitelistrcpt', 1);
     ($code, $mess) = $self->hook_data( $transaction );
     cmp_ok( $code, '==', DECLINED, "missing recipients");
-};
-
-sub test_is_immune {
-    my $self = shift;
-
-    $self->_reset_transaction();
-
-    $self->qp->connection->relay_client(1);
-    ok( $self->is_immune(), 'relayclient');
-
-    $self->qp->connection->relay_client(0);
-    ok( ! $self->is_immune(), "nope -" );
-
-    foreach ( qw/ whitelisthost / ) {
-        $self->connection->notes($_, 1);
-        ok( $self->is_immune(), $_);
-        $self->connection->notes($_, undef);
-    };
-
-    foreach ( qw/ whitelistsender tls_enabled / ) {
-        $self->qp->transaction->notes($_, 1);
-        ok( $self->is_immune(), $_);
-        $self->qp->transaction->notes($_, undef);
-    };
-
-    ok( ! $self->is_immune(), "nope -" );
 };
 
 sub test_get_db_key {
