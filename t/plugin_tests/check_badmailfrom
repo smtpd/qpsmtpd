@@ -11,7 +11,7 @@ sub register_tests {
     $self->register_test("test_badmailfrom_is_immune", 5);
     $self->register_test("test_badmailfrom_match", 7);
     $self->register_test("test_badmailfrom_hook_mail", 4);
-    $self->register_test("test_badmailfrom_hook_rcpt", 2);
+    $self->register_test("test_badmailfrom_rcpt_handler", 2);
 }
 
 sub test_badmailfrom_is_immune {
@@ -50,29 +50,26 @@ sub test_badmailfrom_hook_mail {
     $transaction->sender($address);
 
     $self->{_badmailfrom_config} = ['matt@test.net','matt@test.com'];
-    $transaction->notes('badmailfrom', '');
+    $self->connection->notes('badmailfrom', '');
     my ($r) = $self->hook_mail( $transaction, $address );
     ok( $r == 909, "badmailfrom hook_mail");
-    ok( $transaction->notes('badmailfrom') eq 'Your envelope sender is in my badmailfrom list', 
-        "badmailfrom hook_mail: default reason");
+    cmp_ok( $self->connection->notes('naughty'), 'eq', 'Your envelope sender is in my badmailfrom list', "default reason");
 
     $self->{_badmailfrom_config} = ['matt@test.net','matt@test.com Yer a spammin bastert'];
-    $transaction->notes('badmailfrom', '');
+    $self->connection->notes('badmailfrom', '');
     ($r) = $self->hook_mail( $transaction, $address );
     ok( $r == 909, "badmailfrom hook_mail");
-    ok( $transaction->notes('badmailfrom') eq 'Yer a spammin bastert', 
-        "badmailfrom hook_mail: custom reason");
-
+    cmp_ok( $self->connection->notes('naughty'), 'eq', 'Yer a spammin bastert', "custom reason");
 };
 
-sub test_badmailfrom_hook_rcpt {
+sub test_badmailfrom_rcpt_handler {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
 
     $transaction->notes('badmailfrom', 'Yer a spammin bastart. Be gon wit yuh.' );
 
-    my ($code,$note) = $self->hook_rcpt( $transaction );
+    my ($code,$note) = $self->rcpt_handler( $transaction );
 
     ok( $code == 901, 'badmailfrom hook hit');
     ok( $note, $note );
