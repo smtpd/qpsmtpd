@@ -53,12 +53,13 @@ merging of the two and plugin tests - Matt Simerson <matt@tnpi.net>
 sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
 
+    return DECLINED if $self->is_immune();
+
     my @badmailfrom = $self->qp->config('badmailfrom');
     if ( defined $self->{_badmailfrom_config} ) {       # testing
         @badmailfrom = @{$self->{_badmailfrom_config}};
     };
-
-    return DECLINED if $self->is_immune( $sender, \@badmailfrom );
+    return DECLINED if $self->is_immune_sender( $sender, \@badmailfrom );
 
     my $host = lc $sender->host;
     my $from = lc($sender->user) . '@' . $host;
@@ -98,13 +99,14 @@ sub is_match {
 
 sub hook_rcpt {
     my ($self, $transaction, $rcpt, %param) = @_;
+
     my $note = $transaction->notes('badmailfrom') or return (DECLINED);
 
     $self->log(LOGINFO, $note);
     return (DENY, $note);
 }
 
-sub is_immune {
+sub is_immune_sender {
     my ($self, $sender, $badmf ) = @_;
 
     if ( ! scalar @$badmf ) {

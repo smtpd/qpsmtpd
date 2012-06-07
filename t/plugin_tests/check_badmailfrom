@@ -8,36 +8,36 @@ use Qpsmtpd::Address;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_badmailfrom_is_immune", 5);
+    $self->register_test("test_badmailfrom_is_immune_sender", 5);
     $self->register_test("test_badmailfrom_match", 7);
     $self->register_test("test_badmailfrom_hook_mail", 4);
     $self->register_test("test_badmailfrom_hook_rcpt", 2);
 }
 
-sub test_badmailfrom_is_immune {
+sub test_badmailfrom_is_immune_sender {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
     my $test_email = 'matt@test.com';
     my $address = Qpsmtpd::Address->new( "<$test_email>" );
     $transaction->sender($address);
-    ok( $self->is_immune( $transaction->sender, [] ), "is_immune, empty list");
+    ok( $self->is_immune_sender( $transaction->sender, [] ), "empty list");
 
     $address = Qpsmtpd::Address->new( '<>' );
     $transaction->sender($address);
-    ok( $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, null sender");
+    ok( $self->is_immune_sender( $transaction->sender, ['bad@example.com'] ), "null sender");
 
     $address = Qpsmtpd::Address->new( '<matt@>' );
     $transaction->sender($address);
-    ok( $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing host");
+    ok( $self->is_immune_sender( $transaction->sender, ['bad@example.com'] ), "missing host");
 
     $address = Qpsmtpd::Address->new( '<@example.com>' );
     $transaction->sender($address);
-    ok( $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing user");
+    ok( $self->is_immune_sender( $transaction->sender, ['bad@example.com'] ), "missing user");
 
     $address = Qpsmtpd::Address->new( '<matt@example.com>' );
     $transaction->sender($address);
-    ok( ! $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, false");
+    ok( ! $self->is_immune_sender( $transaction->sender, ['bad@example.com'] ), "false");
 };
 
 sub test_badmailfrom_hook_mail {

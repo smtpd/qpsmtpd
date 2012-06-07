@@ -112,7 +112,7 @@ sub hook_data_post {
         return ($deny, "missing header");
     };
 
-    return DECLINED if $self->is_immune();
+    return (DECLINED, "immune") if $self->is_immune();
 
     if ( ! $header->get('From') ) {
         $self->log(LOGINFO, "fail: no from");
@@ -156,24 +156,3 @@ sub invalid_date_range {
     $self->log(LOGINFO, "pass");
     return;
 }
-
-sub is_immune {
-    my $self = shift;
-
-    if ( $self->qp->connection->relay_client() ) {
-        $self->log(LOGINFO, "skip: relay client");
-        return 1;
-    };
-
-    if ( $self->connection->notes('whitelisthost') ) {
-        $self->log(LOGINFO, "skip: whitelisted host");
-        return 1;
-    };
-
-    if ( $self->qp->transaction->notes('whitelistsender') ) {
-        $self->log(LOGINFO, "skip: whitelisted sender");
-        return 1;
-    };
-
-    return;
-};

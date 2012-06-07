@@ -83,11 +83,13 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
+    return DECLINED if $self->is_immune();
+
     if ( ! $transaction->header->get('DomainKey-Signature') ) {
         $self->log(LOGINFO, "skip: unsigned");
         return DECLINED;
     };
-	
+
     my $body = $self->assemble_body( $transaction );
 
     my $message = load Mail::DomainKeys::Message(
