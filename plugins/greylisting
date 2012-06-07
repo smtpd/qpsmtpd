@@ -169,7 +169,7 @@ use strict;
 use warnings;
 use Qpsmtpd::Constants;
 
-my $VERSION = '0.10';
+my $VERSION = '0.11';
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
@@ -268,6 +268,8 @@ sub greylist {
         join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
     return DECLINED if $self->is_immune();
+    return DECLINED if ! $self->is_p0f_match();
+    return DECLINED if $self->geoip_match();
 
     my $db   = $self->get_db_location();
     my $lock = $self->get_db_lock( $db ) or return DECLINED;
@@ -315,39 +317,6 @@ sub greylist {
     $self->log(LOGWARN, "pass: timed out (grey)");
     return $self->cleanup_and_return( $tied, $lock, DECLINED );
 }
-
-sub is_immune {
-    my $self = shift;
-
-    # Always allow relayclients and whitelisted hosts/senders
-    if ( $self->qp->connection->relay_client() ) {
-        $self->log(LOGINFO, "skip: relay client");
-        return 1;
-    };
-    if ( $self->connection->notes('whitelisthost') ) {
-        $self->log(LOGINFO, "skip: whitelisted host");
-        return 1;
-    };
-    if ( $self->qp->transaction->notes('whitelistsender') ) {
-        $self->log(LOGINFO, "skip: whitelisted sender");
-        return 1;
-    };
-    if ( $self->qp->transaction->notes('tls_enabled') ) {
-        $self->log(LOGINFO, "skip: tls");
-        return 1;
-    };
-
-    if ( $self->{_args}{p0f} && ! $self->p0f_match() ) {
-        return 1;
-    };
-
-    if ( $self->{_args}{geoip} && $self->geoip_match() ) {
-        $self->log(LOGDEBUG, "skip: geoip");
-        return 1;
-    };
-
-    return;
-};
 
 sub cleanup_and_return {
     my ($self, $tied, $lock, $return_val ) = @_;
@@ -516,6 +485,8 @@ sub prune_db {
 sub p0f_match {
     my $self = shift;
 
+    return if ! $self->{_args}{p0f};
+
     my $p0f = $self->connection->notes('p0f');
     if ( !$p0f || !ref $p0f ) {   # p0f fingerprint info not found
         $self->LOGINFO(LOGERROR, "p0f info missing");
@@ -558,6 +529,8 @@ sub p0f_match {
 
 sub geoip_match {
     my $self = shift;
+
+    return if ! $self->{_args}{geoip};
 
     my $country = $self->connection->notes('geoip_country');
     my $c_name  = $self->connection->notes('geoip_country_name') || '';
