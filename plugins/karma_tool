@@ -26,7 +26,7 @@ elsif ( $command eq 'release' ) {
 elsif ( $command eq 'prune' ) {
     $self->prune_db( $ARGV[1] || 7 );
 }
-elsif ( $command eq 'list' ) {
+elsif ( $command eq 'list' | $command eq 'search' ) {
     $self->main();
 };
 
