@@ -141,7 +141,7 @@ sub register {
 
     # just in case naughty doesn't disconnect, which can happen if a plugin
     # with the same hook returned OK before naughty ran, or ....
-    if ( $reject ne 'hook_queue_post' ) {  # this chap wants to queue naughty
+    if ( $reject ne 'data_post' && $reject ne 'hook_queue_post' ) {
         $self->register_hook( 'data_post', 'naughty');
     };
 
@@ -155,7 +155,7 @@ sub naughty {
         $self->log(LOGINFO, "pass, clean");
         return DECLINED;
     };
-    $self->log(LOGINFO, "disconnecting naughty");
+    $self->log(LOGINFO, "disconnecting");
     return ( $self->get_reject_type(), $naughty );
 };
 
