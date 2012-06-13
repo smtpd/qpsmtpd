@@ -17,7 +17,10 @@ sub register_tests {
     $self->register_test('test_no_forward_dns', 2);
     $self->register_test('test_no_reverse_dns', 2);
     $self->register_test('test_no_matching_dns', 4);
+    $self->register_test('test_no_matching_dns', 4);
     $self->register_test('test_helo_handler', 1);
+    $self->register_test('test_check_ip_match', 4);
+    $self->register_test('test_check_name_match', 4);
 }
 
 sub test_helo_handler {
@@ -138,5 +141,39 @@ sub test_no_matching_dns {
     $self->qp->connection->notes('helo_forward_match', 1);
     ($err, $why) = $self->no_matching_dns('matt.test');
     ok( ! $err, "pass");
+};
+
+sub test_check_ip_match {
+    my $self = shift;
+
+    $self->qp->connection->remote_ip('192.0.2.1');
+
+    $self->connection->notes('helo_forward_match', 0);
+    $self->check_ip_match('192.0.2.1');
+    ok( $self->connection->notes('helo_forward_match'), "exact";
+
+    $self->connection->notes('helo_forward_match', 0);
+    $self->check_ip_match('192.0.2.2');
+    ok( $self->connection->notes('helo_forward_match'), "network";
+
+    $self->connection->notes('helo_forward_match', 0);
+    $self->check_ip_match('192.0.1.1');
+    ok( ! $self->connection->notes('helo_forward_match'), "miss";
+};
+
+sub test_check_name_match {
+    my $self = shift;
+
+    $self->connection->notes('helo_reverse_match', 0);
+    $self->check_name_match('mx0.example.com', 'mx0.example.com');
+    ok( $self->connection->notes('helo_reverse_match'), "exact");
+
+    $self->connection->notes('helo_reverse_match', 0);
+    $self->check_name_match('mx0.example.com', 'mx1.example.com');
+    ok( $self->connection->notes('helo_reverse_match'), "domain");
+
+    $self->connection->notes('helo_reverse_match', 0);
+    $self->check_name_match('mx0.example.com', 'mx0.example.net');
+    ok( ! $self->connection->notes('helo_reverse_match'), "domain");
 };
 
