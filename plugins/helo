@@ -10,7 +10,10 @@ Validate the HELO hostname. This plugin includes a suite of optional tests,
 selectable by the I<policy> setting. The policy section details which tests
 are enforced by each policy option.
 
-This plugin adds an X-HELO header with the HELO hostname to the message.
+It sets the connection notes helo_forward_match and helo_reverse_match when
+I<policy rfc> or I<policy strict> are used.
+
+Adds an X-HELO header with the HELO hostname to the message.
 
 Using I<policy rfc> will reject a very large portion of the spam from hosts
 that have yet to get blacklisted.
@@ -112,7 +115,7 @@ support and the prevention of forged localhost and forged IP literals.
 
 =head3 rfc
 
-Per RFC 2821, the HELO hostname must be the FQDN of the sending server or an
+Per RFC 2821, the HELO hostname is the FQDN of the sending server or an
 address literal. When I<policy rfc> is selected, all the lenient checks and
 the following are enforced: is_plain_ip, is_not_fqdn, no_forward_dns, and
 no_reverse_dns.
