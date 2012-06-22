@@ -209,7 +209,7 @@ use Qpsmtpd::Constants;
 use Net::DNS;
 
 sub register {
-    my ($self, $qp) = shift, shift;
+    my ($self, $qp) = (shift, shift);
     $self->{_args} = { @_ };
     $self->{_args}{reject_type} = 'disconnect';
     $self->{_args}{policy} ||= 'lenient';
@@ -262,8 +262,8 @@ sub populate_tests {
     @{ $self->{_helo_tests} } = qw/ is_in_badhelo invalid_localhost is_forged_literal /;
 
     if ( $policy eq 'rfc' || $policy eq 'strict' ) {
-        push @{ $self->{_helo_tests} }, qw/ is_plain_ip is_not_fqdn no_forward_dns
-                                       no_reverse_dns /;
+        push @{ $self->{_helo_tests} }, qw/ is_plain_ip is_not_fqdn
+                                            no_forward_dns no_reverse_dns /;
     };
 
     if ( $policy eq 'strict' ) {
