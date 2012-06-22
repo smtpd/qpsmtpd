@@ -358,7 +358,7 @@ the C<DATA> command. If you need the size that will be queued, use
    + $transaction->body_length;
 
 The line above is of course only valid in I<hook_queue( )>, as other plugins
-may add headers and qpsmtpd will add its I<Received:> header.
+may add headers and qpsmtpd will add it's I<Received:> header.
 
 =head2 body_length( )
 

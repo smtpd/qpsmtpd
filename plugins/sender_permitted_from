@@ -47,6 +47,7 @@ The reject options are modeled after, and aim to match the functionality of thos
 =head1 AUTHOR
 
 Matt Simerson - 2002 - increased policy options from 3 to 6
+
 Matt Simerson - 2011 - rewrote using Mail::SPF
 
 Matt Sergeant - 2003 - initial plugin
@@ -61,7 +62,7 @@ use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp, %args) = @_;
-    eval "use Mail::SPF";
+    eval 'use Mail::SPF';
     if ( $@ ) {
         warn "skip: plugin disabled, could not find Mail::SPF\n";
         $self->log(LOGERROR, "skip: plugin disabled, is Mail::SPF installed?");
@@ -123,10 +124,6 @@ sub hook_mail {
 
     $self->log( LOGINFO, $result );
 
-    if ( $result->code eq 'pass' ) {
-        return (OK);
-    };
-
     return (DECLINED, "SPF - $result->code");
 }
 
@@ -185,6 +182,11 @@ sub hook_data_post {
     my $result = $transaction->notes('spfquery') or return DECLINED;
 
     $self->log(LOGDEBUG, "result was $result->code");
+
+    if ( ! $transaction->header ) {
+        $self->log(LOGERROR, "missing headers!");
+        return DECLINED;
+    };
 
     $transaction->header->add('Received-SPF' => $result->received_spf_header, 0);
 

@@ -37,7 +37,7 @@ Determine if the connection is denied. Use the I<reject 0> option when first ena
 
   check_basicheaders reject [ 0 | 1 ]
 
-Default policy is to reject.
+Default: 1
 
 =head2 reject_type
 
@@ -47,7 +47,7 @@ Whether to issue a permanent or temporary rejection. The default is permanent.
 
 Using a temporary rejection is a cautious way to enable rejections. It allows an administrator to watch for a trial period and assure no valid messages are rejected. If a deferral of valid mail is noticed, I<reject 0> can be set to permit the deferred message to be delivered.
 
-Default policy is a permanent rejection.
+Default: perm
 
 =head2 loglevel
 
@@ -85,7 +85,7 @@ sub register {
     else {
         $self->{_args} = { @args };
     };
-# provide backwards comptibility with the previous unnamed 'days' argument
+# provide backwards compatibility with the previous unnamed 'days' argument
     if ( $self->{_args}{days} ) {
         if ( ! defined $self->{_args}{future} ) {
             $self->{_args}{future} = $self->{_args}{days};
@@ -94,40 +94,44 @@ sub register {
             $self->{_args}{past} = $self->{_args}{days};
         };
     };
+# set explicit defaults
+    $self->{_args}{reject_type} ||= 'perm';
+    if ( ! defined $self->{_args}{reject} ) {
+        $self->{_args}{reject} = 1;
+    };
 }
 
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
-    my $deny = $self->{_args}{reject_type} eq 'temp' ? DENYSOFT : DENY;
-    $deny = DECLINED if defined $self->{_args}{reject} && ! $self->{_args}{reject};
+    my $type = $self->get_reject_type();
 
     if ( $transaction->data_size == 0 ) {
         $self->log(LOGINFO, "fail: no data");
-        return ($deny, "You must send some data first");
+        return ($type, "You must send some data first");
     };
 
     my $header = $transaction->header or do {
         $self->log(LOGINFO, "fail: no headers");
-        return ($deny, "missing header");
+        return ($type, "missing header");
     };
 
-    return DECLINED if $self->is_immune();
+    return (DECLINED, "immune") if $self->is_immune();
 
     if ( ! $header->get('From') ) {
         $self->log(LOGINFO, "fail: no from");
-        return ($deny, "We require a valid From header");
+        return ($type, "We require a valid From header");
     };
 
     my $date = $header->get('Date') or do {
         $self->log(LOGINFO, "fail: no date");
-        return ($deny, "We require a valid Date header");
+        return ($type, "We require a valid Date header");
     };
     chomp $date;
 
     my $err_msg = $self->invalid_date_range($date);
     if ( $err_msg ) {
-        return ($deny, $err_msg );
+        return ($type, $err_msg );
     };
 
     return (DECLINED);
@@ -156,24 +160,3 @@ sub invalid_date_range {
     $self->log(LOGINFO, "pass");
     return;
 }
-
-sub is_immune {
-    my $self = shift;
-
-    if ( $self->qp->connection->relay_client() ) {
-        $self->log(LOGINFO, "skip: relay client");
-        return 1;
-    };
-
-    if ( $self->connection->notes('whitelisthost') ) {
-        $self->log(LOGINFO, "skip: whitelisted host");
-        return 1;
-    };
-
-    if ( $self->qp->transaction->notes('whitelistsender') ) {
-        $self->log(LOGINFO, "skip: whitelisted sender");
-        return 1;
-    };
-
-    return;
-};

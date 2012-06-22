@@ -17,6 +17,20 @@ listed in badmailfrom. A line in badmailfrom may be of the form
 You may include an optional message after the sender address (leave a space),
 to be used when rejecting the sender.
 
+=head1 CONFIGURATION
+
+=head2 reject
+
+  badmailfrom reject [ 0 | 1 | naughty ]
+
+I<0> will not reject any connections.
+
+I<1> will reject naughty senders.
+
+I<connect> is the most efficient setting. It's also the default.
+
+To reject at any other connection hook, use the I<naughty> setting and the
+B<naughty> plugin.
 
 =head1 PATTERNS
 
@@ -42,23 +56,37 @@ stage, so store it until later.
 
 =head1 AUTHORS
 
-initial author of badmailfrom - Jim Winstead
+2002 - Jim Winstead - initial author of badmailfrom
 
-pattern matching plugin - Johan Almqvist <johan-qpsmtpd@almqvist.net>
+2010 - Johan Almqvist <johan-qpsmtpd@almqvist.net> - pattern matching plugin
 
-merging of the two and plugin tests - Matt Simerson <matt@tnpi.net>
+2012 - Matt Simerson - merging of the two and plugin tests
 
 =cut
 
+sub register {
+    my ($self,$qp) = shift, shift;
+    $self->{_args} = { @_ };
+
+    # preserve legacy "reject during rcpt" behavior
+    $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
+
+    return if ! $self->{_args}{reject};               # reject 0, log only
+    return if   $self->{_args}{reject} eq 'naughty';  # naughty will reject
+
+    $self->register_hook('rcpt', 'rcpt_handler');
+};
+
 sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
+
+    return DECLINED if $self->is_immune();
 
     my @badmailfrom = $self->qp->config('badmailfrom');
     if ( defined $self->{_badmailfrom_config} ) {       # testing
         @badmailfrom = @{$self->{_badmailfrom_config}};
     };
 
-    return DECLINED if $self->is_immune();
     return DECLINED if $self->is_immune_sender( $sender, \@badmailfrom );
 
     my $host = lc $sender->host;
@@ -70,8 +98,11 @@ sub hook_mail {
         next unless $bad;
         next unless $self->is_match( $from, $bad, $host );
         $reason ||= "Your envelope sender is in my badmailfrom list";
-        $transaction->notes('badmailfrom', $reason);
+        $self->connection->notes('naughty', $reason);
     }
+    if ( ! $self->connection->notes('naughty') ) {
+        $self->log(LOGINFO, "pass");
+    };
     return DECLINED;
 }
 
@@ -97,11 +128,12 @@ sub is_match {
     return 1;
 };
 
-sub hook_rcpt {
+sub rcpt_handler {
     my ($self, $transaction, $rcpt, %param) = @_;
-    my $note = $transaction->notes('badmailfrom') or return (DECLINED);
 
-    $self->log(LOGINFO, $note);
+    my $note = $self->connection->notes('naughty') or return (DECLINED);
+
+    $self->log(LOGINFO, "fail, $note");
     return (DENY, $note);
 }
 

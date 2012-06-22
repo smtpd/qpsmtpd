@@ -318,39 +318,6 @@ sub greylist {
     return $self->cleanup_and_return( $tied, $lock, DECLINED );
 }
 
-sub is_immune {
-    my $self = shift;
-
-    # Always allow relayclients and whitelisted hosts/senders
-    if ( $self->qp->connection->relay_client() ) {
-        $self->log(LOGINFO, "skip: relay client");
-        return 1;
-    };
-    if ( $self->connection->notes('whitelisthost') ) {
-        $self->log(LOGINFO, "skip: whitelisted host");
-        return 1;
-    };
-    if ( $self->qp->transaction->notes('whitelistsender') ) {
-        $self->log(LOGINFO, "skip: whitelisted sender");
-        return 1;
-    };
-    if ( $self->qp->transaction->notes('tls_enabled') ) {
-        $self->log(LOGINFO, "skip: tls");
-        return 1;
-    };
-
-    if ( $self->{_args}{p0f} && ! $self->p0f_match() ) {
-        return 1;
-    };
-
-    if ( $self->{_args}{geoip} && $self->geoip_match() ) {
-        $self->log(LOGDEBUG, "skip: geoip");
-        return 1;
-    };
-
-    return;
-};
-
 sub cleanup_and_return {
     my ($self, $tied, $lock, $return_val ) = @_;
 

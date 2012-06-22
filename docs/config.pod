@@ -89,7 +89,11 @@ connection before any auth succeeds, defaults to C<0>.
 
 =back
 
+<<<<<<< HEAD
 =head2 Plugin settings
+=======
+=head2 Plugin settings files
+>>>>>>> initial import - based on my qpsmtpd fork
 
 =over 4
 
@@ -150,6 +154,49 @@ sender address if it resolves to something listed in the
 F<invalid_resolvable_fromhost> config file. The I<invalid_resolvable_fromhost>
 expects IP addresses or CIDR (i.e. C<network/mask> values) one per line, IPv4
 only currenlty.
+
+=back
+
+=head2 Plugin settings arguments
+
+These are arguments that can be set on the config/plugins line, after the name
+of the plugin. These config options are available to all plugins.
+
+=over 4
+
+=item loglevel
+
+Adjust the quantity of logging for the plugin. See docs/logging.pod
+
+=item reject
+
+ plugin reject [ 0 | 1 | naughty ]
+
+Should the plugin reject mail?
+
+The special 'naughty' case will mark the connection as a naughty. Most plugins
+skip processing naughty connections. Filtering plugins can learn from them.
+Naughty connections are terminated up by the B<naughty> plugin.
+
+Plugins that use $self->get_reject() or $self->get_reject_type() will
+automatically honor this setting.
+
+=item reject_type
+
+ plugin reject_type [ perm | temp | disconnect | temp_disconnect ]
+
+Default: perm
+
+Values with temp in the name return a 4xx code and the others return a 5xx
+code.
+
+The I<reject_type> argument and the corresponding get_reject_type() method
+provides a standard way for plugins to automatically return the selected
+rejection type, as chosen by the config setting, the plugin author, or the
+get_reject_type() method.
+
+Plugins that are updated to use the $self->get_reject() or
+$self->get_reject_type() methods will automatically honor this setting.
 
 =back
 

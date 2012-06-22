@@ -1,0 +1,181 @@
+#!perl -w
+
+=head1 NAME
+
+headers
+
+=head1 DESCRIPTION
+
+Checks for missing or empty values in the From or Date headers.
+
+Make sure no singular headers are duplicated. Singular headers are:
+
+ Date From Sender Reply-To To Cc Bcc
+ Message-Id In-Reply-To References Subject
+
+Optionally test if the Date header is too many days in the past or future. If
+I<future> or I<past> are not defined, they are not tested.
+
+If the remote IP is whitelisted, header validation is skipped.
+
+=head1 CONFIGURATION
+
+The following optional settings exist:
+
+=head2 require
+
+ headers require [ From | Date | From,Date | From,Date,Subject,Message-ID ]
+
+A comma separated list of headers to require. 
+
+Default: From
+
+=head3 Requiring the Date header
+
+As of 2012, requiring a valid date header will almost certainly cause the loss
+of valid mail. The JavaMail sender used by some banks, photo processing
+services, health insurance companies, bounce senders, and others do send
+messages without a Date header. For this reason, and despite RFC 5322, the
+default is not to require Date.
+
+However, if the date header is present, and I<future> and/or I<past> are
+defined, it will be validated.
+
+=head2 future
+
+The number of days in the future beyond which messages are invalid.
+
+  headers [ future 1 ]
+
+=head2 past
+
+The number of days in the past beyond which a message is invalid. The Date header is added by the MUA, so there are many valid reasons a message may have an older date in the header. It could have been delayed by the client, the sending server, connectivity problems, recipient server problem, recipient server configuration, etc. The I<past> setting should take those factors into consideration.
+
+I would be surprised if a valid message ever had a date header older than a week.
+
+  headers [ past 5 ]
+
+=head2 reject
+
+Determine if the connection is denied. Use the I<reject 0> option when first enabling the plugin, and then watch your logs to see what would have been rejected. When you are no longer concerned that valid messages will be rejected, enable with I<reject 1>.
+
+  headers reject [ 0 | 1 ]
+
+Default: 1
+
+=head2 reject_type
+
+Whether to issue a permanent or temporary rejection. The default is permanent.
+
+  headers reject_type [ temp | perm ]
+
+Using a temporary rejection is a cautious way to enable rejections. It allows an administrator to watch for a trial period and assure no valid messages are rejected. If a deferral of valid mail is noticed, I<reject 0> can be set to permit the deferred message to be delivered.
+
+Default: perm
+
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
+
+=head1 AUTHOR
+
+2012 - Matt Simerson
+
+=head1 ACKNOWLEDGEMENTS
+
+based in part upon check_basicheaders by Jim Winstead Jr.
+
+Singular headers idea from Haraka's data.rfc5322_header_checks.js by Steve Freegard
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+use Date::Parse qw(str2time);
+
+my @required_headers = qw/ From /;  # <- to comply with RFC 5322, add Date here
+#my @should_headers   = qw/ Message-ID /;
+my @singular_headers = qw/ Date From Sender Reply-To To Cc Bcc
+                           Message-Id In-Reply-To References
+                           Subject /;
+
+sub register {
+    my ($self, $qp ) = shift, shift;
+
+    $self->log(LOGWARN, "invalid arguments") if @_ % 2;
+    $self->{_args} = { @_ };
+
+    $self->{_args}{reject_type} ||= 'perm';   # set default
+    if ( ! defined $self->{_args}{reject} ) {
+         $self->{_args}{reject} = 1;          # set default
+    };
+
+    if ( $self->{_args}{require} ) {
+        @required_headers = split /,/, $self->{_args}{require};
+    };
+}
+
+sub hook_data_post {
+    my ($self, $transaction) = @_;
+
+    if ( $transaction->data_size == 0 ) {
+        return $self->get_reject( "You must send some data first", "no data" );
+    };
+
+    my $header = $transaction->header or do {
+        return $self->get_reject( "missing headers", "missing headers" );
+    };
+
+    #return (DECLINED, "immune") if $self->is_immune();
+
+    foreach my $h ( @required_headers ) {
+        if ( ! $header->get($h) ) {
+            return $self->get_reject( 
+                "We require a valid $h header", "no $h header"
+            );
+        };
+    };
+
+    foreach my $h ( @singular_headers ) {
+        next if ! $header->get($h);          # doesn't exist
+        my @qty = $header->get($h);
+        next if @qty == 1;                   # only 1 header
+        return $self->get_reject("Only one $h header allowed. See RFC 5322", "too many $h headers");
+    };
+
+    my $err_msg = $self->invalid_date_range();
+    return $self->get_reject($err_msg, $err_msg) if $err_msg;
+
+    $self->log( LOGINFO, 'pass' );
+    return (DECLINED);
+};
+
+sub invalid_date_range {
+    my $self = shift;
+
+    my $date = $self->transaction->header->get('Date') or return;
+    chomp $date;
+
+    my $ts = str2time($date) or do {
+        $self->log(LOGINFO, "skip, date not parseable ($date)");
+        return;
+    };
+
+    my $past = $self->{_args}{past};
+    if ( $past && $ts < time - ($past*24*3600) ) {
+        $self->log(LOGINFO, "fail, date too old ($date)");
+        return "The Date header is too far in the past";
+    };
+
+    my $future = $self->{_args}{future};
+    if ( $future && $ts > time + ($future*24*3600) ) {
+        $self->log(LOGINFO, "fail, date in future ($date)");
+        return "The Date header is too far in the future";
+    };
+
+    return;
+}
+

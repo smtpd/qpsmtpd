@@ -162,7 +162,7 @@ sub is_in_cidr_block {
         if (    ip_bincomp($bin_ip, 'gt', ip_iptobin($begin, $rversion))
              && ip_bincomp($bin_ip, 'lt', ip_iptobin($end,   $rversion))
            ) {
-            $self->log(LOGINFO, "pass: cidr match ($ip)");
+            $self->log(LOGINFO, "pass, cidr match ($ip)");
             return 1;
         }
     }
@@ -178,7 +178,7 @@ sub is_octet_match {
     $ip =~ s/::/:/;
 
     if ( $ip eq ':1' ) {
-        $self->log(LOGINFO, "pass: octet matched localhost ($ip)");
+        $self->log(LOGINFO, "pass, octet matched localhost ($ip)");
         return 1;
     };
 
@@ -186,12 +186,12 @@ sub is_octet_match {
 
     while ($ip) {
         if ( exists $self->{_octets}{$ip} ) {
-            $self->log(LOGINFO, "pass: octet match in relayclients ($ip)");
+            $self->log(LOGINFO, "pass, octet match in relayclients ($ip)");
             return 1;
         };
 
         if ( exists $more_relay_clients->{$ip} ) {
-            $self->log(LOGINFO, "pass: octet match in morerelayclients ($ip)");
+            $self->log(LOGINFO, "pass, octet match in morerelayclients ($ip)");
             return 1;
         };
         $ip =~ s/(\d|\w)+(:|\.)?$// or last; # strip off another 8 bits
@@ -212,7 +212,7 @@ sub hook_connect {
 
     if ( $ENV{RELAYCLIENT} ) {
         $self->qp->connection->relay_client(1);
-        $self->log(LOGINFO, "pass: enabled by env");
+        $self->log(LOGINFO, "pass, enabled by env");
         return (DECLINED);
     };
 
@@ -223,7 +223,7 @@ sub hook_connect {
         return (DECLINED);
     };
 
-    $self->log(LOGINFO, "skip: no match");
+    $self->log(LOGINFO, "skip, no match");
     return (DECLINED);
 }
 
