@@ -212,32 +212,37 @@ sub compile {
 
 sub get_reject {
     my $self = shift;
-    my $message = shift || "why didn't you pass an error message?";
-    my $log_info = shift || '';
-    $log_info = ", $log_info" if $log_info;
+    my $smtp_mess = shift || "why didn't you pass an error message?";
+    my $log_mess = shift || '';
+    $log_mess = ", $log_mess" if $log_mess;
 
     my $reject = $self->{_args}{reject};
     if ( defined $reject && ! $reject ) {
-        $self->log(LOGINFO, 'fail, reject disabled');
+        $self->log(LOGINFO, "fail, reject disabled" . $log_mess);
         return DECLINED;
     };
 
     # the naughty plugin will reject later
     if ( $reject eq 'naughty' ) {
-        $self->log(LOGINFO, 'fail, NAUGHTY');
-        $self->connection->notes('naughty', $message);
+        $self->log(LOGINFO, "fail, NAUGHTY" . $log_mess);
+        if ( ! $self->connection->notes('naughty') ) {
+            $self->connection->notes('naughty', $smtp_mess);
+        };
+        if ( ! $self->connection->notes('naughty_reject_type') ) {
+            $self->connection->notes('naughty_reject_type', $self->{_args}{reject_type} );
+        }
         return (DECLINED);
     };
 
     # they asked for reject, we give them reject
-    $self->log(LOGINFO, 'fail'.$log_info);
-    return ( $self->get_reject_type(), $message);
+    $self->log(LOGINFO, "fail" . $log_mess);
+    return ( $self->get_reject_type(), $smtp_mess);
 };
 
 sub get_reject_type {
     my $self = shift;
     my $default = shift || DENY;
-    my $deny = $self->{_args}{reject_type} or return $default;
+    my $deny = shift || $self->{_args}{reject_type} or return $default;
 
     return $deny =~ /^(temp|soft)$/i  ? DENYSOFT
          : $deny =~ /^(perm|hard)$/i  ? DENY
