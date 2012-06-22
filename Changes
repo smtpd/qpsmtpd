@@ -1,6 +1,10 @@
 
 Next Version
 
+  check_badmailfrom_patterns, merged functionality into check_badmail_from
+
+  check_badrcptto_patterns, merged functionality into check_badrcptto
+
   check_basicheaders. New arguments available: past, future, reject, reject_type
 
   sender_permitted_from. see UPGRADING (Matt Simerson)
