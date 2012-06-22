@@ -15,12 +15,11 @@ sub register_tests {
     $self->register_test('test_is_plain_ip', 3);
     $self->register_test('test_is_address_literal', 3);
     $self->register_test('test_no_forward_dns', 2);
-    $self->register_test('test_no_reverse_dns', 2);
-    $self->register_test('test_no_matching_dns', 4);
-    $self->register_test('test_no_matching_dns', 4);
+    $self->register_test('test_no_reverse_dns', 3);
+    $self->register_test('test_no_matching_dns', 2);
     $self->register_test('test_helo_handler', 1);
-    $self->register_test('test_check_ip_match', 4);
-    $self->register_test('test_check_name_match', 4);
+    $self->register_test('test_check_ip_match', 3);
+    $self->register_test('test_check_name_match', 3);
 }
 
 sub test_helo_handler {
@@ -150,15 +149,15 @@ sub test_check_ip_match {
 
     $self->connection->notes('helo_forward_match', 0);
     $self->check_ip_match('192.0.2.1');
-    ok( $self->connection->notes('helo_forward_match'), "exact";
+    ok( $self->connection->notes('helo_forward_match'), "exact");
 
     $self->connection->notes('helo_forward_match', 0);
     $self->check_ip_match('192.0.2.2');
-    ok( $self->connection->notes('helo_forward_match'), "network";
+    ok( $self->connection->notes('helo_forward_match'), "network");
 
     $self->connection->notes('helo_forward_match', 0);
     $self->check_ip_match('192.0.1.1');
-    ok( ! $self->connection->notes('helo_forward_match'), "miss";
+    ok( ! $self->connection->notes('helo_forward_match'), "miss");
 };
 
 sub test_check_name_match {
