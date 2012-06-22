@@ -59,8 +59,8 @@ check_basicheaders days 5 reject_type temp
 domainkeys
 
 # content filters
+#uribl
 virus/klez_filter
-
 
 # You can run the spamassassin plugin with options.  See perldoc
 # plugins/spamassassin for details.
