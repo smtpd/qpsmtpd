@@ -141,6 +141,7 @@ use warnings;
 
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
+
 use Socket qw(:DEFAULT :crlf);
 use IO::Handle;
 
@@ -155,12 +156,14 @@ sub register {
     if ( ! defined $self->{_args}{reject} && defined $self->{_args}{reject_threshold} ) {
         $self->{_args}{reject} = $self->{_args}{reject_threshold};
     };
+    if ( ! defined $self->{_args}{reject_type} ) {
+        $self->{_args}{reject_type} = 'perm';
+    };
 
-    $self->register_hook('data_post', 'check_spam_reject');
-    $self->register_hook('data_post', 'check_spam_munge_subject');
+    $self->register_hook('data_post', 'data_post_handler');
 }
 
-sub hook_data_post {
+sub data_post_handler {
     my ($self, $transaction) = @_;
 
     return (DECLINED) if $self->is_immune();
@@ -180,7 +183,8 @@ sub hook_data_post {
     my $headers = $self->parse_spamd_response( $SPAMD ) or return (DECLINED);
 
     $self->insert_spam_headers( $transaction, $headers, $username );
-    return (DECLINED);
+    $self->munge_subject( $transaction );
+    return $self->reject( $transaction );
 };
 
 sub select_spamd_username {
@@ -361,52 +365,62 @@ sub print_to_spamd {
     $self->log(LOGDEBUG, "check_spam: finished sending to spamd");
 };
 
-sub check_spam_reject {
+sub reject {
     my ($self, $transaction) = @_;
 
     my $sa_results = $self->get_spam_results($transaction) or do {
-        $self->log(LOGNOTICE, "skip: no spamassassin results");
+        $self->log(LOGNOTICE, "skip, no results");
         return DECLINED;
     };
     my $score  = $sa_results->{score} or do {
-        $self->log(LOGERROR, "skip: error getting spamassassin score");
+        $self->log(LOGERROR, "skip, error getting score");
         return DECLINED;
     };
 
     my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
+    my $status = "$ham_or_spam, $score";
+    my $learn;
+    if ( $sa_results->{autolearn} ) {
+        $learn = "learn=". $sa_results->{autolearn};
+    };
 
     my $reject = $self->{_args}{reject} or do {
-        $self->log(LOGERROR, "skip: reject not set ($ham_or_spam, $score)");
+        $self->log(LOGERROR, "skip, reject disabled ($status, $learn)");
         return DECLINED;
     };
 
     if ( $score < $reject ) {
-        $self->log(LOGINFO, "pass, $ham_or_spam, $score < $reject");
-        return DECLINED;
-    };
+        if ( $ham_or_spam eq 'Spam' ) {
+            $self->log(LOGINFO, "fail, $status < $reject, $learn");
+            return DECLINED;
+        }
+        else {
+            $self->log(LOGINFO, "pass, $status < $reject, $learn");
+            return DECLINED;
+        }
+    }
 
+    $self->connection->notes('karma', $self->connection->notes('karma') - 1);
 # default of media_unsupported is DENY, so just change the message
-    $self->log(LOGINFO, "deny, $ham_or_spam, $score > $reject");
-    return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold");
+    $self->log(LOGINFO, "deny, $status, > $reject, $learn");
+    return ($self->get_reject_type(), "spam score exceeded threshold");
 }
 
-sub check_spam_munge_subject {
+sub munge_subject {
     my ($self, $transaction) = @_;
 
+    my $sa = $self->get_spam_results($transaction) or return;
     my $qp_num = $self->{_args}{munge_subject_threshold};
-    my $sa = $self->get_spam_results($transaction) or return DECLINED;
 
     my $required = $sa->{required} || $qp_num or do {
         $self->log(LOGDEBUG, "skipping munge, no user or qpsmtpd pref set");
-        return DECLINED;
+        return;
     };
-    return DECLINED unless $sa->{score} > $required;
+    return unless $sa->{score} > $required;
 
     my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
     my $subject = $transaction->header->get('Subject') || '';
     $transaction->header->replace('Subject', "$subject_prefix $subject");
-
-    return DECLINED;
 }
 
 sub get_spam_results {
@@ -465,7 +479,7 @@ sub _cleanup_spam_header {
     $old_header_name = ($old_header_name =~ s/^X-//) ? "X-Old-$old_header_name" : "Old-$old_header_name";
 
     for my $header ( $transaction->header->get($header_name) ) {
-        $transaction->header->add($old_header_name, $header) if $action eq 'rename';
+        $transaction->header->add($old_header_name, $header, 0) if $action eq 'rename';
         $transaction->header->delete($header_name);
     }
 }

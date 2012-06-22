@@ -25,9 +25,9 @@ sub register_tests {
 
     $self->register_test('test_connect_to_spamd', 4);
     $self->register_test('test_parse_spam_header', 10);
-    $self->register_test('test_get_spam_results', 19);
-    $self->register_test('test_check_spam_munge_subject', 4);
-    $self->register_test('test_check_spam_reject', 2);
+    $self->register_test('test_get_spam_results', 20);
+    $self->register_test('test_munge_subject', 4);
+    $self->register_test('test_reject', 2);
 }
 
 sub test_connect_to_spamd {
@@ -43,38 +43,38 @@ sub test_connect_to_spamd {
     $self->{_args}{spamd_socket} = '/var/run/spamd/spamd.socket';
     my $SPAMD = $self->connect_to_spamd();
     if ( $SPAMD ) {
-        ok( $SPAMD, "connect_to_spamd, socket");
-        
+        ok( $SPAMD, "socket");
+
         $self->print_to_spamd( $SPAMD, $message, $length, $username );
         shutdown($SPAMD, 1); # close our side of the socket (tell spamd we're done)
         my $headers = $self->parse_spamd_response( $SPAMD );
         #warn Data::Dumper::Dumper($headers);
-        ok( $headers, "connect_to_spamd, socket response\n");
+        ok( $headers, "socket response\n");
     }
     else {
-        ok( 1 == 1, "connect_to_spamd, socket connect FAILED");
-        ok( 1 == 1, "connect_to_spamd, socket response FAILED");
+        ok( 1 == 1, "socket connect FAILED");
+        ok( 1 == 1, "socket response FAILED");
     };
 
     # Try a TCP/IP connection
     $self->{_args}{spamd_socket} = '127.0.0.1:783';
     $SPAMD = $self->connect_to_spamd();
     if ( $SPAMD ) {
-        ok( $SPAMD, "connect_to_spamd, tcp/ip");
+        ok( $SPAMD, "tcp/ip");
         #warn Data::Dumper::Dumper($SPAMD);
         $self->print_to_spamd( $SPAMD, $message, $length, $username );
         shutdown($SPAMD, 1); # close our side of the socket (tell spamd we're done)
         my $headers = $self->parse_spamd_response( $SPAMD );
         #warn Data::Dumper::Dumper($headers);
-        ok( $headers, "connect_to_spamd, tcp/ip response\n");
+        ok( $headers, "tcp/ip response\n");
     }
     else {
-        ok( 1 == 1, "connect_to_spamd, tcp/ip connect FAILED");
-        ok( 1 == 1, "connect_to_spamd, tcp/ip response FAILED");
+        ok( 1 == 1, "tcp/ip connect FAILED");
+        ok( 1 == 1, "tcp/ip response FAILED");
     };
 };
 
-sub test_check_spam_reject {
+sub test_reject {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
@@ -83,17 +83,17 @@ sub test_check_spam_reject {
     # message scored a 10, should pass
     $self->{_args}{reject} = 12;
     $transaction->notes('spamassassin', { is_spam => 'Yes', score => 10 } );
-    my $r = $self->check_spam_reject($transaction);
-    cmp_ok( DECLINED, '==', $r, "check_spam_reject, $r");
-    
+    my $r = $self->reject($transaction);
+    cmp_ok( DECLINED, '==', $r, "r: $r");
+
     # message scored a 15, should fail
     $self->{_args}{reject} = 12;
     $transaction->notes('spamassassin', { is_spam => 'Yes', score => 15 } );
-    ($r) = $self->check_spam_reject($transaction);
-    cmp_ok( DENY, '==', $r, "check_spam_reject, $r");
+    ($r) = $self->reject($transaction);
+    cmp_ok( DENY, '==', $r, "r: $r");
 };
 
-sub test_check_spam_munge_subject {
+sub test_munge_subject {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
@@ -103,31 +103,31 @@ sub test_check_spam_munge_subject {
     $self->{_args}{munge_subject_threshold} = 5;
     $transaction->notes('spamassassin', { score => 6 } );
     $transaction->header->add('Subject', $subject);
-    $self->check_spam_munge_subject($transaction);
+    $self->munge_subject($transaction);
     my $r = $transaction->header->get('Subject'); chomp $r;
-    cmp_ok($r, 'eq', "*** SPAM *** $subject", "check_spam_munge_subject +");
+    cmp_ok($r, 'eq', "*** SPAM *** $subject", "+");
 
     $transaction->header->delete('Subject');  # cleanup
     $self->{_args}{munge_subject_threshold} = 5;
     $transaction->notes('spamassassin', { score => 3 } );
     $transaction->header->add('Subject', $subject);
-    $self->check_spam_munge_subject($transaction);
+    $self->munge_subject($transaction);
     $r = $transaction->header->get('Subject'); chomp $r;
-    cmp_ok($r, 'eq', $subject, "check_spam_munge_subject -");
+    cmp_ok($r, 'eq', $subject, "-");
 
     $transaction->header->delete('Subject');  # cleanup
     $transaction->notes('spamassassin', { score => 3, required => 4 } );
     $transaction->header->add('Subject', $subject);
-    $self->check_spam_munge_subject($transaction);
+    $self->munge_subject($transaction);
     $r = $transaction->header->get('Subject'); chomp $r;
-    cmp_ok($r, 'eq', $subject, "check_spam_munge_subject -");
+    cmp_ok($r, 'eq', $subject, "-");
 
     $transaction->header->delete('Subject');  # cleanup
     $transaction->notes('spamassassin', { score => 5, required => 4 } );
     $transaction->header->add('Subject', $subject);
-    $self->check_spam_munge_subject($transaction);
+    $self->munge_subject($transaction);
     $r = $transaction->header->get('Subject'); chomp $r;
-    cmp_ok($r, 'eq', "*** SPAM *** $subject", "check_spam_munge_subject +");
+    cmp_ok($r, 'eq', "*** SPAM *** $subject", "+");
 };
 
 sub test_get_spam_results {
@@ -145,15 +145,17 @@ sub test_get_spam_results {
             $r_ref->{hits} = delete $r_ref->{score}; # SA v2 compat
         };
         my $r2 = _reassemble_header($r_ref);
-        cmp_ok( $h, 'eq', $r2, "get_spam_results ($h)" );
+        cmp_ok( $h, 'eq', $r2, $h );
 
         # this time it should be cached
         $r_ref = $self->get_spam_results($transaction);
-        next if $h =~ /hits=/;   # caching is broken for SA v2 headers 
+        if ( $h =~ /hits=/ ) {
+            ok( 1 );
+            next;
+        };   # caching is broken for SA v2 headers
         $r2 = _reassemble_header($r_ref);
-        cmp_ok( $h, 'eq', $r2, "get_spam_results ($h)" );
+        cmp_ok( $h, 'eq', $r2, $h );
     };
-
 };
 
 sub test_parse_spam_header {
@@ -161,11 +163,11 @@ sub test_parse_spam_header {
 
     foreach my $h ( @sample_headers ) {
         my $r_ref = $self->parse_spam_header($h);
-        if ( $h =~ /hits=/ ) { 
+        if ( $h =~ /hits=/ ) {
             $r_ref->{hits} = delete $r_ref->{score}; # SA v2 compat
         };
         my $r2 = _reassemble_header($r_ref);
-        cmp_ok( $h, 'eq', $r2, "parse_spam_header ($h)" );
+        cmp_ok( $h, 'eq', $r2, $h );
     };
 };
 
@@ -181,7 +183,7 @@ sub test_message {
     return <<'EO_MESSAGE'
 To: Fictitious User <fict@example.com>
 From: No Such <such@example.com>
-Subject: jose can you see, by the dawns early light?  
+Subject: jose can you see, by the dawns early light?
 
 What so proudly we.
 EO_MESSAGE
