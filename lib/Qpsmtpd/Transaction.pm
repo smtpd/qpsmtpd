@@ -2,13 +2,15 @@ package Qpsmtpd::Transaction;
 use Qpsmtpd;
 @ISA = qw(Qpsmtpd);
 use strict;
+use warnings;
+
 use Qpsmtpd::Utils;
 use Qpsmtpd::Constants;
+
+use IO::File qw(O_RDWR O_CREAT);
 use Socket qw(inet_aton);
 use Sys::Hostname;
 use Time::HiRes qw(gettimeofday);
-
-use IO::File qw(O_RDWR O_CREAT);
 
 sub new { start(@_) }
 
@@ -115,6 +117,9 @@ sub body_spool {
       $self->{_body_file}->print($line) or die "Cannot print to temp file: $!";
     }
     $self->{_body_start} = $self->{_header_size};
+  }
+  else {
+    $self->log(LOGERROR, "no message body");
   }
   $self->{_body_array} = undef;
 }
@@ -227,10 +232,20 @@ sub DESTROY {
   # would we save some disk flushing if we unlinked the file before
   # closing it?
 
-  undef $self->{_body_file} if $self->{_body_file};
-  if ($self->{_filename} and -e $self->{_filename}) {
-    unlink $self->{_filename} or $self->log(LOGERROR, "Could not unlink ", $self->{_filename}, ": $!");
-  }
+    $self->log(LOGDEBUG, sprintf( "DESTROY called by %s, %s, %s", (caller) ) );
+
+    if ( $self->{_body_file} ) {
+        undef $self->{_body_file};
+    };
+
+    if ($self->{_filename} and -e $self->{_filename}) {
+        if ( unlink $self->{_filename} ) {
+            $self->log(LOGDEBUG, "unlinked ", $self->{_filename} );
+        }
+        else {
+            $self->log(LOGERROR, "Could not unlink ", $self->{_filename}, ": $!");
+        }
+    }
 
   # These may not exist
   if ( $self->{_temp_files} ) {
