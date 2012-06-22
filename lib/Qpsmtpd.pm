@@ -588,7 +588,7 @@ sub size_threshold {
   my $self = shift;
   unless ( defined $Size_threshold ) {
     $Size_threshold = $self->config('size_threshold') || 0;
-    $self->log(LOGNOTICE, "size_threshold set to $Size_threshold");
+    $self->log(LOGDEBUG, "size_threshold set to $Size_threshold");
   }
   return $Size_threshold;
 }
