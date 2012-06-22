@@ -20,17 +20,17 @@ sub test_badmailfromto_is_sender_immune {
     ok( $self->is_sender_immune( $transaction->sender, [] ), "is_immune, empty list");
 
     $transaction->sender( Qpsmtpd::Address->new( '<>' ) );
-    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, null sender");
+    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "null sender");
 
     my $address = Qpsmtpd::Address->new( '<matt@>' );
     $transaction->sender($address);
-    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing host");
+    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "missing host");
 
     $address = Qpsmtpd::Address->new( '<@example.com>' );
     $transaction->sender($address);
-    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing user");
+    ok( $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "missing user");
 
     $transaction->sender( Qpsmtpd::Address->new( '<matt@example.com>' ) );
-    ok( ! $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, false");
+    ok( ! $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "false");
 };
 
