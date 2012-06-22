@@ -17,7 +17,7 @@ hosts_allow
 
 # information plugins
 ident/geoip
-#ident/p0f /tmp/.p0f_socket version 3
+ident/p0f /tmp/.p0f_socket version 3
 connection_time
 
 # enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
@@ -34,13 +34,13 @@ check_earlytalker
 count_unrecognized_commands 4
 relay
 
-require_resolvable_fromhost
+resolvable_fromhost
 
 rhsbl
 dnsbl
 check_badmailfrom
 check_badrcptto
-check_spamhelo
+helo
 
 sender_permitted_from
 greylisting p0f genre,windows
@@ -55,7 +55,7 @@ auth/authdeny
 # this plugin needs to run after all other "rcpt" plugins
 rcpt_ok
 
-check_basicheaders days 5 reject_type temp
+headers days 5 reject_type temp require From,Date
 domainkeys
 
 # content filters
@@ -77,6 +77,7 @@ dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
 virus/clamav
+virus/clamdscan
 
 # You must enable a queue plugin - see the options in plugins/queue/ - for example:
 
