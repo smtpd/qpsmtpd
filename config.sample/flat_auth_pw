@@ -1,0 +1,4 @@
+# used by plugins/auth/auth_flat_file
+# example entries
+good@example.com:good_pass
+bad@example.com:bad_pass

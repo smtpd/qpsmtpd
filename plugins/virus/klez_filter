@@ -1,0 +1,34 @@
+#!perl -w
+
+sub hook_data_post {
+  my ($self, $transaction) = @_;
+
+  # klez files are always sorta big .. how big?  Dunno. 
+  return (DECLINED)
+    if $transaction->data_size < 60_000;
+   #   220k was too little, so let's just disable the "big size check"
+   #   or $transaction->data_size > 1_000_000;
+
+  # maybe it would be worthwhile to add a check for
+  # Content-Type: multipart/alternative; here?
+
+  # make sure we read from the beginning;
+  $transaction->body_resetpos;
+  
+  my $line_number = 0; 
+  my $seen_klez_signature = 0;
+
+  while ($_ = $transaction->body_getline) {
+    last if $line_number++ > 40;
+
+    m/^Content-type:.*(?:audio|application)/i
+      and ++$seen_klez_signature and next;
+
+    return (DENY, "Klez Virus Detected")
+      if $seen_klez_signature 
+	and m!^TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQA!;
+
+  }
+
+  return (DECLINED);
+}

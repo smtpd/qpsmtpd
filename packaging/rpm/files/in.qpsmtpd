@@ -1,0 +1,3 @@
+#!/bin/sh
+export QPSMTPD_CONFIG=/etc/qpsmtpd
+exec /usr/bin/qpsmtpd 2> /dev/null

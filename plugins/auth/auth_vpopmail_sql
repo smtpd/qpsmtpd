@@ -1,0 +1,156 @@
+#!perl -w
+
+=head1 NAME
+
+auth_vpopmail_sql - Authenticate to vpopmail via MySQL
+
+=head1 DESCRIPTION
+
+This plugin authenticates vpopmail users directly against a standard
+vpopmail MySQL database.  It makes the not-unreasonable assumption that
+both pw_name and pw_domain are lowercase only (qmail doesn't actually care).
+If you are using CRAM-MD5, it also requires that vpopmail be built with the
+recommended '--enable-clear-passwd=y' option, because there is no way
+to compare the crypted password.
+
+=head1 CONFIGURATION
+
+ echo "dbi:mysql:dbname=vpopmail;host=127.0.0.1" > config/vpopmail_mysql_dsn
+ echo "vpopmailuser" > config/vpopmail_mysql_user
+ echo "vpoppasswd" > config/vpopmail_mysql_pass
+
+This can be a read-only database user since the plugin does not update the
+last accessed time (yet, see below).
+
+This module supports PLAIN, LOGIN, and CRAM-MD5 authentication methods. You
+can disable undesired methods by editing this module and uncommenting
+the lines in the register() sub.  See the POD for Qspmtpd::Auth for more
+details on the ramifications of supporting various authentication methods.
+
+The remote user must login with a fully qualified e-mail address (i.e. both
+account name and domain), even if they don't normally need to.  This is
+because the vpopmail table has a unique index on pw_name/pw_domain, and this
+module requires that only a single record be returned from the database.
+
+=head1 LIMITATIONS
+
+This authentication modules does not recognize domain aliases. So, if you have
+the domain example.com, with domain aliases for example.org and example.net,
+smtp-auth will only work for $user@example.com. If you have domain aliases,
+consider using another plugin (see SEE ALSO).
+
+=head1 FUTURE DIRECTION
+
+The default MySQL configuration for vpopmail includes a table to log access,
+lastauth, which could conceivably be updated upon sucessful authentication.
+The addition of this feature is left as an exercise for someone who cares. ;)
+
+=head1 SEE ALSO
+
+For an overview of the vpopmail authentication plugins and their merits,
+please read the VPOPMAIL section in docs/authentication.pod
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2004 John Peacock
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Auth;
+use Qpsmtpd::Constants;
+
+#use DBI;  # done in ->register
+
+sub register {
+    my ( $self, $qp ) = @_;
+
+    eval 'use DBI';
+    if ( $@ ) {
+        warn "plugin disabled. is DBI installed?\n";
+        $self->log(LOGERROR, "skip: plugin disabled. is DBI installed?\n");
+        return;
+    };
+
+    $self->register_hook('auth-plain',    'auth_vmysql');
+    $self->register_hook('auth-login',    'auth_vmysql');
+    $self->register_hook('auth-cram-md5', 'auth_vmysql');
+}
+
+sub get_db_handle {
+    my $self = shift;
+
+    my $dsn    = $self->qp->config("vpopmail_mysql_dsn") || "dbi:mysql:dbname=vpopmail;host=127.0.0.1";
+    my $dbuser = $self->qp->config("vpopmail_mysql_user") || "vpopmailuser";
+    my $dbpass = $self->qp->config("vpopmail_mysql_pass") || "vpoppasswd";
+
+    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass ) or do {
+            $self->log(LOGERROR, "skip: db connection failed");
+            return;
+        };
+    $dbh->{ShowErrorStatement} = 1;
+    return $dbh;
+};
+
+sub get_vpopmail_user {
+    my ( $self, $dbh, $user ) = @_;
+
+    my ( $pw_name, $pw_domain ) = split '@', lc($user);
+
+    if ( ! defined $pw_domain ) {
+        $self->log(LOGINFO, "skip: missing domain: " . lc $user );
+        return;
+    };
+
+    $self->log(LOGDEBUG, "auth_vpopmail_sql: $user");
+
+    my $query = "SELECT pw_passwd,pw_clear_passwd
+FROM vpopmail
+  WHERE pw_name = ?
+    AND pw_domain = ?";
+
+    my $sth = $dbh->prepare( $query );
+    $sth->execute( $pw_name, $pw_domain );
+    my $userd_ref = $sth->fetchrow_hashref;
+    $sth->finish;
+    $dbh->disconnect;
+    return $userd_ref;
+};
+
+sub auth_vmysql {
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
+
+    my $dbh = $self->get_db_handle() or return DECLINED;
+    my $u = $self->get_vpopmail_user($dbh, $user) or return DECLINED;
+
+    # if vpopmail was not built with '--enable-clear-passwd=y'
+    # then pw_clear_passwd may not even exist
+    # my $pw_clear_passwd = $db_user->{'pw_clear_passwd'};
+
+    if ( ! $u->{pw_passwd} && ! $u->{pw_clear_passwd} ) {
+        $self->log(LOGINFO, "fail: no such user");
+        return ( DENY, "auth_vmysql - no such user" );
+    };
+
+    # at this point, the user name has matched
+
+    return Qpsmtpd::Auth::validate_password( $self,
+            src_clear     => $u->{pw_clear_passwd},
+            src_crypt     => $u->{pw_passwd},
+            attempt_clear => $passClear,
+            attempt_hash  => $passHash,
+            method        => $method,
+            ticket        => $ticket,
+            deny          => DENY,
+        );
+}
+

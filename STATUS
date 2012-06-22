@@ -1,0 +1,77 @@
+
+New Name Suggestions
+====================
+ignite
+flare(mta)
+quench
+pez (or pezmail)
+
+
+Roadmap
+=======
+
+ - http://code.google.com/p/smtpd/issues
+
+ - Bugfixes - qpsmtpd is extremely stable (in production since 2001), but
+   there are always more things to fix.
+
+ - Add user configuration plugin infrastructure
+   - Add plugin API for checking if a local email address is valid
+
+ - Add API to reject individual recipients after the RCPT has been
+   accepted and generate individual bounce messages.
+
+Issues
+======
+
+See http://code.google.com/p/smtpd/issues/list
+
+------ The rest of the list here might be outdated. ------
+------ Patches to remove things are welcome.        ------
+
+
+add whitelist support to the dnsbl plugin (and maybe to the rhsbl
+plugin too).  Preferably both supporting DNS based whitelists and
+filebased (CDB) ones.
+
+
+plugin support;
+
+  allow plugins to return multiple response lines (does it have to
+  join them to one for SMTP?)
+
+  support plugins for the rest of the commands.
+
+  specify a priority in register_hook. ("LAST", "FIRST", "MIDDLE", or
+  maybe a number)
+
+  plugin access to the data line by line during the DATA phase
+  (instead of just after)
+
+  if qmail-queue can't be loaded we still return 250 ?!
+
+Make a system for configuring the plugins per user/domain/...
+
+  support databytes per user / domain
+
+localiphost - support foo@[a.b.c.d] addresses 
+
+Move dispatch() etc from SMTP.pm to Qpsmtpd.pm to allow other similar
+protocols to use the qpsmtpd framework. 
+
+
+
+Future Ideas
+============
+
+Methods to create a bounce message easily; partly so we can accept a
+mail for one user but bounce it right away for another RCPT'er.
+
+The data_post hook should be able to put in the notes what addresses
+should go through, bounce and get rejected respectively, and qpsmtpd
+should just do the right thing.  See also
+http://nntp.perl.org/group/perl.qpsmtpd/170
+
+David Carraway has some thoughts for "user filters"
+http://nntp.perl.org/group/perl.qpsmtpd/2
+

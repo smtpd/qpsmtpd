@@ -1,0 +1,132 @@
+#!perl -w
+
+=head1 NAME
+
+bitdefender -- BitDefender Linux Edition antivirus plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+This plugin scans incoming mail with the BitDefender Linux Edition scanner,
+and can at your option reject or flag infected messages.
+
+=head1 CONFIGURATION
+
+=over 4
+
+=item B<bitdefender_location>
+
+Full path to the BitDefender binary and all signature files; defaults to
+/opt/bdc/bdc.
+
+=item B<deny_viruses>
+
+Whether the scanner will automatically delete messages which have viruses.
+Takes either 'yes' or 'no' (defaults to 'yes').
+
+=item B<max_size>
+
+Maximum size in kilobytes for messages which will be scanned; defaults to 128k;
+
+=back
+
+=head1 DEPENDENCIES
+
+=over 4
+
+=item B<BitDefender>
+
+The BitDefender Linux Edition is available to use, free of charge, from
+this link:
+
+  <http://www.bitdefender.com/bd/site/products.php?p_id=16>
+
+Please read the documentation for configuring automatic updates of the
+virus profiles.
+
+=back
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2004 John Peacock
+
+Based lightly on the clamav plugin
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use strict;
+use warnings;
+
+use File::Path;
+use Qpsmtpd::Constants;
+
+sub register {
+    my ( $self, $qp, @args ) = @_;
+
+    while (@args) {
+        $self->{"_bitd"}->{ pop @args } = pop @args;
+    }
+    $self->{"_bitd"}->{"bitdefender_location"} ||= "/opt/bdc/bdc";
+    $self->{"_bitd"}->{"deny_viruses"}         ||= "yes";
+    $self->{"_bitd"}->{"max_size"}             ||= 128;
+    $self->{"_bitd"}->{"max_size"} *= 1024;
+}
+
+sub hook_data_post {
+    my ( $self, $transaction ) = @_;
+
+    if ( $transaction->data_size > $self->{"_bitd"}->{"max_size"} ) {
+        $self->log( LOGWARN,
+                'Mail too large to scan ('
+              . $transaction->data_size . " vs "
+              . $self->{"_bitd"}->{"max_size"}
+              . ")" );
+        return (DECLINED);
+    }
+
+    # Ignore non-multipart emails
+    my $content_type = $transaction->header->get('Content-Type');
+    $content_type =~ s/\s/ /g if defined $content_type;
+    unless ( $content_type
+        && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
+    {
+        $self->log( LOGERROR, "non-multipart mail - skipping" );
+        return DECLINED;
+    }
+
+    my $filename = $transaction->body_filename;
+    unless (defined $filename) {
+	$self->log(LOGERROR, "didn't get a filename");
+	return DECLINED;
+    }
+
+    # Now do the actual scanning!
+    open my $bdc, "-|",
+      $self->{"_bitd"}->{"bitdefender_location"}
+      . " --mail --all --arc $filename";
+
+    my $output;
+    while (<$bdc>) {
+        if (/infected: (.+)$/) {
+            $output = $1;
+            last;
+        }
+    }
+    close $bdc;
+
+    if ($output) {
+        $self->log( LOGINFO, "Virus(es) found: $output" );
+        if ( $self->{"_bitd"}->{"deny_viruses"} eq "yes" ) {
+            return ( DENY, "Virus Found: $output" );
+        }
+    }
+
+    return (DECLINED);
+}
+

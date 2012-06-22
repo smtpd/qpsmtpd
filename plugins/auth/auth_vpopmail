@@ -1,0 +1,101 @@
+#!perl -w
+
+=head1 NAME
+
+auth_vpopmail - Authenticate against libvpopmail.a
+
+=head1 DESCRIPTION
+
+This plugin authenticates vpopmail users using p5-vpopmail.
+Using CRAM-MD5 requires that vpopmail be built with the
+'--enable-clear-passwd=y' option.
+
+=head1 CONFIGURATION
+
+This module will only work if qpsmtpd is running as the 'vpopmail' user.
+
+CRAM-MD5 authentication will only work with p5-vpopmail 0.09 or higher.
+    http://github.com/sscanlon/vpopmail
+
+Decide which authentication methods you are willing to support and uncomment
+the lines in the register() sub. See the POD for Qspmtpd::Auth for more
+details on the ramifications of supporting various authentication methods.
+
+=head1 SEE ALSO
+
+For an overview of the vpopmail authentication plugins and their merits,
+please read the VPOPMAIL section in docs/authentication.pod
+
+=head1 AUTHOR
+
+Matt Simerson <msimerson@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2010 Matt Simerson
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Auth;
+use Qpsmtpd::Constants;
+
+#use vpopmail;    # we eval this in $test_vpopmail_module
+
+sub register {
+    my ($self, $qp) = @_;
+
+    return (DECLINED) if ! $self->test_vpopmail_module();
+
+    $self->register_hook("auth-plain", "auth_vpopmail" );
+    $self->register_hook("auth-login", "auth_vpopmail" );
+    $self->register_hook("auth-cram-md5", "auth_vpopmail");
+}
+
+sub auth_vpopmail {
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
+      @_;
+
+    my $pw              = vauth_getpw( split '@', lc($user) );
+    my $pw_clear_passwd = $pw->{pw_clear_passwd};
+    my $pw_passwd       = $pw->{pw_passwd};
+
+    if (!$pw || (!$pw_clear_passwd && !$pw_passwd)) {
+        $self->log(LOGINFO, "fail: invalid user $user");
+        return (DENY, "auth_vpopmail - invalid user");
+        # change DENY to DECLINED to support multiple auth plugins
+    }
+
+    return Qpsmtpd::Auth::validate_password( $self,
+        src_clear     => $pw->{pw_clear_passwd},
+        src_crypt     => $pw->{pw_passwd},
+        attempt_clear => $passClear,
+        attempt_hash  => $passHash,
+        method        => $method,
+        ticket        => $ticket,
+        deny          => DENY,
+    );
+}
+
+sub test_vpopmail_module {
+    my $self = shift;
+# vpopmail will not allow vauth_getpw to succeed unless the requesting user is vpopmail or root.
+# by default, qpsmtpd runs as the user 'qpsmtpd' and does not have permission.
+    eval 'use vpopmail';
+    if ( $@ ) {
+        $self->log(LOGERROR, "skip: is vpopmail perl module installed?");
+        return;
+    };
+
+    my ($domain) = vpopmail::vlistdomains();
+    my $r = vauth_getpw('postmaster', $domain) or do {
+            $self->log(LOGERROR, "skip: could not query vpopmail");
+            return;
+        };
+    return 1;
+}

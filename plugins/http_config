@@ -1,0 +1,50 @@
+#!perl -w
+=head1 NAME
+
+http_config
+
+=head1 DESCRIPTION
+
+Example config plugin.  Gets configuration data via http requests.
+
+=head1 CONFIG
+
+http_config is configured at plugin loading time via the plugins
+config.  Load the plugin with a list of urls like the following (on one line)
+ 
+  http_config http://localhost/~smtpd/config/ http://www.example.com/cgi-bin/qp?config=
+
+Looking to config "me", qpsmtpd will try loading
+http://localhost/~smtpd/config/me and if failing that try
+http://www.example.com/cgi-bin/qp?config=me
+
+=head1 BUGS
+
+http_config doesn't do any caching.  It should do some simple caching
+to be used in production.
+
+=cut
+
+use LWP::Simple qw(get);
+
+my @urls;
+
+sub register {
+  my ($self, $qp, @args) = @_;
+  @urls = @args;
+}
+
+sub hook_config {
+  my ($self, $transaction, $config) = @_; 
+  $self->log(LOGNOTICE, "http_config called with $config");
+  for my $url (@urls) {
+    $self->log(LOGDEBUG, "http_config loading from $url");
+    my @config = split /[\r\n]+/, (get "$url$config" || "");
+    chomp @config;
+    @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
+    close CF;
+    # $self->log(LOGNOTICE, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
+    return (OK, @config) if @config;
+  }
+  return DECLINED;
+}

@@ -1,0 +1,98 @@
+#!perl -w
+=head1 NAME
+
+rcpt_regexp - check recipients against a list of regular expressions
+
+=head1 DESCRIPTION
+
+B<rcpt_regexp> reads a list of regular expressions, return codes and comments
+from the I<rcpt_regexp> config file. If the regular expression does NOT match
+I<m#^(/.*/)$#>, it is used as a string which is compared with I<eq lc($rcpt)>.
+The recipient addresses are checked against this list, and if the first 
+matches, the return code from that line and the comment are returned to
+qpsmtpd. Return code can be any valid plugin return code from 
+L<Qpsmtpd::Constants>. Matching is always done case insenstive. 
+
+=head1 CONFIG FILE
+
+The config file I<rcpt_regexp> contains lines with a perl RE, including the 
+"/"s, a return code and a comment, which will be returned to the sender, if 
+the code is not OK or DECLINED. Example:
+
+  # rcpt_regexp - config for rcpt_regexp plugin
+  me@myhost.org           OK       Accepting mail
+  /^user\d+\@doma\.in$/   OK       Accepting mail
+  info@myhost.com         DENY     User not found.
+  /^unused\@.*/           DENY     User not found.
+  /^.*$/                  DECLINED Fall through to next rcpt plugin
+
+=head1 NOTE
+
+The C<rcpt_regexp> config file should be writeable by trusted users only: the
+regexes are compiled with I<eval()>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2005 Hanno Hecker
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use Qpsmtpd::Constants;
+
+sub hook_rcpt {
+    my ($self, $transaction, $recipient) = @_;
+    return (DECLINED)
+      unless $recipient->host && $recipient->user;
+
+    my $rcpt = lc $recipient->user . '@' . $recipient->host;
+    my ($re, $const, $comment, $str, $ok, $err);
+
+    foreach ($self->qp->config("rcpt_regexp")) {
+        s/^\s*//;
+        ($re, $const, $comment) = split /\s+/, $_, 3;
+        $str = undef;
+        if ($re =~ m#^/(.*)/$#) {
+            $re = $1;
+            $ok = eval { $re = qr/$re/i; };
+            if ($@) {
+                ($err = $@) =~ s/\s*at \S+ line \d+\.\s*$//;
+                $self->log(LOGWARN, "REGEXP '$re' not valid: $err");
+                next;
+            }
+            $re = $ok;
+        }
+        else {
+            $str = lc $re;
+        }
+
+        unless (defined $const) {
+            $self->(LOGWARN, "rcpt_regexp - no return code");
+            next;
+        }
+
+        $ok    = $const;
+        $const = Qpsmtpd::Constants::return_code($const);
+        unless (defined $const) {
+            $self->log(LOGWARN,
+                           "rcpt_regexp - '$ok' is not a valid "
+                         . "constant, ignoring this line"
+                      );
+            next;
+        }
+
+        if (defined $str) {
+            next unless $str eq $rcpt;
+            $self->log(LOGDEBUG, "String $str matched $rcpt, returning $ok");
+        }
+        else {
+            next unless $rcpt =~ $re;
+            $self->log(LOGDEBUG, "RE $re matched $rcpt, returning $ok");
+        }
+
+        return ($const, $comment);
+    }
+    return (DECLINED);
+}

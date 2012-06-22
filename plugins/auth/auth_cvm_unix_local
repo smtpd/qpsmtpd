@@ -1,0 +1,130 @@
+#!perl -w
+
+=head1 NAME
+
+auth_cvm_unix_local - SMTP AUTH LOGIN module using 
+Bruce Guenther's Credential Validation Module (CVM) 
+    http://untroubled.org/cvm/
+
+=head1 SYNOPSIS
+
+In config/plugins:
+
+  auth/auth_cvm_unix_local \
+	cvm_socket /var/lib/cvm/cvm-unix-local.socket	\
+	enable_smtp no \
+	enable_ssmtp yes
+
+=head1 BUGS
+
+- Should probably handle auth-cram-md5 as well. However, this requires
+access to the plain text password. We could store a separate database
+of passwords purely for SMTP AUTH, for example as an optional 
+SMTPAuthPassword property of an account in the esmith::AccountsDB;
+
+=head1 DESCRIPTION
+
+This plugin implements an authentication plugin using Bruce Guenther's
+Credential Validation Module (http://untroubled.org/cvm).
+
+=head1 AUTHOR
+
+Copyright 2005 Gordon Rowell <gordonr@gormand.com.au>
+
+This software is free software and may be distributed under the same
+terms as qpsmtpd itself.
+
+=head1 VERSION
+
+Version $Id: auth_cvm_unix_local,v 1.1 2005/06/09 22:50:06 gordonr Exp gordonr $
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+use Socket;
+use constant SMTP_PORT => getservbyname("smtp", "tcp") || 25;
+use constant SSMTP_PORT => getservbyname("ssmtp", "tcp") || 465;
+
+sub register {
+    my ( $self, $qp, %arg ) = @_;
+
+    unless ($arg{cvm_socket}) {
+        $self->log(LOGERROR, "skip: requires cvm_socket argument");
+        return 0;
+    };
+
+    $self->{_args} = { %arg };
+    $self->{_enable_smtp} = $arg{enable_smtp} || 'no';
+    $self->{_enable_ssmtp} = $arg{enable_ssmtp} || 'yes';
+
+    my $port = $ENV{PORT} || SMTP_PORT;
+
+    return 0 if ($port == SMTP_PORT && $arg{enable_smtp} ne 'yes');
+    return 0 if ($port == SSMTP_PORT && $arg{enable_ssmtp} ne 'yes');
+
+    if ($arg{cvm_socket} =~ /^([\w\/.-]+)$/) {
+        $self->{_cvm_socket} = $1;
+    }
+
+    unless (-S $self->{_cvm_socket}) {
+        $self->log(LOGERROR, "skip: cvm_socket missing or not usable");
+        return 0;
+    }
+
+    $self->register_hook("auth-plain", "authcvm_plain");
+    $self->register_hook("auth-login", "authcvm_plain");
+#    $self->register_hook("auth-cram-md5", "authcvm_hash");
+}
+
+sub authcvm_plain {
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
+      @_;
+
+    socket(SOCK, PF_UNIX, SOCK_STREAM, 0) or do {
+        $self->log(LOGERROR, "skip: socket creation attempt for: $user");
+        return (DENY, "authcvm");
+    };
+
+# DENY, really? Should this plugin return a DENY when it cannot connect
+# to the cvs socket? I'd expect such a failure to return DECLINED, so
+# any other auth plugins could take a stab at authenticating the user
+
+    connect(SOCK, sockaddr_un($self->{_cvm_socket})) or do {
+        $self->log(LOGERROR, "skip: socket connection attempt for: $user");
+        return (DENY, "authcvm");
+    };
+
+    my $o = select(SOCK); $| = 1; select($o);
+
+    my ($u, $host) = split(/\@/, $user);
+    $host ||= "localhost";
+
+    print SOCK "\001$u\000$host\000$passClear\000\000";
+
+    shutdown SOCK, 1;   # tell remote we're finished
+
+    my $ret = <SOCK>;
+    my ($s) = unpack ("C", $ret);
+
+    if ( ! defined $s ) {
+        $self->log(LOGERROR, "skip: no response from cvm for $user");
+        return (DECLINED);
+    };
+
+    if ( $s == 0 ) {
+        $self->log(LOGINFO, "pass: authentication for: $user");
+        return (OK, "auth success for $user");
+    };
+
+    if ( $s == 100 ) {
+        $self->log(LOGINFO, "fail: authentication failure for: $user");
+        return (DENY, 'auth failure (100)');
+    };
+
+    $self->log(LOGERROR, "skip: unknown response from cvm for $user");
+    return (DECLINED, "unknown result code ($s)");
+}

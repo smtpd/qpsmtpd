@@ -1,0 +1,36 @@
+Jim Winstead <jimw@trainedmonkey.com>: the core "command dispatch"
+system in qpsmtpd is taken from his colobus nntp server.  The
+check_badmailfrom and check_mailrcptto plugins.
+
+John Peacock <jpeacock@cpan.org>: More changes, fixes and vast
+improvements for me to ever catch up on here.
+
+Matt Sergeant <matt@sergeant.org>: Clamav plugin.  Patch for the dnsbl
+plugin to give us all the dns results.  Resident SpamAssassin guru.
+PPerl. smtp-forward plugin. Documentation (yay!).  Lots of fixes and
+tweaks.  Apache module.  Event based high performance experiment.
+
+Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
+the connection gets dropped at the wrong moment.  Support and enable
+taint checking. MAIL FROM host dns check configurable.  HELO hook.
+initial earlytalker plugin.
+
+Andrew Pam <xanni@glasswings.com.au>: fixing the maximum message size
+(databytes) stuff.
+
+Marius Kjeldahl <marius@kjeldahl.net>, Zukka Zitting
+<jukka.zitting@iki.fi>: Patches for supporting $ENV{RELAYCLIENT}
+
+Robert Spier <robert@perl.org>: Klez filter.
+
+Rasjid Wilcox <rasjidw@openminddev.net>: Lots of patches as per the
+Changes file.
+
+Kee Hinckley <nazgul@somewhere.com>: Sent me the correct strftime
+format for the dates in the "Received" headers.
+
+Gergely Risko <risko@risko.hu>: Fixed timeout bug when the client sent
+DATA and then stopped before sending the next line.
+
+... and many many others per the Changes file and version control logs and
+    mailing list archives.  Thanks everyone!

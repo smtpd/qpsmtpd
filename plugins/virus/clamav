@@ -1,0 +1,231 @@
+#!perl -w
+
+=head1 NAME
+
+clamav -- ClamAV antivirus plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+This plugin scans incoming mail with the clamav A/V scanner, and can at your
+option reject or flag infected messages.
+
+=head1 CONFIGURATION
+
+Arguments to clamav should be specified in the form of name=value pairs,
+separated by whitespace.  For sake of backwards compatibility, a single
+leading argument containing only alphanumerics, -, _, . and slashes will
+be tolerated, and interpreted as the path to clamscan/clamdscan.  All
+new installations should use the name=value form as follows:
+
+=over 4
+
+=item clamscan_path=I<path> (e.g. I<clamscan_path=/usr/bin/clamdscan>)
+
+Path to the clamav commandline scanner.  Mail will be passed to the clamav
+scanner in Berkeley mbox format (that is, with a "From " line).  See the
+discussion below on which commandline scanner to use.
+
+=item clamd_conf=I<path> (e.g. I<clamd_conf=/etc/sysconfig/clamd.conf>)
+
+Path to the clamd configuration file. Passed as an argument to the
+command-line scanner (--config-file=I<path>).
+
+The default value is '/etc/clamd.conf'.
+
+=item action=E<lt>I<add-header> | I<reject>E<gt> (e.g. I<action=reject>)
+
+Selects an action to take when an inbound message is found to be infected.
+Valid arguments are 'add-header' and 'reject'.  All rejections are hard
+5xx-code rejects; the SMTP error will contain an explanation of the virus
+found in the mail (for example, '552 Virus Found: Worm.SomeFool.P').
+
+The default action is 'add-header'.
+
+=item max_size=I<bytes> (e.g. I<max_size=1048576>)
+
+Specifies the maximum size, in bytes, for mail to be scanned.  Any mail
+exceeding this size will be left alone.  This is recommended, as large mail
+can take an exceedingly long time to scan.  The default is 524288, or 512k.
+
+=item tmp_dir=I<path> (e.g. I<tmp_dir=/tmp>)
+
+Specify an alternate temporary directory.  If not specified, the qpsmtpd
+I<spool_dir> will be used.  If neither is available, I<~/tmp/> will be tried,
+and if that that fails the plugin will gracefully fail.  
+
+=item back_compat
+
+If you are using a version of ClamAV prior to 0.80, you need to set this
+variable to include a couple of now deprecated options.
+
+=back
+
+=head2 CLAMAV COMMAND LINE SCANNER
+
+You can use either clamscan or clamdscan, but the latter is recommended for
+sake of performance.  However, in this case, the user executing clamd
+requires access to the qpsmtpd spool directory, which usually means either
+running clamd as the same user as qpsmtpd does (by far the easiest method)
+or by doing the following: 
+
+=over 4
+
+=item * Change the group ownership of the spool directory to be a group 
+of which clamav is a member or add clamav to the same group as the qpsmtpd
+user.
+
+=item * Enable the "AllowSupplementaryGroups" option in clamd.conf.
+
+=item * Change the permissions of the qpsmtpd spool directory to 0750 (this 
+will emit a warning when the qpsmtpd service starts up, but can be safely
+ignored).
+
+=item * Make sure that all directories above the spool directory (to the
+root) are g+x so that the group has directory traversal rights; it is not
+necessary for the group to have any read rights except to the spool
+directory itself.
+
+=back
+
+It may be helpful to temporary grant the clamav user a shell and test to
+make sure you can cd into the spool directory and read files located there.
+Remember to remove the shell from the clamav user when you are done
+testing.
+
+
+=head2 CLAMAV CONFIGURATION
+
+At the least, you should have 'ScanMail' supplied in your clamav.conf file.
+It is recommended that you also have sane limits on ArchiveMaxRecursion and
+StreamMaxLength also.
+
+=head1 LICENSE
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+ 
+use strict;
+use warnings;
+ 
+use Qpsmtpd::Constants;
+
+sub register {
+  my ($self, $qp, @args) = @_;
+  my %args;
+
+  if ($args[0] && $args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/ && -x $1) {
+    $self->{_clamscan_loc} = $1;
+    shift @args;
+  }
+
+  for (@args) {
+    if (/^max_size=(\d+)$/) {
+        $self->{_max_size} = $1;
+    }
+    elsif (/^clamscan_path=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+        $self->{_clamscan_loc} = $1;
+    }
+    elsif (/^clamd_conf=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+        $self->{_clamd_conf} = "$1";
+    }
+    elsif (/^tmp_dir=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+        $self->{_spool_dir} = $1;
+    }
+    elsif (/^action=(add-header|reject)$/) {
+        $self->{_action} = $1;
+    }
+    elsif (/back_compat/) {
+	$self->{_back_compat} = '-i --max-recursion=50';
+    }
+    elsif (/declined_on_fail/) {
+       $self->{_declined_on_fail} = 1;
+    }
+    else {
+        $self->log(LOGERROR, "Unrecognized argument '$_' to clamav plugin");
+        return undef;
+    }
+  }
+
+  $self->{_max_size} ||= 512 * 1024;
+  $self->{_spool_dir} ||= $self->spool_dir();
+  $self->{_back_compat} ||= ''; # make sure something is set
+  $self->{_clamd_conf} ||= '/etc/clamd.conf'; # make sure something is set
+  $self->{_declined_on_fail} ||= 0; # decline the message on clamav failure
+
+  unless ($self->{_spool_dir}) {
+        $self->log(LOGERROR, "No spool dir configuration found");
+        return undef;
+  }
+  unless (-d $self->{_spool_dir}) {
+        $self->log(LOGERROR, "Spool dir $self->{_spool_dir} does not exist");
+        return undef;
+  }
+
+}
+ 
+sub hook_data_post {
+  my ($self, $transaction) = @_;
+
+  if ($transaction->data_size > $self->{_max_size}) {
+	$self->log(LOGWARN, 'Mail too large to scan ('.
+		$transaction->data_size . " vs $self->{_max_size})" );
+	return (DECLINED);
+  }
+
+  my $filename = $transaction->body_filename;
+  unless (defined $filename) {
+        $self->log(LOGWARN, "didn't get a filename");
+        return DECLINED;
+  }
+  my $mode = (stat($self->{_spool_dir}))[2];
+  if ( $mode & 07077  ) { # must be sharing spool directory with external app
+      $self->log(LOGWARN,
+        "Changing permissions on file to permit scanner access");
+      chmod $mode, $filename;
+  }
+ 
+  # Now do the actual scanning!
+  my $cmd = $self->{_clamscan_loc}
+    . " --stdout "
+    . $self->{_back_compat}
+    . " --config-file=" . $self->{_clamd_conf}
+    . " --no-summary $filename 2>&1";
+  $self->log(LOGDEBUG, "Running: $cmd");
+  my $output = `$cmd`;
+ 
+  my $result = ($? >> 8);
+  my $signal = ($? & 127);
+ 
+  chomp($output);
+ 
+  $output =~ s/^.* (.*) FOUND$/$1 /mg;
+ 
+  $self->log(LOGINFO, "clamscan results: $output");
+ 
+  if ($signal) {
+    $self->log(LOGINFO, "clamscan exited with signal: $signal");
+    return (DENYSOFT) if (!$self->{_declined_on_fail});
+    return (DECLINED);
+  }
+  if ($result == 1) {
+    $self->log(LOGINFO, "Virus(es) found: $output");
+    if ($self->{_action} eq 'add-header') {
+        $transaction->header->add('X-Virus-Found', 'Yes');
+        $transaction->header->add('X-Virus-Details', $output);
+    } else {
+        return (DENY, "Virus Found: $output");
+    }
+  }
+  elsif ($result) {
+    $self->log(LOGERROR, "ClamAV error: $cmd: $result\n");
+    return (DENYSOFT) if (!$self->{_declined_on_fail});
+  }
+  else {
+    $transaction->header->add( 'X-Virus-Checked',
+        "Checked by ClamAV on " . $self->qp->config("me") );
+  }
+  return (DECLINED);
+} 
+

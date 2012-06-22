@@ -1,0 +1,198 @@
+#!perl -w
+use IO::Socket;
+
+sub register {
+    my ( $self, $qp, @args ) = @_;
+
+    %{ $self->{"_sophie"} } = @args;
+
+    # Set some sensible defaults
+    $self->{"_sophie"}->{"sophie_socket"} ||= "/var/run/sophie";
+    $self->{"_sophie"}->{"deny_viruses"}  ||= "yes";
+    $self->{"_sophie"}->{"max_size"}      ||= 128;
+}
+
+sub hook_data_post {
+    my ( $self, $transaction ) = @_;
+    $DB::single = 1;
+
+    if ( $transaction->data_size > $self->{"_sophie"}->{"max_size"} * 1024 ) {
+        $self->log( LOGNOTICE, "Declining due to data_size" );
+        return (DECLINED);
+    }
+
+    # Ignore non-multipart emails
+    my $content_type = $transaction->header->get('Content-Type');
+    $content_type =~ s/\s/ /g if defined $content_type;
+    unless ( $content_type
+        && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
+    {
+        $self->log( LOGWARN, "non-multipart mail - skipping" );
+        return DECLINED;
+    }
+
+    my $filename = $transaction->body_filename;
+    unless ($filename) {
+        $self->log( LOGWARN, "Cannot process due to lack of filename" );
+        return (DECLINED);    # unless $filename;
+    }
+
+    my $mode = ( stat( $self->spool_dir() ) )[2];
+    if ( $mode & 07077 ) {   # must be sharing spool directory with external app
+        $self->log( LOGWARN,
+            "Changing permissions on file to permit scanner access" );
+        chmod $mode, $filename;
+    }
+
+    my ($SOPHIE, $response);
+    socket(\*SOPHIE, AF_UNIX, SOCK_STREAM, 0)
+    	|| die "Couldn't create socket ($!)\n";
+
+    connect(\*SOPHIE, pack_sockaddr_un $self->{"_sophie"}->{"sophie_socket"})
+	|| die "Couldn't connect() to the socket ($!)\n";
+
+    syswrite(\*SOPHIE, $filename."\n", length($filename)+1);
+    sysread(\*SOPHIE, $response, 256);    
+    close (\*SOPHIE);
+
+    my $virus;
+
+    if ( ($virus) = ( $response =~ m/^1:?(.*)?$/ ) ) {
+        $self->log( LOGERROR, "One or more virus(es) found: $virus" );
+
+        if ( lc( $self->{"_sophie"}->{"deny_viruses"} ) eq "yes" ) {
+            return ( DENY,
+                    "Virus"
+                  . ( $virus =~ /,/ ? "es " : " " )
+                  . "Found: $virus" );
+        }
+        else {
+            $transaction->header->add( 'X-Virus-Found',   'Yes' );
+            $transaction->header->add( 'X-Virus-Details', $virus );
+            return (DECLINED);
+        }
+    }
+
+    $transaction->header->add( 'X-Virus-Checked',
+        "Checked by SOPHIE on " . $self->qp->config("me") );
+
+    return (DECLINED);
+}
+
+=head1 NAME
+
+sophie scanner
+
+=head1 DESCRIPTION
+
+A qpsmtpd plugin for virus scanning using the SOPHOS scan daemon, Sophie.
+
+=head1 RESTRICTIONS
+
+The Sophie scan daemon must have at least read access to the qpsmtpd spool
+directory in order to sucessfully scan the messages.  You can ensure this
+by running Sophie as the same user as qpsmtpd does (by far the easiest
+method) or by doing the following: 
+
+=over 4
+
+=item * Change the group ownership of the spool directory to be a group 
+of which the Sophie user is a member or add the Sophie user to the same group
+as the qpsmtpd user.
+
+=item * Change the permissions of the qpsmtpd spool directory to 0750 (this 
+will emit a warning when the qpsmtpd service starts up, but can be safely
+ignored).
+
+=item * Make sure that all directories above the spool directory (to the
+root) are g+x so that the group has directory traversal rights; it is not
+necessary for the group to have any read rights except to the spool
+directory itself.
+
+=back
+
+It may be helpful to temporary grant the Sophie user a shell and test to
+make sure you can cd into the spool directory and read files located there.
+Remember to remove the shell from the Sophieav user when you are done
+testing.
+
+Note also that the contents of config/spool_dir must be the full path to the
+spool directory (not a relative path) in order for the scanner to locate the
+file.
+
+=head1 INSTALL AND CONFIG
+
+Place this plugin in the plugin/virus directory beneath the standard
+qpsmtpd installation.  If you installed Sophie with the default path, you
+can use this plugin with default options (nothing specified):
+
+=over 4
+
+=item B<Sophie_socket>
+
+Full path to the Sophie socket defaults to /var/run/Sophie.
+
+=item B<deny_viruses>
+
+Whether the scanner will automatically delete messages which have viruses.
+Takes either 'yes' or 'no' (defaults to 'yes').  If set to 'no' it will add
+a header to the message with the virus results.
+
+=item B<max_size>
+
+The maximum size, in kilobytes, of messages to scan; defaults to 128k.
+
+=back
+
+=head1 REQUIREMENTS
+
+This module requires the Sophie daemon, available here:
+
+L<http://www.clanfield.info/sophie/>
+
+which in turn requires the libsavi.so library (available with the Sophos
+Anti-Virus for Linux or Unix).
+
+The following changes to F</etc/sophie.cfg> B<should> be made:
+
+=over 4
+
+=item user: qmaild
+
+Change the "user" parameter to match the qpsmtpd user.
+
+=item group: nofiles
+
+Change the "group" parameter to match the qpsmtpd group.
+
+=item umask: 0001
+
+If you don't change the umask, only the above user/group will be able to scan.
+
+=back
+
+The following changes to F</etc/sophie.savi> B<must> be made:
+
+=over 4
+
+=item Mime: 1
+
+This option will permit the SAVI engine to directly scan e-mail messages.
+
+=back
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2005 John Peacock
+
+Based heavily on the clamav plugin
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+

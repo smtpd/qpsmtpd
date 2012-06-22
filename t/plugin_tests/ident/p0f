@@ -1,0 +1,87 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('test_get_v2_query', 1);
+    $self->register_test('test_get_v3_query', 1);
+    $self->register_test('test_store_v2_results', 2);
+    $self->register_test('test_store_v3_results', 2);
+}
+
+sub test_query_p0f_v2 {
+#TODO
+# get path to p0f socket
+# see if it exists
+# try to connect to it
+# if connection succeeds, send it a query
+#   do we  a) pick an IP that recently connected?
+#     or   b) create a connection to localhost...
+#     or   c) is there a p0f test value?
+# parse and validate the response
+# using $self->test_v2_response()
+};
+
+sub test_query_p0f_v3 {
+#TODO: similar to v2 ....
+};
+
+sub test_get_v2_query {
+    my $self = shift;
+
+    my $local_ip = '208.75.177.101';
+    my $remote   = '108.60.149.81';
+    $self->{_args}{local_ip} = $local_ip;
+    $self->qp->connection->local_ip($local_ip);
+    $self->qp->connection->remote_ip($remote);
+    $self->qp->connection->local_port(25);
+    $self->qp->connection->remote_port(2500);
+
+    my $r = $self->get_v2_query();
+    ok( $r, 'get_v2_query' );
+    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
+};
+
+sub test_get_v3_query {
+    my $self = shift;
+
+    my $remote   = '108.60.149.81';
+    $self->qp->connection->remote_ip($remote);
+
+    my $r = $self->get_v3_query();
+    ok( $r, 'get_v3_query' );
+    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
+};
+
+sub test_store_v2_results {
+    my $self = shift;
+
+    my $response = pack("L L C Z20 Z40 c Z30 Z30 C C C s S N",
+        '233811181', '1336687857', '0', 'Windows', 'XP/2000 (RFC1323+, w+, tstamp-)',
+        '11', 'ethernet/modem', '', '0', '0', '1', '-25600', '255', '255' );
+
+    my $r = $self->store_v2_results( $response );
+
+    ok( $r, "query_p0f_v2 result") or return;
+    ok( $r->{genre} =~ /windows/i, "store_v2_results, genre" );
+    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
+};
+
+sub test_store_v3_results {
+    my $self = shift;
+
+    my $response = pack("L L L L L L L L L s C C A32 A32 A32 A32 A32 A32 A32", 
+        1345340930, 16, 1336676595, 1336680290, 3, 0, 0, 0, 0, 13, 0, 0,
+        'Windows', '7 or 8', '', '', 'Ethernet or modem', '', '');
+    my $r = $self->store_v3_results( $response );
+
+    ok( $r, "query_p0f_v3 result");
+    ok( $r->{genre} =~ /windows/i, "store_v3_results, genre" );
+};
+
+

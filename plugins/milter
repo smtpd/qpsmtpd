@@ -1,0 +1,236 @@
+#!perl -w
+=head1 NAME
+
+milter
+
+=head1 DESCRIPTION
+
+This plugin allows you to attach to milter filters (yes, those written for
+sendmail) as though they were qpsmtpd plugins.
+
+In order to do this you need the C<Net::Milter> module from CPAN.
+
+=head1 CONFIG
+
+It takes two required parameters - a milter name (for logging) and the port
+to connect to on the localhost. This can also contain a hostname if
+the filter is on another machine:
+
+  milter Brightmail 5513
+
+or
+
+  milter Brightmail bmcluster:5513
+
+This plugin has so far only been tested with Brightmail's milter module.
+
+=cut
+
+use Net::Milter;
+use Qpsmtpd::Constants;
+no warnings;
+
+sub register {
+  my ($self, $qp, @args) = @_;
+
+  die "Invalid milter setup args: '@args'" unless @args > 1;
+  my ($name, $port) = @args;
+  my $host = '127.0.0.1';
+  if ($port =~ s/^(.*)://) {
+    $host = $1;
+  }
+  
+  $self->{name} = $name;
+  $self->{host} = $host;
+  $self->{port} = $port;
+  
+}
+
+sub hook_disconnect {
+    my ($self) = @_;
+
+    my $milter = $self->connection->notes('milter') || return DECLINED;
+    $milter->send_quit();
+    
+    $self->connection->notes('spam', undef);
+    $self->connection->notes('milter', undef);
+
+    return DECLINED;
+}
+
+sub check_results {
+    my ($self, $transaction, $where, @results) = @_;
+    foreach my $result (@results) {
+        next if $result->{action} eq 'continue';
+        $self->log(LOGINFO, "milter $self->{name} result action: $result->{action}");
+        if ($result->{action} eq 'reject') {
+            die("Rejected at $where by $self->{name} milter ($result->{explanation})");
+        }
+        elsif ($result->{action} eq 'add') {
+            if ($result->{header} eq 'body') {
+                $transaction->body_write($result->{value});
+            }
+            else {
+                push @{$transaction->notes('milter_header_changes')->{add}},
+                        [$result->{header}, $result->{value}];
+            }
+        }
+        elsif ($result->{action} eq 'delete') {
+            push @{$transaction->notes('milter_header_changes')->{delete}},
+                $result->{header};
+        }
+        elsif ($result->{action} eq 'accept') {
+            # TODO - figure out what this is used for
+        }
+        elsif ($result->{action} eq 'replace') {
+            push @{$transaction->notes('milter_header_changes')->{replace}},
+                    [$result->{header}, $result->{value}];
+        }
+    }
+}
+
+sub hook_connect {
+    my ($self, $transaction) = @_;
+    
+    $self->log(LOGDEBUG, "milter $self->{name} opening connection to milter backend");
+    my $milter = Net::Milter->new();
+    $milter->open($self->{host}, $self->{port}, 'tcp');
+    $milter->protocol_negotiation();
+
+    $self->connection->notes(milter => $milter);
+
+    $self->connection->notes(
+        milter_header_changes => { add => [], delete => [], replace => [], }
+    );    
+    my $remote_ip = $self->qp->connection->remote_ip;
+    my $remote_host = $self->qp->connection->remote_host;
+    $self->log(LOGDEBUG, "milter $self->{name} checking connect from $remote_host\[$remote_ip\]");
+    
+    eval {
+        $self->check_results($transaction, "connection",
+            $milter->send_connect($remote_host, 'tcp4', 0, $remote_ip));
+    };
+    $self->connection->notes('spam', $@) if $@;
+
+    return DECLINED;
+}
+
+sub hook_helo {
+    my ($self, $transaction) = @_;
+
+    if (my $txt = $self->connection->notes('spam')) {
+        return DENY, $txt;
+    }
+    
+    my $milter = $self->connection->notes('milter');
+    
+    my $helo = $self->qp->connection->hello;
+    my $host = $self->qp->connection->hello_host;
+
+    $self->log(LOGDEBUG, "milter $self->{name} checking HELO $host");
+    
+    eval { $self->check_results($transaction, "HELO",
+                                $milter->send_helo($host)) };
+    return(DENY, $@) if $@;
+    
+    return DECLINED;
+}
+
+sub hook_mail {
+    my ($self, $transaction, $address, %param) = @_;
+    
+    my $milter = $self->connection->notes('milter');
+
+    $self->log(LOGDEBUG, "milter $self->{name} checking MAIL FROM " . $address->format);
+    eval { $self->check_results($transaction, "MAIL FROM",
+                                $milter->send_mail_from($address->format)) };
+    return(DENY, $@) if $@;
+
+    return DECLINED;
+}
+
+sub hook_rcpt {
+    my ($self, $transaction, $address, %param) = @_;
+    
+    my $milter = $self->connection->notes('milter');
+
+    $self->log(LOGDEBUG, "milter $self->{name} checking RCPT TO " . $address->format);
+
+    eval { $self->check_results($transaction, "RCPT TO",
+                                $milter->send_rcpt_to($address->format)) };
+    return(DENY, $@) if $@;
+
+    return DECLINED;
+}
+
+sub hook_data_post {
+    my ($self, $transaction) = @_;
+
+    my $milter = $self->connection->notes('milter');
+
+    $self->log(LOGDEBUG, "milter $self->{name} checking headers");
+
+    my $headers = $transaction->header(); # Mail::Header object
+    foreach my $h ($headers->tags) {
+        # munge these headers because milters prefer them this way
+        $h =~ s/\b(\w)/\U$1/g;
+        $h =~ s/\bid\b/ID/g;
+        foreach my $val ($headers->get($h)) {
+            # $self->log(LOGDEBUG, "milter $self->{name} checking header: $h: $val");
+            eval { $self->check_results($transaction, "header $h",
+                                $milter->send_header($h, $val)) };
+            return(DENY, $@) if $@;
+        }
+    }
+    
+    eval { $self->check_results($transaction, "end headers",
+                                $milter->send_end_headers()) };
+    return(DENY, $@) if $@;
+     
+    $transaction->body_resetpos;
+    
+    # skip past headers
+    while (my $line = $transaction->body_getline) {
+        $line =~ s/\r?\n//;
+        $line =~ s/\s*$//;
+        last unless length($line);
+    }
+
+    $self->log(LOGDEBUG, "milter $self->{name} checking body");
+
+    my $data = '';
+    while (my $line = $transaction->body_getline) {
+        $data .= $line;
+        if (length($data) > 60000) {
+            eval { $self->check_results($transaction, "body",
+                                $milter->send_body($data)) };
+            return(DENY, $@) if $@;
+            $data = '';
+        }
+    }
+    
+    if (length($data)) {
+        eval { $self->check_results($transaction, "body",
+                                $milter->send_body($data)) };
+        return(DENY, $@) if $@;
+        $data = '';
+    }
+    
+    eval { $self->check_results($transaction, "end of DATA",
+                                $milter->send_end_body()) };
+    return(DENY, $@) if $@;
+
+    my $milter_header_changes = $transaction->notes('milter_header_changes'); 
+
+    foreach my $add (@{$milter_header_changes->{add}}) {
+        $headers->add($add->[0], $add->[1]);
+    }
+    foreach my $del (@{$milter_header_changes->{'delete'}}) {
+        $headers->delete($del);
+    }
+    foreach my $repl (@{$milter_header_changes->{replace}}) {
+        $headers->replace($repl->[0], $repl->[1]);
+    }
+    
+    return DECLINED;
+}

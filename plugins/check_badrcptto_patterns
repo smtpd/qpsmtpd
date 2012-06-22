@@ -1,0 +1,48 @@
+#!perl -w
+=pod
+
+=head1 SYNOPSIS
+
+This plugin checks the badrcptto_patterns config. This allows
+special patterns to be denied (e.g. percent hack, bangs, 
+double ats).
+
+=head1 CONFIG
+
+config/badrcptto_patterns
+
+Patterns are stored in the format pattern\sresponse, where pattern
+is a Perl pattern expression. Don't forget to anchor the pattern if
+you want to restrict it from matching anywhere in the string.
+
+qpsmtpd already ensures that the address contains an @, with something
+to the left and right of the @.
+
+=head1 AUTHOR
+
+Copyright 2005 Gordon Rowell <gordonr@gormand.com.au>
+
+This software is free software and may be distributed under the same
+terms as qpsmtpd itself.
+
+=cut
+
+sub hook_rcpt
+{
+  my ($self, $transaction, $recipient) = @_;
+
+  return (DECLINED) if $self->qp->connection->relay_client();
+
+  my @badrcptto = $self->qp->config("badrcptto_patterns") or return (DECLINED);
+  my $host = lc $recipient->host;
+  my $to = lc($recipient->user) . '@' . $host;
+
+  for (@badrcptto)
+  {
+      my ($pattern, $response) = split /\s+/, $_, 2;
+
+      return (DENY, $response) if ($to =~ /$pattern/);
+  }
+
+  return (DECLINED);
+}

@@ -1,0 +1,158 @@
+#!perl -w
+=head1 NAME
+
+dns_whitelist_soft - dns-based whitelist override for other qpsmtpd plugins
+
+=head1 DESCRIPTION
+
+The dns_whitelist_soft plugin allows selected host to be whitelisted as
+exceptions to later plugin processing.  It is strongly based on the original
+dnsbl plugin as well as Gavin Carr's original whitelist_soft plugin.  It is
+most suitable for multisite installations, so that the whitelist is stored
+in one location and available from all.
+
+=head1 CONFIGURATION
+
+To enable the plugin, add it to the ~qpsmtpd/config/plugins file as usual.
+It should precede any plugins whose rejections you wish to override.  You may
+have to alter those plugins to check the appropriate notes field.
+
+Several configuration files are supported, corresponding to different
+parts of the SMTP conversation:
+
+=over 4
+
+=item whitelist_zones
+
+Any IP address listed in the whitelist_zones file is queried using
+the connecting MTA's IP address.  Any A or TXT answer means that the
+remote HOST address can be selectively exempted at other stages by plugins
+testing for a 'whitelisthost' connection note.
+
+=back
+
+NOTE: other 'connect' hooks will continue to fire (e.g. dnsbl), since the DNS
+queries happen in the background.  This plugin's 'rcpt_handler' retrieves
+the results of the query and sets the connection note if found.
+
+If you switch to qpsmtpd-async and to the async version of this plugin, then
+the 'whitelisthost' connection note will be available to the other 'connect'
+hooks, see the documentation of the async plugin.
+
+=head1 AUTHOR
+
+John Peacock <jpeacock@rowman.com>
+
+Based on the 'whitelist_soft' plugin by Gavin Carr <gavin@openfusion.com.au>,
+based on the 'whitelist' plugin by Devin Carraway <qpsmtpd@devin.com>.
+
+=cut
+
+sub hook_connect {
+  my ($self, $transaction) = @_;
+
+  my $remote_ip = $self->qp->connection->remote_ip;
+
+  my %whitelist_zones = map { (split /\s+/, $_, 2)[0,1] }
+				$self->qp->config('whitelist_zones');
+
+  return DECLINED unless %whitelist_zones;
+
+  my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
+
+  # we queue these lookups in the background and just fetch the
+  # results in the first rcpt handler
+
+  my $res = new Net::DNS::Resolver;
+  my $sel = IO::Select->new();
+
+  for my $dnsbl (keys %whitelist_zones) {
+    $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl in the background");
+    $sel->add($res->bgsend("$reversed_ip.$dnsbl", "TXT"));
+  }
+
+  $self->connection->notes('whitelist_sockets', $sel);
+
+  return DECLINED;
+}
+
+sub process_sockets {
+  my ($self) = @_;
+
+  my $conn = $self->connection;
+
+  return $conn->notes('whitelisthost') 
+    if $conn->notes('whitelisthost');
+
+  my $res = new Net::DNS::Resolver;
+  my $sel = $conn->notes('whitelist_sockets') or return "";
+
+  my $result; 
+
+  $self->log(LOGDEBUG, "waiting for whitelist dns");
+
+  # don't wait more than 4 seconds here
+  my @ready = $sel->can_read(4);
+
+  $self->log(LOGDEBUG, "DONE waiting for whitelist dns, got ",
+  	scalar @ready, " answers ...") ;
+  return '' unless @ready;
+
+  for my $socket (@ready) {
+    my $query = $res->bgread($socket);
+    $sel->remove($socket);
+    undef $socket;
+
+    my $whitelist;
+
+    if ($query) {
+      my $a_record = 0;
+      foreach my $rr ($query->answer) {
+	$a_record = 1 if $rr->type eq "A";
+	my $name = $rr->name;
+	($whitelist) = ($name =~ m/(?:\d+\.){4}(.*)/) unless $whitelist;
+	$whitelist = $name unless $whitelist;
+	$self->log(LOGDEBUG, "name ", $rr->name);
+	next unless $rr->type eq "TXT";
+	$self->log(LOGDEBUG, "got txt record");
+	$result = $rr->txtdata and last;
+      }
+      $a_record and $result = "Blocked by $whitelist";
+    }
+    else {
+      $self->log(LOGERROR, "$whitelist query failed: ", $res->errorstring)
+	unless $res->errorstring eq "NXDOMAIN";
+    }
+
+    if ($result) {
+      #kill any other pending I/O
+      $conn->notes('whitelist_sockets', undef);
+      return $conn->notes('whitelisthost', $result);
+    }
+  }
+
+  if ($sel->count) {
+    # loop around if we have dns blacklists left to see results from
+    return $self->process_sockets();
+  }
+
+  # er, the following code doesn't make much sense anymore...
+
+  # if there was more to read; then forget it
+  $conn->notes('whitelist_sockets', undef);
+
+  return $conn->notes('whitelisthost', $result);
+
+}
+
+sub hook_rcpt {
+  my ($self, $transaction, $rcpt, %param) = @_;
+  my $ip = $self->qp->connection->remote_ip || return (DECLINED);
+  my $note = $self->process_sockets;
+  if ( $note ) {
+    $self->log(LOGNOTICE,"Host $ip is whitelisted: $note");
+  }
+  return DECLINED;
+}
+
+1;

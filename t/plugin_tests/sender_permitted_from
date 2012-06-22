@@ -1,0 +1,50 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+my $r;
+
+sub register_tests {
+    my $self = shift;
+
+    eval 'use Mail::SPF';
+    return if $@;
+
+    $self->register_test('test_is_relayclient', 3);
+    $self->register_test('test_is_special_recipient', 5);
+}
+
+sub test_is_relayclient {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    ok( ! $self->is_relayclient( $transaction ),
+        "sender_permitted_from, is_relayclient -");
+
+    $self->qp->connection->relay_client(1);
+    ok( $self->is_relayclient( $transaction ),
+        "sender_permitted_from, is_relayclient +");
+
+    $self->qp->connection->relay_client(0);
+    $self->qp->connection->remote_ip('192.168.7.5');
+    my $client_ip = $self->qp->connection->remote_ip;
+    ok( $client_ip, "sender_permitted_from, relayclients ($client_ip)");
+};
+
+sub test_is_special_recipient {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $address     = Qpsmtpd::Address->new('user@example.com');
+
+    ok( ! $self->is_special_recipient( $address ), "is_special_recipient -");
+
+    foreach my $user ( qw/ postmaster abuse mailer-daemon root / ) {
+        $address = Qpsmtpd::Address->new("$user\@example.com");
+        ok( $self->is_special_recipient( $address ), "is_special_recipient ($user)");
+    };
+};
+

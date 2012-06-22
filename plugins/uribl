@@ -1,0 +1,514 @@
+#!perl -w
+
+=head1 NAME
+
+uribl - URIBL blocking plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+This plugin implements DNSBL lookups for URIs found in spam, such as that
+implemented by SURBL (see E<lt>http://surbl.org/E<gt>).  Incoming messages are
+scanned for URIs, which are then checked against one or more URIBLs in a
+fashion similar to DNSBL systems.
+
+=head1 CONFIGURATION
+
+To enable the plugin, add it to I<~qpsmtpd/config/plugins>.  The list of
+URIBLs to check should be placed in I<uribl_zones> in the config directory
+(typically I<~qpsmtpd/config>).
+
+The format of the I<uribl_zones> file is a list of URIBL DNS zones, one per
+line, consisting of one or more columns separated by whitespace.  The first
+column (the only mandatoy one) should consist of the URIBL zone.
+
+The second column may contain a comma-delimited list of integers selecting
+mask values to be applied to the A record(s) returned from a URIBL.  This
+enables the use of composite DNSBLs, such as multi.surbl.org, where several
+lists are combined so they may be accessed with a single query; any returns
+are checked against the mask of lists you're interested in.  If unspecified,
+or if a negative number is given, all lists in a composite URIBL will be
+checked.  URIBL operators prefer that you use the composite lists to reduce
+their own query load, and it's more efficient for qpsmtpd as well.
+
+The third column specifies an action, which overrides the default action
+configured with the I<action> setting discussed below.
+
+For example:
+
+=over 4
+
+    multi.surbl.org    2,8    deny
+    ob.surbl.org    1    add-header
+
+=back
+
+You may specify the following config option(s) in the I<qpsmtpd/config> file:
+
+=over 4
+
+=item action
+
+Specifies what to do when a URI is matched in a URIBL.  Available options are
+I<add-header> (the default) I<deny> and I<denysoft>.  If set to add-header, an
+X-URIBL-Match: header will be added explaining the URIBL entry found.  If set
+to 'deny,' the delivery will be declined with a hard failure.  If set to
+denysoft, the delivery will be soft failed (this is probably not a good idea.)
+
+=item timeout
+
+Timeout for DNS requests, in seconds.  The default is 30 seconds.  DNS
+requests are issued asynchronously and in parallel for all hosts found
+in URIs in the mail; the same timeout will apply to each; see the
+Net::DNS documentation for details.
+
+=item scan-headers
+
+If set true, any headers found in the URIs will be checked as well.  Disabled
+by default.
+
+=back
+
+=head1 CAUTIONS
+
+When used in I<deny> or I<denysoft> mode, a URIBL check can block not
+only the original spam containing a listed URI, but mail unintentionally
+carrying that URI, such as forwarded complaints.  The uribl checks should
+only be used in these modes if you know what you're doing.
+
+The URI scanner used by the uribl plugin is quite aggressive, and attempts to
+detect all forms of URIs supported by typical MUAs (even those that lack a
+protocol specification, for example.)  However, it does not attempt to detect
+URIs that have been mangled beyond programmatic reconstruction.  Even so, it
+may issue spurious lookups on unintended URIs, especially those in non-text
+sections of the mail.
+
+=head1 COPYRIGHT
+
+uribl is copyright 2004-2007 by Devin Carraway E<lt>qpsmtpd@devin.comE<gt>.  It
+may be used and redistributed under the same terms as qpsmtpd itself.
+
+=cut
+
+use Net::DNS::Resolver;
+use Time::HiRes qw(time);
+use IO::Select;
+
+use Qpsmtpd::Constants;
+
+use strict;
+use warnings;
+
+# ccTLDs that allocate domain names within a strict two-level hierarchy,
+# as in *.co.uk
+my %strict_twolevel_cctlds = (
+    'ac' => 1,
+    'ae' => 1,
+    'uk' => 1,
+    'ai' => 1,
+    'ar' => 1,
+    'at' => 1,
+    'au' => 1,
+    'az' => 1,
+    'bb' => 1,
+    'bh' => 1,
+    'bm' => 1,
+    'br' => 1,
+    'bs' => 1,
+    'ca' => 1,
+    'ck' => 1,
+    'cn' => 1,
+    'co' => 1,
+    'cr' => 1,
+    'cu' => 1,
+    'cy' => 1,
+    'do' => 1,
+    'et' => 1,
+    'ge' => 1,
+    'hk' => 1,
+    'id' => 1,
+    'il' => 1,
+    'jp' => 1,
+    'kr' => 1,
+    'kw' => 1,
+    'lv' => 1,
+    'sg' => 1,
+    'za' => 1,
+);
+
+# async version: OK
+sub init {
+    my ($self, $qp, %args) = @_;
+
+    $self->{action} = $args{action} || 'add-header';
+    $self->{timeout} = $args{timeout} || 30;
+    # scan-headers was the originally documented name for this option, while
+    # check-headers actually implements it, so tolerate both.
+    $self->{check_headers} = $args{'check-headers'} || $args{'scan-headers'};
+
+    $args{mask} ||= 0x00ffffff;
+    $self->{mask} = 0;
+
+    my @zones = $self->qp->config('uribl_zones');
+    for (@zones) {
+        chomp;
+        next if !$_ or /^\s*#/;
+        my @z = split (/\s+/, $_);
+        next unless $z[0];
+
+        my $mask = 0;
+        $z[1] ||= 0x00ffffff;
+        for (split /,/, $z[1]) {
+            unless (/^(-?\d+)$/) {
+                $self->log(LOGERROR, "Malformed mask $_ for $z[0]");
+                return undef;
+            }
+            $mask |= $1 >= 0 ? $1 : 0x00ffffff;
+        }
+        my $action = $z[2] || $self->{action};
+        unless ($action =~ /^(add-header|deny|denysoft|log)$/) {
+            $self->log(LOGERROR, "Unknown action $action for $z[0]");
+            return undef;
+        }
+
+        $self->{uribl_zones}->{$z[0]} = {
+            mask => $mask,
+            action => $action,
+        };
+    }
+    keys %{$self->{uribl_zones}} or return 0;
+
+    my @whitelist = $self->qp->config('uribl_whitelist_domains');
+    $self->{whitelist_zones} = {
+        ( map { ($_ => 1) } @whitelist )
+    };
+
+    $self->init_resolver;
+}
+
+# async version: not used
+sub register {
+    my $self = shift;
+
+    $self->register_hook('data_post', 'data_handler');
+}
+
+# async version: not used
+sub send_query {
+    my $self = shift;
+    my $name = shift || return undef;
+    my $count = 0;
+
+    $self->{socket_select} ||= new IO::Select or return undef;
+    for my $z (keys %{$self->{uribl_zones}}) {
+        my ($s, $s1);
+        my $index = {
+            zone => $z,
+            name => $name,
+        };
+
+        next unless $z;
+        next if exists $self->{sockets}->{$z}->{$name};
+        $s = $self->{resolver}->bgsend("$name.$z", 'A');
+        if (defined $s) {
+            $self->{sockets}->{$z}->{$name}->{'a'} = $s;
+            $self->{socket_select}->add($s);
+            $self->{socket_idx}->{"$s"} = $index;
+            $count++;
+        } else {
+            $self->log(LOGERROR,
+                       "Couldn't open socket for A record '$name.$z': ".
+                       ($self->{resolver}->errorstring || 'unknown error'));
+        }
+
+        $s1 = $self->{resolver}->bgsend("$name.$z", 'TXT');
+        if (defined $s1) {
+            $self->{sockets}->{$z}->{$name}->{'txt'} = $s1;
+            $self->{socket_select}->add($s1);
+            $self->{socket_idx}->{"$s1"} = $index;
+            $count++;
+        } else {
+            $self->log(LOGERROR,
+                       "Couldn't open socket for TXT record '$name.$z': ".
+                       ($self->{resolver}->errorstring || 'unknown error'));
+        }
+
+        $self->{sockets}->{$z}->{$name} = {};
+    }
+    $count;
+}
+
+# async version: not used
+sub lookup_finish {
+    my $self = shift;
+    $self->{socket_idx} = {};
+    $self->{sockets} = {};
+    undef $self->{socket_select};
+}
+
+# async version: OK
+sub evaluate {
+    my $self = shift;
+    my $zone = shift || return undef;
+    my $a = shift || return undef;
+
+    my $mask = $self->{uribl_zones}->{$zone}->{mask} || $self->{mask};
+    $a =~ /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/ or return undef;
+    my $v = (($1 & 0xff) << 24) |
+        (($2 & 0xff) << 16) |
+        (($3 & 0xff) << 8) |
+        ($4 & 0xff);
+    return ($v & $mask);
+}
+
+# async version: OK
+sub lookup_start {
+    my ($self, $transaction, $start_query) = @_;
+
+    my $l;
+    my $queries = 0;
+    my %pending;
+    my @qp_continuations;
+
+    $transaction->body_resetpos;
+	# if we're not looking for URIs in the headers, read past that point
+	# before starting to actually look for any
+    while (!$self->{check_headers} and $l = $transaction->body_getline) {
+        chomp $l;
+        last if !$l;
+    }
+    while ($l = $transaction->body_getline) {
+        chomp $l;
+
+        if ($l =~ /(.*)=$/) {
+            push @qp_continuations, $1;
+        } elsif (@qp_continuations) {
+            $l = join('', @qp_continuations, $l);
+            @qp_continuations = ();
+        }
+
+        # Undo URI escape munging
+        $l =~ s/[=%]([0-9A-Fa-f]{2,2})/chr(hex($1))/ge;
+        # Undo HTML entity munging (e.g. in parameterized redirects)
+        $l =~ s/&#(\d{2,3});?/chr($1)/ge;
+        # Dodge inserted-semicolon munging
+        $l =~ tr/;//d;
+
+        while ($l =~ m{
+            \w{3,16}:/+            # protocol
+            (?:\S+@)?            # user/pass
+            (\d{7,})            # raw-numeric IP
+            (?::\d*)?([/?\s]|$)        # port, slash
+                            #  or EOL
+            }gx) {
+            my @octets = (
+                (($1 >> 24) & 0xff),
+                (($1 >> 16) & 0xff),
+                (($1 >> 8) & 0xff),
+                ($1 & 0xff)
+                );
+            my $fwd = join('.', @octets);
+            my $rev = join('.', reverse @octets);
+            $self->log(LOGDEBUG, "uribl: matched pure-integer ipaddr $1 ($fwd)");
+            unless (exists $pending{$rev}) {
+                $queries += $start_query->($self, $rev);
+                $pending{$rev} = 1;
+            }
+        }
+        while ($l =~ m{
+            \w{3,16}:/+                  # protocol
+            (?:\S+@)?                    # user/pass
+            (\d+|0[xX][0-9A-Fa-f]+)\.    # IP address
+            (\d+|0[xX][0-9A-Fa-f]+)\.
+            (\d+|0[xX][0-9A-Fa-f]+)\.
+            (\d+|0[xX][0-9A-Fa-f]+)
+            }gx) {
+            my @octets = ($1,$2,$3,$4);
+            # return any octal/hex octets in the IP addr back
+            # to decimal form (e.g. http://0x7f.0.0.00001)
+            for (0..$#octets) {
+                $octets[$_] =~ s/^0([0-7]+)$/oct($1)/e;
+                $octets[$_] =~ s/^0x([0-9a-fA-F]+)$/hex($1)/e;
+            }
+            my $fwd = join('.', @octets);
+            my $rev = join('.', reverse @octets);
+            $self->log(LOGDEBUG, "uribl: matched URI ipaddr $fwd");
+            unless (exists $pending{$rev}) {
+                $queries += $start_query->($self, $rev);
+                $pending{$rev} = 1;
+            }
+        }
+        while ($l =~ m{
+            ((?:www\.)?                             # www?
+             [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname
+             (?:aero|arpa|asia|biz|cat|com|coop|    # tld
+                edu|gov|info|int|jobs|mil|mobi|
+                museum|name|net|org|pro|tel|travel|
+                [a-zA-Z]{2})
+            )(?!\w)        
+            }gix) {
+            my $host = lc $1;
+            my @host_domains = split /\./, $host;
+            $self->log(LOGDEBUG, "uribl: matched 'www.' hostname $host");
+
+            my $cutoff = exists
+                $strict_twolevel_cctlds{$host_domains[$#host_domains]} ? 3 : 2;
+            if (exists $self->{whitelist_zones}->{
+		join('.', 
+		     @host_domains[($#host_domains-$cutoff+1)..$#host_domains])}) {
+                $self->log(LOGINFO, "Skipping whitelist URI domain '$host'");
+            } else {
+                while (@host_domains >= $cutoff) {
+                    my $subhost = join('.', @host_domains);
+                    unless (exists $pending{$subhost}) {
+                        $self->log(LOGINFO, "URIBL: checking sub-host $subhost");
+                        $queries += $start_query->($self, $subhost);
+                        $pending{$subhost} = 1;
+                    }
+                    shift @host_domains;
+                }
+            }
+        }
+        while ($l =~ m{
+            \w{3,16}:/+                 # protocol
+            (?:\S+@)?                   # user/pass
+            (
+	     [a-zA-Z0-9][a-zA-Z0-9\-.]+\.           # hostname
+	     (?:aero|arpa|asia|biz|cat|com|coop|    # tld
+                edu|gov|info|int|jobs|mil|mobi|
+                museum|name|net|org|pro|tel|travel|
+                [a-zA-Z]{2})
+            )
+            }gix) {
+            my $host = lc $1;
+            my @host_domains = split /\./, $host;
+            $self->log(LOGDEBUG, "uribl: matched full URI hostname $host");
+
+            my $cutoff = exists
+                $strict_twolevel_cctlds{$host_domains[$#host_domains]} ? 3 : 2;
+            if (exists $self->{whitelist_zones}->{
+                    join('.', @host_domains[($cutoff-1)..$#host_domains])}) {
+
+                $self->log(LOGINFO, "Skipping whitelist URI domain '$host'");
+            } else {
+                while (@host_domains >= $cutoff) {
+                    my $subhost = join('.', @host_domains);
+                    unless (exists $pending{$subhost}) {
+                        $self->log(LOGINFO, "URIBL: checking sub-host $subhost");
+                        $queries += $start_query->($self, $subhost);
+                        $pending{$subhost} = 1;
+                    }
+                    shift @host_domains;
+                }
+            }
+        }
+    }
+    $transaction->body_resetpos;
+
+    return $queries;
+}
+
+# async version: not used
+sub collect_results {
+    my ($self, $transaction) = @_;
+
+    my $matches = 0;
+    my $complete = 0;
+    my $start_time = time;
+    while ($self->{socket_select}->handles) {
+        my $timeout = ($start_time + $self->{timeout}) - time;
+        last if $timeout <= 0;
+
+        my @ready = $self->{socket_select}->can_read($timeout);
+
+        SOCK: for my $s (@ready) {
+            $self->{socket_select}->remove($s);
+            my $r = $self->{socket_idx}->{"$s"} or next SOCK;
+            $self->log(LOGDEBUG, "from $r: socket $s: ".
+                join(', ', map { "$_=$r->{$_}" } keys %{$r}));
+            my $zone = $r->{zone};
+            my $name = $r->{name};
+            my $h = $self->{sockets}->{$zone}->{$name};
+            my $packet = $self->{resolver}->bgread($s)
+                or next SOCK;
+
+            for my $a ($packet->answer) {
+                if ($a->type eq 'TXT') {
+                    $h->{txt} = $a->txtdata;
+                }
+                elsif ($a->type eq 'A') {
+                    $h->{a} = $a->address;
+                    if ($self->evaluate($zone, $h->{a})) {
+                        $self->log(LOGDEBUG,
+                            "match in $zone");
+                        $h->{match} = 1;
+                        $matches++;
+                    }
+                }
+            }
+
+            $complete++;
+        }
+    }
+    my $elapsed = time - $start_time;
+    $self->log(LOGINFO,
+        sprintf("$complete lookup%s finished in %.2f sec (%d match%s)",
+            $complete == 1 ? '' : 's', $elapsed,
+            $matches, $matches == 1 ? '' : 'es'));
+
+    my @matches = ();
+    for my $z (keys %{$self->{sockets}}) {
+        for my $n (keys %{$self->{sockets}->{$z}}) {
+            my $h = $self->{sockets}->{$z}->{$n};
+            next unless $h->{match};
+            push @matches, {
+                action =>
+                    $self->{uribl_zones}->{$z}->{action},
+                desc => "$n in $z: ".
+                    ($h->{txt} || $h->{a}),
+            };
+        }
+    }
+
+    $self->lookup_finish;
+
+    return \@matches;
+}
+
+# async version: not used
+sub data_handler {
+    my ($self, $transaction) = @_;
+
+    return (DECLINED) if $self->is_immune();
+
+    my $queries = $self->lookup_start($transaction, sub {
+        my ($self, $name) = @_;
+        return $self->send_query($name);
+    });
+
+    unless ($queries) {
+        $self->log(LOGINFO, "No URIs found in mail");
+        return DECLINED;
+    }
+
+    my $matches = $self->collect_results($transaction);
+    for (@$matches) {
+        $self->log(LOGWARN, $_->{desc});
+        if ($_->{action} eq 'add-header') {
+            $transaction->header->add('X-URIBL-Match', $_->{desc});
+        } elsif ($_->{action} eq 'deny') {
+            return (DENY, $_->{desc});
+        } elsif ($_->{action} eq 'denysoft') {
+            return (DENYSOFT, $_->{desc});
+        }
+    }
+    return DECLINED;
+}
+
+# async version: not used
+sub init_resolver {
+    my $self = shift;
+
+    $self->{resolver} = new Net::DNS::Resolver or return undef;
+    $self->{resolver}->udp_timeout($self->{timeout});
+}
+

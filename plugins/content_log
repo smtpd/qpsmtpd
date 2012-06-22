@@ -1,0 +1,25 @@
+#!perl -w
+
+# A simple example of a plugin that logs all incoming mail to a file.
+# Useful for debugging other plugins or keeping an archive of things.
+
+use POSIX qw:strftime:;
+
+sub hook_data_post {
+  my ($self, $transaction) = @_;
+
+  # as a decent default, log on a per-day-basis
+  my $date = strftime("%Y%m%d",localtime(time));
+  open(my $out,">>mail/$date")
+    or return(DECLINED,"Could not open log file.. continuing anyway");
+
+  $transaction->header->print($out);
+  $transaction->body_resetpos;
+  while (my $line = $transaction->body_getline) {
+    print $out $line;
+  }
+
+  close $out;
+
+  return (DECLINED, "successfully saved message.. continuing");
+}

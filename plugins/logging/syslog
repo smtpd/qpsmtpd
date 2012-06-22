@@ -1,0 +1,186 @@
+#!perl -w
+
+=head1 NAME
+
+syslog - Syslog logging plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+The syslog plugin for qpsmtpd passes qpsmtpd log messages into the standard
+UNIX syslog facility, mapping qpsmtpd priorities to syslog priorities.
+
+=head1 CONFIGURATION
+
+To enable the logging plugin, add a line of this form to the qpsmtpd plugins
+configuration file:
+
+=over
+
+logging/syslog [loglevel l] [priority p] [ident str] [facility f] [logsock t]
+
+For example:
+
+logging/syslog loglevel LOGINFO priority LOG_NOTICE
+
+=back
+
+The following optional configuration settings can be supplied:
+
+=over
+
+=item B<loglevel>
+
+The internal log level below which messages will be logged.  Priorities count
+downward as follows:
+
+=over
+
+=item B<LOGDEBUG>
+
+=item B<LOGINFO>
+
+=item B<LOGNOTICE>
+
+=item B<LOGWARN>
+
+=item B<LOGERROR>
+
+=item B<LOGCRIT>
+
+=item B<LOGALERT>
+
+=item B<LOGEMERG>
+
+=back
+
+
+=item B<priority>
+
+Normally, log messages will be mapped from the above log levels into the
+syslog(3) log levels of their corresponding names.  This will cause various
+messages to appear or not in syslog outputs according to your syslogd
+configuration (typically /etc/syslog.conf).  However, if the B<priority>
+setting is used, all messages will be logged at that priority regardless of
+what the original priority might have been.
+
+=item B<ident>
+
+The ident string that will be attached to messages logged via this plugin.
+The default is 'qpsmtpd'.
+
+=item B<facility>
+
+The syslog facility to which logged mesages will be directed.  See syslog(3)
+for details.  The default is LOG_MAIL.
+
+=item B<logsock>
+
+The syslog socket where messages should be sent via syslogsock().  The valid
+options are 'udp', 'tcp', 'unix', 'stream' and 'console'.  Not all are
+available on all systems.  See Sys::Syslog for details.  The default is
+the above list in that order.  To select specific sockets, use a comma to
+separate the types.
+
+=over
+
+    logsock udp,unix
+    logsock stream
+
+=back
+
+=back
+
+=head1 AUTHOR
+
+Devin Carraway <qpsmtpd@devin.com>
+Peter Eisch <peter@boku.net> (logsock support)
+
+=head1 LICENSE
+
+Copyright (c) 2005, Devin Carraway.
+
+This plugin is licensed under the same terms as the qpsmtpd package itself.
+Please see the LICENSE file included with qpsmtpd for details.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+use Sys::Syslog qw(:DEFAULT setlogsock);
+
+sub register {
+    my ($self, $qp, @args) = @_;
+    my %args;
+
+    if (@args % 2 == 0) {
+        %args = @args;
+    } else {
+        warn "Malformed arguments to syslog plugin";
+        return;
+    }
+
+    my $ident = 'qpsmtpd';
+    my $logopt = 'pid';
+    my $facility = 'LOG_MAIL';
+
+    $self->{_loglevel} = LOGWARN;
+
+    if ($args{loglevel}) {
+        if ($args{loglevel} =~ /^(\d+)$/) {
+            $self->{_loglevel} = $1;
+        }
+        elsif ($args{loglevel} =~ /^(LOG\w+)$/) {
+            $self->{_loglevel} = log_level($1) || LOGWARN;
+        }
+    }
+
+    if ($args{priority}) {
+        if ($args{priority} =~ /^(\d+|LOG\w+)$/) {
+            $self->{_priority} = $1;
+        }
+    }
+
+    if ($args{ident} && $args{ident} =~ /^([\w\-.]+)$/) {
+        $ident = $1;
+    }
+    if ($args{facility} && $args{facility} =~ /^(\w+)$/) {
+        $facility = $1;
+    }
+
+    if ($args{logsock}) {
+       my @logopt = split(/,/, $args{logsock});
+       setlogsock(@logopt);
+    }
+
+    unless (openlog $ident, $logopt, $facility) {
+        warn "Error opening syslog output";
+        return;
+    }
+}
+
+my %priorities_ = (
+    0 => 'LOG_EMERG',
+    1 => 'LOG_ALERT',
+    2 => 'LOG_CRIT',
+    3 => 'LOG_ERR',
+    4 => 'LOG_WARNING',
+    5 => 'LOG_NOTICE',
+    6 => 'LOG_INFO',
+    7 => 'LOG_DEBUG',
+);
+
+sub hook_logging {
+    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+
+    return DECLINED if $trace > $self->{_loglevel};
+    return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
+
+    my $priority = $self->{_priority} ?
+                   $self->{_priority} : $priorities_{$trace};
+
+    syslog $priority, '%s', join(' ', @log);
+    return DECLINED;
+}
+

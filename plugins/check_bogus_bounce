@@ -1,0 +1,126 @@
+#!perl -w
+
+=head1 NAME
+
+check_bogus_bounce - Check that a bounce message isn't bogus
+
+=head1 DESCRIPTION
+
+This plugin is designed to reject bogus bounce messages.
+
+In our case a bogus bounce message is defined as a bounce message
+which has more than a single recipient.
+
+=head1 CONFIGURATION
+
+Only a single argument is recognized and is assumed to be the default
+action.  Valid settings are:
+
+=over 8
+
+=item log
+
+Merely log the receipt of the bogus bounce (the default behaviour).
+
+=item deny
+
+Deny with a hard error code.
+
+=item denysoft
+
+Deny with a soft error code.
+
+=back
+
+=cut
+
+=head1 AUTHOR
+
+Steve Kemp
+--
+http://steve.org.uk/Software/qpsmtpd/
+
+=cut
+
+=begin doc
+
+Look for our single expected argument and configure "action" appropriately.
+
+=end doc
+
+=cut
+
+sub register {
+    my ($self, $qp, $arg, @nop) = (@_);
+
+    #
+    #  Default behaviour is to merely log.
+    #
+    $self->{_action} = "log";
+
+    #
+    #  Unless one was specified
+    #
+    if ($arg) {
+        if ($arg =~ /^(log|deny|denysoft)$/i) {
+            $self->{_action} = $arg;
+        }
+        else {
+            die "Invalid argument '$arg' - use one of : log, deny, denysoft";
+        }
+    }
+}
+
+=begin doc
+
+Handle the detection of bounces here.
+
+If we find a match then we'll react with our expected action.
+
+=end doc
+
+=cut
+
+sub hook_data_post {
+    my ($self, $transaction) = (@_);
+
+    #
+    # Find the sender, and return unless it wasn't a bounce.
+    #
+    my $sender = $transaction->sender->address || undef;
+    return DECLINED unless ($sender eq "<>");
+
+    #
+    #  Get the recipients.
+    #
+    my @to = $transaction->recipients || ();
+    return DECLINED unless (scalar @to > 1);
+
+    #
+    #  OK at this point we know:
+    #
+    #   1.  It is a bounce, via the null-envelope.
+    #   2.  It is a bogus bounce, because there are more than one recipients.
+    #
+    if (lc $self->{_action} eq "log") {
+        $self->log(LOGWARN,
+                 $self->plugin_name() . " bogus bounce for :" . join(",", @to));
+    }
+    elsif (lc $self->{_action} eq "deny") {
+        return (DENY,
+                $self->plugin_name() . " determined this to be a bogus bounce");
+    }
+    elsif (lc $self->{_action} eq "denysoft") {
+        return (DENYSOFT,
+                $self->plugin_name() . " determined this to be a bogus bounce");
+    }
+    else {
+        $self->log(LOGWARN,
+                   $self->plugin_name() . " failed to determine action.  bug?");
+    }
+
+    #
+    #  All done; allow this to proceed
+    #
+    return DECLINED;
+}

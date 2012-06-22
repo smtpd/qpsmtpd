@@ -1,0 +1,7 @@
+#!perl -w
+# this is a simple 'drop packets on the floor' plugin
+
+sub hook_logging {
+  return DECLINED;
+}
+

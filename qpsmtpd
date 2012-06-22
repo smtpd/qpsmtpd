@@ -1,0 +1,38 @@
+#!/usr/bin/perl -Tw
+# Copyright (c) 2001-2010 Ask Bjoern Hansen. See the LICENSE file for details.
+# The "command dispatch" system was taken from colobus - http://trainedmonkey.com/colobus/
+#
+# this is designed to be run under tcpserver (http://cr.yp.to/ucspi-tcp.html)
+# or inetd if you're into that sort of thing
+#
+#
+# For more information see http://smtpd.develooper.com/
+#
+#
+
+use lib 'lib';
+use Qpsmtpd::TcpServer;
+use strict;
+$| = 1;
+
+delete $ENV{ENV};
+$ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
+
+my $qpsmtpd = Qpsmtpd::TcpServer->new();
+$qpsmtpd->load_plugins();
+$qpsmtpd->start_connection();
+$qpsmtpd->run(\*STDIN); # pass the "socket" like -prefork/-forkserver
+$qpsmtpd->run_hooks("post-connection");
+$qpsmtpd->connection->reset;
+
+# needed for Qpsmtpd::TcpServer::check_socket(): 
+#  emulate IO::Socket::connected on STDIN. STDIN was used instead of STDOUT
+#  because the other code also calls getpeername(STDIN).
+sub IO::Handle::connected { return getpeername(shift) }
+
+__END__
+
+
+
+
+1;

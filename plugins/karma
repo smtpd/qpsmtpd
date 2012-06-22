@@ -1,0 +1,474 @@
+#!perl -w
+
+=head1 NAME
+
+karma - reward nice and penalize naughty mail senders
+
+=head1 SYNOPSIS
+
+Karma tracks sender history, providing the ability to deliver differing levels
+of service to naughty, nice, and unknown senders.
+
+=head1 DESCRIPTION
+
+Karma records the number of nice, naughty, and total connections from mail
+senders. After sending a naughty message, if a sender has more naughty than
+nice connections, they are penalized for I<penalty_days>. Connections
+from senders in the penalty box are tersely disconnected.
+
+Karma provides other plugins with a karma value they can use to be more
+lenient, strict, or skip processing entirely.
+
+Karma is small, fast, and ruthlessly efficient. Karma can be used to craft
+custom connection policies such as these two examples: 
+
+=over 4 
+
+Hi there, well behaved sender. Please help yourself to TLS, AUTH, greater
+concurrency, multiple recipients, no delays, and other privileges.
+
+Hi there, naughty sender. Enjoy this poke in the eye with a sharp stick. Bye.
+
+=back 
+
+=head1 CONFIG
+
+=head2 negative <integer>
+
+How negative a senders karma can get before we penalize them for sending a
+naughty message. Karma is the number of nice - naughty connections. 
+
+Default: 1
+
+Examples:
+
+   negative 1:  0 nice - 1 naughty = karma -1, penalize
+   negative 1:  1 nice - 1 naughty = karma  0, okay
+   negative 2:  1 nice - 2 naughty = karma -1, okay
+   negative 2:  1 nice - 3 naughty = karma -2, penalize
+
+With the default negative limit of one, there's a very small chance you could
+penalize a "mostly good" sender. Raising it to 2 reduces that possibility to
+improbable.
+
+=head2 penalty_days <days>
+
+The number of days a naughty sender is refused connections. Use a decimal
+value to penalize for portions of days.
+
+  karma penalty_days 1
+
+Default: 1
+
+=head2 reject
+
+  karma reject [ 0 | 1 | connect | naughty ]
+
+I<0> will not reject any connections.
+
+I<1> will reject naughty senders.
+
+I<connect> is the most efficient setting. 
+
+To reject at any other connection hook, use the I<naughty> setting and the
+B<naughty> plugin.
+
+=head2 db_dir <path>
+
+Path to a directory in which the DB will be stored. This directory must be
+writable by the qpsmtpd user. If unset, the first usable directory from the
+following list will be used:
+
+=over 4
+
+=item /var/lib/qpsmtpd/karma
+
+=item I<BINDIR>/var/db (where BINDIR is the location of the qpsmtpd binary)
+
+=item I<BINDIR>/config
+
+=back
+
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
+
+=head1 BENEFITS
+
+Karma reduces the resources wasted by naughty mailers.  When used with
+I<reject connect>, naughty senders are disconnected in about 0.1 seconds.
+
+The biggest gains to be had are by having heavy plugins (spamassassin, dspam,
+virus filters) set the B<karma> transaction note (see KARMA) when they encounter
+naughty senders. Reasons to send servers to the penalty box could include
+sending a virus, early talking, or sending messages with a very high spam
+score.
+
+This plugin does not penalize connections with transaction notes I<relayclient>
+or I<whitelisthost> set. These notes would have been set by the B<relay>, 
+B<whitelist>, and B<dns_whitelist_soft> plugins. Obviously, those plugins must
+run before B<karma> for that to work.
+
+=head1 KARMA
+
+No attempt is made by this plugin to determine what karma is. It is up to
+other plugins to make that determination and communicate it to this plugin by
+incrementing or decrementing the transaction note B<karma>. Raise it for good
+karma and lower it for bad karma. This is best done like so:
+
+ # only if karma plugin loaded
+ if ( defined $connection->notes('karma') ) {   
+   $connection->notes('karma', $connection->notes('karma') - 1); # bad
+   $connection->notes('karma', $connection->notes('karma') + 1); # good 
+ };
+
+After the connection ends, B<karma> will record the result. Mail servers whose
+naughty connections exceed nice ones are sent to the penalty box. Servers in
+the penalty box will be tersely disconnected for I<penalty_days>. Here is
+an example connection from an IP in the penalty box:
+
+ 73122 Connection from smtp.midsetmediacorp.com [64.185.226.65]
+ 73122 (connect) ident::geoip: US, United States
+ 73122 (connect) ident::p0f: Windows 7 or 8
+ 73122 (connect) earlytalker: pass: 64.185.226.65 said nothing spontaneous
+ 73122 (connect) relay: skip: no match
+ 73122 (connect) karma: fail
+ 73122 550 You were naughty. You are penalized for 0.99 more days.
+ 73122 click, disconnecting
+ 73122 (post-connection) connection_time: 1.048 s.
+
+If we only set negative karma, we will almost certainly penalize servers we
+want to receive mail from. For example, a Yahoo user sends an egregious spam
+to a user on our server. Now nobody on our server can receive email from that
+Yahoo server for I<penalty_days>. This should happen approximately 0% of
+the time if we are careful to also set positive karma.
+
+=head1 KARMA HISTORY
+
+Karma maintains a history for each IP. When a senders history has decreased
+below -5 and they have never sent a good message, they get a karma bonus.
+The bonus tacks on an extra day of blocking for every naughty message they
+sent us.
+
+Example: an unknown sender delivers a spam. They get a one day penalty_box.
+After 5 days, 5 spams, 5 penalties, and 0 nice messages, they get a six day
+penalty. The next offence gets a 7 day penalty, and so on.
+
+=head1 USING KARMA
+
+To get rid of naughty connections as fast as possible, run karma before other
+connection plugins. Plugins that trigger DNS lookups or impose time delays
+should run after B<karma>. In this example, karma runs before all but the
+ident plugins.
+
+ 89011 Connection from Unknown [69.61.27.204]
+ 89011 (connect) ident::geoip: US, United States
+ 89011 (connect) ident::p0f: Linux 3.x
+ 89011 (connect) karma: fail, 1 naughty, 0 nice, 1 connects
+ 89011 550 You were naughty. You are penalized for 0.99 more days.
+ 89011 click, disconnecting
+ 89011 (post-connection) connection_time: 0.118 s.
+ 88798 cleaning up after 89011
+
+Unlike RBLs, B<karma> only penalizes IPs that have sent us spam, and only when
+those senders haven't sent us any ham. As such, it's much safer to use.
+
+=head1 USING KARMA IN OTHER PLUGINS
+
+This plugin sets the connection note I<karma_history>. Your plugin can
+use the senders karma to be more gracious or rude to senders. The value of
+I<karma_history> is the number the nice connections minus naughty
+ones. The higher the number, the better you should treat the sender.
+
+When I<reject naughty> is set and a naughty sender is encountered, most
+plugins should skip processing. However, if you wish to toy with spammers by
+teergrubing, extending banner delays, limiting connections, limiting
+recipients, random disconnects, handoffs to rblsmtpd, and other fun tricks, 
+then connections with the I<naughty> note set are for you!
+
+=head1 EFFECTIVENESS
+
+In the first 24 hours, B<karma> rejected 8% of all connections. After one
+week of running with I<penalty_days 1>, karma has rejected 15% of all
+connections.
+
+This plugins effectiveness results from the propensity of naughty senders
+to be repeat offenders. Limiting them to a single offense per day(s) greatly
+reduces the number of useless tokens miscreants add to our Bayes databases.
+
+Of the connections that had previously passed all other checks and were caught
+only by spamassassin and/or dspam, B<karma> rejected 31 percent. Since
+spamassassin and dspam consume more resources than others plugins, this plugin
+seems to be a very big win.
+
+=head1 DATABASE
+
+Connection summaries are stored in a database. The database key is the int
+form of the remote IP. The value is a : delimited list containing a penalty
+box start time (if the server is/was on timeout) and the count of naughty,
+nice, and total connections. The database can be listed and searched with the
+karma_dump.pl script.
+
+=head1 BUGS & LIMITATIONS
+
+This plugin is reactionary. Like the FBI, it doesn't punish until
+after a crime has been committed. It an "abuse me once, shame on you,
+abuse me twice, shame on me" policy.
+
+There is little to be gained by listing servers that are already on DNS
+blacklists, send to non-existent users, earlytalkers, etc. Those already have
+very lightweight tests.
+
+=head1 AUTHOR
+
+ 2012 - Matt Simerson - msimerson@cpan.org
+
+=head1 ACKNOWLEDGEMENTS
+
+Gavin Carr's DB implementation in the greylisting plugin.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
+use AnyDBM_File;
+use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
+use Net::IP;
+
+sub register {
+    my ($self, $qp ) = shift, shift;
+    $self->log(LOGERROR, "Bad arguments") if @_ % 2;
+    $self->{_args} = { @_ };
+    $self->{_args}{negative}     ||= 1;
+    $self->{_args}{penalty_days} ||= 1;
+    $self->{_args}{reject_type}  ||= 'disconnect';
+
+    if ( ! defined $self->{_args}{reject} ) {
+        $self->{_args}{reject} = 'naughty';
+    };
+    #$self->prune_db();    # keep the DB compact
+    $self->register_hook('connect',           'connect_handler');
+    $self->register_hook('disconnect',        'disconnect_handler');
+}
+
+sub connect_handler {
+    my $self = shift;
+
+    $self->connection->notes('karma', 0);  # default
+
+    return DECLINED if $self->is_immune();
+
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $key  = $self->get_db_key();
+
+    if ( ! $tied->{$key} ) {
+        $self->log(LOGINFO, "pass, no record");
+        return $self->cleanup_and_return($tied, $lock );
+    };
+
+    my ($penalty_start_ts, $naughty, $nice, $connects) = $self->parse_value( $tied->{$key} );
+    my $summary = "$naughty naughty, $nice nice, $connects connects";
+    my $karma = $self->calc_karma($naughty, $nice);
+
+    if ( ! $penalty_start_ts ) {
+        $self->log(LOGINFO, "pass, no penalty ($summary)");
+        return $self->cleanup_and_return($tied, $lock );
+    };
+
+    my $days_old = (time - $penalty_start_ts) / 86400;
+    if ( $days_old >= $self->{_args}{penalty_days} ) {
+        $self->log(LOGINFO, "pass, penalty expired ($summary)");
+        return $self->cleanup_and_return($tied, $lock );
+    };
+
+    $tied->{$key} = join(':', $penalty_start_ts, $naughty, $nice, ++$connects);
+    $self->cleanup_and_return($tied, $lock );
+
+    my $left = sprintf "%.2f", $self->{_args}{penalty_days} - $days_old;
+    my $mess = "You were naughty. You are penalized for $left more days.";
+
+    return $self->get_reject( $mess, $karma );
+}
+
+sub disconnect_handler {
+    my $self = shift;
+
+    my $karma = $self->connection->notes('karma') or do {
+        $self->log(LOGDEBUG, "no karma");
+        return DECLINED;
+    };
+
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $key  = $self->get_db_key();
+
+    my ($penalty_start_ts, $naughty, $nice, $connects) = $self->parse_value( $tied->{$key} );
+
+    if ( $karma < 0 ) {
+        $naughty++;
+        my $negative_limit = 0 - $self->{_args}{negative};
+        my $history  = ($nice || 0) - $naughty;
+        if ( $history <= $negative_limit ) {
+            if ( $nice == 0 && $history < -5 ) {
+                $self->log(LOGINFO, "penalty box bonus!");
+                $penalty_start_ts = sprintf "%s", time + abs($history) * 86400;
+            }
+            else {
+                $penalty_start_ts = sprintf "%s", time;
+            };
+            $self->log(LOGINFO, "negative, sent to penalty box ($history)");
+        }
+        else {
+            $self->log(LOGINFO, "negative");
+        };
+    }
+    elsif ($karma > 1) {
+        $nice++;
+        $self->log(LOGINFO, "positive");
+    }
+
+    $tied->{$key} = join(':', $penalty_start_ts, $naughty, $nice, ++$connects);
+    return $self->cleanup_and_return($tied, $lock );
+}
+
+sub parse_value {
+    my ($self, $value) = @_;
+
+    my $penalty_start_ts = my $naughty = my $nice = my $connects = 0;
+    if ( $value  ) {
+        ($penalty_start_ts, $naughty, $nice, $connects) = split /:/, $value;
+        $penalty_start_ts ||= 0;
+        $nice    ||= 0;
+        $naughty ||= 0;
+        $connects ||= 0;
+    };
+    return ($penalty_start_ts, $naughty, $nice, $connects );
+};
+
+sub calc_karma {
+    my ($self, $naughty, $nice) = @_;
+    return 0 if ( ! $naughty && ! $nice );
+
+    my $karma = ( $nice || 0 ) - ( $naughty || 0 );
+    $self->connection->notes('karma_history', $karma );
+    return $karma;
+};
+
+sub cleanup_and_return {
+    my ($self, $tied, $lock, $return_val ) = @_;
+
+    untie $tied;
+    close $lock;
+    return ($return_val) if defined $return_val;  # explicit override
+    return (DECLINED);
+};
+
+sub get_db_key {
+    my $self = shift;
+    my $nip = Net::IP->new( $self->qp->connection->remote_ip );
+    return $nip->intip;   # convert IP to an int
+};
+
+sub get_db_tie {
+    my ( $self, $db, $lock ) = @_;
+
+    tie( my %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) or do {
+        $self->log(LOGCRIT, "tie to database $db failed: $!");
+        close $lock;
+        return;
+    };
+    return \%db;
+};
+
+sub get_db_location {
+    my $self = shift;
+
+    # Setup database location
+    my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
+    my @candidate_dirs = ( $self->{args}{db_dir},
+        "/var/lib/qpsmtpd/karma", "$QPHOME/var/db", "$QPHOME/config", '.' );
+
+    my $dbdir;
+    for my $d ( @candidate_dirs ) {
+        next if ! $d || ! -d $d;   # impossible
+        $dbdir = $d;
+        last;   # first match wins
+    }
+    my $db = "$dbdir/karma.dbm";
+    $self->log(LOGDEBUG,"using $db as karma database");
+    return $db;
+};
+
+sub get_db_lock {
+    my ($self, $db) = @_;
+
+    return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
+
+    # Check denysoft db
+    open( my $lock, ">$db.lock" ) or do {
+        $self->log(LOGCRIT, "opening lockfile failed: $!");
+        return;
+    };
+
+    flock( $lock, LOCK_EX ) or do {
+        $self->log(LOGCRIT, "flock of lockfile failed: $!");
+        close $lock;
+        return;
+    };
+
+    return $lock;
+}
+
+sub get_db_lock_nfs {
+    my ($self, $db) = @_;
+
+    require File::NFSLock;
+
+    ### set up a lock - lasts until object looses scope
+    my $nfslock = new File::NFSLock {
+        file      => "$db.lock",
+        lock_type => LOCK_EX|LOCK_NB,
+        blocking_timeout   => 10,      # 10 sec
+        stale_lock_timeout => 30 * 60, # 30 min
+    } or do {
+        $self->log(LOGCRIT, "nfs lockfile failed: $!");
+        return;
+    };
+
+    open( my $lock, "+<$db.lock") or do {
+        $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
+        return;
+    };
+
+    return $lock;
+};
+
+sub prune_db {
+    my $self = shift;
+
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $count = keys %$tied;
+
+    my $pruned = 0;
+    foreach my $key ( keys %$tied ) {
+        my $ts = $tied->{$key};
+        my $days_old = ( time - $ts ) / 86400;
+        next if $days_old < $self->{_args}{penalty_days} * 2;
+        delete $tied->{$key};
+        $pruned++;
+    };
+    untie $tied;
+    close $lock;
+    $self->log( LOGINFO, "pruned $pruned of $count DB entries" );
+    return $self->cleanup_and_return( $tied, $lock, DECLINED );
+};
+

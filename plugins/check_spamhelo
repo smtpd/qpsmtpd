@@ -1,0 +1,34 @@
+#!perl -w
+=head1 NAME
+
+check_spamhelo - Check a HELO message delivered from a connecting host.
+
+=head1 DESCRIPTION
+
+Check a HELO message delivered from a connecting host.  Reject any
+that appear in the badhelo config -- e.g. yahoo.com and aol.com, which
+neither the real Yahoo or the real AOL use, but which spammers use
+rather a lot.
+
+=head1 CONFIGURATION
+
+Add domains or hostnames to the F<badhelo> configuration file; one
+per line.
+
+=cut
+
+sub hook_helo {
+  my ($self, $transaction, $host) = @_;
+  ($host = lc $host) or return DECLINED;
+  
+  for my $bad ($self->qp->config('badhelo')) {
+    if ($host eq lc $bad) {
+      $self->log(LOGDEBUG, "Denying HELO from host claiming to be $bad");
+      return (DENY_DISCONNECT, "Sorry, I don't believe that you are $host.");
+    }
+  }
+  return DECLINED;
+}
+
+# also support EHLO
+*hook_ehlo = \&hook_helo;

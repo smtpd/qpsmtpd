@@ -1,0 +1,147 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+# Very basic script to create TLS certificates for qpsmtpd
+use File::Temp qw/ tempfile tempdir /;
+use Getopt::Long;
+
+my %opts = ();
+chomp (my $hostname = `hostname --fqdn`);
+if ($?) {
+    chomp($hostname = `hostname`);
+}
+print "Using hostname: $hostname\n";
+my %defaults = (
+    C  => 'XY',
+    ST => 'unknown',
+    L  => 'unknown',
+    O  => 'QSMTPD',
+    OU => 'Server',
+    CN => $hostname,
+);
+
+GetOptions(\%opts, 
+    'C|Country:s',
+    'ST|State:s',
+    'L|Locality|City:s',
+    'O|Organization:s',
+    'OU|OrganizationalUnit|U:s',
+    'CN|CommonName|N:s',
+    'emailAddress|email|E:s',
+    'help|H',
+);
+
+usage() if $opts{help};
+
+# initialize defaults
+foreach my $key ( keys %defaults ) {
+    $opts{$key} = $defaults{$key} unless $opts{$key}
+}
+$opts{emailAddress} = 'postmaster@'.$opts{CN};
+
+mkdir('ssl') unless -d 'ssl';
+
+my $CA_key = 'ssl/qpsmtpd-ca.key';
+my $CA_crt = 'ssl/qpsmtpd-ca.crt';
+my $CA_serial = 'ssl/.cert.serial';
+
+my $template;
+my ($CA, $CAfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
+
+print ${CA} return_cfg('CA');
+close ${CA};
+
+system('openssl', 'genrsa', '-out', $CA_key, 2048) == 0 
+    or die "Cannot create CA key: $?";
+
+system('openssl', 'req', '-config', $CAfilename, '-new', '-x509',
+	'-days', (365*6), '-key', $CA_key,
+	'-out', $CA_crt) == 0
+    or die "Cannot create CA cert: $?";
+
+my $SERVER_key = 'ssl/qpsmtpd-server.key';
+my $SERVER_csr = 'ssl/qpsmtpd-server.csr';
+my $SERVER_crt = 'ssl/qpsmtpd-server.crt';
+
+my ($SERVER, $SERVERfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
+print ${SERVER} return_cfg($opts{OU});
+close ${SERVER};
+
+system('openssl', 'genrsa', '-out', $SERVER_key, 1024) == 0 
+    or die "Cannot create server key: $?";
+
+system('openssl', 'req', '-config', $SERVERfilename, '-new', 
+	'-key', $SERVER_key, '-out', $SERVER_csr) == 0
+    or die "Cannot create server cert: $?";
+
+my ($SIGN, $SIGNfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
+print ${SIGN} <<"EOT";
+extensions = x509v3
+[ x509v3 ]
+subjectAltName   = email:copy
+nsComment        = tls certificate
+nsCertType       = server
+EOT
+close ${SIGN};
+
+open my $SERIAL, '>', $CA_serial;
+print ${SERIAL} "01\n";
+close ${SERIAL};
+
+system('openssl', 'x509', '-extfile', $SIGNfilename, '-days', (365*2),
+	'-CAserial', $CA_serial, '-CA', $CA_crt,
+	'-CAkey', $CA_key, '-in', $SERVER_csr,
+	'-req', '-out', $SERVER_crt) == 0
+    or die "Cannot sign cert: $?";
+
+exit(0);
+	
+sub return_cfg {
+    my $OU = shift;
+    my $RANDOM = int(rand(1000)).'RAN'.int(rand(1000)).'DOM';
+    my $cfg = <<"EOT";
+[ req ]
+default_bits           = 1024
+default_keyfile        = keyfile.pem
+distinguished_name     = req_distinguished_name
+attributes             = req_attributes
+prompt                 = no
+output_password        = mypass
+
+[ req_distinguished_name ]
+C                      = $opts{C}
+ST                     = $opts{ST}
+L                      = $opts{L}
+O                      = $opts{O}
+OU                     = $OU
+CN                     = $opts{CN}
+emailAddress           = $opts{emailAddress}
+
+[ req_attributes ]
+challengePassword      = $RANDOM challenge password
+EOT
+    return $cfg;
+}
+
+sub usage {
+    print STDERR <<"EOT";
+
+ $0 will generate a TLS certificate "the quick way",
+ i.e. without interaction.  You can change some defaults however.
+    
+ These options are recognized:             Default:
+
+  --C       Country (two letters, e.g. DE) $defaults{C}
+  --ST      State (spelled out)            $defaults{ST}
+  --L       City                           $defaults{L}
+  --O       Organization                   $defaults{O}
+  --OU      Organizational Unit            $defaults{OU}
+  --CN      Common name                    $defaults{CN}
+  --email   Email address of postmaster    postmaster\@CN
+  --help    Show usage
+
+EOT
+    exit(1);
+}

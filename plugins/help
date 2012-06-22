@@ -1,0 +1,142 @@
+#!perl -w
+
+=head1 NAME
+
+help - default help plugin for qpsmtpd
+
+=head1 DESCRIPTION
+
+The B<help> plugin gives the answers for the help command. It can be configured
+to return C<502 Not implemented>.
+
+Without any arguments, the C<help_dir> is set to F<./help/>.
+
+=head1 OPTIONS
+
+=over 4
+
+=item not_implemented (1|0)
+
+If this option is set (and the next argument is true), the plugin answers, 
+that the B<HELP> command is not implemented
+
+=item help_dir /path/to/help/files/
+
+When a client requests help for C<COMMAND> the file F</path/to/help/files/ 
+. lc(COMMAND)> is dumped to the client if it exists.
+
+=item COMMAND HELPFILE
+
+Any other argument pair is treated as command / help file pair. The file is 
+expexted in the F<help/> sub directory. If the client calls C<HELP COMMAND>
+the contents of HELPFILE are dumped to him.
+
+=back
+
+=head1 NOTES
+
+The hard coded F<help/> path should be changed.
+
+=cut
+
+my %config = ();
+
+sub register {
+    my ($self,$qp,%args) = @_;
+    my ($file, $cmd);
+    unless (%args) {
+        $config{help_dir} = './help/';
+    }
+    foreach (keys %args) {
+        /^(\w+)$/ or
+            $self->log(LOGWARN, "Invalid argument for the 'help' plugin $_"), 
+            next;
+        $cmd = $1;
+        if ($cmd eq 'not_implemented') {
+            $config{'not_implemented'} = $args{'not_implemented'};
+        }
+        elsif ($cmd eq 'help_dir') {
+            $file = $args{$cmd};
+            $file =~ m#^([\w\.\-/]+)$#
+              or $self->log(LOGERROR, 
+                            "Invalid charachters in filename for command $cmd"),
+                next; 
+            $config{'help_dir'} = $1;
+        }
+        else {
+            $file = $args{$cmd};
+            $file =~ m#^([\w\.\-/]+)$#
+              or $self->log(LOGERROR, 
+                            "Invalid charachters in filename for command $cmd"),
+                 next;
+            $file = $1;
+            if ($file =~ m#/#) {
+                -e $file 
+                  or $self->log(LOGWARN, "No help file for command '$cmd'"),
+                     next;
+            }
+            else {
+                $file = "help/$file";
+                if (-e "help/$file") { ## FIXME: path
+                    $file = "help/$file";
+                } 
+                else {
+                    $self->log(LOGWARN, "No help file for command '$cmd'");
+                    next;
+                }
+            }
+            $config{lc $cmd} = $file;
+        }
+    }
+    return DECLINED;
+}
+
+sub hook_help {
+    my ($self, $transaction, @args) = @_;
+    my ($help, $cmd);
+
+    if ($config{not_implemented}) {
+        $self->qp->respond(502, "Not implemented.");
+        return DONE;
+    }
+
+    return OK, "Try 'HELP COMMAND' for getting help on COMMAND"
+      unless $args[0];
+
+    $cmd = lc $args[0];
+
+    unless ($cmd =~ /^(\w+)$/) { # else someone could request 
+                                 # "HELP ../../../../../../../../etc/passwd"
+        $self->qp->respond(502, "Invalid command name");
+        return DONE;
+    }
+    $cmd = $1;
+
+    if (exists $config{$cmd}) {
+        $help = read_helpfile($config{$cmd}, $cmd)
+            or $self->log(LOGERROR, "failed to open help file for $cmd: $!"),
+               return OK, "No help available for SMTP command: $cmd";
+    }
+    elsif (exists $config{'help_dir'} && -e $config{'help_dir'}."/$cmd") {
+        $help = read_helpfile($config{help_dir}."/$cmd", $cmd)
+            or $self->log(LOGERROR, "failed to open help file for $cmd: $!"),
+               return OK, "No help available for SMTP command: $cmd";
+    }
+    $help = "No help available for SMTP command: $cmd" # empty file
+      unless $help;
+    return OK, split(/\n/, $help);
+}
+
+sub read_helpfile {
+    my ($file,$cmd) = @_;
+    my $help;
+    open HELP, $file
+        or return undef;
+    { 
+        local $/ = undef;
+        $help = <HELP>;
+    };
+    close HELP;
+    return $help;
+}
+
