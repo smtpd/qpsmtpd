@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-headers
+headers - validate message headers
 
 =head1 DESCRIPTION
 
@@ -96,14 +96,14 @@ use Qpsmtpd::Constants;
 
 use Date::Parse qw(str2time);
 
-my @required_headers = qw/ From /;  # <- to comply with RFC 5322, add Date here
+my @required_headers = qw/ From /;  # <- to be RFC 5322 compliant, add Date here
 #my @should_headers   = qw/ Message-ID /;
 my @singular_headers = qw/ Date From Sender Reply-To To Cc Bcc
                            Message-Id In-Reply-To References
                            Subject /;
 
 sub register {
-    my ($self, $qp ) = shift, shift;
+    my ($self, $qp ) = (shift, shift);
 
     $self->log(LOGWARN, "invalid arguments") if @_ % 2;
     $self->{_args} = { @_ };
@@ -129,7 +129,7 @@ sub hook_data_post {
         return $self->get_reject( "missing headers", "missing headers" );
     };
 
-    #return (DECLINED, "immune") if $self->is_immune();
+    return (DECLINED, "immune") if $self->is_immune();
 
     foreach my $h ( @required_headers ) {
         if ( ! $header->get($h) ) {
@@ -156,7 +156,8 @@ sub hook_data_post {
 sub invalid_date_range {
     my $self = shift;
 
-    my $date = $self->transaction->header->get('Date') or return;
+    return if ! $self->transaction->header;
+    my $date = shift || $self->transaction->header->get('Date') or return;
     chomp $date;
 
     my $ts = str2time($date) or do {

@@ -55,7 +55,7 @@ auth/authdeny
 # this plugin needs to run after all other "rcpt" plugins
 rcpt_ok
 
-check_basicheaders days 5 reject_type temp
+headers days 5 reject_type temp
 domainkeys
 
 # content filters
