@@ -30,7 +30,7 @@ output/.*
 ^cover_db/
 \.(orig|rej)$
 packaging
-log/main
-config
-supervise
-ssl
+^log/main/
+^config/
+^supervise/
+^ssl/
