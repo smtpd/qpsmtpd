@@ -7,8 +7,8 @@ naughty - dispose of naughty connections
 =head1 BACKGROUND
 
 Rather than immediately terminating naughty connections, plugins often mark
-the connections and dispose of them later. Examples are B<dnsbl>, B<karma>, 
-B<greylisting>, B<resolvable_fromhost> and B<SPF>. 
+the connections and dispose of them later. Examples are B<dnsbl>, B<karma>,
+B<greylisting>, B<resolvable_fromhost> and B<SPF>.
 
 This practice is based on RFC standards and the belief that malware will retry
 less if we disconnect after RCPT. This may have been true, and may still be,
@@ -44,7 +44,7 @@ connections, regardless of who identified them, exactly when you choose.
 =head2 simplicity
 
 Rather than having plugins split processing across hooks, they can run to
-completion when they have the information they need, issue a 
+completion when they have the information they need, issue a
 I<reject naughty> if warranted, and be done.
 
 This may help reduce the code divergence between the sync and async
@@ -88,7 +88,8 @@ from detecting address validity.
 
 =head2 reject_type [ temp | perm | disconnect ]
 
-What type of rejection should be sent? See docs/config.pod
+If the plugin that set naughty didn't specify, what type of rejection should
+be sent? See docs/config.pod
 
 =head2 loglevel
 
@@ -99,7 +100,7 @@ Adjust the quantity of logging for this plugin. See docs/logging.pod
 Here's how to use naughty and get_reject in your plugin:
 
  sub register {
-    my ($self,$qp) = shift, shift;
+    my ($self, $qp) = (shift, shift);
     $self->{_args} = { @_ };
     $self->{_args}{reject} ||= 'naughty';
  };
@@ -123,14 +124,14 @@ use warnings;
 use Qpsmtpd::Constants;
 
 sub register {
-    my ($self, $qp ) = shift, shift;
+    my ($self, $qp) = (shift, shift);
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
     $self->{_args} = { @_ };
     $self->{_args}{reject} ||= 'rcpt';
     $self->{_args}{reject_type} ||= 'disconnect';
 
     my $reject = lc $self->{_args}{reject};
-    my %hooks  = map { $_ => 1 } 
+    my %hooks  = map { $_ => 1 }
         qw/ connect mail rcpt data data_post hook_queue_post /;
 
     if ( ! $hooks{$reject} ) {
@@ -156,6 +157,8 @@ sub naughty {
         return DECLINED;
     };
     $self->log(LOGINFO, "disconnecting");
-    return ( $self->get_reject_type(), $naughty );
+    my $type = $self->get_reject_type( 'disconnect',
+        $self->connection->notes('naughty_reject_type') );
+    return ( $type, $naughty );
 };
 
