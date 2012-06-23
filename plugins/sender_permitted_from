@@ -46,8 +46,7 @@ The reject options are modeled after, and aim to match the functionality of thos
 
 =head1 AUTHOR
 
-Matt Simerson - 2002 - increased policy options from 3 to 6
-
+Matt Simerson - 2012 - increased policy options from 3 to 6
 Matt Simerson - 2011 - rewrote using Mail::SPF
 
 Matt Sergeant - 2003 - initial plugin
@@ -64,7 +63,7 @@ sub register {
     my ($self, $qp, %args) = @_;
     eval 'use Mail::SPF';
     if ( $@ ) {
-        warn "skip: plugin disabled, could not find Mail::SPF\n";
+        warn "skip: plugin disabled, is Mail::SPF installed?\n";
         $self->log(LOGERROR, "skip: plugin disabled, is Mail::SPF installed?");
         return;
     };
@@ -76,26 +75,29 @@ sub register {
     if ( ! $self->{_args}{reject} && $self->qp->config('spfbehavior') ) {
         $self->{_args}{reject} = $self->qp->config('spfbehavior');
     };
+    $self->register_hook('mail',      'mail_handler');
+    $self->register_hook('data_post', 'data_post_handler');
 }
 
-sub hook_mail {
+sub mail_handler {
     my ($self, $transaction, $sender, %param) = @_;
 
     return (DECLINED) if $self->is_immune();
 
-    if ( ! $self->{_args}{reject} ) {
-        $self->log( LOGINFO, "skip: disabled in config" );
-        return (DECLINED);
-    };
-
     my $format = $sender->format;
     if ( $format eq '<>' || ! $sender->host || ! $sender->user ) {
-        $self->log( LOGINFO, "skip: null sender" );
+        $self->log( LOGINFO, "skip, null sender" );
         return (DECLINED, "SPF - null sender");
     };
 
     if ( $self->is_in_relayclients() ) {
+        $self->log( LOGINFO, "skip, in relayclients" );
         return (DECLINED, "SPF - relaying permitted");
+    };
+
+    if ( ! $self->{_args}{reject} ) {
+        $self->log( LOGINFO, "skip, reject disabled" );
+        return (DECLINED);
     };
 
     my $client_ip  = $self->qp->connection->remote_ip;
@@ -118,21 +120,10 @@ sub hook_mail {
 
     my $spf_server = Mail::SPF::Server->new();
     my $request    = Mail::SPF::Request->new(%req_params);
-    my $result     = $spf_server->process($request);
+    my $result     = $spf_server->process($request) or return DECLINED;
 
     $transaction->notes('spfquery', $result);
 
-    $self->log( LOGINFO, $result );
-
-    return (DECLINED, "SPF - $result->code");
-}
-
-sub hook_rcpt {
-    my ($self, $transaction, $rcpt, %param) = @_;
-
-    return DECLINED if $self->is_special_recipient( $rcpt );
-
-    my $result = $transaction->notes('spfquery') or return DECLINED;
     my $code   = $result->code;
     my $why    = $result->local_explanation;
     my $reject = $self->{_args}{reject};
@@ -172,11 +163,11 @@ sub hook_rcpt {
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
     }
 
-    $self->log(LOGDEBUG, "result for $rcpt->address was $code: $why");
+    $self->log(LOGDEBUG, "SPF from $from was $code: $why");
     return (DECLINED, "SPF - $code: $why");
 }
 
-sub hook_data_post {
+sub data_post_handler {
     my ($self, $transaction) = @_;
 
     my $result = $transaction->notes('spfquery') or return DECLINED;
@@ -188,7 +179,7 @@ sub hook_data_post {
         return DECLINED;
     };
 
-    $transaction->header->add('Received-SPF' => $result->received_spf_header, 0);
+    $transaction->header->add('Received-SPF', $result->received_spf_header, 0);
 
     return DECLINED;
 }
@@ -196,8 +187,6 @@ sub hook_data_post {
 sub is_in_relayclients {
     my $self = shift;
 
-    # If we are receiving from a relay permitted host, then we are probably
-    # not the delivery system, and so we shouldn't check
     my $client_ip          = $self->qp->connection->remote_ip;
     my @relay_clients      = $self->qp->config('relayclients');
     my $more_relay_clients = $self->qp->config('morerelayclients', 'map');
@@ -206,7 +195,7 @@ sub is_in_relayclients {
     while ($client_ip) {
         if ( exists $relay_clients{$client_ip} ||
              exists $more_relay_clients->{$client_ip} ) {
-            $self->log( LOGDEBUG, "skip: relaying permitted (config)" );
+            $self->log( LOGDEBUG, "skip, IP in relayclients" );
             return 1;
         };
         $client_ip =~ s/\d+\.?$// or last;   # strip off another 8 bits
