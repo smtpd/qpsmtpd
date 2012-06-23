@@ -35,6 +35,7 @@ sub init {
 
   if ( $self->{_max_hops} !~ /^\d+$/ ) {
     $self->log(LOGWARN, "Invalid max_hops value -- using default");
+    $self->{_max_hops} = 100;
   }
   $self->log(LOGWARN, "Ignoring additional arguments") if @args > 1;
 }
