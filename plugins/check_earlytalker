@@ -131,7 +131,7 @@ sub apr_connect_handler {
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
         if ($self->{_args}{'defer-reject'}) {
-            $self->qp->connection->notes('earlytalker', 1);
+            $self->connection->notes('earlytalker', 1);
             return DECLINED;
         };
         return $self->log_and_deny();
@@ -172,7 +172,8 @@ sub connect_handler {
         return $self->log_and_deny();
     };
 
-    $self->qp->connection->notes('earlytalker', 1);
+    $self->connection->notes('earlytalker', 1);
+    $self->connection->notes('karma', -1);
     return DECLINED;
 }
 
@@ -194,7 +195,7 @@ sub data_handler {
 sub log_and_pass {
     my $self = shift;
     my $ip = $self->qp->connection->remote_ip || 'remote host';
-    $self->log(LOGINFO, "pass: $ip said nothing spontaneous");
+    $self->log(LOGINFO, "pass, $ip said nothing spontaneous");
     return DECLINED;
 }
 
@@ -202,27 +203,19 @@ sub log_and_deny {
     my $self = shift;
 
     my $ip = $self->qp->connection->remote_ip || 'remote host';
-    my $msg = 'Connecting host started transmitting before SMTP greeting';
 
-    $self->qp->connection->notes('earlytalker', 1);
-    $self->log(LOGNOTICE, "fail: $ip started talking before we said hello");
+    $self->connection->notes('earlytalker', 1);
 
-    return ( $self->get_reject_type(), $msg ) if $self->{_args}{reject};
-    return DECLINED;
+    my $log_mess = "fail, $ip started talking before we said hello";
+    my $smtp_msg = 'Connecting host started transmitting before SMTP greeting';
+
+    return $self->get_reject( $smtp_msg, $log_mess );
 }
 
 sub mail_handler {
   my ($self, $transaction) = @_;
 
-  return DECLINED unless $self->qp->connection->notes('earlytalker');
+  return DECLINED unless $self->connection->notes('earlytalker');
   return $self->log_and_deny();
 }
 
-sub get_reject_type {
-    my $self = shift;
-    my $deny = $self->{_args}{reject_type} or return DENY;
-
-    return $deny eq 'temp'       ? DENYSOFT
-         : $deny eq 'disconnect' ? DENY_DISCONNECT
-         : DENY;
-};
