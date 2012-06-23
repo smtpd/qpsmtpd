@@ -17,6 +17,11 @@ parameters is done.
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 sub hook_mail_parse {
     my $self = shift;
     return (OK, \&_parse) if ($self->qp->connection->hello eq 'helo');
