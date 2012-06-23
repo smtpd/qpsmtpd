@@ -12,7 +12,7 @@ sub register_tests {
     $self->register_test('test_get_v3_query', 1);
     $self->register_test('test_store_v2_results', 2);
     $self->register_test('test_store_v3_results', 2);
-}
+};
 
 sub test_query_p0f_v2 {
 #TODO
@@ -43,7 +43,7 @@ sub test_get_v2_query {
     $self->qp->connection->remote_port(2500);
 
     my $r = $self->get_v2_query();
-    ok( $r, 'get_v2_query' );
+    ok( $r, 'r +' );
     #use Data::Dumper; warn Data::Dumper::Dumper( $r );
 };
 
@@ -54,8 +54,7 @@ sub test_get_v3_query {
     $self->qp->connection->remote_ip($remote);
 
     my $r = $self->get_v3_query();
-    ok( $r, 'get_v3_query' );
-    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
+    ok( $r, 'any +' );
 };
 
 sub test_store_v2_results {
@@ -67,8 +66,8 @@ sub test_store_v2_results {
 
     my $r = $self->store_v2_results( $response );
 
-    ok( $r, "query_p0f_v2 result") or return;
-    ok( $r->{genre} =~ /windows/i, "store_v2_results, genre" );
+    ok( $r, "r: +") or return;
+    ok( $r->{genre} =~ /windows/i, "genre +" );
     #use Data::Dumper; warn Data::Dumper::Dumper( $r );
 };
 
@@ -80,8 +79,8 @@ sub test_store_v3_results {
         'Windows', '7 or 8', '', '', 'Ethernet or modem', '', '');
     my $r = $self->store_v3_results( $response );
 
-    ok( $r, "query_p0f_v3 result");
-    ok( $r->{genre} =~ /windows/i, "store_v3_results, genre" );
+    ok( $r, "result");
+    ok( $r->{genre} =~ /windows/i, "genre" );
 };
 
 
