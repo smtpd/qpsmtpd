@@ -34,7 +34,7 @@ sub hook_mail {
     next unless $bad;
     $bad = lc $bad;
     if ( $bad !~ m/\@/ ) {
-        $self->log(LOGWARN, 'badmailfromto: bad config, no @ sign in '. $bad);
+        $self->log(LOGWARN, 'bad config, no @ sign in '. $bad);
         next;
     };
     if ( $bad eq $from || (substr($bad,0,1) eq '@' && $bad eq "\@$host") ) {
@@ -48,7 +48,7 @@ sub hook_rcpt {
     my ($self, $transaction, $rcpt, %param) = @_;
     my $recipient = lc($rcpt->user) . '@' . lc($rcpt->host);
     my $sender = $transaction->notes('badmailfromto') or do {
-        $self->log(LOGDEBUG, "pass: sender not listed");
+        $self->log(LOGDEBUG, "pass, sender not listed");
         return (DECLINED);
     };
 
@@ -57,7 +57,7 @@ sub hook_rcpt {
         return (DENY, "mail to $recipient not accepted here")
             if lc($from) eq $sender && lc($to) eq $recipient;
     }
-    $self->log(LOGDEBUG, "pass: recipient not listed");
+    $self->log(LOGDEBUG, "pass, recipient not listed");
     return (DECLINED);
 }
 
@@ -65,17 +65,17 @@ sub is_sender_immune {
     my ($self, $sender, $badmf ) = @_;
 
     if ( ! scalar @$badmf ) {
-        $self->log(LOGDEBUG, 'skip: empty list');
+        $self->log(LOGDEBUG, 'skip, empty list');
         return 1;
     };
 
     if ( ! $sender || $sender->format eq '<>' ) {
-        $self->log(LOGDEBUG, 'skip: null sender');
+        $self->log(LOGDEBUG, 'skip, null sender');
         return 1;
     };
 
     if ( ! $sender->host || ! $sender->user ) {
-        $self->log(LOGDEBUG, 'skip: missing user or host');
+        $self->log(LOGDEBUG, 'skip, missing user or host');
         return 1;
     };
 
