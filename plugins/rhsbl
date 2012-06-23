@@ -31,146 +31,111 @@ use warnings;
 use Qpsmtpd::Constants;
 
 sub register {
-  my ($self, $qp, $denial ) = @_;
-  if ( defined $denial and $denial =~ /^disconnect$/i ) {
-    $self->{_rhsbl}->{DENY} = DENY_DISCONNECT;
-  }
-  else {
-    $self->{_rhsbl}->{DENY} = DENY;
-  }
+    my ($self, $qp ) = (shift, shift);
+
+    my $denial;
+    if ( @_ == 1 ) {
+        $denial = shift;
+        if ( defined $denial && $denial =~ /^disconnect$/i ) {
+            $self->{_args}{reject_type} = 'disconnect';
+        }
+        else {
+            $self->{_args}{reject_type} = 'perm';
+        }
+    }
+    else {
+        $self->{_args} = { @_ };
+    };
 }
 
 sub hook_mail {
-  my ($self, $transaction, $sender, %param) = @_;
+    my ($self, $transaction, $sender, %param) = @_;
 
     return DECLINED if $self->is_immune();
 
     if ($sender->format eq '<>') {
-        $self->log(LOGINFO, 'skip, null sender');
+        $self->log(LOGINFO, 'pass, null sender');
         return DECLINED;
     };
 
-    my %rhsbl_zones = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('rhsbl_zones');
+    my %rhsbl_zones = $self->populate_zones() or return DECLINED;
 
-    if ( ! %rhsbl_zones ) {
-        $self->log(LOGINFO, 'skip, no zones');
-        return DECLINED;
-    };
+    my $res = $self->init_resolver();
 
-  my $res = new Net::DNS::Resolver;
-  my $sel = IO::Select->new();
-  my %rhsbl_zones_map = ();
-
-  # Perform any RHS lookups in the background. We just send the query packets
-  # here and pick up any results in the RCPT handler.
-  # MTAs gets confused when you reject mail during MAIL FROM:
-
-    push(my @hosts, $sender->host);
-    #my $helo = $self->qp->connection->hello_host;
-    #push(@hosts, $helo) if $helo && $helo ne $sender->host;
+    my @hosts = $sender->host;
     for my $host (@hosts) {
-    for my $rhsbl (keys %rhsbl_zones) {
-      # fix to find TXT records, if the rhsbl_zones line doesn't have second field
-      if (defined($rhsbl_zones{$rhsbl})) {
-        $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record in the background");
-        $sel->add($res->bgsend("$host.$rhsbl"));
-      } else {
-        $self->log(LOGDEBUG, "Checking $host.$rhsbl for TXT record in the background");
-        $sel->add($res->bgsend("$host.$rhsbl", "TXT"));
-      }
-        $rhsbl_zones_map{"$host.$rhsbl"} = $rhsbl_zones{$rhsbl};
+        for my $rhsbl (keys %rhsbl_zones) {
+            my $query;
+# fix to find TXT records, if the rhsbl_zones line doesn't have second field
+            if (defined($rhsbl_zones{$rhsbl})) {
+                $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record");
+                $query = $res->query("$host.$rhsbl");
+            } else {
+                $self->log(LOGDEBUG, "Checking $host.$rhsbl for TXT record");
+                $query = $res->query("$host.$rhsbl", 'TXT');
+            }
+
+            if ( ! $query) {
+                if  ( $res->errorstring ne 'NXDOMAIN' ) {
+                    $self->log(LOGCRIT, "query failed: ", $res->errorstring);
+                };
+                next;
+            };
+
+            my $result;
+            foreach my $rr ($query->answer) {
+                $self->log(LOGDEBUG, 'got an ' . $rr->type . ' record ' . $rr->name);
+                if ($rr->type eq 'A') {
+                    $self->log(LOGDEBUG, "A record found for $result with IP " . $rr->address);
+                    $result = $rr->name;
+                }
+                elsif ($rr->type eq 'TXT') {
+                    $result = $rr->txtdata;
+                    $self->log(LOGDEBUG, "TXT record found: " . $rr->txtdata);
+                };
+
+                if ( $result ) {
+                    $self->log(LOGINFO, "fail, $result");
+
+                    my $host = $transaction->sender->host;
+                    if ($result =~ /^$host\./ ) {
+                        return $self->get_reject( "Mail from $host rejected because it $result" );
+                    };
+
+                    my $hello = $self->qp->connection->hello_host;
+                    return $self->get_reject( "Mail from HELO $hello rejected because it $result" );
+                };
+            }
+        }
     }
-  }
 
-    %{$self->{_rhsbl_zones_map}} = %rhsbl_zones_map;
-    $transaction->notes('rhsbl_sockets', $sel);
-
-  return DECLINED;
-}
-
-sub hook_rcpt {
-  my ($self, $transaction, $rcpt) = @_;
-
-  my $result = $self->process_sockets or do {
     $self->log(LOGINFO, "pass");
     return DECLINED;
-  };
-
-
-  if ( defined($self->{_rhsbl_zones_map}{$result}) ) {
-    my $host = $transaction->sender->host;
-    if ($result =~ /^$host\./ ) {
-      return ($self->{_rhsbl}->{DENY}, "Mail from $host rejected because it " . $self->{_rhsbl_zones_map}{$result});
-    } else {
-      my $hello = $self->qp->connection->hello_host;
-      return ($self->{_rhsbl}->{DENY}, "Mail from HELO $hello rejected because it " . $self->{_rhsbl_zones_map}{$result});
-    }
-  }
-  return ($self->{_rhsbl}->{DENY}, $result);
 }
 
-sub process_sockets {
-  my ($self) = @_;
-  my $trans = $self->transaction;
-  my $result = '';
+sub populate_zones {
+    my $self = shift;
 
-  return $trans->notes('rhsbl') if $trans->notes('rhsbl');
+    my %rhsbl_zones
+        = map { (split /\s+/, $_, 2)[0,1] }
+            $self->qp->config('rhsbl_zones');
 
-  my $res = new Net::DNS::Resolver;
-  my $sel = $trans->notes('rhsbl_sockets') or return '';
+    if ( ! keys %rhsbl_zones ) {
+        $self->log(LOGINFO, 'pass, no zones');
+        return;
+    };
 
-  $self->log(LOGDEBUG, 'waiting for rhsbl dns');
+    return %rhsbl_zones;
+};
 
-  # don't wait more than 8 seconds here
-  my @ready = $sel->can_read(8);
-
-  $self->log(LOGDEBUG, 'DONE waiting for rhsbl dns, got ' , scalar @ready, ' answers ...') ;
-  return '' unless @ready;
-
-  for my $socket (@ready) {
-    my $query = $res->bgread($socket);
-    $sel->remove($socket);
-    undef $socket;
-
-    if ($query) {
-      foreach my $rr ($query->answer) {
-        $self->log(LOGDEBUG, 'got an ' . $rr->type . ' record ' . $rr->name);
-        if ($rr->type eq 'A') {
-          $result = $rr->name;
-          $self->log(LOGDEBUG, "A record found for $result with IP " . $rr->address);
-          last;
-        } elsif ($rr->type eq 'TXT') {
-          $result = $rr->txtdata;
-          $self->log(LOGDEBUG, "TXT record found: " . $rr->txtdata);
-          last;
-        }
-      }
-    } else {
-      $self->log(LOGCRIT, "query failed: ", $res->errorstring) unless $res->errorstring eq 'NXDOMAIN';
-    }
-
-    if ($result) {
-      #kill any other pending I/O
-      $trans->notes('rhsbl_sockets', undef);
-      return $trans->notes('rhsbl', $result);
-    }
-  }
-
-  if ($sel->count) {
-    # loop around if we have dns results left
-    return $self->process_sockets();
-  }
-
-  # if there was more to read; then forget it
-  $trans->notes('rhsbl_sockets', undef);
-
-  return $trans->notes('rhsbl', $result);
-}
-
-sub hook_disconnect {
-  my ($self, $transaction) = @_;
-
-  $transaction->notes('rhsbl_sockets', undef);
-  return DECLINED;
-}
+sub init_resolver {
+    my $self = shift;
+    return $self->{_resolver} if $self->{_resolver};
+    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
+    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
+    my $timeout = $self->{_args}{timeout} || 8;
+    $self->{_resolver}->tcp_timeout($timeout);
+    $self->{_resolver}->udp_timeout($timeout);
+    return $self->{_resolver};
+};
 
