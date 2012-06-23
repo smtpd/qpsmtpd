@@ -14,24 +14,25 @@ information about incoming connections.
 This plugin saves geographic information in the following connection notes:
 
   geoip_country      - 2 char country code
-  geoip_country_name - full english name of country
+  geoip_country_name - english name of country
   geoip_continent    - 2 char continent code
+  geoip_city         - english name of city
   geoip_distance     - distance in kilometers
 
 And adds entries like this to your logs:
 
-  (connect) ident::geoip: US, United States, NA,    1319 km
-  (connect) ident::geoip: IN, India, AS,    13862 km
+  (connect) ident::geoip: NA, US, United States,     1319 km
+  (connect) ident::geoip: AS, IN, India,            13862 km
   (connect) ident::geoip: fail: no results
-  (connect) ident::geoip: CA, Canada, NA,   2464 km
-  (connect) ident::geoip: US, United States, NA,    2318 km
-  (connect) ident::geoip: PK, Pakistan, AS,    12578 km
-  (connect) ident::geoip: TJ, Tajikistan, AS,  11965 km
-  (connect) ident::geoip: AT, Austria, EU,     8745 km
-  (connect) ident::geoip: IR, Iran, Islamic Republic of, AS,   12180 km
-  (connect) ident::geoip: BY, Belarus, EU,     9030 km
-  (connect) ident::geoip: CN, China, AS,   11254 km
-  (connect) ident::geoip: PA, Panama, NA,  3163 km
+  (connect) ident::geoip: NA, CA, Canada,            2464 km
+  (connect) ident::geoip: NA, US, United States,     2318 km
+  (connect) ident::geoip: AS, PK, Pakistan,         12578 km
+  (connect) ident::geoip: AS, TJ, Tajikistan,       11965 km
+  (connect) ident::geoip: EU, AT, Austria,           8745 km
+  (connect) ident::geoip: AS, IR, Iran, Islamic Republic of, 12180 km
+  (connect) ident::geoip: EU, BY, Belarus,           9030 km
+  (connect) ident::geoip: AS, CN, China,            11254 km
+  (connect) ident::geoip: NA, PA, Panama,            3163 km
 
 Calculating the distance has three prerequsites:
 
@@ -145,18 +146,21 @@ sub connect_handler {
     $self->qp->connection->notes('geoip_country', $c_code);
 
     my $c_name = $self->set_country_name();
-    my ($continent_code, $distance);
+    my ($city, $continent_code, $distance) = '';
 
     if ( $self->{_my_country_code} ) {
         $continent_code = $self->set_continent( $c_code );
+        $city     = $self->set_city_gc();
         $distance = $self->set_distance_gc();
     };
 
-    my $message  = $c_code;
-       $message .= ", $c_name" if $c_name;
-       $message .= ", $continent_code" if $continent_code && $continent_code ne '--';
-       $message .= ", \t$distance km" if $distance;
-    $self->log(LOGINFO, $message);
+    my @msg_parts;
+    push @msg_parts, $continent_code  if $continent_code && $continent_code ne '--';
+    push @msg_parts, $c_code          if $c_code;
+    #push @msg_parts, $c_name          if $c_name;
+    push @msg_parts, $city            if $city;
+    push @msg_parts, "\t$distance km" if $distance;
+    $self->log(LOGINFO, join( ", ", @msg_parts) );
 
     return DECLINED;
 }
@@ -248,6 +252,15 @@ sub set_continent_gc {
     my $continent = $self->{_geoip_record}->continent_code() or return;
     $self->qp->connection->notes('geoip_continent', $continent);
     return $continent;
+};
+
+sub set_city_gc {
+    my $self = shift;
+    return if ! $self->{_geoip_record};
+    my $remote_ip = $self->qp->connection->remote_ip;
+    my $city = $self->{_geoip_record}->city() or return;
+    $self->qp->connection->notes('geoip_city', $city);
+    return $city;
 };
 
 sub set_distance_gc {
