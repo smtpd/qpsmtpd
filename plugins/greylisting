@@ -17,7 +17,7 @@ has configurable timeout periods (black/grey/white) to control whether
 connections are allowed, instead of using connection counts or rates.
 
 Automatic whitelisting is enabled for relayclients, whitelisted hosts,
-whitelisted senders, p0f matches, and geoip matches.
+whitelisted senders, TLS connections, p0f matches, and geoip matches.
 
 =head1 TRIPLETS
 
