@@ -82,24 +82,34 @@ sub hook_pre_connection {
         }
     }
 
-    foreach ($self->qp->config("hosts_allow")) {
-        s/^\s*//;
-        my ($ipmask, $const, $message) = split /\s+/, $_, 3;
-        next unless defined $const;
-
-        my ($net,$mask) = split '/', $ipmask, 2;
-        $mask = 32 if !defined $mask;
-        $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
-        if (join(".", unpack("C4", inet_aton($remote) & $mask)) eq $net) {
-            $const = Qpsmtpd::Constants::return_code($const) || DECLINED;
-            if ( $const =~ /deny/i ) {
-                $self->log( LOGINFO, "fail: $message" );
-            };
-            $self->log( LOGDEBUG, "pass: $const, $message" );
-            return($const, $message);
-        }
-    }
+    my @r = $self->in_hosts_allow( $remote );
+    return @r if scalar @r;
 
     $self->log( LOGDEBUG, "pass" );
     return (DECLINED);
 }
+
+sub in_hosts_allow {
+    my $self = shift;
+    my $remote = shift;
+
+    foreach ( $self->qp->config('hosts_allow') ) {
+        s/^\s*//;    # trim leading whitespace
+        my ($ipmask, $const, $message) = split /\s+/, $_, 3;
+        next unless defined $const;
+
+        my ($net,$mask) = split '/', $ipmask, 2;
+        $mask = 32 if ! defined $mask;
+        $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
+        if (join('.', unpack('C4', inet_aton($remote) & $mask)) eq $net) {
+            $const = Qpsmtpd::Constants::return_code($const) || DECLINED;
+            if ( $const =~ /deny/i ) {
+                $self->log( LOGINFO, "fail, $message" );
+            };
+            $self->log( LOGDEBUG, "pass, $const, $message" );
+            return($const, $message);
+        }
+    }
+
+    return;
+};
