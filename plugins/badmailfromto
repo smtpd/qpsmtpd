@@ -2,18 +2,18 @@
 
 =head1 NAME
 
-check_badmailfromto - checks the badmailfromto config
+badmailfromto - checks the badmailfromto config
 
 =head1 DESCRIPTION
 
-Much like the similar check_badmailfrom, this plugin references both the
+Much like the similar badmailfrom, this plugin references both the
 FROM: and TO: lines, and if they both are present in the badmailfromto
 config file (a tab delimited list of FROM/TO pairs), then the message is
 blocked as if the recipient (TO) didn't exist.  This is specifically designed
 to not give the impression that the sender is blocked (good for cases of
 harassment).
 
-Based heavily on check_badmailfrom.
+Based heavily on badmailfrom.
 
 =cut
 
