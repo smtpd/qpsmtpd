@@ -48,12 +48,6 @@ anywhere in the string.
  ^admin.*\.ppoonn400\.com$
 
 
-=head1 NOTES
-
-According to the SMTP protocol, we can't reject until after the RCPT
-stage, so store it until later.
-
-
 =head1 AUTHORS
 
 2002 - Jim Winstead - initial author of badmailfrom
@@ -65,16 +59,10 @@ stage, so store it until later.
 =cut
 
 sub register {
-    my ($self,$qp) = shift, shift;
+    my ($self,$qp) = (shift, shift);
     $self->{_args} = { @_ };
 
-    # preserve legacy "reject during rcpt" behavior
     $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
-
-    return if ! $self->{_args}{reject};               # reject 0, log only
-    return if   $self->{_args}{reject} eq 'naughty';  # naughty will reject
-
-    $self->register_hook('rcpt', 'rcpt_handler');
 };
 
 sub hook_mail {
@@ -86,7 +74,6 @@ sub hook_mail {
     if ( defined $self->{_badmailfrom_config} ) {       # testing
         @badmailfrom = @{$self->{_badmailfrom_config}};
     };
-
     return DECLINED if $self->is_immune_sender( $sender, \@badmailfrom );
 
     my $host = lc $sender->host;
@@ -98,20 +85,22 @@ sub hook_mail {
         next unless $bad;
         next unless $self->is_match( $from, $bad, $host );
         $reason ||= "Your envelope sender is in my badmailfrom list";
-        $self->connection->notes('naughty', $reason);
+        $self->connection->notes('karma', ($self->connection->notes('karma') || 0) - 1);
+        return $self->get_reject( $reason );
     }
-    if ( ! $self->connection->notes('naughty') ) {
-        $self->log(LOGINFO, "pass");
-    };
+
+    $self->log(LOGINFO, "pass");
     return DECLINED;
 }
 
 sub is_match {
     my ( $self, $from, $bad, $host ) = @_;
 
-    if ( $bad =~ /[\/\^\$\*\+]/ ) {  # it's a regexp
-        $self->log(LOGDEBUG, "badmailfrom pattern ($bad) match for $from");
-        return 1 if $from =~ /$bad/;
+    if ( $bad =~ /[\/\^\$\*\+\!\%\?\\]/ ) {  # it's a regexp
+        if ( $from =~ /$bad/ ) {
+            $self->log(LOGDEBUG, "badmailfrom pattern ($bad) match for $from");
+            return 1;
+        };
         return;
     };
 
@@ -128,30 +117,21 @@ sub is_match {
     return 1;
 };
 
-sub rcpt_handler {
-    my ($self, $transaction, $rcpt, %param) = @_;
-
-    my $note = $self->connection->notes('naughty') or return (DECLINED);
-
-    $self->log(LOGINFO, "fail, $note");
-    return (DENY, $note);
-}
-
 sub is_immune_sender {
     my ($self, $sender, $badmf ) = @_;
 
     if ( ! scalar @$badmf ) {
-        $self->log(LOGDEBUG, 'skip: empty list');
+        $self->log(LOGDEBUG, 'skip, empty list');
         return 1;
     };
 
     if ( ! $sender || $sender->format eq '<>' ) {
-        $self->log(LOGDEBUG, 'skip: null sender');
+        $self->log(LOGDEBUG, 'skip, null sender');
         return 1;
     };
 
     if ( ! $sender->host || ! $sender->user ) {
-        $self->log(LOGDEBUG, 'skip: missing user or host');
+        $self->log(LOGDEBUG, 'skip, missing user or host');
         return 1;
     };
 
