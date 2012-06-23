@@ -38,7 +38,7 @@ resolvable_fromhost
 
 rhsbl
 dnsbl
-check_badmailfrom
+badmailfrom
 check_badrcptto
 helo
 
