@@ -240,7 +240,7 @@ use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 use Net::IP;
 
 sub register {
-    my ($self, $qp ) = shift, shift;
+    my ($self, $qp ) = (shift, shift);
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
     $self->{_args} = { @_ };
     $self->{_args}{negative}     ||= 1;
@@ -265,7 +265,10 @@ sub connect_handler {
     my $db   = $self->get_db_location();
     my $lock = $self->get_db_lock( $db ) or return DECLINED;
     my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
-    my $key  = $self->get_db_key();
+    my $key  = $self->get_db_key() or do {
+        $self->log( LOGINFO, "skip, unable to get DB key" );
+        return DECLINED;
+    };
 
     if ( ! $tied->{$key} ) {
         $self->log(LOGINFO, "pass, no record");
@@ -372,7 +375,7 @@ sub cleanup_and_return {
 
 sub get_db_key {
     my $self = shift;
-    my $nip = Net::IP->new( $self->qp->connection->remote_ip );
+    my $nip = Net::IP->new( $self->qp->connection->remote_ip ) or return;
     return $nip->intip;   # convert IP to an int
 };
 
