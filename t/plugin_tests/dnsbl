@@ -8,8 +8,7 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_hook_connect', 2);
-    $self->register_test('test_hook_rcpt', 2);
+    $self->register_test('test_hook_connect', 1);
     $self->register_test('test_ip_whitelisted', 3);
     $self->register_test('test_is_set_rblsmtpd', 4);
     $self->register_test('test_hook_disconnect', 1);
@@ -54,21 +53,10 @@ sub test_hook_connect {
     $conn->relay_client(0);        # other tests may leave it enabled
     $conn->remote_ip('127.0.0.2'); # standard dnsbl test value
 
-    cmp_ok( DECLINED, '==', $self->hook_connect($self->qp->transaction),
-        "connect +");
-
-    ok($self->connection->notes('dnsbl_sockets'), "sockets +");
-    ok($self->connection->notes('dnsbl_domains'), "domains +");
+    my ($rc, $mess) = $self->hook_connect($self->qp->transaction);
+    cmp_ok( $rc, '==', DENY, "connect +");
 }
 
-sub test_hook_rcpt {
-    my $self = shift;
-
-    my $address = Qpsmtpd::Address->parse('<rcpt@example.com>');
-    my ($ret, $note) = $self->hook_rcpt($self->qp->transaction, $address);
-    is($ret, DENY, "Check we got a DENY ($note)");
-    #print("# dnsbl result: $note\n");
-}
 sub test_hook_disconnect {
     my $self = shift;
 
