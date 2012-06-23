@@ -11,7 +11,6 @@ my $r;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_filter_cmd', 5);
     $self->register_test('test_get_dspam_results', 6);
     $self->register_test('test_log_and_return', 6);
     $self->register_test('test_reject_type', 3);
@@ -81,36 +80,6 @@ sub test_get_dspam_results {
         ok( ref $r, "r: ($header)" );
         #warn Data::Dumper::Dumper($r);
     };
-};
-
-sub test_get_filter_cmd {
-    my $self = shift;
-
-    my $transaction = $self->qp->transaction;
-    my $dspam = "/usr/local/bin/dspam";
-    $self->{_args}{dspam_bin} = $dspam;
-    $self->{_args}{autolearn} = 'spamassassin';
-
-    foreach my $user ( qw/ smtpd matt@example.com / ) {
-        my $answer = "$dspam --user smtpd --mode=tum --process --deliver=summary --stdout";
-        my $r = $self->get_filter_cmd($transaction, 'smtpd');
-        cmp_ok( $r, 'eq', $answer, "$user" );
-    };
-
-    $transaction->notes('spamassassin', { is_spam => 'No', autolearn => 'ham' } );
-    my $r = $self->get_filter_cmd($transaction, 'smtpd');
-    cmp_ok( $r, 'eq', "$dspam --user smtpd --mode=tum --source=corpus --class=innocent --deliver=summary --stdout",
-        "smtpd, ham" );
-
-    $transaction->notes('spamassassin', { is_spam => 'Yes', autolearn => 'spam', score => 110 } );
-    $r = $self->get_filter_cmd($transaction, 'smtpd');
-    cmp_ok( $r, 'eq', "$dspam --user smtpd --mode=tum --source=corpus --class=spam --deliver=summary --stdout",
-        "smtpd, spam" );
-
-    $transaction->notes('spamassassin', { is_spam => 'No', autolearn => 'spam' } );
-    $r = $self->get_filter_cmd($transaction, 'smtpd');
-    cmp_ok( $r, 'eq', "$dspam --user smtpd --mode=tum --process --deliver=summary --stdout",
-        "smtpd, spam" );
 };
 
 sub test_reject_type {

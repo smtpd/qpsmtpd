@@ -18,13 +18,13 @@ contain a probability and confidence rating.
 
 =head1 TRAINING DSPAM
 
-Do not just enable dspam! Its false positive rate when untrained is high. The
-good news is; dspam learns very, very fast.
+If you enable dspam rejection without training first, you will lose valid
+mail. The dspam false positive rate is high when untrained. The good news is;
+dspam learns very, very fast.
 
-To get dspam into a useful state, it must be trained. The best method way to
-train dspam is to feed it two large equal sized corpuses of spam and ham from
-your mail server. The dspam authors suggest avoiding public corpuses. I train
-dspam as follows:
+The best method way to train dspam is to feed it two large equal sized
+corpuses of spam and ham from your mail server. The dspam authors suggest
+avoiding public corpuses. I train dspam as follows:
 
 =over 4
 
@@ -70,7 +70,7 @@ learn messages with negative karma as spam (see plugins/karma)
 
 =item spamassassin
 
-learn from spamassassins messages with autolearn=(ham|spam)
+learn from spamassassins messages with autolearn=(ham|spam). See SPAMASSASSIN.
 
 =item any
 
@@ -135,7 +135,7 @@ after delivery (ie, users moving messages to/from spam folders), then the
 dspam signature must be in the headers.
 
 When using the dspam MySQL backend, use InnoDB tables. DSPAM training
-is dramatically slowed by MyISAM table locks and dspam requires lots
+is dramatically slowed by MyISAM table locks and dspam requires a lot
 of training. InnoDB has row level locking and updates are much faster.
 
 =head1 DSPAM periodic maintenance
@@ -143,8 +143,6 @@ of training. InnoDB has row level locking and updates are much faster.
 Install this cron job to clean up your DSPAM database.
 
 http://dspam.git.sourceforge.net/git/gitweb.cgi?p=dspam/dspam;a=tree;f=contrib/dspam_maintenance;hb=HEAD
-
-
 
 =head1 SPAMASSASSIN
 
@@ -164,13 +162,14 @@ reduce the SA load.
 
 =item 2
 
-Autolearn must be enabled and configured in SpamAssassin. SA autolearn will
+For I<autolearn spamassassin> to work, autolearn must be enabled and
+configured in SpamAssassin. SA autolearn will
 determine if a message is learned by dspam. The settings to pay careful
 attention to in your SA local.cf file are I<bayes_auto_learn_threshold_spam>
 and I<bayes_auto_learn_threshold_nonspam>. Make sure they are set to
 conservative values that will yield no false positives.
 
-If you are using I<autolearn spamassassin> and reject, messages that exceed
+If you are using I<autolearn spamassassin> and I<reject>, messages that exceed
 the SA threshholds will cause dspam to reject them. Again I say, make sure
 the SA autolearn threshholds are set high enough to avoid false positives.
 
@@ -207,7 +206,7 @@ use IO::Handle;
 use Socket qw(:DEFAULT :crlf);
 
 sub register {
-    my ($self, $qp) = shift, shift;
+    my ($self, $qp) = (shift, shift);
 
     $self->log(LOGERROR, "Bad parameters for the dspam plugin") if @_ % 2;
 
@@ -222,7 +221,6 @@ sub data_post_handler {
     my $self = shift;
     my $transaction = shift || $self->qp->transaction;
 
-    $self->autolearn( $transaction );
     return (DECLINED) if $self->is_immune();
 
     if ( $transaction->data_size > 500_000 ) {
@@ -231,16 +229,18 @@ sub data_post_handler {
     };
 
     my $username = $self->select_username( $transaction );
-    my $filtercmd = $self->get_filter_cmd( $transaction, $username );
+    my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
+    my $filtercmd = "$dspam_bin --user $username --mode=tum --process --deliver=summary --stdout";
     $self->log(LOGDEBUG, $filtercmd);
 
     my $response = $self->dspam_process( $filtercmd, $transaction );
-    if ( ! $response ) {
+    if ( ! $response->{result} ) {
         $self->log(LOGWARN, "skip, no dspam response. Check logs for errors.");
         return (DECLINED);
     };
 
     $self->attach_headers( $response, $transaction );
+    $self->autolearn( $response, $transaction );
 
     return $self->log_and_return( $transaction );
 };
@@ -279,8 +279,26 @@ sub assemble_message {
 sub dspam_process {
     my ( $self, $filtercmd, $transaction ) = @_;
 
-    return $self->dspam_process_backticks( $filtercmd );
-    #return $self->dspam_process_open2( $filtercmd, $transaction );
+    my $dspam_response = $self->dspam_process_backticks( $filtercmd );
+    #my $dspam_response = $self->dspam_process_open2( $filtercmd, $transaction );
+    #my $dspam_response = $self->dspam_process_fork( $filtercmd );
+
+    # X-DSPAM-Result: user@example.com; result="Spam"; class="Spam"; probability=1.0000; confidence=1.00; signature=N/A
+    # X-DSPAM-Result: smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
+    my ($r, $p, $c, $s)
+        = $dspam_response
+            =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
+
+    return {
+        result      => $r,
+        probability => $p,
+        confidence  => $c,
+        signature   => $s,
+    };
+};
+
+sub dspam_process_fork {
+    my ( $self, $filtercmd, $transaction ) = @_;
 
     # yucky. This method (which forks) exercises a bug in qpsmtpd. When the
     # child exits, the Transaction::DESTROY method is called, which deletes
@@ -305,7 +323,6 @@ sub dspam_process_backticks {
     my ( $self, $filtercmd ) = @_;
 
     my $filename = $self->qp->transaction->body_filename;
-    #my $response = `cat $filename | $filtercmd`; chomp $response;
     my $response = `$filtercmd < $filename`; chomp $response;
     $self->log(LOGDEBUG, $response);
     return $response;
@@ -450,46 +467,11 @@ sub get_dspam_results {
     return \%d;
 };
 
-sub get_filter_cmd {
-    my ($self, $transaction, $user) = @_;
-
-    my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
-    my $default = "$dspam_bin --user $user --mode=tum --process --deliver=summary --stdout";
-
-    my $learn = $self->{_args}{autolearn} or return $default;
-    return $default if ( $learn ne 'spamassassin' && $learn ne 'any' );
-
-    $self->log(LOGDEBUG, "attempting to learn from SA");
-
-    my $sa = $transaction->notes('spamassassin' );
-    if ( ! $sa || ! $sa->{is_spam} ) {
-        $self->log(LOGERROR, "SA results missing");
-        return $default;
-    };
-
-    if ( ! $sa->{autolearn} ) {
-        $self->log(LOGERROR, "SA autolearn unset");
-        return $default;
-    };
-
-    if ( $sa->{is_spam} eq 'Yes' && $sa->{autolearn} eq 'spam' ) {
-        return "$dspam_bin --user $user --mode=tum --source=corpus --class=spam --deliver=summary --stdout";
-    }
-    elsif ( $sa->{is_spam} eq 'No' && $sa->{autolearn} eq 'ham' ) {
-        return "$dspam_bin --user $user --mode=tum --source=corpus --class=innocent --deliver=summary --stdout";
-    };
-
-    return $default;
-};
-
 sub attach_headers {
-    my ($self, $response, $transaction) = @_;
+    my ($self, $r, $transaction) = @_;
     $transaction ||= $self->qp->transaction;
 
-    # X-DSPAM-Result: user@example.com; result="Spam"; class="Spam"; probability=1.0000; confidence=1.00; signature=N/A
-    # X-DSPAM-Result: smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
-    my ($result,$prob,$conf,$sig) = $response =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
-    my $header_str = "$result, probability=$prob, confidence=$conf";
+    my $header_str = "$r->{result}, probability=$r->{probability}, confidence=$r->{confidence}";
     $self->log(LOGDEBUG, $header_str);
     my $name = 'X-DSPAM-Result';
     $transaction->header->delete($name) if $transaction->header->get($name);
@@ -497,49 +479,108 @@ sub attach_headers {
 
     # the signature header is required if you intend to train dspam later.
     # In dspam.conf, set: Preference "signatureLocation=headers"
-    $transaction->header->add('X-DSPAM-Signature', $sig, 0);
+    $transaction->header->add('X-DSPAM-Signature', $r->{signature}, 0);
 };
 
-sub learn_as_ham {
+sub train_error_as_ham {
     my $self = shift;
     my $transaction = shift;
 
     my $user = $self->select_username( $transaction );
     my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
-    my $cmd = "$dspam_bin --user $user --mode=tum --source=corpus --class=innocent --deliver=summary --stdout";
+    my $cmd = "$dspam_bin --user $user --mode=toe --source=error --class=innocent --deliver=summary --stdout";
     $self->dspam_process( $cmd, $transaction );
 };
 
-sub learn_as_spam {
+sub train_error_as_spam {
     my $self = shift;
     my $transaction = shift;
 
     my $user = $self->select_username( $transaction );
     my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
-    my $cmd = "$dspam_bin --user $user --mode=tum --source=corpus --class=spam --deliver=summary --stdout";
+    my $cmd = "$dspam_bin --user $user --mode=toe --source=error --class=spam --deliver=summary --stdout";
     $self->dspam_process( $cmd, $transaction );
 };
 
 sub autolearn {
-    my ( $self, $transaction ) = @_;
+    my ( $self, $response, $transaction ) = @_;
+
+    defined $self->{_args}{autolearn} or return;
+
+    $self->autolearn_naughty( $response, $transaction ) and return;
+    $self->autolearn_karma( $response, $transaction ) and return;
+    $self->autolearn_spamassassin( $response, $transaction ) and return;
+};
+
+sub autolearn_naughty {
+    my ( $self, $response, $transaction ) = @_;
 
     my $learn = $self->{_args}{autolearn} or return;
 
-    if ( $learn eq 'naughty' || $learn eq 'any' ) {
-        if ( $self->connection->notes('naughty') ) {
-            $self->log(LOGINFO, "training naughty as spam");
-            $self->learn_as_spam( $transaction );
-        };
+    return if ( $learn ne 'naughty' && $learn ne 'any' );
+
+    if ( $self->connection->notes('naughty') && $response->{result} eq 'Innocent' ) {
+        $self->log(LOGINFO, "training naughty FN message as spam");
+        $self->train_error_as_spam( $transaction );
+        return 1;
     };
-    if ( $learn eq 'karma' || $learn eq 'any' ) {
-        my $karma = $self->connection->notes('karma');
-        if ( defined $karma && $karma <= -1 ) {
-            $self->log(LOGINFO, "training poor karma as spam");
-            $self->learn_as_spam( $transaction );
-        };
-        if ( defined $karma && $karma >= 1 ) {
-            $self->log(LOGINFO, "training good karma as ham");
-            $self->learn_as_ham( $transaction );
-        };
+
+    return;
+};
+
+sub autolearn_karma {
+    my ( $self, $response, $transaction ) = @_;
+
+    my $learn = $self->{_args}{autolearn} or return;
+
+    return if ( $learn ne 'karma' && $learn ne 'any' );
+
+    my $karma = $self->connection->notes('karma');
+    return if ! defined $karma;
+
+    if ( $karma <= -1  && $response->{result} eq 'Innocent' ) {
+        $self->log(LOGINFO, "training bad karma FN as spam");
+        $self->train_error_as_spam( $transaction );
+        return 1;
     };
+
+    if ( $karma >= 1 && $response->{result} eq 'Spam' ) {
+        $self->log(LOGINFO, "training good karma FP as ham");
+        $self->train_error_as_ham( $transaction );
+        return 1;
+    };
+
+    return;
+};
+
+sub autolearn_spamassassin {
+    my ( $self, $response, $transaction ) = @_;
+
+    my $learn = $self->{_args}{autolearn} or return;
+
+    return if ( $learn ne 'spamassassin' && $learn ne 'any' );
+
+    my $sa = $transaction->notes('spamassassin' );
+    if ( ! $sa || ! $sa->{is_spam} ) {
+        $self->log(LOGERROR, "SA results missing");
+        return;
+    };
+
+    if ( ! $sa->{autolearn} ) {
+        $self->log(LOGERROR, "SA autolearn unset");
+        return;
+    };
+
+    if ( $sa->{is_spam} eq 'Yes' && $sa->{autolearn} eq 'spam' && $response->{result} eq 'Innocent' ) {
+        $self->log(LOGINFO, "training spamassassin FN as spam");
+        $self->train_error_as_spam( $transaction );
+        return 1;
+    }
+    elsif ( $sa->{is_spam} eq 'No' && $sa->{autolearn} eq 'ham' && $response->{result} eq 'Spam' ) {
+        $self->log(LOGINFO, "training spamassassin FP as ham");
+        $self->train_error_as_ham( $transaction );
+        return 1;
+    };
+
+    return;
 };
