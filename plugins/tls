@@ -59,7 +59,7 @@ and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
 
 =cut
 
-use IO::Socket::SSL 0.98; # qw(debug1 debug2 debug3 debug4);
+use IO::Socket::SSL 0.98;
 
 sub init {
     my ($self, $qp, $cert, $key, $ca) = @_;
@@ -75,7 +75,7 @@ sub init {
     $self->tls_ca($ca);
     $self->tls_ciphers($self->qp->config('tls_ciphers') || 'HIGH');
     
-    $self->log(LOGINFO, "ciphers: ".$self->tls_ciphers);
+    $self->log(LOGDEBUG, "ciphers: ".$self->tls_ciphers);
 
     local $^W; # this bit is very noisy...
     my $ssl_ctx = IO::Socket::SSL::SSL_Context->new(
@@ -111,8 +111,7 @@ sub hook_ehlo {
     return DECLINED unless $self->can_do_tls;
     return DECLINED if $self->connection->notes('tls_enabled');
     return DENY, "Command refused due to lack of security" if $transaction->notes('ssl_failed');
-    my $cap = $transaction->notes('capabilities');
-    $cap ||= [];
+    my $cap = $transaction->notes('capabilities') || [];
     push @$cap, 'STARTTLS';
     $transaction->notes('tls_enabled', 1);
     $transaction->notes('capabilities', $cap);
@@ -193,10 +192,8 @@ sub _convert_to_ssl {
     };
     if ($@) {
         return 0;
-    }
-    else {
-        return 1;
-    }
+    };
+    return 1;
 }
 
 sub _convert_to_ssl_async {
