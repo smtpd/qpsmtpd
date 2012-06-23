@@ -105,7 +105,7 @@ use Qpsmtpd::Constants;
 use Net::IP qw(:PROC);
 
 sub register {
-    my ($self, $qp) = shift, shift;
+    my ($self, $qp) = ( shift, shift );
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
     $self->{_args} = { @_ };
 
@@ -123,7 +123,7 @@ sub is_in_norelayclients {
 
     while ( $ip ) {
         if ( exists $no_relay_clients{$ip} ) {
-            $self->log(LOGNOTICE, "$ip in norelayclients");
+            $self->log(LOGINFO, "$ip in norelayclients");
             return 1;
         }
         $ip =~ s/(\d|\w)+(:|\.)?$// or last; # strip off another octet
@@ -207,6 +207,7 @@ sub hook_connect {
     if ( $self->is_in_norelayclients() ) {
         $self->qp->connection->relay_client(0);
         delete $ENV{RELAYCLIENT};
+        $self->log(LOGINFO, "fail, disabled by norelayclients");
         return (DECLINED);
     }
 
@@ -217,6 +218,8 @@ sub hook_connect {
     };
 
     $self->populate_relayclients();
+
+# 95586 (connect) relay: pass, octet match in relayclients (127.0.0.)
 
     if ( $self->is_in_cidr_block() || $self->is_octet_match() ) {
         $self->qp->connection->relay_client(1);
