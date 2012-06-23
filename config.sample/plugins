@@ -40,7 +40,7 @@ rhsbl
 dnsbl
 badmailfrom
 badrcptto
-check_spamhelo
+helo
 
 # sender_permitted_from
 # greylisting p0f genre,windows
