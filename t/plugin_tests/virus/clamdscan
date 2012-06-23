@@ -75,7 +75,12 @@ sub test_is_not_multipart {
 
     ok( $self->is_not_multipart(), "not_multipart" );
 
-    $tran->header->add('Content-Type', 'multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"');
-    ok( ! $self->is_not_multipart(), "not_multipart" );
+    if ( $tran->header ) {
+        $tran->header->add('Content-Type', 'multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"');
+        ok( ! $self->is_not_multipart(), "not_multipart" );
+    }
+    else {
+        ok( 1 );
+    }
 }
 
