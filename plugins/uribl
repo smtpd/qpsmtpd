@@ -494,7 +494,7 @@ sub data_handler {
     for (@$matches) {
         $self->log(LOGWARN, $_->{desc});
         if ($_->{action} eq 'add-header') {
-            $transaction->header->add('X-URIBL-Match', $_->{desc});
+            $transaction->header->add('X-URIBL-Match', $_->{desc}, 0);
         } elsif ($_->{action} eq 'deny') {
             return (DENY, $_->{desc});
         } elsif ($_->{action} eq 'denysoft') {
