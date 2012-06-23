@@ -47,8 +47,13 @@ sub command_counter {
 }
 
 sub dispatch {
-  my $self = shift;
-  my ($cmd) = lc shift;
+    my $self = shift;
+    my ($cmd) = shift;
+    if ( ! $cmd ) {
+        $self->run_hooks("unrecognized_command", '', @_);
+        return 1;
+    };
+    $cmd = lc $cmd;
 
   $self->{_counter}++; 
 
@@ -304,13 +309,12 @@ sub mail {
 
   $self->reset_transaction;
   
-  unless ($self->connection->hello) {
+  if ( ! $self->connection->hello) {
     return $self->respond(503, "please say hello first ...");
-  }
-  else {
+  };
+
     $self->log(LOGDEBUG, "full from_parameter: $line");
     $self->run_hooks("mail_parse", $line);
-  }
 }
 
 sub mail_parse_respond {
@@ -451,13 +455,13 @@ sub rcpt_respond {
   }
   elsif ($rc == DENY_DISCONNECT) {
       $msg->[0] ||= 'delivery denied';
-      $self->log(LOGINFO, "delivery denied (@$msg)");
+      $self->log(LOGDEBUG, "delivery denied (@$msg)");
       $self->respond(550, @$msg);
       $self->disconnect;
   }
   elsif ($rc == DENYSOFT_DISCONNECT) {
     $msg->[0] ||= 'relaying denied';
-    $self->log(LOGINFO, "delivery denied (@$msg)");
+    $self->log(LOGDEBUG, "delivery denied (@$msg)");
     $self->respond(421, @$msg);
     $self->disconnect;
   }
