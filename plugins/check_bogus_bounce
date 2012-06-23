@@ -32,13 +32,9 @@ Deny with a soft error code.
 
 =back
 
-=cut
-
 =head1 AUTHOR
 
-Steve Kemp
---
-http://steve.org.uk/Software/qpsmtpd/
+2010 - Steve Kemp - http://steve.org.uk/Software/qpsmtpd/
 
 =cut
 
@@ -51,23 +47,22 @@ Look for our single expected argument and configure "action" appropriately.
 =cut
 
 sub register {
-    my ($self, $qp, $arg, @nop) = (@_);
+    my ($self, $qp) = (shift, shift);
 
-    #
-    #  Default behaviour is to merely log.
-    #
-    $self->{_action} = "log";
+    if ( @_ % 2 ) {
+        $self->{_args}{action} = shift;
+    }
+    else {
+        $self->{_args} = { @_ };
+    };
 
-    #
-    #  Unless one was specified
-    #
-    if ($arg) {
-        if ($arg =~ /^(log|deny|denysoft)$/i) {
-            $self->{_action} = $arg;
-        }
-        else {
-            die "Invalid argument '$arg' - use one of : log, deny, denysoft";
-        }
+    if ( ! defined $self->{_args}{reject} ) {
+        $self->{_args}{reject} = 0;     # legacy default
+    };
+
+    # we only need to check for deferral, default is DENY
+    if ( $self->{_args}{action} =~ /soft/i ) {
+        $self->{_args}{reject_type} = 'temp';
     }
 }
 
@@ -88,39 +83,27 @@ sub hook_data_post {
     # Find the sender, and return unless it wasn't a bounce.
     #
     my $sender = $transaction->sender->address || undef;
-    return DECLINED unless ($sender eq "<>");
+    if ( $sender && $sender ne '<>') {
+        $self->log(LOGINFO, "pass, not a null sender");
+        return DECLINED;
+    };
 
     #
     #  Get the recipients.
     #
     my @to = $transaction->recipients || ();
-    return DECLINED unless (scalar @to > 1);
+    if (scalar @to == 1) {
+        $self->log(LOGINFO, "pass, only 1 recipient");
+        return DECLINED;
+    };
 
     #
-    #  OK at this point we know:
+    #  at this point we know:
     #
     #   1.  It is a bounce, via the null-envelope.
     #   2.  It is a bogus bounce, because there are more than one recipients.
     #
-    if (lc $self->{_action} eq "log") {
-        $self->log(LOGWARN,
-                 $self->plugin_name() . " bogus bounce for :" . join(",", @to));
-    }
-    elsif (lc $self->{_action} eq "deny") {
-        return (DENY,
-                $self->plugin_name() . " determined this to be a bogus bounce");
-    }
-    elsif (lc $self->{_action} eq "denysoft") {
-        return (DENYSOFT,
-                $self->plugin_name() . " determined this to be a bogus bounce");
-    }
-    else {
-        $self->log(LOGWARN,
-                   $self->plugin_name() . " failed to determine action.  bug?");
-    }
+    $self->log(LOGINFO, "fail, bogus bounce for :" . join(',', @to));
 
-    #
-    #  All done; allow this to proceed
-    #
-    return DECLINED;
+    $self->get_reject( "fail, this is a bogus bounce" );
 }
