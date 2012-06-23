@@ -206,7 +206,7 @@ sub log_and_deny {
 
     $self->connection->notes('earlytalker', 1);
 
-    my $log_mess = "fail, $ip started talking before we said hello";
+    my $log_mess = "$ip started talking before we said hello";
     my $smtp_msg = 'Connecting host started transmitting before SMTP greeting';
 
     return $self->get_reject( $smtp_msg, $log_mess );
