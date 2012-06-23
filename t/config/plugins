@@ -39,6 +39,7 @@ resolvable_fromhost
 rhsbl
 dnsbl
 badmailfrom
+badmailfromto
 badrcptto
 helo
 
