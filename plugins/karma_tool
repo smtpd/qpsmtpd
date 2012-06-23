@@ -38,7 +38,7 @@ sub usage {
 
 list takes no arguments.
 
-search [ naughty nice both ]
+search [ naughty nice both <ip> ]
   and returns a list of matching IPs
 
 capture [ IP ]
@@ -115,7 +115,7 @@ sub main {
             elsif ( $search eq 'both' ) {
                 next if ! $naughty || ! $nice;
             }
-            elsif ( is_ip() && $search ne $ip ) {
+            elsif ( is_ip( $ARGV[1] ) && $search ne $ip ) {
                 next;
             }
         };
