@@ -22,7 +22,7 @@ use warnings;
 use Qpsmtpd::Constants;
 
 sub register {
-    my ($self, $qp ) = shift, shift;
+    my ($self, $qp ) = (shift, shift);
 
     $self->{_unrec_cmd_max} = shift || 4;
 
