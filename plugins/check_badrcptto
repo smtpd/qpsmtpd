@@ -47,7 +47,7 @@ use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {
-  my ($self, $transaction, $recipient, %param) = @_;
+    my ($self, $transaction, $recipient, %param) = @_;
 
     return (DECLINED) if $self->is_immune();
 
@@ -55,7 +55,7 @@ sub hook_rcpt {
         or return (DECLINED);
 
     my @badrcptto = $self->qp->config("badrcptto") or do {
-        $self->log(LOGINFO, "skip: empty config");
+        $self->log(LOGINFO, "skip, empty config");
         return (DECLINED);
     };
 
@@ -79,7 +79,7 @@ sub hook_rcpt {
 sub is_match {
     my ( $self, $to, $bad, $host ) = @_;
 
-    if ( $bad =~ /[\/\^\$\*\+\!\%]/ ) {  # it's a regexp
+    if ( $bad =~ /[\/\^\$\*\+\!\%\?\\]/ ) {  # it's a regexp
         $self->log(LOGDEBUG, "badmailfrom pattern ($bad) match for $to");
         if ( $to =~ /$bad/i ) {
             $self->log(LOGINFO, 'fail: pattern match');
