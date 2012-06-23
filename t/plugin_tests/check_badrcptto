@@ -13,6 +13,14 @@ sub register_tests {
     $self->register_test("test_get_host_and_to", 8);
 }
 
+sub _reset_connection_flags {
+    my $self = shift;
+    $self->qp->connection->relay_client(0);
+    $self->qp->connection->notes('whitelisthost', 0);
+    $self->connection->notes('naughty',0);
+    $self->connection->notes('rejected', 0);
+};
+
 sub test_is_match {
     my $self = shift;
 
@@ -52,19 +60,21 @@ sub test_is_match {
 sub test_hook_rcpt {
     my $self = shift;
 
+    $self->_reset_connection_flags();
+
     my $transaction = $self->qp->transaction;
     my $recipient = Qpsmtpd::Address->new( '<user@example.com>' );
 
     my ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
-    cmp_ok( DECLINED, '==', $r, "valid +");
+    cmp_ok( $r, '==', DECLINED, "valid +");
 
     $recipient = Qpsmtpd::Address->new( '<bad@example.com>' );
     ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
-    cmp_ok( DENY, '==', $r, "bad match, +");
+    cmp_ok( $r, '==', DENY, "bad match, +, $mess");
 
     $recipient = Qpsmtpd::Address->new( '<any@bad.example.com>' );
     ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
-    cmp_ok( DENY, '==', $r, "bad host match, +");
+    cmp_ok( $r, '==', DENY, "bad host match, +, $mess");
 };
 
 sub test_get_host_and_to {
