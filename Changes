@@ -1,7 +1,11 @@
 
 Next Version
 
-  check_badmailfrom_patterns, merged functionality into check_badmail_from
+  renamed check_badrcptto     -> badrcptto
+  renamed check_badmailfromto -> badmailfromto
+  renamed check_badmailfrom   -> badmailfrom
+
+  check_badmailfrom_patterns, merged functionality into check_badmailfrom
 
   check_badrcptto_patterns, merged functionality into check_badrcptto
 

@@ -236,7 +236,7 @@ Arguments for this hook are
   # sender of the message
 
 Example plugins for the C<hook_mail> are F<require_resolvable_fromhost>
-and F<check_badmailfrom>.
+and F<badmailfrom>.
 
 =head2 hook_rcpt_pre
 
