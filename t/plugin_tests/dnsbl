@@ -11,7 +11,6 @@ sub register_tests {
     $self->register_test('test_hook_connect', 1);
     $self->register_test('test_ip_whitelisted', 3);
     $self->register_test('test_is_set_rblsmtpd', 4);
-    $self->register_test('test_hook_disconnect', 1);
     $self->register_test('test_reject_type', 3);
 }
 
@@ -55,13 +54,6 @@ sub test_hook_connect {
 
     my ($rc, $mess) = $self->hook_connect($self->qp->transaction);
     cmp_ok( $rc, '==', DENY, "connect +");
-}
-
-sub test_hook_disconnect {
-    my $self = shift;
-
-    cmp_ok( DECLINED, '==', $self->hook_connect($self->qp->transaction),
-        "hook_disconnect +");
 }
 
 sub test_reject_type {
