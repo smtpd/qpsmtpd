@@ -8,7 +8,7 @@ use strict;
 
 use POSIX ();
 
-my $has_ipv6;
+my $has_ipv6 = 0;
 if (
     eval {require Socket6;} &&
     # INET6 prior to 2.01 will not work; sorry.
@@ -16,9 +16,6 @@ if (
     ) {
     import Socket6;
     $has_ipv6=1;
-}
-else {
-    $has_ipv6=0;
 }
 
 sub has_ipv6 {
