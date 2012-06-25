@@ -140,7 +140,7 @@ sub connect_handler {
     $self->open_geoip_db();
 
     my $c_code = $self->set_country_code() or do {
-        $self->log( LOGINFO, "fail: no results" );
+        $self->log( LOGINFO, "skip, no results" );
         return DECLINED;
     };
     $self->qp->connection->notes('geoip_country', $c_code);
