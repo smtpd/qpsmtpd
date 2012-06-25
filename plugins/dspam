@@ -235,9 +235,11 @@ sub data_post_handler {
 
     my $response = $self->dspam_process( $filtercmd, $transaction );
     if ( ! $response->{result} ) {
-        $self->log(LOGWARN, "skip, no dspam response. Check logs for errors.");
+        $self->log(LOGWARN, "error, no dspam response. Check logs for errors.");
         return (DECLINED);
     };
+
+    $transaction->notes('dspam', $response);
 
     $self->attach_headers( $response, $transaction );
     $self->autolearn( $response, $transaction );
@@ -264,37 +266,78 @@ sub select_username {
 sub assemble_message {
     my ($self, $transaction) = @_;
 
-    $transaction->body_resetpos;
-
     my $message = "X-Envelope-From: "
         . $transaction->sender->format . "\n"
         . $transaction->header->as_string . "\n\n";
 
+    $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) { $message .= $line; };
 
     $message = join(CRLF, split/\n/, $message);
     return $message . CRLF;
 };
 
+sub parse_response {
+    my $self = shift;
+    my $response = shift or do {
+        $self->log( LOGDEBUG, "missing dspam response!" );
+        return;
+    };
+
+# example DSPAM results:
+# user@example.com; result="Spam"; class="Spam"; probability=1.0000; confidence=1.00; signature=N/A
+# smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
+
+    #return $self->parse_response_regexp( $response );  # probably slower
+
+    my ($user, $result, $class, $prob, $conf, $sig) = split '; ', $response;
+
+    (undef, $result) = split '=', $result;
+    (undef, $class ) = split '=', $class;
+    (undef, $prob  ) = split '=', $prob;
+    (undef, $conf  ) = split '=', $conf;
+    (undef, $sig   ) = split '=', $sig;
+
+    $result = substr($result, 1, -1);  # strip off quotes
+    $class  = substr($class,  1, -1);
+
+    return {
+        class       => $class,
+        result      => $result,
+        probability => $prob,
+        confidence  => $conf,
+        signature   => $sig,
+    };
+};
+
+sub parse_response_regexp {
+    my ($self, $response) = @_;
+
+    my ($result, $class, $prob, $conf, $sig) = $response =~ /
+                result=\"(Spam|Innocent)\";\s
+                class=\"(Spam|Innocent)\";\s
+                probability=([\d\.]+);\s
+                confidence=([\d\.]+);\s
+                signature=(.*)
+            /x;
+
+    return {
+        class       => $class,
+        result      => $result,
+        probability => $prob,
+        confidence  => $conf,
+        signature   => $sig,
+    };
+};
+
 sub dspam_process {
     my ( $self, $filtercmd, $transaction ) = @_;
 
-    my $dspam_response = $self->dspam_process_backticks( $filtercmd );
-    #my $dspam_response = $self->dspam_process_open2( $filtercmd, $transaction );
-    #my $dspam_response = $self->dspam_process_fork( $filtercmd );
+    my $response = $self->dspam_process_backticks( $filtercmd );
+    #my $response = $self->dspam_process_open2( $filtercmd, $transaction );
+    #my $response = $self->dspam_process_fork( $filtercmd );
 
-    # X-DSPAM-Result: user@example.com; result="Spam"; class="Spam"; probability=1.0000; confidence=1.00; signature=N/A
-    # X-DSPAM-Result: smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
-    my ($r, $p, $c, $s)
-        = $dspam_response
-            =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
-
-    return {
-        result      => $r,
-        probability => $p,
-        confidence  => $c,
-        signature   => $s,
-    };
+    return $self->parse_response( $response );
 };
 
 sub dspam_process_fork {
@@ -322,10 +365,22 @@ sub dspam_process_fork {
 sub dspam_process_backticks {
     my ( $self, $filtercmd ) = @_;
 
-    my $filename = $self->qp->transaction->body_filename;
-    my $response = `$filtercmd < $filename`; chomp $response;
-    $self->log(LOGDEBUG, $response);
-    return $response;
+    my $transaction = $self->qp->transaction;
+
+    my $message = $self->temp_file();
+    open my $fh, '>', $message;
+    print $fh "X-Envelope-From: "
+        . $transaction->sender->format . CRLF
+        . $transaction->header->as_string . CRLF . CRLF;
+
+    $transaction->body_resetpos;
+    while (my $line = $transaction->body_getline) { print $fh $line; };
+
+    close $fh;
+
+    my ($line1) = split /[\r|\n]/, `$filtercmd < $message`;
+    $self->log(LOGDEBUG, $line1);
+    return $line1;
 };
 
 sub dspam_process_open2 {
@@ -336,16 +391,25 @@ sub dspam_process_open2 {
 # not sure why, but this is not as reliable as I'd like. What's a dspam
 # error -5 mean anyway?
     use FileHandle;
-    use IPC::Open2;
-    my ($dspam_in, $dspam_out);
-    my $pid = open2($dspam_out, $dspam_in, $filtercmd);
-    print $dspam_in $message;
-    close $dspam_in;
+    use IPC::Open3;
+    my ($read, $write, $err);
+    use Symbol 'gensym'; $err = gensym;
+    my $pid = open3($write, $read, $err, $filtercmd);
+    print $write $message;
+    close $write;
     #my $response = join('', <$dspam_out>);  # get full response
-    my $response = <$dspam_out>;             # get first line only
+    my $response = <$read>;             # get first line only
     waitpid $pid, 0;
-    chomp $response;
-    $self->log(LOGDEBUG, $response);
+    my $child_exit_status = $? >> 8;
+    #$self->log(LOGINFO, "exit status: $child_exit_status");
+    if ( $response ) {
+        chomp $response;
+        $self->log(LOGDEBUG, $response);
+    };
+    my $err_msg = <$err>;
+    if ( $err_msg ) {
+        $self->log(LOGDEBUG, $err_msg );
+    };
     return $response;
 };
 
@@ -367,7 +431,7 @@ sub log_and_return {
     };
 
     if ( $reject eq 'agree' ) {
-        return $self->reject_agree( $transaction, $d );
+        return $self->reject_agree( $transaction );
     };
 
     if ( $d->{class} eq 'Innocent' ) {
@@ -394,9 +458,10 @@ sub log_and_return {
 }
 
 sub reject_agree {
-    my ($self, $transaction, $d ) = @_;
+    my ($self, $transaction ) = @_;
 
     my $sa = $transaction->notes('spamassassin' );
+    my $d  = $transaction->notes('dspam' );
 
     my $status = "$d->{class}, $d->{confidence} c";
 
@@ -423,13 +488,14 @@ sub reject_agree {
         if ( $sa->{is_spam} eq 'No' ) {
             if ( $d->{confidence} > .9 ) {
                 if ( defined $self->connection->notes('karma') ) {
-                    $self->connection->notes('karma', $self->connection->notes('karma') + 2);
+                    $self->connection->notes('karma', ( $self->connection->notes('karma') + 2) );
                 };
             };
             $self->log(LOGINFO, "pass, agree, $status");
             return DECLINED;
         };
         $self->log(LOGINFO, "pass, disagree, $status");
+        return DECLINED;
     };
 
     $self->log(LOGINFO, "pass, other $status");
@@ -489,7 +555,13 @@ sub train_error_as_ham {
     my $user = $self->select_username( $transaction );
     my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
     my $cmd = "$dspam_bin --user $user --mode=toe --source=error --class=innocent --deliver=summary --stdout";
-    $self->dspam_process( $cmd, $transaction );
+    my $response = $self->dspam_process( $cmd, $transaction );
+    if ( $response ) {
+        $transaction->notes('dspam', $response);
+    }
+    else {
+        $transaction->notes('dspam', { class => 'Innocent', result => 'Innocent', confidence=>1 } );
+    };
 };
 
 sub train_error_as_spam {
@@ -499,7 +571,13 @@ sub train_error_as_spam {
     my $user = $self->select_username( $transaction );
     my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
     my $cmd = "$dspam_bin --user $user --mode=toe --source=error --class=spam --deliver=summary --stdout";
-    $self->dspam_process( $cmd, $transaction );
+    my $response = $self->dspam_process( $cmd, $transaction );
+    if ( $response ) {
+        $transaction->notes('dspam', $response);
+    }
+    else {
+        $transaction->notes('dspam', { class => 'Spam', result => 'Spam', confidence=>1 } );
+    };
 };
 
 sub autolearn {
@@ -572,12 +650,12 @@ sub autolearn_spamassassin {
     };
 
     if ( $sa->{is_spam} eq 'Yes' && $sa->{autolearn} eq 'spam' && $response->{result} eq 'Innocent' ) {
-        $self->log(LOGINFO, "training spamassassin FN as spam");
+        $self->log(LOGINFO, "training SA FN as spam");
         $self->train_error_as_spam( $transaction );
         return 1;
     }
     elsif ( $sa->{is_spam} eq 'No' && $sa->{autolearn} eq 'ham' && $response->{result} eq 'Spam' ) {
-        $self->log(LOGINFO, "training spamassassin FP as ham");
+        $self->log(LOGINFO, "training SA FP as ham");
         $self->train_error_as_ham( $transaction );
         return 1;
     };
