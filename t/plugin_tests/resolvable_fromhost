@@ -17,13 +17,11 @@ sub register_tests {
     my %args = ( );
     $self->register( $self->qp, reject => 0 );
 
-    $self->register_test('test_is_immune', 3);
     $self->register_test('test_populate_invalid_networks', 2);
     $self->register_test('test_mx_address_resolves', 2);
     $self->register_test('test_get_host_records', 2);
     $self->register_test('test_get_and_validate_mx', 2);
     $self->register_test('test_check_dns', 2);
-    $self->register_test('test_hook_rcpt', 10);
     $self->register_test('test_hook_mail', 4);
 }
 
@@ -49,48 +47,6 @@ sub test_hook_mail {
     $self->{_args}{reject_type} = 'hard';
     ($r) = $self->hook_mail( $transaction, $sender );
     ok( $r == DENY, "($r)");
-};
-
-sub test_hook_rcpt {
-    my $self = shift;
-
-    my $transaction = $self->qp->transaction;
-    my $recipient = 'foo@example.com';
-
-    $transaction->notes('resolvable_fromhost', 'a');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'mx');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'ip');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'whitelist');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'null');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'config');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'oops!');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'oops!');
-    ok( DECLINED == $self->hook_rcpt( $transaction, $recipient ) );
-
-    $transaction->notes('resolvable_fromhost', 'oops!');
-    $self->{_args}{reject} = 1;
-    $self->{_args}{reject_type} = 'soft';
-    my ($r) = $self->hook_rcpt( $transaction, $recipient );
-    ok( DENYSOFT == $r, "($r)");
-
-    $transaction->notes('resolvable_fromhost', 'failed again');
-    $self->{_args}{reject_type} = 'hard';
-    ($r) = $self->hook_rcpt( $transaction, $recipient );
-    ok( DENY == $r, "($r)");
 };
 
 sub test_check_dns {
@@ -141,25 +97,4 @@ sub test_populate_invalid_networks {
     $self->qp->config('invalid_resolvable_fromhost', undef );
     $self->{invalid} = ();
 };
-
-sub test_is_immune {
-    my $self = shift;
-
-    my $transaction = $self->qp->transaction;
-
-    # null sender should be immune
-    $transaction->sender('<>');
-    ok( $self->is_immune( $transaction->sender, $transaction ) );
-
-    # whitelisted host should be immune
-    my $connection = $self->qp->connection->notes('whitelisthost', 1);
-    ok( $self->is_immune( $transaction->sender, $transaction ) );
-    $self->qp->connection->notes('whitelisthost', undef);
-
-    # reject is not defined, so email should not be immune
-    my $address = Qpsmtpd::Address->new( "<$test_email>" );
-    $transaction->sender($address);
-    ok( ! $self->is_immune( $transaction->sender, $transaction ) );
-};
-
 
