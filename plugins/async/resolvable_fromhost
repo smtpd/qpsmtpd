@@ -15,7 +15,7 @@ my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
 
 sub register {
     my ( $self, $qp ) = @_;
-    
+
     foreach my $i ( $self->qp->config("invalid_resolvable_fromhost") ) {
         $i =~ s/^\s*//;
         $i =~ s/\s*$//;
@@ -35,7 +35,7 @@ sub register {
 
 sub hook_mail_start {
     my ( $self, $transaction, $sender ) = @_;
-    
+
     return DECLINED
       if ($self->connection->notes('whitelisthost'));
 
@@ -63,7 +63,7 @@ sub hook_mail_start {
 
 sub hook_mail_done {
     my ( $self, $transaction, $sender ) = @_;
-    
+
     return DECLINED
       if ( $self->connection->notes('whitelisthost') );
 
@@ -81,7 +81,7 @@ sub check_dns {
 
     my $qp = $self->qp;
     $qp->input_sock->pause_read;
-    
+
     my $a_records = [];
     my $num_queries = 1;    # queries in progress
     my $mx_found = 0;
@@ -159,7 +159,7 @@ sub finish_up {
             return;
         }
     }
-    
+
     unless ($num_queries) {
         # all queries returned no valid response
         $qp->transaction->notes('resolvable_fromhost', 0);
