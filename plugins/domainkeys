@@ -86,7 +86,7 @@ sub data_post_handler {
     return DECLINED if $self->is_immune();
 
     if ( ! $transaction->header->get('DomainKey-Signature') ) {
-        $self->log(LOGINFO, "skip: unsigned");
+        $self->log(LOGINFO, "skip, unsigned");
         return DECLINED;
     };
 
@@ -95,28 +95,28 @@ sub data_post_handler {
     my $message = load Mail::DomainKeys::Message(
         HeadString => $transaction->header->as_string,
         BodyReference => $body) or do {
-            $self->log(LOGWARN, "skip: unable to load message"),
+            $self->log(LOGWARN, "skip, unable to load message"),
             return DECLINED;
         };
 
     # no sender domain means no verification
     if ( ! $message->senderdomain ) {
-        $self->log(LOGINFO, "skip: failed to parse sender domain"),
+        $self->log(LOGINFO, "skip, failed to parse sender domain"),
         return DECLINED;
     };
 
     my $status = $self->get_message_status( $message );
 
     if ( defined $status ) {
-        $transaction->header->replace("DomainKey-Status", $status);
-        $self->log(LOGINFO, "pass: $status");
+        $transaction->header->add("DomainKey-Status", $status, 0);
+        $self->log(LOGINFO, "pass, $status");
         return DECLINED;
     };
 
-    $self->log(LOGERROR, "fail: signature failed to verify");
+    $self->log(LOGERROR, "fail, signature invalid");
     return DECLINED if ! $self->{reject};
     my $deny = $self->{reject_type} eq 'temp' ? DENYSOFT : DENY;
-    return ($deny, "DomainKeys signature failed to verify");
+    return ($deny, "DomainKeys signature validation failed");
 }
 
 sub get_message_status {
