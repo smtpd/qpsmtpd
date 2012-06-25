@@ -144,9 +144,9 @@ evaluate the efficacy and listing policies of a DNSBL before using it.
 See also C<dnsbl_allow> and C<dnsbl_rejectmsg> in the documentation of the
 C<dnsbl> plugin
 
-=item require_resolvable_fromhost
+=item resolvable_fromhost
 
-Plugin: F<require_resolvable_fromhost>
+Plugin: F<resolvable_fromhost>
 
 Reject sender addresses where the MX is unresolvable, i.e. a boolean value
 is the only value in this file. If the MX resolves to something, reject the
