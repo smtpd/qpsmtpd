@@ -140,7 +140,7 @@ sub data_post_handler {
 
     my $filename = $self->get_filename( $transaction ) or return DECLINED;
 
-    return (DECLINED) if $self->is_immune( );
+    return (DECLINED) if $self->is_immune();
     return (DECLINED) if $self->is_too_big( $transaction );
     return (DECLINED) if $self->is_not_multipart( $transaction );
 
@@ -167,7 +167,7 @@ sub data_post_handler {
         $self->connection->notes('naughty', 1); # see plugins/naughty
 
         if ( defined $self->connection->notes('karma') ) {
-            $self->connection->notes('karma', $self->connection->notes('karma') - 1);
+            $self->connection->notes('karma', ($self->connection->notes('karma') - 1));
         };
 
         if ( $self->{_args}{deny_viruses} ) {
