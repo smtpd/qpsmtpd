@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-SPF - plugin to implement Sender Permitted From
+SPF - implement Sender Permitted From
 
 =head1 SYNOPSIS
 
@@ -10,7 +10,7 @@ Prevents email sender address spoofing by checking the SPF policy of the purport
 
 =head1 DESCRIPTION
 
-Sender Policy Framework (SPF) is an e-mail validation system designed to prevent spam by addressing source address spoofing. SPF allows administrators to specify which hosts are allowed to send e-mail from a given domain by creating a specific SPF record in the public DNS. Mail exchangers then use the DNS to check that mail from a given domain is being sent by a host sanctioned by that domain's administrators. -- http://en.wikipedia.org/wiki/Sender_Policy_Framework
+Sender Policy Framework (SPF) is an email validation system designed to prevent source address spoofing. SPF allows administrators to specify which hosts are allowed to send email from a given domain by creating a specific SPF record in the public DNS. Mail exchangers then use the DNS to verify that mail is being sent by a host sanctioned by a given domain administrators. -- http://en.wikipedia.org/wiki/Sender_Policy_Framework
 
 The results of a SPF query are stored in a transaction note named 'spfquery';
 
@@ -33,7 +33,7 @@ Set to a value between 1 and 6 to enable the following SPF behaviors:
 
 Most sites should start at level 3. It temporarily defers connections (4xx) that have soft SFP failures and only rejects (5xx) messages when the sending domains policy suggests it.
 
-SPF levels above 4 are for crusaders who don't mind rejecting some valid mail when the sending server administrator hasn't dotted his i's and crossed his t's. May the deities bless theirobsessive little hearts.
+SPF levels above 4 are for crusaders who don't mind rejecting some valid mail when the sending server administrator hasn't dotted his i's and crossed his t's. May the deities bless their obsessive little hearts.
 
 =head1 SEE ALSO
 
@@ -120,7 +120,10 @@ sub mail_handler {
 
     my $spf_server = Mail::SPF::Server->new();
     my $request    = Mail::SPF::Request->new(%req_params);
-    my $result     = $spf_server->process($request) or return DECLINED;
+    my $result     = $spf_server->process($request) or do {
+        $self->log( LOGINFO, "fail, no result" );
+        return DECLINED;
+    };
 
     $transaction->notes('spfquery', $result);
 
@@ -129,42 +132,56 @@ sub mail_handler {
     my $reject = $self->{_args}{reject};
 
     if ( ! $code ) {
+        $self->log( LOGINFO, "fail, no response" );
         return (DENYSOFT, "SPF - no response") if $reject >= 2;
         return (DECLINED, "SPF - no response");
     };
 
-    return (DECLINED, "SPF - $code: $why") if ! $reject;
+    if ( ! $reject ) {
+        $self->log( LOGINFO, "fail, no reject policy ($code: $why)" );
+        return (DECLINED, "SPF - $code: $why")
+    };
 
 # SPF result codes: pass fail softfail neutral none error permerror temperror
-    if    ( $code eq 'pass' ) { }
+    if    ( $code eq 'pass' ) {
+        $self->log(LOGINFO, "pass, $code: $why" );
+        return (DECLINED);
+    }
     elsif ( $code eq 'fail' ) {
+        $self->log(LOGINFO, "fail, $why" );
         return (DENY, "SPF - forgery: $why") if $reject >= 3;
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
     }
     elsif ( $code eq 'softfail' ) {
-        return (DENY, "SPF - forgery: $why") if $reject >= 4;
+        $self->log(LOGINFO, "fail, $why" );
+        return (DENY, "SPF - $code: $why") if $reject >= 4;
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 3;
     }
     elsif ( $code eq 'neutral' ) {
-        return (DENY, "SPF - forgery: $why") if $reject >= 5;
+        $self->log(LOGINFO, "fail, $code, $why" );
+        return (DENY, "SPF - $code: $why") if $reject >= 5;
     }
     elsif ( $code eq 'none' ) {
-        return (DENY, "SPF - forgery: $why") if $reject >= 6;
+        $self->log(LOGINFO, "fail, $code, $why" );
+        return (DENY, "SPF - $code: $why") if $reject >= 6;
     }
     elsif ( $code eq 'error' ) {
+        $self->log(LOGINFO, "fail, $code, $why" );
         return (DENY, "SPF - $code: $why") if $reject >= 6;
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
     }
     elsif ( $code eq 'permerror' ) {
+        $self->log(LOGINFO, "fail, $code, $why" );
         return (DENY, "SPF - $code: $why") if $reject >= 6;
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 3;
     }
     elsif ( $code eq 'temperror' ) {
+        $self->log(LOGINFO, "fail, $code, $why" );
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
     }
 
-    $self->log(LOGDEBUG, "SPF from $from was $code: $why");
-    return (DECLINED, "SPF - $code: $why");
+    $self->log(LOGINFO, "SPF from $from was $code: $why");
+    return (DECLINED);
 }
 
 sub data_post_handler {
