@@ -235,7 +235,7 @@ Arguments for this hook are
   # $sender: an Qpsmtpd::Address object for 
   # sender of the message
 
-Example plugins for the C<hook_mail> are F<require_resolvable_fromhost>
+Example plugins for the C<hook_mail> are F<resolvable_fromhost>
 and F<badmailfrom>.
 
 =head2 hook_rcpt_pre

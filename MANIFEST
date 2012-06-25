@@ -15,7 +15,6 @@ config.sample/norelayclients
 config.sample/plugins
 config.sample/rcpthosts
 config.sample/relayclients
-config.sample/require_resolvable_fromhost
 config.sample/rhsbl_zones
 config.sample/size_threshold
 config.sample/smtpauth-checkpassword
@@ -64,7 +63,7 @@ plugins/async/check_earlytalker
 plugins/async/dns_whitelist_soft
 plugins/async/dnsbl
 plugins/async/queue/smtp-forward
-plugins/async/require_resolvable_fromhost
+plugins/async/resolvable_fromhost
 plugins/async/rhsbl
 plugins/async/uribl
 plugins/auth/auth_checkpassword
@@ -122,7 +121,7 @@ plugins/rcpt_map
 plugins/rcpt_ok
 plugins/rcpt_regexp
 plugins/relay
-plugins/require_resolvable_fromhost
+plugins/resolvable_fromhost
 plugins/resolvable_fromhost
 plugins/rhsbl
 plugins/sender_permitted_from
@@ -186,7 +185,7 @@ t/plugin_tests/ident/geoip
 t/plugin_tests/ident/p0f
 t/plugin_tests/rcpt_ok
 t/plugin_tests/relay
-t/plugin_tests/require_resolvable_fromhost
+t/plugin_tests/resolvable_fromhost
 t/plugin_tests/sender_permitted_from
 t/plugin_tests/spamassassin
 t/plugin_tests/virus/clamdscan

@@ -25,7 +25,7 @@ various I<hooks> provided by the qpsmtpd core engine.
 At least one plugin B<must> allow or deny the B<RCPT> command to enable 
 receiving mail. The F<check_relay> plugin is the standard plugin for this.
 Other plugins provide extra functionality related to this; for example the
-F<require_resolvable_fromhost> plugin.
+F<resolvable_fromhost> plugin.
 
 =head2 Loading Plugins
 

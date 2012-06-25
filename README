@@ -123,7 +123,7 @@ interest in various "hooks" provided by the qpsmtpd core engine.
 At least one plugin MUST allow or deny the RCPT command to enable
 receiving mail.  The "rcpt_ok" is one basic plugin that does
 this.  Other plugins provide extra functionality related to this; for
-example the require_resolvable_fromhost plugin described above.
+example the resolvable_fromhost plugin described above.
 
 
 =head1 Configuration files
@@ -156,12 +156,6 @@ Normal ip based DNS blocking lists ("RBLs"). For example:
   relays.ordb.org
   spamsources.fabel.dk
 
-
-=item require_resolvable_fromhost
-
-If this file contains anything but a 0 on the first line, envelope
-senders will be checked against DNS. If an A or a MX record can't be
-found the mail command will return a soft rejection (450).
 
 =item spool_dir
 

@@ -17,7 +17,7 @@ Next Version
 
   p0f version 3 supported and new default. see UPGRADING (Matt Simerson)
 
-  require_resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
+  resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
 
   new plugin auth_vpopmaild (Robin Bowes)
 
@@ -44,7 +44,7 @@ Next Version
 
   AUTH PLAIN bug with Alpine (Rick Richard)
 
-  require_resolvable_fromhost: Moved DENYSOFT for temp_resolver_failed
+  resolvable_fromhost: Moved DENYSOFT for temp_resolver_failed
   to the RCPT TO hook. (Larry Nedry)
 
   Note Net::IP dependency (Larry Nedry)
@@ -163,7 +163,7 @@ Next Version
   plugins/queue/maildir: multi user / multi domain support added
   set the Return-Path header when queuing into maildir mailboxes
 
-  plugins/require_resolvable_fromhost: check all MX hosts, not just the first
+  plugins/resolvable_fromhost: check all MX hosts, not just the first
 
   remove outdated virus/check_for_hi_virus plugin
 
@@ -191,7 +191,7 @@ Next Version
 
   async: Dereference the DATA deny message before sending it to the client
 
-  Change async/require_resolvable_fromhost to match the logic of
+  Change async/resolvable_fromhost to match the logic of
   the non-async version and other MTAs
 
   async: Handle End-of-data marker split across packets
@@ -453,7 +453,7 @@ Next Version
 
   example patterns for badrcptto plugin - Gordon Rowell
 
-  Extend require_resolvable_fromhost to include a configurable list of
+  Extend resolvable_fromhost to include a configurable list of
   "impossible" addresses to combat spammer forging.  (Hanno Hecker)
 
   Use qmail/control/smtpdgreeting if it exists, otherwise
@@ -570,7 +570,7 @@ Next Version
   no longer exists for that sender (great for harassment cases).
   (John Peacock)
 
-  check_earlytalker and require_resolvable_fromhost - short circuit test if
+  check_earlytalker and resolvable_fromhost - short circuit test if
   whitelistclient is set. (Michael Toren)
 
   check_badmailfrom - Do not say why a given message is denied.

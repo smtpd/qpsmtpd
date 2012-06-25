@@ -34,7 +34,7 @@ check_earlytalker
 count_unrecognized_commands 4
 relay
 
-require_resolvable_fromhost
+resolvable_fromhost
 
 rhsbl
 dnsbl
