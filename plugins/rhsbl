@@ -46,6 +46,11 @@ sub register {
     else {
         $self->{_args} = { @_ };
     };
+
+    if ( ! defined $self->{_args}{reject}  ) {
+        $self->{_args}{reject} = 1;
+    };
+    $self->{_args}{reject_type} ||= 'perm';
 }
 
 sub hook_mail {
@@ -94,17 +99,17 @@ sub hook_mail {
                     $self->log(LOGDEBUG, "TXT record found: " . $rr->txtdata);
                 };
 
-                if ( $result ) {
-                    $self->log(LOGINFO, "fail, $result");
+                next if ! $result;
 
-                    my $host = $transaction->sender->host;
-                    if ($result =~ /^$host\./ ) {
-                        return $self->get_reject( "Mail from $host rejected because it $result" );
-                    };
+                $self->log(LOGINFO, "fail, $result");
 
-                    my $hello = $self->qp->connection->hello_host;
-                    return $self->get_reject( "Mail from HELO $hello rejected because it $result" );
+                my $host = $transaction->sender->host;
+                if ($result =~ /^$host\./ ) {
+                    return $self->get_reject( "Mail from $host rejected because it $result" );
                 };
+
+                my $hello = $self->qp->connection->hello_host;
+                return $self->get_reject( "Mail from HELO $hello rejected because it $result" );
             }
         }
     }
