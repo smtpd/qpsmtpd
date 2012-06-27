@@ -154,47 +154,25 @@ sub register {
 sub hook_connect {
     my ($self, $transaction) = @_;
 
-    my $reject = $self->{_args}{reject};
-
+    # perform RBLSMTPD checks to mimic DJB's rblsmtpd
     # RBLSMTPD being non-empty means it contains the failure message to return
     if ( defined $ENV{'RBLSMTPD'} && $ENV{'RBLSMTPD'} ne '' ) {
+        my $reject = $self->{_args}{reject};
         return $self->return_env_message() if $reject && $reject eq 'connect';
     };
 
     return DECLINED if $self->is_immune();
-
-    # perform RBLSMTPD checks to mimic Dan Bernstein's rblsmtpd
     return DECLINED if $self->is_set_rblsmtpd();
     return DECLINED if $self->ip_whitelisted();
 
-    my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
-    if ( ! %dnsbl_zones ) {
-        $self->log( LOGDEBUG, "skip, no zones");
-        return DECLINED;
-    };
+    my $dnsbl_zones = $self->get_dnsbl_zones() or return DECLINED;
+    my $resolv      = $self->get_resolver() or return DECLINED;
 
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $reversed_ip = join('.', reverse(split(/\./, $remote_ip)));
+    for my $dnsbl ( keys %$dnsbl_zones ) {
 
-    my $res = new Net::DNS::Resolver;
-    $res->tcp_timeout(30);
-    $res->udp_timeout(30);
-
-    for my $dnsbl (keys %dnsbl_zones) {
-# fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
-        my $query;
-        if ( defined $dnsbl_zones{$dnsbl} ) {
-            $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record");
-            $query = $res->query("$reversed_ip.$dnsbl");
-        }
-        else {
-            $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record");
-            $query = $res->query("$reversed_ip.$dnsbl", "TXT");
-        }
-
-        if ( ! $query) {
-            if ( $res->errorstring ne "NXDOMAIN" ) {
-                $self->log(LOGERROR, "$dnsbl query failed: ", $res->errorstring);
+        my $query = $self->get_query( $dnsbl ) or do {
+            if ( $resolv->errorstring ne 'NXDOMAIN' ) {
+                $self->log(LOGERROR, "$dnsbl query failed: ", $resolv->errorstring);
             };
             next;
         };
@@ -217,8 +195,9 @@ sub hook_connect {
             if ( ! $dnsbl ) {  $dnsbl = $result; };
 
             if ($a_record) {
-                if (defined $dnsbl_zones{$dnsbl}) {
-                    my $smtp_msg = $dnsbl_zones{$dnsbl};
+                if (defined $dnsbl_zones->{$dnsbl}) {
+                    my $smtp_msg = $dnsbl_zones->{$dnsbl};
+                    my $remote_ip= $self->qp->connection->remote_ip;
                     $smtp_msg =~ s/%IP%/$remote_ip/g;
                     return $self->get_reject( $smtp_msg, $dnsbl );
                 }
@@ -231,6 +210,35 @@ sub hook_connect {
 
     $self->log(LOGINFO, 'pass');
     return DECLINED;
+};
+
+sub get_dnsbl_zones {
+    my $self = shift;
+
+    my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
+    if ( ! %dnsbl_zones ) {
+        $self->log( LOGDEBUG, "skip, no zones");
+        return;
+    };
+
+    $self->{_dnsbl}{zones} = \%dnsbl_zones;
+    return \%dnsbl_zones;
+};
+
+sub get_query {
+    my ($self, $dnsbl) = @_;
+
+    my $remote_ip = $self->qp->connection->remote_ip;
+    my $reversed_ip = join('.', reverse(split(/\./, $remote_ip)));
+
+# fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
+    if ( defined $self->{_dnsbl}{zones}{$dnsbl} ) {
+        $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record");
+        return $self->{_resolver}->query("$reversed_ip.$dnsbl");
+    };
+
+    $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record");
+    return $self->{_resolver}->query("$reversed_ip.$dnsbl", 'TXT');
 };
 
 sub is_set_rblsmtpd {
@@ -285,4 +293,15 @@ sub hook_rcpt {
 
     return DECLINED;
 }
+
+sub get_resolver {
+    my $self = shift;
+    return $self->{_resolver} if $self->{_resolver};
+    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
+    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
+    my $timeout = $self->{_args}{timeout} || 30;
+    $self->{_resolver}->tcp_timeout($timeout);
+    $self->{_resolver}->udp_timeout($timeout);
+    return $self->{_resolver};
+};
 
