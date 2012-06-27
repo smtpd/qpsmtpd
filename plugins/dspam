@@ -217,6 +217,7 @@ sub register {
 
     if ( ! -x $self->{_args}{dspam_bin} ) {
         $self->log(LOGERROR, "dspam not found: ");
+        return DECLINED;
     };
 
     $self->register_hook('data_post', 'data_post_handler');
