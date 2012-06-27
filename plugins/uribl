@@ -89,14 +89,14 @@ may be used and redistributed under the same terms as qpsmtpd itself.
 
 =cut
 
-use Net::DNS::Resolver;
-use Time::HiRes qw(time);
-use IO::Select;
+use strict;
+use warnings;
 
 use Qpsmtpd::Constants;
 
-use strict;
-use warnings;
+use Net::DNS::Resolver;
+use Time::HiRes qw(time);
+use IO::Select;
 
 # ccTLDs that allocate domain names within a strict two-level hierarchy,
 # as in *.co.uk
