@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-check_earlytalker - Check that the client doesn't talk before we send the SMTP banner
+earlytalker - Check that the client doesn't talk before we send the SMTP banner
 
 =head1 DESCRIPTION
 

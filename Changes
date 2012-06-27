@@ -570,7 +570,7 @@ Next Version
   no longer exists for that sender (great for harassment cases).
   (John Peacock)
 
-  check_earlytalker and resolvable_fromhost - short circuit test if
+  earlytalker and resolvable_fromhost - short circuit test if
   whitelistclient is set. (Michael Toren)
 
   check_badmailfrom - Do not say why a given message is denied.
@@ -642,7 +642,7 @@ Next Version
 
   Add a plugin hook for the DATA command
 
-  check_earlytalker -
+  earlytalker -
     + optionally react to an earlytalker by denying all MAIL-FROM commands
       rather than issuing a 4xx/5xx greeting and disconnecting. (Mark
       Powell)
@@ -728,7 +728,7 @@ Next Version
   Use $ENV{QMAIL} to override /var/qmail for where to find the
   control/ directory.
 
-  Enable "check_earlytalker" in the default plugins config
+  Enable "earlytalker" in the default plugins config
 
   Added a milter plugin to allow use of sendmail milters
 
@@ -792,7 +792,7 @@ Next Version
   unrecognized_command hook and a count_unrecognized_commands
   plugin. (Rasjid Wilcox)
 
-  check_earlytalker plugin.  Deny the connection if the client talks
+  earlytalker plugin.  Deny the connection if the client talks
   before we show our SMTP banner.  (From Devin Carraway)
 
   Patch Qpsmtpd::SMTP to allow connect plugins to give DENY and

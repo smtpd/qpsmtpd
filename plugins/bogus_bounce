@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-check_bogus_bounce - Check that a bounce message isn't bogus
+bogus_bounce - Check that a bounce message isn't bogus
 
 =head1 DESCRIPTION
 

@@ -30,7 +30,7 @@ dont_require_anglebrackets
 quit_fortune
 # tls should load before count_unrecognized_commands
 #tls
-check_earlytalker
+earlytalker
 count_unrecognized_commands 4
 relay
 

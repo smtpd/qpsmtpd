@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-check_earlytalker - Check that the client doesn't talk before we send the SMTP banner
+earlytalker - Check that the client doesn't talk before we send the SMTP banner
 
 =head1 DESCRIPTION
 
@@ -30,7 +30,7 @@ must also be allowed for.
 
 Do we reject/deny connections to early talkers?
 
-  check_earlytalker reject [ 0 | 1 ]
+  earlytalker reject [ 0 | 1 ]
 
 Default: I<reject 1>
 
@@ -48,7 +48,7 @@ issued a deny or denysoft (depending on the value of I<reject_type>). The defaul
 is to react at the SMTP greeting stage by issuing the apropriate response code
 and terminating the SMTP connection.
 
-  check_earlytalker defer-reject [ 0 | 1 ]
+  earlytalker defer-reject [ 0 | 1 ]
 
 =head2 check-at [ CONNECT | DATA ]
 
