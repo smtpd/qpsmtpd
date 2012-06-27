@@ -103,9 +103,11 @@ sub hook_mail {
 
                 $self->log(LOGINFO, "fail, $result");
 
-                my $host = $transaction->sender->host;
-                if ($result =~ /^$host\./ ) {
-                    return $self->get_reject( "Mail from $host rejected because it $result" );
+                if ( $transaction->sender ) {
+                    my $host = $transaction->sender->host;
+                    if ($result =~ /^$host\./ ) {
+                        return $self->get_reject( "Mail from $host rejected because it $result" );
+                    };
                 };
 
                 my $hello = $self->qp->connection->hello_host;
