@@ -213,6 +213,11 @@ sub register {
     $self->{_args} = { @_ };
     $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
+    $self->{_args}{dspam_bin} ||= '/usr/local/bin/dspam';
+
+    if ( ! -x $self->{_args}{dspam_bin} ) {
+        $self->log(LOGERROR, "dspam not found: ");
+    };
 
     $self->register_hook('data_post', 'data_post_handler');
 }
@@ -228,9 +233,9 @@ sub data_post_handler {
         return (DECLINED);
     };
 
-    my $username = $self->select_username( $transaction );
-    my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
-    my $filtercmd = "$dspam_bin --user $username --mode=tum --process --deliver=summary --stdout";
+    my $user = $self->select_username( $transaction );
+    my $bin  = $self->{_args}{dspam_bin};
+    my $filtercmd = "$bin --user $user --mode=tum --process --deliver=summary --stdout";
     $self->log(LOGDEBUG, $filtercmd);
 
     my $response = $self->dspam_process( $filtercmd, $transaction );
