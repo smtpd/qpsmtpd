@@ -24,7 +24,7 @@ The following optional settings exist:
 
 =head2 require
 
- headers require [ From | Date | From,Date | From,Date,Subject,Message-ID ]
+ headers require [ From | Date | From,Date | From,Date,Subject,Message-ID,Received ]
 
 A comma separated list of headers to require. 
 
