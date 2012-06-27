@@ -293,7 +293,7 @@ was sent, this hook is called.
 
 B<NOTE:> This hook, like B<EHLO>, B<VRFY>, B<QUIT>, B<NOOP>, is an 
 endpoint of a pipelined command group (see RFC 1854) and may be used to 
-detect ``early talkers''. Since svn revision 758 the F<check_earlytalker>
+detect ``early talkers''. Since svn revision 758 the F<earlytalker>
 plugin may be configured to check at this hook for ``early talkers''.
 
 Allowed return codes are
