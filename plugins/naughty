@@ -16,7 +16,7 @@ but my observations in 2012 suggest it makes no measurable difference whether
 I disconnect during connect or rcpt.
 
 Disconnecting later is inefficient because other plugins continue to do their
-work, oblivious to the fact that the connection is destined for the bit bucket.
+work, oblivious to the fact that a connection is destined for the bit bucket.
 
 =head1 DESCRIPTION
 
@@ -31,7 +31,7 @@ Plugins like SpamAssassin and DSPAM can benefit from using naughty connections
 to train their filters.
 
 Since so many connections are from blacklisted IPs, naughty significantly
-reduces the processing time required for disposing of them. Over 80% of my
+reduces the resources required to disposing of them. Over 80% of my
 connections are disposed of after after a few DNS queries (B<dnsbl> or one DB
 query (B<karma>) and 0.01s of compute time.
 
@@ -40,6 +40,8 @@ query (B<karma>) and 0.01s of compute time.
 Instead of each plugin handling cleanup, B<naughty> does it. Set I<reject> to
 the hook you prefer to reject in and B<naughty> will reject the naughty
 connections, regardless of who identified them, exactly when you choose.
+
+For training spam filters, I<reject data_post> is best.
 
 =head2 simplicity
 
@@ -55,7 +57,8 @@ deployment models.
 When a user authenticates, the naughty flag on their connection is cleared.
 This is to allow users to send email from IPs that fail connection tests such
 as B<dnsbl>. Keep in mind that if I<reject connect> is set, connections will
-not get the chance to authenticate.
+not get the chance to authenticate. To allow clients a chance to authenticate,
+I<reject mail> works well.
 
 =head2 naughty
 
@@ -109,7 +112,7 @@ Here's how to use naughty and get_reject in your plugin:
      my ($self, $transaction) = @_;
      ... do a bunch of stuff ...
      return DECLINED if is_okay();
-     return $self->get_reject( $message );
+     return $self->get_reject( $message, $optional_log_message );
  };
 
 =head1 AUTHOR
@@ -153,7 +156,7 @@ sub register {
 sub naughty {
     my $self = shift;
     my $naughty = $self->connection->notes('naughty') or do {
-        $self->log(LOGINFO, "pass, clean");
+        $self->log(LOGINFO, 'pass');
         return DECLINED;
     };
     $self->log(LOGINFO, "disconnecting");
