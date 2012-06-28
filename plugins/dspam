@@ -216,7 +216,7 @@ sub register {
     $self->{_args}{dspam_bin} ||= '/usr/local/bin/dspam';
 
     if ( ! -x $self->{_args}{dspam_bin} ) {
-        $self->log(LOGERROR, "dspam not found: ");
+        $self->log(LOGERROR, "dspam CLI binary not found: install dspam and/or set dspam_bin");
         return DECLINED;
     };
 
