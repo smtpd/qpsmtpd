@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use Cwd;
 use Data::Dumper;
 use File::Tail;
 
@@ -276,15 +277,19 @@ sub show_symbol {
 
 sub get_qp_dir {
     foreach my $user ( qw/ qpsmtpd smtpd / ) {
-
         my ($homedir) = (getpwnam( $user ))[7] or next;
 
         if ( -d "$homedir/plugins" ) {
             return "$homedir";
         };
-        if ( -d "$homedir/smtpd/plugins" ) {
-            return "$homedir/smtpd";
+        foreach my $s ( qw/ smtpd qpsmtpd qpsmtpd-dev / ) {
+            if ( -d "$homedir/smtpd/plugins" ) {
+                return "$homedir/smtpd";
+            };
         };
+    };
+    if ( -d "./plugins" ) {
+        return Cwd::getcwd();
     };
 };
 
