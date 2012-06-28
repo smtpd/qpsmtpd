@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 export LOGDIR=./main
 mkdir -p $LOGDIR
 exec multilog t s10000000 n20 $LOGDIR
