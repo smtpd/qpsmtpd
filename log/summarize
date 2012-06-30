@@ -293,8 +293,8 @@ sub get_qp_dir {
             return "$homedir";
         };
         foreach my $s ( qw/ smtpd qpsmtpd qpsmtpd-dev / ) {
-            if ( -d "$homedir/smtpd/plugins" ) {
-                return "$homedir/smtpd";
+            if ( -d "$homedir/$s/plugins" ) {
+                return "$homedir/$s";
             };
         };
     };
