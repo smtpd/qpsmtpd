@@ -85,7 +85,7 @@ sub hook_mail {
         next unless $bad;
         next unless $self->is_match( $from, $bad, $host );
         $reason ||= "Your envelope sender is in my badmailfrom list";
-        $self->connection->notes('karma', ($self->connection->notes('karma') || 0) - 1);
+        $self->adjust_karma( -1 );
         return $self->get_reject( $reason );
     }
 
