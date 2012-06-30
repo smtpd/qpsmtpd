@@ -11,6 +11,7 @@ PERL=/usr/bin/perl
 QMAILDUID=`id -u $QPUSER`
 NOFILESGID=`id -g $QPUSER`
 IP=`head -1 config/IP`
+PORT=25
 LANG=C
 
 # Remove the comments between the <start> and <end> tags to choose a
@@ -19,7 +20,7 @@ LANG=C
 # <start tcpserver>
 exec $BIN/softlimit -m $MAXRAM  \
   $BIN/tcpserver -c 10 -v -R -p \
-  -u $QMAILDUID -g $NOFILESGID $IP smtp   \
+  -u $QMAILDUID -g $NOFILESGID $IP $PORT  \
   ./qpsmtpd 2>&1
 # <end tcpserver>
 
@@ -30,7 +31,7 @@ exec $BIN/softlimit -m $MAXRAM  \
 #  exec $BIN/softlimit -m $MAXRAM   \
 #    $PERL -T ./qpsmtpd-forkserver  \
 #      --listen-address $IP         \
-#      --port 25                    \
+#      --port $PORT                 \
 #      --limit-connections 15       \
 #      --max-from-ip 5              \
 #      --user $QPUSER
