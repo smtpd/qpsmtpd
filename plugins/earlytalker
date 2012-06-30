@@ -173,7 +173,7 @@ sub connect_handler {
     };
 
     $self->connection->notes('earlytalker', 1);
-    $self->connection->notes('karma', -1);
+    $self->adjust_karma( -1 );
     return DECLINED;
 }
 
