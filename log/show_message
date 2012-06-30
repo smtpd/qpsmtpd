@@ -5,7 +5,7 @@ use warnings;
 
 use Data::Dumper;
 
-my $QPDIR = '/usr/home/qpsmtpd/smtpd';
+my $QPDIR = get_qp_dir();
 my $logfile = "$QPDIR/log/main/current";
 
 my $is_ip  = 0;
@@ -20,7 +20,7 @@ if ( $search =~ /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/ ) {
     $is_ip++;
 };
 
-open my $LOG, '<', $logfile;
+open my $LOG, '<', $logfile or die "unable to open $logfile\n";
 
 if ( $is_ip ) {    # look for the connection start message for the IP
     my $ip_matches;
