@@ -3,11 +3,12 @@
 use strict;
 use warnings;
 
+use Cwd;
 use Data::Dumper;
 use File::Tail;
 
-my $dir = find_qp_log_dir() or die "unable to find QP home dir";
-my $file = "$dir/main/current";
+my $dir = get_qp_dir() or die "unable to find QP home dir";
+my $file = "$dir/log/main/current";
 my $fh = File::Tail->new(name=>$file, interval=>1, maxinterval=>1, debug =>1, tail =>100 );
 
 while ( defined (my $line = $fh->read) ) {
@@ -15,16 +16,21 @@ while ( defined (my $line = $fh->read) ) {
     print $line;
 };
 
-sub find_qp_log_dir {
+sub get_qp_dir {
     foreach my $user ( qw/ qpsmtpd smtpd / ) {
-
         my ($homedir) = (getpwnam( $user ))[7] or next;
 
-        if ( -d "$homedir/log" ) {
-            return "$homedir/log";
+        if ( -d "$homedir/plugins" ) {
+            return "$homedir";
         };
-        if ( -d "$homedir/smtpd/log" ) {
-            return "$homedir/smtpd/log";
+        foreach my $s ( qw/ smtpd qpsmtpd qpsmtpd-dev / ) {
+            if ( -d "$homedir/$s/plugins" ) {
+                return "$homedir/$s";
+            };
         };
     };
+    if ( -d "./plugins" ) {
+        return Cwd::getcwd();
+    };
 };
+
