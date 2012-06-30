@@ -70,7 +70,7 @@ while ( defined (my $line = $fh->read) ) {
     next if ! $line;
     my ( $type, $pid, $hook, $plugin, $message ) = parse_line( $line );
     next if ! $type;
-    next if $type =~ /info|unknown|response/;
+    next if $type =~ /^(info|unknown|response|tcpserver)$/;
     next if $type eq 'init';           # doesn't occur in all deployment models
 
     if ( ! $pids{$pid} ) {             # haven't seen this pid 
@@ -151,6 +151,7 @@ sub parse_line {
     return parse_line_plugin( $line ) if substr($message, 0, 1) eq '(';
     return ( 'dispatch', $pid, undef, undef, $message ) if substr($message, 0, 12) eq 'dispatching ';
     return ( 'response', $pid, undef, undef, $message ) if $message =~ /^[2|3]\d\d/;
+    return ( 'tcpserver', $pid, undef, undef, undef ) if substr($pid, 0, 10) eq 'tcpserver:';
 
     # lines seen about once per connection
     return ( 'init',     $pid, undef, undef, $message ) if substr($message, 0, 19) eq 'Accepted connection';
