@@ -401,7 +401,7 @@ sub reject {
         }
     }
 
-    $self->connection->notes('karma', ($self->connection->notes('karma') - 1));
+    $self->adjust_karma( -1 );
 # default of media_unsupported is DENY, so just change the message
     $self->log(LOGINFO, "fail, $status, > $reject, $learn");
     return ($self->get_reject_type(), "spam score exceeded threshold");

@@ -430,7 +430,7 @@ sub no_matching_dns {
     if ( $self->connection->notes('helo_forward_match') &&
          $self->connection->notes('helo_reverse_match') ) {
         $self->log( LOGDEBUG, "foward and reverse match" );
-# TODO: consider adding some karma here
+        $self->adjust_karma( 1 );  # whoppee, a match!
         return;
     };
 
