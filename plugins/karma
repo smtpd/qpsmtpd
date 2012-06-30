@@ -383,7 +383,7 @@ sub get_db_tie {
     my ( $self, $db, $lock ) = @_;
 
     tie( my %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) or do {
-        $self->log(LOGCRIT, "tie to database $db failed: $!");
+        $self->log(LOGCRIT, "error, tie to database $db failed: $!");
         close $lock;
         return;
     };
@@ -416,12 +416,12 @@ sub get_db_lock {
 
     # Check denysoft db
     open( my $lock, ">$db.lock" ) or do {
-        $self->log(LOGCRIT, "opening lockfile failed: $!");
+        $self->log(LOGCRIT, "error, opening lockfile failed: $!");
         return;
     };
 
     flock( $lock, LOCK_EX ) or do {
-        $self->log(LOGCRIT, "flock of lockfile failed: $!");
+        $self->log(LOGCRIT, "error, flock of lockfile failed: $!");
         close $lock;
         return;
     };
@@ -441,12 +441,12 @@ sub get_db_lock_nfs {
         blocking_timeout   => 10,      # 10 sec
         stale_lock_timeout => 30 * 60, # 30 min
     } or do {
-        $self->log(LOGCRIT, "nfs lockfile failed: $!");
+        $self->log(LOGCRIT, "error, nfs lockfile failed: $!");
         return;
     };
 
     open( my $lock, "+<$db.lock") or do {
-        $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
+        $self->log(LOGCRIT, "error, opening nfs lockfile failed: $!");
         return;
     };
 
