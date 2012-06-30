@@ -140,7 +140,7 @@ sub data_post_handler {
 
     my $filename = $self->get_filename( $transaction ) or return DECLINED;
 
-    return (DECLINED) if $self->is_immune();
+    #return (DECLINED) if $self->is_immune();
     return (DECLINED) if $self->is_too_big( $transaction );
     return (DECLINED) if $self->is_not_multipart( $transaction );
 
