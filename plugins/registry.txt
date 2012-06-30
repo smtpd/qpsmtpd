@@ -9,7 +9,7 @@
 3	ident::p0f					p0f		p0f
 5	karma						krm		karma
 6	dnsbl						dbl		dnsbl
-7	relay						rly		relay
+7	relay						rly		relay       check_relay,check_norelay,relay_only
 9	earlytalker					ear		early		check_earlytalker
 15	helo						hlo		helo		check_spamhelo
 16	tls							tls		tls
@@ -22,13 +22,14 @@
 #
 # Authentication
 #
-30	auth::vpopmail_sql			aut		vpsql
-31	auth::vpopmaild				vpd		vpopd
-32	auth::vpopmail				vpo		vpop
-33	auth::checkpasswd			ckp		chkpw
-34	auth::cvs_unix_local		cvs		cvsul
-35	auth::flat_file				flt		aflat
-36	auth::ldap_bind				ldp		aldap
+30	auth::auth_vpopmail_sql		aut		vpsql
+31	auth::auth_vpopmaild		vpd		vpopd
+32	auth::auth_vpopmail			vpo		vpop
+33	auth::auth_checkpasswd		ckp		chkpw
+34	auth::auth_cvs_unix_local	cvs		cvsul
+35	auth::auth_flat_file		flt		aflat
+36	auth::auth_ldap_bind		ldp		aldap
+37	auth::authdeny	        	dny		adeny
 #
 # Sender / From
 #
