@@ -39,7 +39,7 @@ relay
 resolvable_fromhost
 
 rhsbl
-dnsbl reject naughty
+dnsbl reject naughty reject_type disconnect
 badmailfrom
 badrcptto
 helo policy lenient
