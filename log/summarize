@@ -25,7 +25,6 @@ my %formats = (
     ip                    => "%-15.15s",
     hostname              => "%-20.20s",
     distance              =>    "%5.5s",
-
     'ident::geoip'        => "%-20.20s",
     'ident::p0f'          => "%-10.10s",
     count_unrecognized_commands => "%-5.5s",
@@ -109,10 +108,16 @@ while ( defined (my $line = $fh->read) ) {
         };
 
         if ( $plugin eq 'ident::geoip' ) {
-            my ($gip, $distance) = $message =~ /(.*?),\s+([\d]+)\skm/;
-            if ( $distance ) {
-                $pids{$pid}{$plugin}  = $gip;
-                $pids{$pid}{distance} = $distance;
+            if ( length $message < 3 ) {
+                $formats{'ident::geoip'} = "%-3.3s";
+                $formats3{'ident::geoip'} = "%-3.3s";
+            }
+            else {
+                my ($gip, $distance) = $message =~ /(.*?),\s+([\d]+)\skm/;
+                if ( $distance ) {
+                    $pids{$pid}{$plugin}  = $gip;
+                    $pids{$pid}{distance} = $distance;
+                };
             };
         };
     }
@@ -234,12 +239,12 @@ sub print_auto_format {
 
         if ( defined $pids{$pid}{helo_host} && $plugin =~ /helo/ ) {
             $format .= " %-18.18s";
-            push @values, delete $pids{$pid}{helo_host};
+            push @values, substr( delete $pids{$pid}{helo_host}, -18, 18);
             push @headers, 'HELO';
         }
         elsif ( defined $pids{$pid}{from} && $plugin =~ /from/ ) {
             $format .= " %-20.20s";
-            push @values, delete $pids{$pid}{from};
+            push @values, substr( delete $pids{$pid}{from}, -20, 20);
             push @headers, 'MAIL FROM';
         }
         elsif ( defined $pids{$pid}{to} && $plugin =~ /to|rcpt|recipient/ ) {
