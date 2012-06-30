@@ -285,7 +285,7 @@ sub is_immune {
 sub adjust_karma {
     my ( $self, $value ) = @_;
 
-    my $karma = $self->connection->notes('karma') || 0;
+    my $karma = $self->connection->notes('karma') || 0
     $karma += $value;
     $self->connection->notes('karma', $value);
     return $value;

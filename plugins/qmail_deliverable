@@ -195,12 +195,12 @@ sub rcpt_handler {
     $self->log(LOGINFO, "error, SHOULD NOT HAPPEN"),        $k++ if $rv == 0xfe;
     $self->log(LOGINFO, "fail, address not local"),         $k++ if $rv == 0xff;
 
-    if ( $rv ) {
-        $self->log(LOGINFO, sprintf("error, unknown: 0x%02x", $rv)) if not $k;
-        return DECLINED;
-    };
+    $self->log(LOGINFO, sprintf("Unknown: 0x%02x", $rv)) if $rv and not $k;
 
-    return (DENY, "Sorry, no mailbox by that name. qd (#5.1.1)" );
+    return DECLINED if $rv;
+
+    $self->adjust_karma( -1 );
+    return (DENY, "fail, no mailbox by that name. qd (#5.1.1)" );
 }
 
 sub _smtproute {
