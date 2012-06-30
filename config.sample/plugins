@@ -28,6 +28,8 @@ dont_require_anglebrackets
 # parse_addr_withhelo
 
 quit_fortune
+#karma penalty_box 1 reject naughty
+
 # tls should load before count_unrecognized_commands
 #tls
 earlytalker
@@ -37,10 +39,10 @@ relay
 resolvable_fromhost
 
 rhsbl
-dnsbl
+dnsbl reject naughty reject_type disconnect
 badmailfrom
 badrcptto
-helo
+helo policy lenient
 
 # sender_permitted_from
 # greylisting p0f genre,windows
@@ -65,18 +67,21 @@ virus/klez_filter
 # You can run the spamassassin plugin with options.  See perldoc
 # plugins/spamassassin for details.
 #
-spamassassin
+spamassassin reject 12
 
 # rejects mails with a SA score higher than 20 and munges the subject
 # of the score is higher than 10.
 #
-#   spamassassin reject_threshold 20 munge_subject_threshold 10
+#   spamassassin reject 20 munge_subject_threshold 10
 
 # dspam must run after spamassassin for the learn_from_sa feature to work
 dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
 # virus/clamav
+# virus/clamdscan deny_viruses yes scan_all 1
+
+naughty reject data
 
 # You must enable a queue plugin - see the options in plugins/queue/ - for example:
 
