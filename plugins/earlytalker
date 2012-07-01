@@ -205,6 +205,7 @@ sub log_and_deny {
     my $ip = $self->qp->connection->remote_ip || 'remote host';
 
     $self->connection->notes('earlytalker', 1);
+    $self->adjust_karma( -1 );
 
     my $log_mess = "$ip started talking before we said hello";
     my $smtp_msg = 'Connecting host started transmitting before SMTP greeting';
