@@ -68,6 +68,7 @@ Default: temp (temporary, aka soft, aka 4xx).
 use strict;
 use warnings;
 
+use lib 'lib';
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 use Qpsmtpd::TcpServer;
@@ -114,13 +115,14 @@ sub hook_mail {
     };
 
     my $result = $transaction->notes('resolvable_fromhost') or do {
+        $self->log(LOGINFO, 'error, missing result' );
         return Qpsmtpd::DSN->temp_resolver_failed( $self->get_reject_type(), '' );
     };
 
     return DECLINED if $result =~ /^(?:a|ip|mx)$/;         # success
     return DECLINED if $result =~ /^(?:whitelist|null|naughty)$/; # immunity
 
-    $self->log(LOGINFO, $result ); # log error
+    $self->log(LOGINFO, "fail, $result" ); # log error
 
     return Qpsmtpd::DSN->addr_bad_from_system( $self->get_reject_type(),
                             "FQDN required in the envelope sender");
