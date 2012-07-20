@@ -634,7 +634,10 @@ sub data_respond {
 
   my $timeout = $self->config('timeout');
   while (defined($_ = $self->getline($timeout))) {
-    $complete++, last if $_ eq ".\r\n";
+    if ( $_ eq ".\r\n" ) {
+        $complete++;
+        $_ eq '';
+    };
     $i++;
 
     # should probably use \012 and \015 in these checks instead of \r and \n ...
@@ -650,7 +653,7 @@ sub data_respond {
     unless (($max_size and $size > $max_size)) {
       s/\r\n$/\n/;
       s/^\.\./\./;
-      if ($in_header and m/^$/) {
+      if ($in_header && (m/^$/ || $complete > 0)) {
         $in_header = 0;
         my @headers = split /^/m, $buffer;
 
@@ -693,9 +696,10 @@ sub data_respond {
 
       # copy all lines into the spool file, including the headers
       # we will create a new header later before sending onwards
-      $self->transaction->body_write($_);
+      $self->transaction->body_write($_) if ! $complete;
       $size += length $_;
     }
+    last if $complete > 0;
     #$self->log(LOGDEBUG, "size is at $size\n") unless ($i % 300);
   }
 
