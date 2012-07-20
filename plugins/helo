@@ -106,25 +106,25 @@ Default: lenient
 
 =head3 lenient
 
-Reject failures of the following tests: is_in_badhelo, invalid_localhost, and
-is_forged_literal.
+Reject failures of the following tests: is_in_badhelo, invalid_localhost,
+is_forged_literal, and is_plain_ip.
 
 This setting is lenient enough not to cause problems for your Windows users.
 It is comparable to running check_spamhelo, but with the addition of regexp
-support and the prevention of forged localhost and forged IP literals.
+support, the prevention of forged localhost, forged IP literals, and plain
+IPs.
 
 =head3 rfc
 
 Per RFC 2821, the HELO hostname is the FQDN of the sending server or an
 address literal. When I<policy rfc> is selected, all the lenient checks and
-the following are enforced: is_plain_ip, is_not_fqdn, no_forward_dns, and
-no_reverse_dns.
+the following are enforced: is_not_fqdn, no_forward_dns, and no_reverse_dns.
 
 If you have Windows users that send mail via your server, do not choose
-I<policy rfc> without I<reject naughty> and the B<naughty> plugin. Windows
-users often send unqualified HELO names and will have trouble sending mail.
-<Naughty> can defer the rejection, and if the user subsequently authenticates,
-the rejection will be cancelled.
+I<policy rfc> without settings I<reject naughty> and using the B<naughty>
+plugin. Windows PCs often send unqualified HELO names and will have trouble
+sending mail. The B<naughty> plugin defers the rejection, and if the user
+subsequently authenticates, the rejection is be cancelled.
 
 =head3 strict
 
@@ -259,11 +259,10 @@ sub populate_tests {
     my $self = shift;
 
     my $policy = $self->{_args}{policy};
-    @{ $self->{_helo_tests} } = qw/ is_in_badhelo invalid_localhost is_forged_literal /;
+    @{ $self->{_helo_tests} } = qw/ is_in_badhelo invalid_localhost is_forged_literal is_plain_ip /;
 
     if ( $policy eq 'rfc' || $policy eq 'strict' ) {
-        push @{ $self->{_helo_tests} }, qw/ is_plain_ip is_not_fqdn
-                                            no_forward_dns no_reverse_dns /;
+        push @{ $self->{_helo_tests} }, qw/ is_not_fqdn no_forward_dns no_reverse_dns /;
     };
 
     if ( $policy eq 'strict' ) {
@@ -431,7 +430,7 @@ sub no_matching_dns {
     if ( $self->connection->notes('helo_forward_match') &&
          $self->connection->notes('helo_reverse_match') ) {
         $self->log( LOGDEBUG, "foward and reverse match" );
-# TODO: consider adding some karma here
+        $self->adjust_karma( 1 );  # whoppee, a match!
         return;
     };
 

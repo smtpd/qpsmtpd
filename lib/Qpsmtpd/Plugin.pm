@@ -282,6 +282,15 @@ sub is_immune {
     return;
 };
 
+sub adjust_karma {
+    my ( $self, $value ) = @_;
+
+    my $karma = $self->connection->notes('karma') || 0;
+    $karma += $value;
+    $self->connection->notes('karma', $value);
+    return $value;
+};
+
 sub _register_standard_hooks {
   my ($plugin, $qp) = @_;
 

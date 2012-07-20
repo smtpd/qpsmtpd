@@ -77,7 +77,7 @@ sub register {
         $self->log(LOGWARN, "Odd number of arguments, using default config");
     } else {
         my %args = @args;
-        if ($args{server} =~ /^smtproutes:/) {
+        if ($args{server} && $args{server} =~ /^smtproutes:/) {
 
             my ($fallback, $port) = $args{server} =~ /:(?:(.*?):?)(\d+)/;
 
@@ -138,9 +138,7 @@ sub rcpt_handler {
 
     return DECLINED if $rv;
 
-    if ( defined $self->connection->notes('karma') ) {
-        $self->connection->notes('karma', ($self->connection->notes('karma') - 1));
-    };
+    $self->adjust_karma( -1 );
     return (DENY, "fail, no mailbox by that name. qd (#5.1.1)" );
 }
 

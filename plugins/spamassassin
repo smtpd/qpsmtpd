@@ -369,11 +369,12 @@ sub reject {
     my ($self, $transaction) = @_;
 
     my $sa_results = $self->get_spam_results($transaction) or do {
-        $self->log(LOGNOTICE, "skip, no results");
+        $self->log(LOGNOTICE, "error, no results");
         return DECLINED;
     };
-    my $score  = $sa_results->{score} or do {
-        $self->log(LOGERROR, "skip, error getting score");
+    my $score  = $sa_results->{score};
+    if ( ! defined $score ) {
+        $self->log(LOGERROR, "error, error getting score");
         return DECLINED;
     };
 
@@ -385,7 +386,7 @@ sub reject {
     };
 
     my $reject = $self->{_args}{reject} or do {
-        $self->log(LOGERROR, "skip, reject disabled ($status, $learn)");
+        $self->log(LOGERROR, "pass, reject disabled ($status, $learn)");
         return DECLINED;
     };
 
@@ -400,7 +401,7 @@ sub reject {
         }
     }
 
-    $self->connection->notes('karma', $self->connection->notes('karma') - 1);
+    $self->adjust_karma( -1 );
 # default of media_unsupported is DENY, so just change the message
     $self->log(LOGINFO, "fail, $status, > $reject, $learn");
     return ($self->get_reject_type(), "spam score exceeded threshold");

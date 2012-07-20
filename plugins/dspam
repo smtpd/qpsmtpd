@@ -216,7 +216,7 @@ sub register {
     $self->{_args}{dspam_bin} ||= '/usr/local/bin/dspam';
 
     if ( ! -x $self->{_args}{dspam_bin} ) {
-        $self->log(LOGERROR, "dspam not found: ");
+        $self->log(LOGERROR, "dspam CLI binary not found: install dspam and/or set dspam_bin");
         return DECLINED;
     };
 
@@ -478,9 +478,7 @@ sub reject_agree {
 
     if ( $d->{class} eq 'Spam' ) {
         if ( $sa->{is_spam} eq 'Yes' ) {
-            if ( defined $self->connection->notes('karma') ) {
-                $self->connection->notes('karma', $self->connection->notes('karma') - 2);
-            };
+            $self->adjust_karma( -2 );
             $self->log(LOGINFO, "fail, agree, $status");
             my $reject = $self->get_reject_type();
             return ($reject, 'we agree, no spam please');
@@ -493,9 +491,7 @@ sub reject_agree {
     if ( $d->{class} eq 'Innocent' ) {
         if ( $sa->{is_spam} eq 'No' ) {
             if ( $d->{confidence} > .9 ) {
-                if ( defined $self->connection->notes('karma') ) {
-                    $self->connection->notes('karma', ( $self->connection->notes('karma') + 2) );
-                };
+                $self->adjust_karma( 2 );
             };
             $self->log(LOGINFO, "pass, agree, $status");
             return DECLINED;
@@ -591,6 +587,7 @@ sub autolearn {
 
     defined $self->{_args}{autolearn} or return;
 
+    # only train once.
     $self->autolearn_naughty( $response, $transaction ) and return;
     $self->autolearn_karma( $response, $transaction ) and return;
     $self->autolearn_spamassassin( $response, $transaction ) and return;

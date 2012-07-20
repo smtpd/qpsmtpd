@@ -177,14 +177,14 @@ those senders haven't sent us any ham. As such, it's much safer to use.
 
 This plugin sets the connection note I<karma_history>. Your plugin can
 use the senders karma to be more gracious or rude to senders. The value of
-I<karma_history> is the number the nice connections minus naughty
+I<karma_history> is the number of nice connections minus naughty
 ones. The higher the number, the better you should treat the sender.
 
-When I<reject naughty> is set and a naughty sender is encountered, most
-plugins should skip processing. However, if you wish to toy with spammers by
-teergrubing, extending banner delays, limiting connections, limiting
-recipients, random disconnects, handoffs to rblsmtpd, and other fun tricks, 
-then connections with the I<naughty> note set are for you!
+To alter a connections karma based on its behavior, do this:
+
+  $self->adjust_karma( -1 );  # lower karma (naughty)
+  $self->adjust_karma(  1 );  # raise karma (good)
+
 
 =head1 EFFECTIVENESS
 
@@ -194,7 +194,7 @@ connections.
 
 This plugins effectiveness results from the propensity of naughty senders
 to be repeat offenders. Limiting them to a single offense per day(s) greatly
-reduces the number of useless tokens miscreants add to our Bayes databases.
+reduces the resources they can waste.
 
 Of the connections that had previously passed all other checks and were caught
 only by spamassassin and/or dspam, B<karma> rejected 31 percent. Since
@@ -207,7 +207,7 @@ Connection summaries are stored in a database. The database key is the int
 form of the remote IP. The value is a : delimited list containing a penalty
 box start time (if the server is/was on timeout) and the count of naughty,
 nice, and total connections. The database can be listed and searched with the
-karma_dump.pl script.
+karma_tool script.
 
 =head1 BUGS & LIMITATIONS
 
@@ -383,7 +383,7 @@ sub get_db_tie {
     my ( $self, $db, $lock ) = @_;
 
     tie( my %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) or do {
-        $self->log(LOGCRIT, "tie to database $db failed: $!");
+        $self->log(LOGCRIT, "error, tie to database $db failed: $!");
         close $lock;
         return;
     };
@@ -416,12 +416,12 @@ sub get_db_lock {
 
     # Check denysoft db
     open( my $lock, ">$db.lock" ) or do {
-        $self->log(LOGCRIT, "opening lockfile failed: $!");
+        $self->log(LOGCRIT, "error, opening lockfile failed: $!");
         return;
     };
 
     flock( $lock, LOCK_EX ) or do {
-        $self->log(LOGCRIT, "flock of lockfile failed: $!");
+        $self->log(LOGCRIT, "error, flock of lockfile failed: $!");
         close $lock;
         return;
     };
@@ -441,12 +441,12 @@ sub get_db_lock_nfs {
         blocking_timeout   => 10,      # 10 sec
         stale_lock_timeout => 30 * 60, # 30 min
     } or do {
-        $self->log(LOGCRIT, "nfs lockfile failed: $!");
+        $self->log(LOGCRIT, "error, nfs lockfile failed: $!");
         return;
     };
 
     open( my $lock, "+<$db.lock") or do {
-        $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
+        $self->log(LOGCRIT, "error, opening nfs lockfile failed: $!");
         return;
     };
 

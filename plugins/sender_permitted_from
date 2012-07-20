@@ -143,27 +143,17 @@ sub mail_handler {
     };
 
 # SPF result codes: pass fail softfail neutral none error permerror temperror
+    return $self->handle_code_none($reject, $why) if $code eq 'none';
+    return $self->handle_code_fail($reject, $why) if $code eq 'fail';
+    return $self->handle_code_softfail($reject, $why) if $code eq 'softfail';
+
     if    ( $code eq 'pass' ) {
         $self->log(LOGINFO, "pass, $code: $why" );
         return (DECLINED);
     }
-    elsif ( $code eq 'fail' ) {
-        $self->log(LOGINFO, "fail, $why" );
-        return (DENY, "SPF - forgery: $why") if $reject >= 3;
-        return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
-    }
-    elsif ( $code eq 'softfail' ) {
-        $self->log(LOGINFO, "fail, $why" );
-        return (DENY, "SPF - $code: $why") if $reject >= 4;
-        return (DENYSOFT, "SPF - $code: $why") if $reject >= 3;
-    }
     elsif ( $code eq 'neutral' ) {
         $self->log(LOGINFO, "fail, $code, $why" );
         return (DENY, "SPF - $code: $why") if $reject >= 5;
-    }
-    elsif ( $code eq 'none' ) {
-        $self->log(LOGINFO, "fail, $code, $why" );
-        return (DENY, "SPF - $code: $why") if $reject >= 6;
     }
     elsif ( $code eq 'error' ) {
         $self->log(LOGINFO, "fail, $code, $why" );
@@ -183,6 +173,44 @@ sub mail_handler {
     $self->log(LOGINFO, "SPF from $from was $code: $why");
     return (DECLINED);
 }
+
+sub handle_code_none {
+    my ($self, $reject, $why ) = @_;
+
+    if ( $reject >= 6 ) {
+        $self->log(LOGINFO, "fail, none, $why" );
+        return (DENY, "SPF - none: $why");
+    };
+
+    $self->log(LOGINFO, "pass, none, $why" );
+    return DECLINED;
+};
+
+sub handle_code_fail {
+    my ($self, $reject, $why ) = @_;
+
+    if ( $reject >= 2 ) {
+        $self->log(LOGINFO, "fail, $why" );
+        return (DENY, "SPF - forgery: $why") if $reject >= 3;
+        return (DENYSOFT, "SPF - fail: $why")
+    };
+
+    $self->log(LOGINFO, "pass, fail tolerated, $why" );
+    return DECLINED;
+};
+
+sub handle_code_softfail {
+    my ($self, $reject, $why ) = @_;
+
+    if ( $reject >= 3 ) {
+        $self->log(LOGINFO, "fail, soft, $why" );
+        return (DENY, "SPF - fail: $why") if $reject >= 4;
+        return (DENYSOFT, "SPF - fail: $why") if $reject >= 3;
+    };
+
+    $self->log(LOGINFO, "pass, softfail tolerated, $why" );
+    return DECLINED;
+};
 
 sub data_post_handler {
     my ($self, $transaction) = @_;

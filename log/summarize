@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use Cwd;
 use Data::Dumper;
 use File::Tail;
 
@@ -24,7 +25,6 @@ my %formats = (
     ip                    => "%-15.15s",
     hostname              => "%-20.20s",
     distance              =>    "%5.5s",
-
     'ident::geoip'        => "%-20.20s",
     'ident::p0f'          => "%-10.10s",
     count_unrecognized_commands => "%-5.5s",
@@ -37,6 +37,10 @@ my %formats = (
     check_earlytalker     => "%-3.3s",
     helo                  => "%-3.3s",
     tls                   => "%-3.3s",
+    'auth::auth_vpopmail' => "%-3.3s",
+    'auth::auth_vpopmaild' => "%-3.3s",
+    'auth::auth_vpopmail_sql' => "%-3.3s",
+    'auth::auth_checkpassword' => "%-3.3s",
     badmailfrom           => "%-3.3s",
     check_badmailfrom     => "%-3.3s",
     sender_permitted_from => "%-3.3s",
@@ -69,7 +73,7 @@ while ( defined (my $line = $fh->read) ) {
     next if ! $line;
     my ( $type, $pid, $hook, $plugin, $message ) = parse_line( $line );
     next if ! $type;
-    next if $type =~ /info|unknown|response/;
+    next if $type =~ /^(info|unknown|response|tcpserver)$/;
     next if $type eq 'init';           # doesn't occur in all deployment models
 
     if ( ! $pids{$pid} ) {             # haven't seen this pid 
@@ -104,10 +108,16 @@ while ( defined (my $line = $fh->read) ) {
         };
 
         if ( $plugin eq 'ident::geoip' ) {
-            my ($gip, $distance) = $message =~ /(.*?),\s+([\d]+)\skm/;
-            if ( $distance ) {
-                $pids{$pid}{$plugin}  = $gip;
-                $pids{$pid}{distance} = $distance;
+            if ( length $message < 3 ) {
+                $formats{'ident::geoip'} = "%-3.3s";
+                $formats3{'ident::geoip'} = "%-3.3s";
+            }
+            else {
+                my ($gip, $distance) = $message =~ /(.*?),\s+([\d]+)\skm/;
+                if ( $distance ) {
+                    $pids{$pid}{$plugin}  = $gip;
+                    $pids{$pid}{distance} = $distance;
+                };
             };
         };
     }
@@ -150,6 +160,7 @@ sub parse_line {
     return parse_line_plugin( $line ) if substr($message, 0, 1) eq '(';
     return ( 'dispatch', $pid, undef, undef, $message ) if substr($message, 0, 12) eq 'dispatching ';
     return ( 'response', $pid, undef, undef, $message ) if $message =~ /^[2|3]\d\d/;
+    return ( 'tcpserver', $pid, undef, undef, undef ) if substr($pid, 0, 10) eq 'tcpserver:';
 
     # lines seen about once per connection
     return ( 'init',     $pid, undef, undef, $message ) if substr($message, 0, 19) eq 'Accepted connection';
@@ -228,12 +239,12 @@ sub print_auto_format {
 
         if ( defined $pids{$pid}{helo_host} && $plugin =~ /helo/ ) {
             $format .= " %-18.18s";
-            push @values, delete $pids{$pid}{helo_host};
+            push @values, substr( delete $pids{$pid}{helo_host}, -18, 18);
             push @headers, 'HELO';
         }
         elsif ( defined $pids{$pid}{from} && $plugin =~ /from/ ) {
             $format .= " %-20.20s";
-            push @values, delete $pids{$pid}{from};
+            push @values, substr( delete $pids{$pid}{from}, -20, 20);
             push @headers, 'MAIL FROM';
         }
         elsif ( defined $pids{$pid}{to} && $plugin =~ /to|rcpt|recipient/ ) {
@@ -276,15 +287,19 @@ sub show_symbol {
 
 sub get_qp_dir {
     foreach my $user ( qw/ qpsmtpd smtpd / ) {
-
         my ($homedir) = (getpwnam( $user ))[7] or next;
 
         if ( -d "$homedir/plugins" ) {
             return "$homedir";
         };
-        if ( -d "$homedir/smtpd/plugins" ) {
-            return "$homedir/smtpd";
+        foreach my $s ( qw/ smtpd qpsmtpd qpsmtpd-dev / ) {
+            if ( -d "$homedir/$s/plugins" ) {
+                return "$homedir/$s";
+            };
         };
+    };
+    if ( -d "./plugins" ) {
+        return Cwd::getcwd();
     };
 };
 
