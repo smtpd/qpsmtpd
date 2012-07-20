@@ -83,6 +83,8 @@ dspam learn_from_sa 7 reject 1
 
 naughty reject data
 
+naughty
+
 # You must enable a queue plugin - see the options in plugins/queue/ - for example:
 
 # queue to a maildir
