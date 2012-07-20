@@ -38,6 +38,13 @@ Example:
 Use "smtproutes:8998" (no second colon) to simply skip the deliverability
 check for domains not listed in smtproutes.
 
+=item vpopmail_ext [ 0 | 1 ]
+
+Is vpopmail configured with the qmail-ext feature enabled? If so, this config
+option must be enabled in order for user-ext@example.org addresses to work.
+
+Default: 0
+
 =back
 
 =head1 CAVEATS
@@ -62,11 +69,57 @@ L<Qmail::Deliverable>, L<qmail-deliverabled>, L<Qmail::Deliverable::Client>
 
 =cut
 
-use Qmail::Deliverable::Client qw(deliverable);
+#################################
+#################################
+
+BEGIN {
+    use FindBin qw($Bin $Script);
+    if (not $INC{'Qpsmtpd.pm'}) {
+        my $dir = '$PLUGINS_DIRECTORY';
+        -d and $dir = $_ for qw(
+            /home/qpsmtpd/plugins
+            /home/smtp/qpsmtpd/plugins
+            /usr/local/qpsmtpd/plugins
+            /usr/local/share/qpsmtpd/plugins
+            /usr/share/qpsmtpd/plugins
+        );
+
+        my $file = "the 'plugins' configuration file";
+        -f and $file = $_ for qw(
+            /home/qpsmtpd/config/plugins
+            /home/smtp/qpsmtpd/config/plugins
+            /usr/local/qpsmtpd/config/plugins
+            /usr/local/etc/qpsmtpd/plugins
+            /etc/qpsmtpd/plugins
+        );
+
+        # "die" would print "BEGIN failed" garbage
+        print STDERR <<"END";
+
+This is a plugin for qpsmtpd and should not be run manually.
+
+To install the plugin:
+
+    ln -s $Bin/$Script $dir/
+
+And add "$Script server 127.0.0.1:8998" to $file, before rcpt_ok.
+For configuration instructions, read "man $Script"
+
+(Paths may vary.)
+
+END
+        exit 255;
+    }
+}
+
+#################################
+#################################
+
 use strict;
 use warnings;
 
 use Qpsmtpd::Constants;
+use Qmail::Deliverable::Client qw(deliverable);
 
 my %smtproutes;
 my $shared_domain;  # global variable to be closed over by the SERVER callback
@@ -98,14 +151,18 @@ sub register {
         } elsif ($args{server}) {
             $Qmail::Deliverable::Client::SERVER = $args{server};
         }
+
+        if ( $args{vpopmail_ext} ) {
+            $Qmail::Deliverable::VPOPMAIL_EXT = $args{vpopmail_ext};
+        };
     }
-    $self->register_hook('rcpt', 'rcpt_handler');
+    $self->register_hook("rcpt", "rcpt_handler");
 }
 
 sub rcpt_handler {
     my ($self, $transaction, $rcpt) = @_;
 
-    return DECLINED if $self->is_immune();
+    return DECLINED if $self->is_immune(); # requires QP 0.90+
 
     my $address = $rcpt->address;
     $self->log(LOGDEBUG, "Checking deliverability for recipient '$address'");
@@ -115,31 +172,35 @@ sub rcpt_handler {
     my $rv = deliverable $address;
 
     if (not defined $rv or not length $rv) {
-        $self->log(LOGWARN, "Unknown error checking deliverability of '$address'");
+        $self->log(LOGWARN, "error (unknown) checking '$address'");
         return DECLINED;
     }
 
     my $k = 0;  # known status code
-    $self->log(LOGINFO, "Permission failure"),              $k++ if $rv == 0x11;
+    $self->log(LOGINFO, "error, permission failure"),       $k++ if $rv == 0x11;
     $self->log(LOGINFO, "pass, qmail-command in dot-qmail"),$k++ if $rv == 0x12;
-    $self->log(LOGINFO, "bouncesaying with program"),       $k++ if $rv == 0x13;
+    $self->log(LOGINFO, "pass, bouncesaying with program"), $k++ if $rv == 0x13;
     $self->log(LOGINFO, "Temporarily undeliverable: group/world writable"), $k++
                                                                  if $rv == 0x21;
     $self->log(LOGINFO, "Temporarily undeliverable: sticky home directory"),$k++
                                                                  if $rv == 0x22;
-    $self->log(LOGINFO, "error: $Qmail::Deliverable::Client::ERROR"), $k++
+    $self->log(LOGINFO, "error, $Qmail::Deliverable::Client::ERROR"), $k++
                                                                  if $rv == 0x2f;
     $self->log(LOGINFO, "pass, normal delivery"),           $k++ if $rv == 0xf1;
-    $self->log(LOGINFO, "pass, deliverable through vpopmail"), $k++ if $rv == 0xf2;
-    $self->log(LOGINFO, "SHOULD NOT HAPPEN"),               $k++ if $rv == 0xfe;
+    $self->log(LOGINFO, "pass, vpopmail dir"),              $k++ if $rv == 0xf2;
+    $self->log(LOGINFO, "pass, vpopmail alias"),            $k++ if $rv == 0xf3;
+    $self->log(LOGINFO, "pass, vpopmail catchall"),         $k++ if $rv == 0xf4;
+    $self->log(LOGINFO, "pass, vpopmail vuser"),            $k++ if $rv == 0xf5;
+    $self->log(LOGINFO, "pass, vpopmail qmail-ext"),        $k++ if $rv == 0xf6;
+    $self->log(LOGINFO, "error, SHOULD NOT HAPPEN"),        $k++ if $rv == 0xfe;
     $self->log(LOGINFO, "fail, address not local"),         $k++ if $rv == 0xff;
 
-    $self->log(LOGINFO, sprintf("Unknown: 0x%02x", $rv)) if $rv and not $k;
+    if ( $rv ) {
+        $self->log(LOGINFO, sprintf("error, unknown: 0x%02x", $rv)) if not $k;
+        return DECLINED;
+    };
 
-    return DECLINED if $rv;
-
-    $self->adjust_karma( -1 );
-    return (DENY, "fail, no mailbox by that name. qd (#5.1.1)" );
+    return (DENY, "Sorry, no mailbox by that name. qd (#5.1.1)" );
 }
 
 sub _smtproute {
