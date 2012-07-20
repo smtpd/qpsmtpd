@@ -65,7 +65,7 @@ virus/klez_filter
 # You can run the spamassassin plugin with options.  See perldoc
 # plugins/spamassassin for details.
 #
-spamassassin
+spamassassin reject 12
 
 # rejects mails with a SA score higher than 20 and munges the subject
 # of the score is higher than 10.
