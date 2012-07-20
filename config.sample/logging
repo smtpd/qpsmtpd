@@ -5,7 +5,7 @@
 # are included below. Just remove the # symbol to enable them.
 
 # default logging plugin
-logging/warn 9
+logging/warn 6
 
 #logging/adaptive [accept minlevel] [reject maxlevel] [prefix char]
 #logging/adaptive 4 6
