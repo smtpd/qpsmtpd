@@ -1,1 +1,140 @@
-Placeholder for qpsmtpd website
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+      "http://www.w3.org/TR/REC-html40/loose.dtd">
+
+<html>  
+
+
+
+<head><title>qpsmtpd - Develooper LLC</title>
+
+<link rel="stylesheet" href="http://dev.perl.org/perl-styles.css" type="text/css" />
+<link rel="stylesheet" href="http://develooper.com/images/style.css" type="text/css" />
+
+</head>
+<body bgcolor="white" link="#690020" alink="#003600" vlink="#900000"> 
+
+<a href="http://develooper.com/">
+<img align="right" src="http://develooper.com/images/develooperlogo.gif" alt="Develooper" height="104" width="390" border="0"></a><br>
+
+ 
+  
+    
+| <b>Home</b> 
+| <a href="list.html">Mailinglist</a>
+| <a href="get.html">Download</a>
+| <a href="license.html">License</a>
+|
+
+
+  
+
+
+
+
+<h1>qpsmtpd</h1>
+
+
+
+
+<p>
+
+qpsmtpd is a flexible smtpd daemon written in Perl.  Apart from the
+core SMTP features, all functionality is implemented in small
+"extension plugins" using the easy to use object oriented plugin API.
+
+</p>
+
+<p>
+qpsmtpd was originally written as a drop-in qmail-smtpd replacement,
+but now it also includes smtp forward, postfix, exim and maildir
+"backends".
+</p>
+
+<p>
+
+<h2>Articles and Documentation</h2>
+
+<ul>
+  <li>The <a href="http://wiki.qpsmtpd.org/">qpsmtpd wiki</a></li>
+  <li><a
+  href="http://www.oreillynet.com/pub/a/sysadmin/2005/09/15/qpsmtpd.html">Using
+  Qpsmtpd</a> by Matt Sergeant (O'Reilly Network article)</li>
+  <li><a href="http://develooper.com/talks/qpsmtpd-lt-oscon-2007.pdf">5 minute lightning talk</a></li>
+  <li><a href="http://www.taint.org/2007/04/17/132339a.html">Using qpsmtpd for traps.SpamAssassin.org</a></li>
+</ul>
+
+(Also: <a href="http://en.wikipedia.org/wiki/Qpsmtpd">Wikipedia</a>, <a href="http://www.ohloh.net/p/qpsmtpd">Ohloh</a>)
+
+<h2>Features</h2>
+
+<h3>Plugins</h3>
+
+<ul>
+<li>Advanced but simple to use plugin system to easily install extra
+functionality and write local rules.
+<li>Almost all features are implemented in plugins 
+
+<li>For example: tls (implements STARTTLS), spamassassin, plugins
+for most major anti-virus programs, various AUTH plugins (ldap,
+vpopmail, ...), OS detection, queue plugins (qmail, exim, postfix,
+Maildir), greylisting, SPF, etc etc.
+
+<li>Plugin directories:
+<a href="http://git.develooper.com/?p=qpsmtpd.git;a=tree;f=plugins">current development repository</a>,
+<a href="http://www.hjp.at/projekte/qpsmtpd/index.en.rxml">Peter J. Holzer</a>,
+<a href="http://www.openfusion.com.au/labs/qpsmtpd/">Gavin Carr</a>.
+ 
+</ul>
+
+
+<h3>MTA compatibility</h3>
+
+<ul>
+<li>Drop-in replacement for qmail-smtpd
+<li>Postfix protocol module
+<li>EXIM-BSMTP
+<li>SMTP queuing plugin to support any SMTP compliant backend
+<li>Other "backends" are easily implemented with a queue plugin
+</ul>
+
+<h3>Anti-Spam</h3>
+<ul>
+   <li>Innovative spam fighting ideas can easily be implemented and
+   tested with qpsmtpd plugins.  One successful examples is the <a
+   href="http://git.develooper.com/?p=qpsmtpd.git;a=blob;f=plugins/check_earlytalker;hb=HEAD">check_earlytalker</a>
+   plugin (disconnects most viruses and many spam engines before we
+   even say hello!).
+   <li>Support for DNS Black Lists like the <a href="http://www.spamhaus.org/">Spamhaus</a> lists.
+   <li>Support for <a href="http://www.rfc-ignorant.org/how_to_domain.php">Domain-Based Blacklist Zones</a> lists.
+   <li>Support for <a href="http://www.milter.org/">Milter</a> filters (yes, those written for sendmail) with the <a href="http://git.develooper.com/?p=qpsmtpd.git;a=blob;f=plugins/milter;hb=HEAD">milter plugin</a>
+   <li><a href="http://projects.puremagic.com/greylisting/">Greylisting</a> with Gavin Carr's <a href="http://www.openfusion.com.au/labs/qpsmtpd/denysoft_greylist">denysoft_greylist plugin</a>
+   <li>DomainKeys support with the <a href="http://git.develooper.com/?p=qpsmtpd.git;a=blob;f=plugins/domainkeys;hb=HEAD">domainkeys</a> plugin 
+   <li>Integrated support for <a href="http://www.spamassassin.org/">SpamAssassin</a> 
+   <li>Virus scanning with <a href="http://www.clamav.net/">ClamAV</a>
+   <li>Many others ...</li>
+</ul>
+
+<h3>Your Idea Here</h3>
+
+If you have just been occasionally dabbling in Perl you should be all
+set for writing a plugin.  You can consult the <a
+href="list.html">mailing list</a> to
+hear if someone else already implemented your idea or something
+similar.
+
+
+
+</p>
+
+
+
+</p>
+<hr noshade size=1>
+<span class="comments">
+Comments to Ask Bj&oslash;rn Hansen at <a href="mailto:ask@develooper.com">ask@develooper.com</a>
+</span>
+
+</body>
+
+</html>
+
