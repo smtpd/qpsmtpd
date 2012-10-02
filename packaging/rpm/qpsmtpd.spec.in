@@ -1,6 +1,6 @@
-Name:           %{_package}
-Version:        %{_version}
-Release:        %{_release}
+Name:           @PACKAGE@
+Version:        @VERSION@
+Release:        @RELEASE@
 
 Summary: qpsmtpd + qpsmtpd-apache + qpsmtpd-async
 License: MIT
@@ -8,7 +8,7 @@ Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
 BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
 BuildRequires: perl >= 0:5.00503
-BuildArchitectures: noarch
+BuildArch: noarch
 Requires: perl(Mail::Header), perl(Net::DNS) perl(Net::IP) perl(IPC::Shareable)
 Requires(pre): coreutils, shadow-utils, perl
 
@@ -52,7 +52,7 @@ qpsmpd-async which uses it.
 %setup -q -n %{name}-%{version}-%{release}
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" perl Makefile.PL INSTALLSITELIB=%{_prefix}/lib/perl5/site_perl
+CFLAGS="$RPM_OPT_FLAGS" perl Makefile.PL PREFIX=%{_prefix} INSTALLSITELIB=%{_prefix}/lib/perl5/site_perl
 make
 
 %clean
