@@ -157,6 +157,9 @@ then
 fi
 
 %changelog
+* Tue Oct 02 2012 <robin.bowes@yo61.com>
+- Fix up spec file to build directly from git repo
+
 * Sun Jul 12 2009 <rpmbuild@robinbowes.com> 0.82-0.1
 - Update to latest release
 - don't add qpsmtpd to start-up by default
