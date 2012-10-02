@@ -10,7 +10,7 @@ tls - plugin to support STARTTLS
 
 tls [B<cert_path priv_key_path ca_path>]
 
-=over indentlevel
+=over 4
 
 =item B<cert_path>
 
@@ -275,6 +275,7 @@ sub upgrade_socket {
     my UpgradeClientSSL $self = shift;
 
     unless ( $self->{_ssl_started} ) {
+        $self->{_stashed_qp}->clear_data();
         IO::Socket::SSL->start_SSL(
             $self->{_stashed_qp}->{sock}, {
                 SSL_use_cert => 1,
@@ -304,8 +305,8 @@ sub event_read {
     if (defined $sock) {
         $qp->connection( $qp->connection->clone );
         $qp->reset_transaction;
-        $qp->connection->notes('tls_socket', $sock);
-        $qp->connection->notes('tls_enabled', 1);
+        $self->connection->notes('tls_socket', $sock);
+        $self->connection->notes('tls_enabled', 1);
         $qp->watch_read(1);
         return 1;
     }
@@ -324,5 +325,3 @@ sub event_read {
         $qp->disconnect();
     }
 }
-
-1;

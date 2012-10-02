@@ -1,4 +1,4 @@
-#!perl
+#!perl -w
 # Adaptive logging plugin - logs at one level for successful messages and
 # one level for DENY'd messages
 
@@ -93,9 +93,6 @@ sub hook_reset_transaction { # slog
 
     return DECLINED;
 }
-
-=cut
-
 
 =head1 NAME
 

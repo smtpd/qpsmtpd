@@ -69,8 +69,8 @@ should be configured to run I<last>, like B<rcpt_ok>.
       unless (($rc == DENY) and $self->{_count_relay_max});
 
    my $count = 
-     ($self->qp->connection->notes('count_relay_attempts') || 0) + 1;
-   $self->qp->connection->notes('count_relay_attempts', $count);
+     ($self->connection->notes('count_relay_attempts') || 0) + 1;
+   $self->connection->notes('count_relay_attempts', $count);
 
    return ($rc, @msg) unless ($count > $self->{_count_relay_max});
    return Qpsmtpd::DSN->relaying_denied(DENY_DISCONNECT, 

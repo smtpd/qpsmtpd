@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 
 =head1 NAME
 
@@ -102,10 +102,11 @@ Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
 
-use ClamAV::Client;
-
 use strict;
 use warnings;
+
+use ClamAV::Client;
+use Qpsmtpd::Constants;
 
 sub register {
     my ( $self, $qp, @args ) = @_;
@@ -231,4 +232,3 @@ sub hook_data_post {
     return (DECLINED);
 }
 
-# vi: set ts=4 sw=4 et:

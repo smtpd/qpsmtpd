@@ -1,0 +1,27 @@
+#!perl -w
+
+warn "loaded test auth_vpopmaild\n";
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test("test_auth_vpopmaild", 3);
+}
+
+my @u_list = qw ( good bad none );
+my %u_data = (
+	      good => [ 'postmaster@example.com', OK, 'Good Strong Passphrase' ],
+	      bad => [ 'bad@example.com', DENY, 'not_bad_pass' ],
+	      none => [ 'none@example.com', DECLINED, '' ],
+	      );
+
+sub test_auth_vpopmaild {
+    my $self = shift;
+    my ($tran, $ret, $note, $u, $r, $p, $a );
+    $tran = $self->qp->transaction;
+    for $u ( @u_list ) {
+	( $a,$r,$p ) = @{$u_data{$u}};
+	($ret, $note) = $self->auth_vpopmaild($tran,'LOGIN',$a,$p);
+	defined $note or $note='No-Message';
+	is ($ret, $r, $note);
+    }
+}

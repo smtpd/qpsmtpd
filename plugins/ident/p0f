@@ -1,4 +1,4 @@
-# -*- perl -*-
+#!perl -w
 
 =head1 NAME
 
@@ -43,15 +43,33 @@ from Windows computers.
 
 =head1 CONFIGURATION
 
+Configuration consists of two steps: starting p0f and configuring this plugin.
+
+=head2 start p0f
+
 Create a startup script for PF that creates a communication socket when your
 server starts up.
 
- p0f -u qpsmtpd -d -q -Q /tmp/.p0f_socket 'dst port 25' -o /dev/null
- chown qpsmtpd /tmp/.p0f_socket
+p0f v2 example:
+
+ p0f -u qpsmtpd -d -q -Q /tmp/.p0f_socket2 'dst port 25' -o /dev/null
+ chown qpsmtpd /tmp/.p0f_socket2
+
+p0f v3 example:
+
+ p0f -u qpsmtpd -d -s /tmp/.p0f_socket3 'dst port 25'
+ chown qpsmtpd /tmp/.p0f_socket3
+
+=head2 configure p0f plugin
 
 add an entry to config/plugins to enable p0f:
 
- ident/p0f /tmp/.p0f_socket 
+ ident/p0f /tmp/.p0f_socket3
+
+It's even possible to run both versions of p0f simultaneously:
+
+ ident/p0f:2 /tmp/.p0f_socket2 version 2
+ ident/p0f:3 /tmp/.p0f_socket3
 
 =head2 local_ip
 
@@ -64,11 +82,20 @@ Example config/plugins entry with local_ip override:
 
   ident/p0f /tmp/.p0f_socket local_ip 208.75.177.101
 
-All code heavily based upon the p0fq.pl included with the p0f distribution.
+
+=head2 version
+
+The version settings specifies the version of p0f you are running. This plugin supports p0f versions 2 and 3. If version is not defined, version 3 is assumed.
+
+Example entry specifying p0f version 2
+
+  ident/p0f /tmp/.p0f_socket version 2
 
 =head1 Environment requirements
 
-p0f requires four pieces of information to look up the p0f fingerprint:
+p0f v3 requires only the remote IP.
+
+p0f v2 requires four pieces of information to look up the p0f fingerprint:
 local_ip, local_port, remote_ip, and remote_port. TcpServer.pm has been
 has been updated to provide that information when running under djb's
 tcpserver. The async, forkserver, and prefork models will likely require
@@ -76,19 +103,36 @@ some additional changes to make sure these fields are populated.
 
 =head1 ACKNOWLEDGEMENTS
 
-Heavily based upon the p0fq.pl included with the p0f distribution.
+Version 2 code heavily based upon the p0fq.pl included with the p0f distribution.
 
 =head1 AUTHORS
 
- Matt Simerson <msimerson@cpan.org> - 5/1/2010
- previous unnamed author
+Robert Spier ( original author )
+
+Matt Simerson
+
+=head1 CHANGES
+
+Added local_ip option - Matt Simerson (5/2010)
+
+Refactored and added p0f v3 support - Matt Simerson (4/2012)
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use IO::Socket;
 use Net::IP;
 
-my $QUERY_MAGIC = 0x0defaced;
+my $QUERY_MAGIC_V2 = 0x0defaced;
+my $QUERY_MAGIC_V3 = 0x50304601;
+my  $RESP_MAGIC_V3 = 0x50304602;
+
+my $P0F_STATUS_BADQUERY = 0x00;
+my $P0F_STATUS_OK       = 0x10;
+my $P0F_STATUS_NOMATCH  = 0x20;
 
 sub register {
     my ($self, $qp, $p0f_socket, %args) = @_;
@@ -101,66 +145,219 @@ sub register {
 }
 
 sub hook_connect {
-  my($self, $qp) = @_;
+    my($self, $qp) = @_;
 
-  my $p0f_socket = $self->{_args}->{p0f_socket};
-  my $local_ip = $self->{_args}{local_ip} || $self->qp->connection->local_ip;
+    my $p0f_version = $self->{_args}{version} || 3;
+    if ( $p0f_version == 3 ) {
+        my $response = $self->query_p0f_v3() or return DECLINED;
+        $self->test_v3_response( $response ) or return DECLINED;
+        $self->store_v3_results( $response );
+    }
+    else {
+        my $response = $self->query_p0f_v2() or return DECLINED;
+        $self->test_v2_response( $response ) or return DECLINED;
+        $self->store_v2_results( $response );
+    }
 
-  my $src = new Net::IP ($self->qp->connection->remote_ip) 
-    or $self->log(LOGERROR, "p0f: ".Net::IP::Error()), return (DECLINED);
-  my $dst = new Net::IP($local_ip)
-    or $self->log(LOGERROR, "p0f: ".NET::IP::Error()), return (DECLINED);
-  my $query = pack("L L L N N S S",
-                   $QUERY_MAGIC, 
-                   1, 
+    return DECLINED;
+}
+
+sub get_v2_query {
+    my $self = shift;
+
+    my $local_ip = $self->{_args}{local_ip} || $self->qp->connection->local_ip;
+
+    my $src = new Net::IP ($self->qp->connection->remote_ip)
+        or $self->log(LOGERROR, "p0f: ".Net::IP::Error()), return;
+
+    my $dst = new Net::IP($local_ip)
+        or $self->log(LOGERROR, "p0f: ".NET::IP::Error()), return;
+
+    return pack("L L L N N S S",
+                   $QUERY_MAGIC_V2,
+                   1,
                    rand ^ 42 ^ time,
-                   $src->intip(), 
-                   $dst->intip(), 
+                   $src->intip(),
+                   $dst->intip(),
                    $self->qp->connection->remote_port,
                    $self->qp->connection->local_port);
+};
 
-  # Open the connection to p0f
-  socket(SOCK, PF_UNIX, SOCK_STREAM, 0) 
-    or $self->log(LOGERROR, "p0f: socket: $!"), return (DECLINED);
-  connect(SOCK, sockaddr_un($p0f_socket)) 
-    or $self->log(LOGERROR, "p0f: connect: $!"), return (DECLINED);
-  defined syswrite SOCK, $query 
-    or $self->log(LOGERROR, "p0f: write: $!"), close SOCK, return (DECLINED);
+sub get_v3_query {
+    my $self = shift;
 
-  my $response;
-  defined sysread SOCK, $response, 1024 
-    or $self->log(LOGERROR, "p0f: read: $!"), close SOCK, return (DECLINED);
-  close SOCK;
+    my $src_ip = $self->qp->connection->remote_ip or do {
+        $self->log( LOGERROR, "unable to determine remote IP");
+        return;
+    };
 
-  # Extract the response from p0f
-  my ($magic, $id, $type, $genre, $detail, $dist, $link, $tos, $fw,
-      $nat, $real, $score, $mflags, $uptime) =
-        unpack ("L L C Z20 Z40 c Z30 Z30 C C C s S N", $response);
+    if ( $src_ip =~ /:/ ) {   # IPv6
+        my @bits = split(/\:/, $src_ip );
+        return pack( "L C C C C C C C C C C C C C C C C C", $QUERY_MAGIC_V3, 0x06, @bits );
+    };
 
-  if ($magic != $QUERY_MAGIC) {
-	$self->log(LOGERROR, "p0f: Bad response magic.");
-	return (DECLINED);
-  }
-  if ($type == 1) {
-	$self->log(LOGERROR, "p0f: P0f did not honor our query");
-	return (DECLINED);
-  }
-  if ($type == 2) {
-	$self->log(LOGWARN, "p0f: This connection is no longer in the cache");
-	return (DECLINED);
-  }
+    my @octets = split(/\./, $src_ip);
+    return pack( "L C C16", $QUERY_MAGIC_V3, 0x04, @octets );
+};
 
-  my $p0f = { 
-      genre    => $genre,
-      detail   => $detail,
-      distance => $dist,
-      link     => $link,
-      uptime   => $uptime,
-  };
+sub query_p0f_v3 {
+    my $self = shift;
 
-  $self->qp->connection->notes('p0f', $p0f);
-  $self->log(LOGINFO, "Results: ".$p0f->{genre}." (".$p0f->{detail}.")");
-  $self->log(LOGERROR,"error: $@") if $@;
+    my $p0f_socket = $self->{_args}{p0f_socket} or do {
+        $self->log(LOGERROR, "socket not defined in config.");
+        return;
+    };
+    my $query = $self->get_v3_query() or return;
 
-  return DECLINED;
-}
+# Open the connection to p0f
+    my $sock;
+    eval {
+        $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM );
+    };
+    if ( ! $sock ) {
+        $self->log(LOGERROR, "p0f: could not open socket: $@");
+        return;
+    };
+
+    $sock->autoflush(1);  # paranoid redundancy
+    $sock->connected or do {
+            $self->log(LOGERROR, "p0f: socket not connected: $!");
+            return;
+        };
+
+    my $sent = $sock->send($query, 0) or do {
+            $self->log(LOGERROR, "p0f: send failed: $!");
+            return;
+        };
+
+    print $sock $query;  # yes, this is redundant, but I get no response from p0f otherwise
+
+    $self->log(LOGDEBUG, "p0f: send $sent byte request");
+
+    my $response;
+    $sock->recv( $response, 232 );
+    my $length = length $response;
+    $self->log(LOGDEBUG, "p0f: received $length byte response");
+    close $sock;
+    return $response;
+};
+
+sub query_p0f_v2 {
+    my $self = shift;
+
+    my $p0f_socket = $self->{_args}->{p0f_socket};
+    my $query = $self->get_v2_query() or return;
+
+    # Open the connection to p0f
+    socket(SOCK, PF_UNIX, SOCK_STREAM, 0)
+        or $self->log(LOGERROR, "p0f: socket: $!"), return;
+    connect(SOCK, sockaddr_un($p0f_socket))
+        or $self->log(LOGERROR, "p0f: connect: $!"), return;
+    defined syswrite SOCK, $query
+        or $self->log(LOGERROR, "p0f: write: $!"), close SOCK, return;
+
+    my $response;
+    defined sysread SOCK, $response, 1024
+        or $self->log(LOGERROR, "p0f: read: $!"), close SOCK, return;
+    close SOCK;
+    return $response;
+};
+
+sub test_v2_response {
+    my ($self, $response ) = @_;
+
+    # Extract part of the p0f response
+    my ($magic, $id, $type) = unpack ("L L C", $response);
+
+    # $self->log(LOGERROR, $response);
+    if ($magic != $QUERY_MAGIC_V2) {
+        $self->log(LOGERROR, "p0f: Bad response magic.");
+        return;
+    }
+
+    if ($type == 1) {
+        $self->log(LOGERROR, "p0f: p0f did not honor our query");
+        return;
+    }
+    elsif ($type == 2) {
+        $self->log(LOGWARN, "p0f: This connection is no longer in the cache");
+        return;
+    }
+    return 1;
+};
+
+sub test_v3_response {
+    my ($self, $response ) = @_;
+
+    my ($magic,$status) = unpack ("L L", $response);
+
+    # check the magic response value (a p0f constant)
+    if ($magic != $RESP_MAGIC_V3 ) {
+        $self->log(LOGERROR, "p0f: Bad response magic.");
+        return;
+    }
+
+    # check the response status
+    if ($status == $P0F_STATUS_BADQUERY ) {
+        $self->log(LOGERROR, "p0f: bad query");
+        return;
+    }
+    elsif ($status == $P0F_STATUS_NOMATCH ) {
+        $self->log(LOGINFO, "p0f: no match");
+        return;
+    }
+    if ($status == $P0F_STATUS_OK ) {
+        $self->log(LOGDEBUG, "p0f: query ok");
+        return 1;
+    }
+    return;
+};
+
+sub store_v2_results {
+    my ($self, $response ) = @_;
+
+    my ($magic, $id, $type, $genre, $detail, $dist, $link, $tos, $fw,
+        $nat, $real, $score, $mflags, $uptime) =
+            unpack ("L L C Z20 Z40 c Z30 Z30 C C C s S N", $response);
+
+    my $p0f = {
+        genre    => $genre,
+        detail   => $detail,
+        distance => $dist,
+        link     => $link,
+        uptime   => $uptime,
+    };
+
+    $self->connection->notes('p0f', $p0f);
+    $self->log(LOGINFO, $genre." (".$detail.")");
+    $self->log(LOGERROR,"error: $@") if $@;
+    return $p0f;
+};
+
+sub store_v3_results {
+    my ($self, $response ) = @_;
+
+    my @labels = qw/ magic status first_seen last_seen total_conn uptime_min
+        up_mod_days last_nat last_chg distance bad_sw os_match_q os_name os_flavor
+        http_name http_flavor link_type language /;
+    my @values = unpack ("L L L L L L L L L s C C A32 A32 A32 A32 A32 A32 A32", $response);
+
+    my %r;
+    foreach my $i ( 0 .. ( scalar @labels -1 ) ) {
+        next if ! defined $values[$i];
+        next if ! defined $values[$i];
+        $r{ $labels[$i] } = $values[$i];
+    };
+    if ( $r{os_name} ) {                             # compat with p0f v2
+        $r{genre}  = "$r{os_name} $r{os_flavor}";
+        $r{link}   = $r{link_type} if $r{link_type};
+        $r{uptime} = $r{uptime_min} if $r{uptime_min};
+    };
+
+    $self->connection->notes('p0f', \%r);
+    $self->log(LOGINFO, "$r{os_name} $r{os_flavor}");
+    $self->log(LOGDEBUG, join(' ', @values ));
+    $self->log(LOGERROR,"error: $@") if $@;
+    return \%r;
+};
+

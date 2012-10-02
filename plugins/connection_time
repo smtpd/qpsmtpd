@@ -1,58 +1,79 @@
+#!perl -w
 
 =head1 NAME
 
-connection_time - log the duration of a connection 
+connection_time - log the duration of a connection
 
 =head1 DESCRIPTION
 
 The B<connection_time> plugin records the time of a connection between the
-first and the last possible hook in qpsmtpd (I<pre-connection> and 
-I<post-connection>) and writes a C<LOGNOTICE> (default, see below) line to 
+first and the last possible hook in qpsmtpd (I<pre-connection> and
+I<post-connection>) and writes a C<LOGINFO> (default, see below) line to
 the log.
 
 =head1 CONFIG
 
-One optional argument: the name of the log level (e.g. C<LOGNOTICE>,
-C<LOGDEBUG>, ...) the message should be logged with. Defaults to C<LOGNOTICE>.
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
+
+ connection_time loglevel +1   (less logging)
+
+ connection_time loglevel -1   (more logging)
 
 =cut
 
-use Time::HiRes qw(gettimeofday tv_interval);
+use strict;
+use warnings;
+
 use Qpsmtpd::Constants;
 
+use Time::HiRes qw(gettimeofday tv_interval);
+
 sub register {
-    my ($self, $qp, @args) = @_;
-    die "too many arguments"
-      if @args > 1;
-    $self->{_level} = shift @args;
-    $self->{_level} = 'LOGNOTICE'
-      unless defined $self->{_level};
-    $self->{_level} = Qpsmtpd::Constants::log_level($self->{_level});
-    $self->{_level} = LOGNOTICE
-      unless defined $self->{_level};
+    my ($self, $qp) = shift, shift;
+    if ( @_ == 1 ) {              # backwards compatible
+        $self->{_args}{loglevel} = shift;
+        if ( $self->{_args}{loglevel} =~ /\D/ ) {
+            $self->{_args}{loglevel} = Qpsmtpd::Constants::log_level($self->{_args}{loglevel});
+        };
+        $self->{_args}{loglevel} ||= 6;
+    }
+    elsif ( @_ % 2 ) {
+       $self->log(LOGERROR, "invalid arguments");
+    }
+    else {
+        $self->{_args} = { @_ };     # named args, inherits loglevel
+    };
 }
 
 sub hook_pre_connection {
-    my ($self, @foo) = @_;
+    my $self = shift;
     $self->{_connection_start} = [gettimeofday];
+    $self->log(LOGDEBUG, "started at " . $self->{_connection_start} );
+    return (DECLINED);
+}
+
+sub hook_connect {
+    my $self = shift;
+# this method is needed to function with the tcpserver deployment model
+    return (DECLINED) if defined $self->{_connection_start};
+    $self->{_connection_start} = [gettimeofday];
+    $self->log(LOGDEBUG, "started at " . $self->{_connection_start} );
     return (DECLINED);
 }
 
 sub hook_post_connection {
-    my ($self, @foo) = @_;
-    if ($self->{_connection_start}) {
-        my $remote = $self->connection->remote_ip;
-        my $elapsed = sprintf(
-                              "%.3f",
-                              tv_interval(
-                                          $self->{_connection_start},
-                                          [gettimeofday]
-                                         )
-                             );
-        $self->log($self->{_level},
-                   "Connection time from $remote: $elapsed sec.");
-    }
+    my $self = shift;
+
+    if ( ! $self->{_connection_start} ) {
+        $self->log(LOGERROR, "Start time not set?!");
+        return (DECLINED);
+    };
+
+    my $elapsed = tv_interval( $self->{_connection_start}, [gettimeofday] );
+
+    $self->log(LOGINFO, sprintf "%.3f s.", $elapsed );
     return (DECLINED);
 }
 
-# vim: ts=4 sw=4 expandtab syn=perl

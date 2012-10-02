@@ -1,3 +1,4 @@
+#!perl -w
 =head1 NAME
 
 dns_whitelist_soft - dns-based whitelist override for other qpsmtpd plugins
@@ -70,7 +71,7 @@ sub hook_connect {
     $sel->add($res->bgsend("$reversed_ip.$dnsbl", "TXT"));
   }
 
-  $self->qp->connection->notes('whitelist_sockets', $sel);
+  $self->connection->notes('whitelist_sockets', $sel);
 
   return DECLINED;
 }
@@ -78,7 +79,7 @@ sub hook_connect {
 sub process_sockets {
   my ($self) = @_;
 
-  my $conn = $self->qp->connection;
+  my $conn = $self->connection;
 
   return $conn->notes('whitelisthost') 
     if $conn->notes('whitelisthost');

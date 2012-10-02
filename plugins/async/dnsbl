@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 
 use Qpsmtpd::Plugin::Async::DNSBLBase;
 
@@ -64,21 +64,21 @@ sub process_a_result {
     my ($class, $qp, $result, $query) = @_;
 
     my $conn = $qp->connection;
-    return if $conn->notes('dnsbl');
+    return if $class->connection->notes('dnsbl');
 
-    my $templates = $conn->notes('dnsbl_templates');
+    my $templates = $class->connection->notes('dnsbl_templates');
     my $ip        = $conn->remote_ip;
 
     my $template = $templates->{$query};
     $template =~ s/%IP%/$ip/g;
 
-    $conn->notes('dnsbl', $template);
+    $class->connection->notes('dnsbl', $template);
 }
 
 sub process_txt_result {
     my ($class, $qp, $result, $query) = @_;
 
-    my $conn = $qp->connection;
+    my $conn = $class->connection;
     $conn->notes('dnsbl', $result) unless $conn->notes('dnsbl');
 }
 
@@ -98,8 +98,6 @@ sub hook_rcpt {
     return (DENY, $note) if $note;
     return DECLINED;
 }
-
-1;
 
 =head1 NAME
 

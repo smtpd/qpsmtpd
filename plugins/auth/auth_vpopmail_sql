@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 
 =head1 NAME
 
@@ -61,86 +61,89 @@ Copyright (c) 2004 John Peacock
 This plugin is licensed under the same terms as the qpsmtpd package itself.
 Please see the LICENSE file included with qpsmtpd for details.
 
-
 =cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Auth;
+use Qpsmtpd::Constants;
+
+use DBI;
 
 sub register {
     my ( $self, $qp ) = @_;
 
-    $self->register_hook("auth-plain", "auth_vmysql" );
-    $self->register_hook("auth-login", "auth_vmysql" );
-    $self->register_hook("auth-cram-md5", "auth_vmysql");
+    $self->register_hook('auth-plain',    'auth_vmysql');
+    $self->register_hook('auth-login',    'auth_vmysql');
+    $self->register_hook('auth-cram-md5', 'auth_vmysql');
 }
 
-sub auth_vmysql {
-    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
-
-    use DBI;
-    use Qpsmtpd::Constants;
-    use Digest::HMAC_MD5 qw(hmac_md5_hex);
-
-#    $DB::single = 1;
+sub get_db_handle {
+    my $self = shift;
 
     my $dsn    = $self->qp->config("vpopmail_mysql_dsn") || "dbi:mysql:dbname=vpopmail;host=127.0.0.1";
     my $dbuser = $self->qp->config("vpopmail_mysql_user") || "vpopmailuser";
     my $dbpass = $self->qp->config("vpopmail_mysql_pass") || "vpoppasswd";
 
-    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass );
+    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass ) or do {
+            $self->log(LOGERROR, "skip: db connection failed");
+            return;
+        };
     $dbh->{ShowErrorStatement} = 1;
+    return $dbh;
+};
+
+sub get_vpopmail_user {
+    my ( $self, $dbh, $user ) = @_;
 
     my ( $pw_name, $pw_domain ) = split '@', lc($user);
 
-    return DECLINED if ! defined $pw_domain;
+    if ( ! defined $pw_domain ) {
+        $self->log(LOGINFO, "skip: missing domain: " . lc $user );
+        return;
+    };
 
-    $self->log(LOGINFO,
-	"Authentication to vpopmail via mysql: $pw_name\@$pw_domain");
+    $self->log(LOGDEBUG, "auth_vpopmail_sql: $user");
 
-    my $sth = $dbh->prepare(<<SQL);
-SELECT *
+    my $query = "SELECT pw_passwd,pw_clear_passwd
 FROM vpopmail
-WHERE pw_name = ? AND pw_domain = ?
-SQL
+  WHERE pw_name = ?
+    AND pw_domain = ?";
 
+    my $sth = $dbh->prepare( $query );
     $sth->execute( $pw_name, $pw_domain );
-
-    my $passwd_hash = $sth->fetchrow_hashref;
-
+    my $userd_ref = $sth->fetchrow_hashref;
     $sth->finish;
     $dbh->disconnect;
+    return $userd_ref;
+};
+
+sub auth_vmysql {
+    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
+
+    my $dbh = $self->get_db_handle() or return DECLINED;
+    my $u = $self->get_vpopmail_user($dbh, $user) or return DECLINED;
 
     # if vpopmail was not built with '--enable-clear-passwd=y'
     # then pw_clear_passwd may not even exist
-    my $pw_clear_passwd = exists $passwd_hash->{'pw_clear_passwd'}
-                               ? $passwd_hash->{'pw_clear_passwd'}
-			       : undef;
-    my $pw_passwd = $passwd_hash->{'pw_passwd'}; # this is always present
+    # my $pw_clear_passwd = $db_user->{'pw_clear_passwd'};
 
-    if ( # clear_passwd isn't defined so we cannot support CRAM-MD5
-         ( $method =~ /CRAM-MD5/i and not defined $pw_clear_passwd )
-	 or
-         # user doesn't exist in this domain
-	 ( not defined $pw_passwd )
-       ) {
-        return ( DECLINED, "auth_vmysql/$method" );
-    }
+    if ( ! $u->{pw_passwd} && ! $u->{pw_clear_passwd} ) {
+        $self->log(LOGINFO, "fail: no such user");
+        return ( DENY, "auth_vmysql - no such user" );
+    };
 
-    # at this point we can assume the user name matched
-    if (
-        ( defined $passClear and
-	  (
-	     ($pw_clear_passwd eq $passClear)
-	  or ($pw_passwd eq crypt( $passClear, $pw_passwd ) )
-	  )
-	)
-        or ( defined $passHash
-             and $passHash eq hmac_md5_hex( $ticket, $pw_clear_passwd ) )
-      )
-    {
+    # at this point, the user name has matched
 
-        return ( OK, "auth_vmysql/$method" );
-    }
-    else {
-        return ( DENY, "auth_vmysql/$method - wrong password" );
-    }
+    return Qpsmtpd::Auth::validate_password( $self,
+            src_clear     => $u->{pw_clear_passwd},
+            src_crypt     => $u->{pw_passwd},
+            attempt_clear => $passClear,
+            attempt_hash  => $passHash,
+            method        => $method,
+            ticket        => $ticket,
+            deny          => DENY,
+        );
 }
 

@@ -1,3 +1,4 @@
+#!perl -w
 
 =head1 NAME
 
@@ -186,5 +187,3 @@ sub hook_rcpt {
     
     return @{$map{$rcpt}};
 }
-
-# vim: ts=4 sw=4 expandtab syn=perl

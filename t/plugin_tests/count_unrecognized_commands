@@ -1,0 +1,31 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('test_hook_unrecognized_command', 4);
+};
+
+sub test_hook_unrecognized_command {
+    my $self = shift;
+
+    $self->{_unrec_cmd_max} = 2;
+    $self->connection->notes( 'unrec_cmd_count', 0 );
+
+    my ($code, $mess) = $self->hook_unrecognized_command(undef,'hiya');
+    cmp_ok( $code, '==', DECLINED, "good" );
+
+    $self->connection->notes( 'unrec_cmd_count', 2 );
+    ($code, $mess) = $self->hook_unrecognized_command(undef,'snookums');
+    cmp_ok( $code, '==', DENY_DISCONNECT, "limit" );
+
+    ($code, $mess) = $self->hook_unrecognized_command(undef,'wtf');
+    cmp_ok( $code, '==', DENY_DISCONNECT, "over limit" );
+
+    cmp_ok( $self->connection->notes( 'unrec_cmd_count'), '==', 4, "correct increment" );
+};

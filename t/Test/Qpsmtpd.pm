@@ -1,5 +1,7 @@
 package Test::Qpsmtpd;
 use strict;
+use lib 't';
+use lib 'lib';
 use Carp qw(croak);
 use base qw(Qpsmtpd::SMTP);
 use Test::More;
@@ -71,7 +73,7 @@ sub config_dir {
 }
 
 sub plugin_dirs {
-    ('./plugins');
+    ('./plugins', './plugins/ident', './plugins/async');
 }
 
 sub log {

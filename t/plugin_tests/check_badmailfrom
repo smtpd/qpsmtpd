@@ -1,0 +1,107 @@
+#!perl -w
+
+use strict;
+use Data::Dumper;
+
+use Qpsmtpd::Address;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("test_badmailfrom_is_immune", 5);
+    $self->register_test("test_badmailfrom_match", 7);
+    $self->register_test("test_badmailfrom_hook_mail", 4);
+    $self->register_test("test_badmailfrom_hook_rcpt", 2);
+}
+
+sub test_badmailfrom_is_immune {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $test_email = 'matt@test.com';
+    my $address = Qpsmtpd::Address->new( "<$test_email>" );
+    $transaction->sender($address);
+    ok( $self->is_immune( $transaction->sender, [] ), "is_immune, empty list");
+
+    $address = Qpsmtpd::Address->new( '<>' );
+    $transaction->sender($address);
+    ok( $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, null sender");
+
+    $address = Qpsmtpd::Address->new( '<matt@>' );
+    $transaction->sender($address);
+    ok( $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing host");
+
+    $address = Qpsmtpd::Address->new( '<@example.com>' );
+    $transaction->sender($address);
+    ok( $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, missing user");
+
+    $address = Qpsmtpd::Address->new( '<matt@example.com>' );
+    $transaction->sender($address);
+    ok( ! $self->is_immune( $transaction->sender, ['bad@example.com'] ), "is_immune, false");
+};
+
+sub test_badmailfrom_hook_mail {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+
+    my $test_email = 'matt@test.com';
+    my $address = Qpsmtpd::Address->new( "<$test_email>" );
+    $transaction->sender($address);
+
+    $self->{_badmailfrom_config} = ['matt@test.net','matt@test.com'];
+    $transaction->notes('badmailfrom', '');
+    my ($r) = $self->hook_mail( $transaction, $address );
+    ok( $r == 909, "badmailfrom hook_mail");
+    ok( $transaction->notes('badmailfrom') eq 'Your envelope sender is in my badmailfrom list', 
+        "badmailfrom hook_mail: default reason");
+
+    $self->{_badmailfrom_config} = ['matt@test.net','matt@test.com Yer a spammin bastert'];
+    $transaction->notes('badmailfrom', '');
+    ($r) = $self->hook_mail( $transaction, $address );
+    ok( $r == 909, "badmailfrom hook_mail");
+    ok( $transaction->notes('badmailfrom') eq 'Yer a spammin bastert', 
+        "badmailfrom hook_mail: custom reason");
+
+};
+
+sub test_badmailfrom_hook_rcpt {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+
+    $transaction->notes('badmailfrom', 'Yer a spammin bastart. Be gon wit yuh.' );
+
+    my ($code,$note) = $self->hook_rcpt( $transaction );
+
+    ok( $code == 901, 'badmailfrom hook hit');
+    ok( $note, $note );
+}
+
+sub test_badmailfrom_match {
+    my $self = shift;
+
+# is_match receives ( $from, $bad, $host )
+
+    my $r = $self->is_match( 'matt@test.net', 'matt@test.net', 'test.net' );
+    ok($r, "check_badmailfrom match");
+    
+    ok( ! $self->is_match( 'matt@test.net', 'matt@test.com', 'tnpi.net' ),
+        "check_badmailfrom non-match");
+
+    ok( $self->is_match( 'matt@test.net', '@test.net', 'test.net' ),
+        "check_badmailfrom match host");
+
+    ok( ! $self->is_match( 'matt@test.net', '@test.not', 'test.net' ),
+        "check_badmailfrom non-match host");
+
+    ok( ! $self->is_match( 'matt@test.net', '@test.net', 'test.not' ),
+        "check_badmailfrom non-match host");
+
+    ok( $self->is_match( 'matt@test.net', 'test.net$', 'tnpi.net' ),
+        "check_badmailfrom pattern match");
+
+    ok( ! $self->is_match( 'matt@test.net', 'test.not$', 'tnpi.net' ),
+        "check_badmailfrom pattern non-match");
+};
+

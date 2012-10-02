@@ -1,115 +1,4 @@
-#!/usr/bin/perl -Tw
-
-sub register {
-  my ( $self, $qp, @args ) = @_;
-  $self->register_hook( "auth-plain", "authldap" );
-  $self->register_hook( "auth-login", "authldap" );
-
-  # pull config defaults in from file
-  %{ $self->{"ldconf"} } = map { (split /\s+/, $_, 2)[0,1] } $self->qp->config('ldap');
-
-  # override ldap config defaults with plugin args
-  for my $ldap_arg (@args) {
-    %{ $self->{"ldconf"} } = map { (split /\s+/, $_, 2)[0,1] } $ldap_arg;
-  }
-
-  # do light validation of ldap_host and ldap_port to satisfy -T
-  my $ldhost = $self->{"ldconf"}->{'ldap_host'};
-  my $ldport = $self->{"ldconf"}->{'ldap_port'};
-  if (($ldhost) && ($ldhost =~ m/^(([a-z0-9]+\.?)+)$/)) {
-    $self->{"ldconf"}->{'ldap_host'} = $1
-  } else {
-    undef $self->{"ldconf"}->{'ldap_host'};
-  }
-  if (($ldport) && ($ldport =~ m/^(\d+)$/)) {
-    $self->{"ldconf"}->{'ldap_port'} = $1
-  } else {
-    undef $self->{"ldconf"}->{'ldap_port'};
-  }
-
-  # set any values that are not already
-  $self->{"ldconf"}->{"ldap_host"} ||= "127.0.0.1";
-  $self->{"ldconf"}->{"ldap_port"} ||= 389;
-  $self->{"ldconf"}->{"ldap_timeout"} ||= 5;
-  $self->{"ldconf"}->{"ldap_auth_filter_attr"} ||= "uid";
-}
-
-sub authldap {
-  use Net::LDAP qw(:all);
-  use Qpsmtpd::Constants;
-
-  my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
-    @_;
-  my ($ldhost, $ldport, $ldwait, $ldbase, $ldmattr, $lduserdn, $ldh, $mesg);
-
-  # pull values in from config
-  $ldhost = $self->{"ldconf"}->{"ldap_host"};
-  $ldport = $self->{"ldconf"}->{"ldap_port"};
-  $ldbase = $self->{"ldconf"}->{"ldap_base"};
-
-  # log error here and DECLINE if no baseDN, because a custom baseDN is required:
-  unless ($ldbase) {
-    $self->log(LOGERROR, "authldap/$method - please configure ldap_base" ) &&
-    return ( DECLINED, "authldap/$method - temporary auth error" );
-  }
-  $ldwait  = $self->{"ldconf"}->{'ldap_timeout'};
-  $ldmattr  = $self->{"ldconf"}->{'ldap_auth_filter_attr'};
-
-  my ( $pw_name, $pw_domain ) = split "@", lc($user);
-
-  # find dn of user matching supplied username
-  $ldh = Net::LDAP->new($ldhost, port=>$ldport, timeout=>$ldwait ) or
-    $self->log(LOGALERT, "authldap/$method - error in initial conn" ) &&
-    return ( DECLINED, "authldap/$method - temporary auth error" );
-
-  # find the user's DN
-  $mesg = $ldh->search(
-    base=>$ldbase,
-    scope=>'sub',
-    filter=>"$ldmattr=$pw_name",
-    attrs=>['uid'],
-    timeout=>$ldwait,
-    sizelimit=>'1') or 
-      $self->log(LOGALERT, "authldap/$method - err in search for user" ) &&
-      return ( DECLINED, "authldap/$method - temporary auth error" );
-
-  # deal with errors if they exist
-  if ( $mesg->code ) {
-    $self->log(LOGALERT, "authldap/$method - err " . $mesg->code . " in search for user" );
-    return ( DECLINED, "authldap/$method - temporary auth error" );
-  }
-
-  # unbind, so as to allow a rebind below
-  $ldh->unbind if ($ldh);
-
-  # bind against directory as user with password supplied
-  if (($mesg->count) && ($lduserdn = $mesg->entry->dn)) {
-    $ldh = Net::LDAP->new($ldhost, port=>$ldport, timeout=>$ldwait ) or
-      $self->log(LOGALERT, "authldap/$method - err in user conn" ) &&
-        return ( DECLINED, "authldap/$method - temporary auth error" );
-	
-    # here's the whole reason for the script
-    $mesg = $ldh->bind($lduserdn, password=>$passClear, timeout=>$ldwait);
-    $ldh->unbind if ($ldh);
-
-    # deal with errors if they exist, or allow success
-    if ( $mesg->code ) {
-      $self->log(LOGALERT, "authldap/$method - error in user bind" );
-      return ( DECLINED, "authldap/$method - wrong username or password" );
-    } else {
-      $self->log( LOGINFO, "authldap/$method - $user auth success" );
-      $self->log( LOGDEBUG, "authldap/$method - user: $user, pass: $passClear" );
-      return ( OK, "authldap/$method" );
-    }
-
-  # if the plugin couldn't find user's entry
-  } else {
-    $self->log(LOGALERT, "authldap/$method - user not found" ) &&
-      return ( DECLINED, "authldap/$method - wrong username or password" );
-  }
-
-  $ldh->disconnect;
-}
+#!perl -w
 
 =head1 NAME
 
@@ -155,7 +44,7 @@ based on the 'uid' attribute.
 =head1 NOTES
 
 Each auth requires an initial lookup to find the user's DN.  Ideally, the
-plugin would simply bind as the user without the need for this lookup(see
+plugin would simply bind as the user without the need for this lookup (see
 FUTURE DIRECTION below).
 
 This plugin requires that the Directory allow anonymous bind (see FUTURE
@@ -187,6 +76,122 @@ Copyright (c) 2005 Elliot Foster
 This plugin is licensed under the same terms as the qpsmtpd package itself.
 Please see the LICENSE file included with qpsmtpd for details.
 
-
 =cut
+
+use strict;
+use warnings;
+
+use Net::LDAP qw(:all);
+use Qpsmtpd::Constants;
+
+sub register {
+    my ($self, $qp, @args) = @_;
+
+    $self->register_hook("auth-plain", "authldap");
+    $self->register_hook("auth-login", "authldap");
+
+    # pull config defaults in from file
+    %{$self->{"ldconf"}} =
+      map { (split /\s+/, $_, 2)[0, 1] } $self->qp->config('ldap');
+
+    # override ldap config defaults with plugin args
+    for my $ldap_arg (@args) {
+        %{$self->{"ldconf"}} = map { (split /\s+/, $_, 2)[0, 1] } $ldap_arg;
+    }
+
+    # do light validation of ldap_host and ldap_port to satisfy -T
+    my $ldhost = $self->{"ldconf"}->{'ldap_host'};
+    my $ldport = $self->{"ldconf"}->{'ldap_port'};
+    if (($ldhost) && ($ldhost =~ m/^(([a-z0-9]+\.?)+)$/)) {
+        $self->{"ldconf"}->{'ldap_host'} = $1;
+    }
+    else {
+        undef $self->{"ldconf"}->{'ldap_host'};
+    }
+    if (($ldport) && ($ldport =~ m/^(\d+)$/)) {
+        $self->{"ldconf"}->{'ldap_port'} = $1;
+    }
+    else {
+        undef $self->{"ldconf"}->{'ldap_port'};
+    }
+
+    # set any values that are not already
+    $self->{"ldconf"}->{"ldap_host"}             ||= "127.0.0.1";
+    $self->{"ldconf"}->{"ldap_port"}             ||= 389;
+    $self->{"ldconf"}->{"ldap_timeout"}          ||= 5;
+    $self->{"ldconf"}->{"ldap_auth_filter_attr"} ||= "uid";
+}
+
+sub authldap {
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
+      @_;
+    my ($ldhost, $ldport, $ldwait, $ldbase, $ldmattr, $lduserdn, $ldh, $mesg);
+
+    # pull values in from config
+    $ldhost = $self->{"ldconf"}->{"ldap_host"};
+    $ldport = $self->{"ldconf"}->{"ldap_port"};
+    $ldbase = $self->{"ldconf"}->{"ldap_base"};
+
+ # log error here and DECLINE if no baseDN, because a custom baseDN is required:
+    unless ($ldbase) {
+        $self->log(LOGERROR, "skip: please configure ldap_base");
+        return (DECLINED, "authldap - temporary auth error");
+    };
+    $ldwait  = $self->{"ldconf"}->{'ldap_timeout'};
+    $ldmattr = $self->{"ldconf"}->{'ldap_auth_filter_attr'};
+
+    my ($pw_name, $pw_domain) = split "@", lc($user);
+
+    # find dn of user matching supplied username
+    $ldh = Net::LDAP->new($ldhost, port => $ldport, timeout => $ldwait) or do {
+        $self->log(LOGALERT, "skip: error in initial conn");
+        return (DECLINED, "authldap - temporary auth error");
+    };
+
+    # find the user's DN
+    $mesg = $ldh->search(   base      => $ldbase,
+                            scope     => 'sub',
+                            filter    => "$ldmattr=$pw_name",
+                            attrs     => ['uid'],
+                            timeout   => $ldwait,
+                            sizelimit => '1'
+                        ) or do {
+        $self->log(LOGALERT, "skip: err in search for user");
+        return (DECLINED, "authldap - temporary auth error");
+    };
+
+    # deal with errors if they exist
+    if ($mesg->code) {
+        $self->log(LOGALERT, "skip: err " . $mesg->code . " in search for user");
+        return (DECLINED, "authldap - temporary auth error");
+    }
+
+    # unbind, so as to allow a rebind below
+    $ldh->unbind if $ldh;
+
+    # bind against directory as user with password supplied
+    if ( ! $mesg->count || $lduserdn = $mesg->entry->dn ) {
+        $self->log(LOGALERT, "fail: user not found");
+        return (DECLINED, "authldap - wrong username or password");
+    };
+
+    $ldh = Net::LDAP->new($ldhost, port => $ldport, timeout => $ldwait) or do {
+        $self->log(LOGALERT, "skip: err in user conn");
+        return (DECLINED, "authldap - temporary auth error");
+    };
+
+    # here's the whole reason for the script
+    $mesg = $ldh->bind($lduserdn, password => $passClear, timeout => $ldwait);
+    $ldh->unbind if $ldh;
+
+    # deal with errors if they exist, or allow success
+    if ($mesg->code) {
+        $self->log(LOGALERT, "fail: error in user bind");
+        return (DECLINED, "authldap - wrong username or password");
+    }
+
+    $self->log(LOGINFO,  "pass: $user auth success");
+    $self->log(LOGDEBUG, "user: $user, pass: $passClear");
+    return (OK, "authldap");
+}
 

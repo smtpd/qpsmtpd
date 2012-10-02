@@ -1,17 +1,22 @@
-#!/usr/bin/perl
-#
-#  This plugin doesn't actually check anything and will fail any
-#  user no matter what they type.  It is strictly a proof of concept for
-#  the Qpsmtpd::Auth module.  Don't run this in production!!!
-#
+#!perl -w
+
+=head1 NAME
+
+authdeny
+
+=head1 SYNOPSIS
+
+This plugin doesn't actually check anything and will fail any
+user no matter what they type.  It is strictly a proof of concept for
+the Qpsmtpd::Auth module.  Don't run this in production!!!
+
+=cut
 
 sub hook_auth {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    #  $DB::single = 1;
-
-    $self->log( LOGWARN, "Cannot authenticate using authdeny" );
+    $self->log( LOGWARN, "fail: cannot authenticate" );
 
     return ( DECLINED, "$user is not free to abuse my relay" );
 }

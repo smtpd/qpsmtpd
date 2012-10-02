@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!perl -w
 
 =head1 NAME
 
@@ -20,10 +20,10 @@ logging/file [loglevel I<level>] [reopen] [nosplit] [tsformat I<format>] I<path>
 
 For example:
 
-logging/file loglevel LOGINFO /var/log/qpsmtpd.log
-logging/file /var/log/qpsmtpd.log.%Y-%m-%d
-logging/file loglevel LOGCRIT reopen |/usr/local/sbin/page-sysadmin
-logging/file loglevel LOGDEBUG tsformat %FT%T /var/log/qpsmtpd.log
+ logging/file loglevel LOGINFO /var/log/qpsmtpd.log
+ logging/file /var/log/qpsmtpd.log.%Y-%m-%d
+ logging/file loglevel LOGCRIT reopen |/usr/local/sbin/page-sysadmin
+ logging/file loglevel LOGDEBUG tsformat %FT%T /var/log/qpsmtpd.log
 
 =back
 
@@ -121,6 +121,7 @@ use warnings;
 use IO::File;
 use Sys::Hostname;
 use POSIX qw(strftime);
+use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp, @args) = @_;
@@ -279,4 +280,3 @@ sub hook_logging {
     return DECLINED;
 }
 
-# vi: tabstop=4 shiftwidth=4 expandtab:

@@ -1,0 +1,29 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    eval 'use Geo::IP';
+    if ( $@ ) {
+        warn "could not load Geo::IP\n";
+        return;
+    };
+
+    $self->register_test('test_geoip_lookup', 2);
+};
+
+sub test_geoip_lookup {
+    my $self = shift;
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    cmp_ok( $self->connect_handler(), '==', DECLINED, "exit code");
+
+    cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "note");
+};
+
+

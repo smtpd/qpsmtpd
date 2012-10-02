@@ -1,29 +1,59 @@
-# -*- perl -*-
+#!perl -w
 
-=pod
+=head1 SYNOPSIS
 
 This plugin uses MaxMind's GeoIP service and the Geo::IP perl module to
 do a lookup on incoming connections and record the country of origin.
 
 Thats all it does.
 
-It logs the country to the connection notes 'geoip_country'.  Another
-plugin can use that value to do things to the connection, like reject,
-or greylist.
+It logs the 2 char country code to connection note I<geoip_country>.
+It logs the country name to the connection note I<geoip_country_name>.
+
+Other plugins can use that info to do things to the connection, like
+reject or greylist.
 
 =cut
 
-use Geo::IP;
+use strict;
+use warnings;
 
-sub hook_connect {
-  my ($self) = @_;
+use Qpsmtpd::Constants;
+#use Geo::IP;  # eval'ed in register()
 
-  my $geoip = Geo::IP->new(GEOIP_STANDARD);
-  my $country = 
-    $geoip->country_code_by_addr( $self->qp->connection->remote_ip );
+sub register {
+    my $self = shift;
+    eval 'use Geo::IP';
+    if ( $@ ) {
+        warn "could not load Geo::IP";
+        $self->log( LOGERROR, "could not load Geo::IP" );
+        return;
+    };
 
-  $self->qp->connection->notes('geoip_country', $country);
-  $self->log(LOGNOTICE, "GeoIP Country: $country");
+    $self->register_hook( 'connect', 'connect_handler' );
+};
 
-  return DECLINED;
+sub connect_handler {
+    my $self = shift;
+
+    my $geoip = Geo::IP->new();
+    my $remote_ip = $self->qp->connection->remote_ip;
+
+    my $c_code = $geoip->country_code_by_addr( $remote_ip ) or do {
+        $self->log( LOGINFO, "fail: no results" );
+        return DECLINED;
+    };
+
+    my $c_name = $geoip->country_name_by_addr( $remote_ip );
+    if ( $c_name ) {
+        $self->connection->notes('geoip_country_name', $c_name);
+    };
+
+    $self->connection->notes('geoip_country', $c_code);
+
+    my $message  = $c_code;
+       $message .= ", $c_name" if $c_name;
+    $self->log(LOGINFO, $message);
+
+    return DECLINED;
 }

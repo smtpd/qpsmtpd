@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 
 use Qpsmtpd::Plugin::Async::DNSBLBase;
 
@@ -122,8 +122,6 @@ sub collect_results {
 
     return \@matches;
 }
-
-1;
 
 =head1 NAME
 

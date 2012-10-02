@@ -1,1 +1,23 @@
+# by default, qpsmtpd logs to STDERR at the level set in config/loglevel.
+#
+# In addition, qpsmtpd will log through any plugins enabled in this file.
+# You can enable as many plugins as you wish. Example plugin invocations
+# are included below. Just remove the # symbol to enable them.
+
+# default logging plugin
 logging/warn 9
+
+#logging/adaptive [accept minlevel] [reject maxlevel] [prefix char]
+#logging/adaptive 4 6
+
+# send logs to apache (useful if running qpsmtpd under apache)
+#logging/apache
+
+# send logs to the great bit bucket
+#logging/devnull
+
+# log to a file
+#logging/file loglevel LOGINFO /var/log/qpsmtpd.log
+
+# log to syslog
+#logging/syslog loglevel LOGWARN priority LOG_NOTICE

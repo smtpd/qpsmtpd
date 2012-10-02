@@ -1,0 +1,112 @@
+#!perl -w
+
+use strict;
+use Data::Dumper;
+use POSIX qw(strftime);
+
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+
+my $test_email = 'matt@example.com';
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("test_hook_data_post", 7);
+    $self->register_test('test_invalid_date_range', 7);
+}
+
+sub setup_test_headers {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $address = Qpsmtpd::Address->new( "<$test_email>" );
+    my $header  = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
+    my $now    = strftime "%a %b %e %H:%M:%S %Y", localtime time;
+
+    $transaction->sender($address);
+    $transaction->header($header);
+    $transaction->header->add('From', "<$test_email>");
+    $transaction->header->add('Date', $now );
+    $transaction->body_write( "test message body " );
+};
+
+sub test_invalid_date_range {
+    my $self = shift;
+
+    my $now = strftime "%a %b %e %H:%M:%S %Y", localtime time;
+    ok( ! $self->invalid_date_range($now), "valid +");
+
+    $self->{_args}{future} = 2;
+
+    my $future_6 = strftime "%a %b %e %H:%M:%S %Y", localtime time + 518400; #6d
+    my $r = $self->invalid_date_range( $future_6 );
+    ok( $r, "too new -" );
+
+    my $future_3 = strftime "%a %b %e %H:%M:%S %Y", localtime time + 259200; #3d
+    $r = $self->invalid_date_range( $future_3 );
+    ok( $r, "too new -" );
+
+    my $future_1 = strftime "%a %b %e %H:%M:%S %Y", localtime time +  86400; #1d
+    $r = $self->invalid_date_range( $future_1 );
+    ok( ! $r, "a little new, +" );
+
+
+    $self->{_args}{past}   = 2;
+
+    my $past_6   = strftime "%a %b %e %H:%M:%S %Y", localtime time - 518400; #6d
+    $r = $self->invalid_date_range( $past_6 );
+    ok( $r, "too old -" );
+
+    my $past_3   = strftime "%a %b %e %H:%M:%S %Y", localtime time - 259200; #3d
+    $r = $self->invalid_date_range( $past_3 );
+    ok( $r, "too old -" );
+
+    my $past_1   = strftime "%a %b %e %H:%M:%S %Y", localtime time -  86400; #1d
+    $r = $self->invalid_date_range( $past_1 );
+    ok( ! $r, "a little old +" );
+};
+
+sub test_hook_data_post {
+    my $self = shift;
+
+    my $reject = $self->{_args}{reject_type};
+    my $deny   = $reject =~ /^temp|soft$/i ? DENYSOFT : DENY;
+
+    $self->setup_test_headers();
+    my $transaction = $self->qp->transaction;
+
+    my ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DECLINED, '==', $code, "okay +" );
+
+    $transaction->header->delete('Date');
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( $deny, '==', $code, "missing date ( $mess )" );
+
+    my $now    = strftime "%a %b %e %H:%M:%S %Y", localtime time;
+    $transaction->header->add('Date', $now );
+    $transaction->header->delete('From');
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( $deny, '==', $code, "missing from ( $mess )" );
+    $transaction->header->add('From', "<$test_email>");
+
+    $self->{_args}{future} = 5;
+    my $future = strftime "%a %b %e %H:%M:%S %Y", localtime time + 518400; #6d
+    $transaction->header->replace('Date', $future );
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( $deny, '==', $code, "too new ( $mess )" );
+
+    $self->{_args}{past} = 5;
+    my $past   = strftime "%a %b %e %H:%M:%S %Y", localtime time - 518400; #6d
+    $transaction->header->replace('Date', $past );
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( $deny, '==', $code, "too old ( $mess )" );
+
+    $self->{_args}{reject_type} = 'temp';
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DENYSOFT, '==', $code, "defer, not deny ( $mess )" );
+
+    $self->{_args}{reject_type} = 'perm';
+    ($code, $mess) = $self->hook_data_post( $transaction );
+    cmp_ok( DENY, '==', $code, "deny ( $mess )" );
+};

@@ -1,3 +1,4 @@
+#!perl -w
 =head1 NAME
 
 random_error
@@ -15,7 +16,7 @@ of messages.  The default is 1. Use a negative number to disable.
 
 For use with other plugins, scribble the revised failure rate to
 
-   $self->qp->connection->notes('random_fail_%');
+   $self->connection->notes('random_fail_%');
 
 =cut
 
@@ -30,9 +31,9 @@ sub register {
 sub NEXT() { DECLINED }
 
 sub random_fail {
-        my $fpct = $_[0]->qp->connection->notes('random_fail_%');
+        my $fpct = $_[0]->connection->notes('random_fail_%');
 
-=head calculating the probability of failure
+=head1 calculating the probability of failure
 
 There are six tests a message must pass to reach the queueing stage, and we wish to
 provide random failure for each one, with the combined probability being out
@@ -54,7 +55,7 @@ or
 
 
 sub hook_connect {
-    $_[0]->qp->connection->notes('random_fail_%', $_[0]->{__PACKAGE__.'_how'});
+    $_[0]->connection->notes('random_fail_%', $_[0]->{__PACKAGE__.'_how'});
     goto &random_fail
 }
 
@@ -81,5 +82,4 @@ sub hook_data {
 sub hook_data_post {
     goto &random_fail
 }
-
 

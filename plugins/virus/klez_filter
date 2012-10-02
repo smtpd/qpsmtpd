@@ -1,3 +1,4 @@
+#!perl -w
 
 sub hook_data_post {
   my ($self, $transaction) = @_;

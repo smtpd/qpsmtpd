@@ -1,4 +1,4 @@
-# 
+#
 #  Example configuration file for plugins
 #
 
@@ -6,11 +6,19 @@
 # plugins/http_config for details.
 #   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
 
+# hosts_allow does not work with the tcpserver deployment model!
+#   perldoc plugins/hosts_allow for an alternative.
+#
 # The hosts_allow module must be loaded if you want the -m / --max-from-ip /
 # my $MAXCONNIP = 5; # max simultaneous connections from one IP
 # settings... without this it will NOT refuse more than $MAXCONNIP connections
 # from one IP!
 hosts_allow
+
+# information plugins
+ident/geoip
+#ident/p0f /tmp/.p0f_socket version 3
+#connection_time
 
 # enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
 dont_require_anglebrackets
@@ -20,7 +28,8 @@ dont_require_anglebrackets
 # parse_addr_withhelo
 
 quit_fortune
-
+# tls should load before count_unrecognized_commands
+#tls
 check_earlytalker
 count_unrecognized_commands 4
 check_relay
@@ -42,20 +51,25 @@ auth/authdeny
 # this plugin needs to run after all other "rcpt" plugins
 rcpt_ok
 
+check_basicheaders days 5 reject_type temp
+domainkeys
+
 # content filters
 virus/klez_filter
 
 
 # You can run the spamassassin plugin with options.  See perldoc
-# plugins/spamassassin for details. 
+# plugins/spamassassin for details.
 #
 spamassassin
 
 # rejects mails with a SA score higher than 20 and munges the subject
-# of the score is higher than 10.  
+# of the score is higher than 10.
 #
 #   spamassassin reject_threshold 20 munge_subject_threshold 10
 
+# dspam must run after spamassassin for the learn_from_sa feature to work
+dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
 # virus/clamav

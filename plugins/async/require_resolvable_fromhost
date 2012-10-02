@@ -1,9 +1,14 @@
-#!/usr/bin/perl -w
+#!perl -w
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
-use ParaDNS;
-use Socket;
 use Qpsmtpd::TcpServer;
+
+#use ParaDNS;  # moved into register
+use Socket;
 
 my %invalid  = ();
 my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
@@ -19,6 +24,11 @@ sub register {
         }
     }
 
+    eval 'use ParaDNS';
+    if ( $@ ) {
+        warn "could not load ParaDNS, plugin disabled";
+        return DECLINED;
+    };
     $self->register_hook( mail => 'hook_mail_start' );
     $self->register_hook( mail => 'hook_mail_done' );
 }
@@ -27,10 +37,10 @@ sub hook_mail_start {
     my ( $self, $transaction, $sender ) = @_;
     
     return DECLINED
-      if ( $self->qp->connection->notes('whitelisthost') );
+      if ($self->connection->notes('whitelisthost'));
 
-    if ( $sender ne "<>" ) {
-        
+    if ( $sender ne '<>' ) {
+
         unless ( $sender->host ) {
             # default of addr_bad_from_system is DENY, we use DENYSOFT here to
             # get the same behaviour as without Qpsmtpd::DSN...
@@ -47,7 +57,7 @@ sub hook_mail_start {
 
         return YIELD;
     }
-    
+
     return DECLINED;
 }
 
@@ -55,7 +65,7 @@ sub hook_mail_done {
     my ( $self, $transaction, $sender ) = @_;
     
     return DECLINED
-      if ( $self->qp->connection->notes('whitelisthost') );
+      if ( $self->connection->notes('whitelisthost') );
 
     if ( $sender ne "<>" && !$transaction->notes('resolvable_fromhost') ) {
         # default of temp_resolver_failed is DENYSOFT
@@ -169,5 +179,3 @@ sub is_valid {
     }
     return 1;
 }
-
-# vim: ts=4 sw=4 expandtab syn=perl

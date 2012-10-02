@@ -1,3 +1,4 @@
+#!perl -w
 =head1 NAME
 
 check_earlytalker - Check that the client doesn't talk before we send the SMTP banner
@@ -55,10 +56,11 @@ The default is I<check-at CONNECT> only.
 
 =cut
 
-use IO::Select;
-
-use warnings;
 use strict;
+use warnings;
+
+use IO::Select;
+use Qpsmtpd::Constants;
 
 sub register {
   my ($self, $qp, @args) = @_;
@@ -104,7 +106,7 @@ sub apr_connect_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
-    return DECLINED if ($self->qp->connection->notes('whitelisthost'));
+    return DECLINED if ($self->connection->notes('whitelisthost'));
     my $ip = $self->qp->connection->remote_ip;
 
     my $c = $self->qp->{conn};
@@ -115,7 +117,7 @@ sub apr_connect_handler {
     if ($rc == APR::Const::SUCCESS()) {
         $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
         if ($self->{_args}->{'defer-reject'}) {
-            $self->qp->connection->notes('earlytalker', 1);
+            $self->connection->notes('earlytalker', 1);
         }
         else {
             my $msg = 'Connecting host started transmitting before SMTP greeting';
@@ -124,7 +126,7 @@ sub apr_connect_handler {
         }
     }
     else {
-        $self->log(LOGINFO, "remote host said nothing spontaneous, proceeding");
+        $self->log(LOGINFO, "pass: remote host said nothing spontaneous");
     }
 }
 
@@ -132,7 +134,7 @@ sub apr_data_handler {
     my ($self, $transaction) = @_;
 
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
-    return DECLINED if ($self->qp->connection->notes('whitelisthost'));
+    return DECLINED if ($self->connection->notes('whitelisthost'));
     my $ip = $self->qp->connection->remote_ip;
 
     my $c = $self->qp->{conn};
@@ -147,7 +149,7 @@ sub apr_data_handler {
         return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
     }
     else {
-        $self->log(LOGINFO, "remote host said nothing spontaneous, proceeding");
+        $self->log(LOGINFO, "pass: remote host said nothing spontaneous");
     }
 }
 
@@ -158,20 +160,20 @@ sub connect_handler {
 
   return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
   return DECLINED
-      if ($self->qp->connection->notes('whitelisthost'));
+      if ($self->connection->notes('whitelisthost'));
 
   $in->add(\*STDIN) || return DECLINED;
   if ($in->can_read($self->{_args}->{'wait'})) {
     $self->log(LOGNOTICE, "remote host started talking before we said hello [$ip]");
     if ($self->{_args}->{'defer-reject'}) {
-        $self->qp->connection->notes('earlytalker', 1);
+        $self->connection->notes('earlytalker', 1);
     } else {
       my $msg = 'Connecting host started transmitting before SMTP greeting';
       return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
       return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
     }
   } else {
-    $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
+    $self->log(LOGINFO, 'pass: remote host said nothing spontaneous');
   }
   return DECLINED;
 }
@@ -183,7 +185,7 @@ sub data_handler {
 
   return DECLINED unless $self->{_args}{'check-at'}{DATA};
   return DECLINED
-      if ($self->qp->connection->notes('whitelisthost'));
+      if ($self->connection->notes('whitelisthost'));
 
   $in->add(\*STDIN) || return DECLINED;
   if ($in->can_read($self->{_args}->{'wait'})) {
@@ -193,7 +195,7 @@ sub data_handler {
     return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
   }
   else {
-    $self->log(LOGINFO, 'remote host said nothing spontaneous, proceeding');
+    $self->log(LOGINFO, 'pass: remote host said nothing spontaneous');
   }
   return DECLINED;
 }
@@ -202,12 +204,11 @@ sub mail_handler {
   my ($self, $transaction) = @_;
   my $msg = 'Connecting host started transmitting before SMTP greeting';
 
-  return DECLINED unless $self->qp->connection->notes('earlytalker');
+  return DECLINED unless $self->connection->notes('earlytalker');
   return (DENY,$msg) if $self->{_args}->{'action'} eq 'deny';
   return (DENYSOFT,$msg) if $self->{_args}->{'action'} eq 'denysoft';
   return DECLINED;
 }
-
 
 1;
 

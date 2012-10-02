@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 
 =head1 NAME
 
@@ -30,46 +30,54 @@ algorithm so no password is transfered in the clear.
 
 =cut
 
-use Digest::HMAC_MD5 qw(hmac_md5_hex);
+use strict;
+use warnings;
+
+use Qpsmtpd::Auth;
+use Qpsmtpd::Constants;
 
 sub register {
     my ( $self, $qp ) = @_;
 
-    $self->register_hook("auth-cram-md5", "auth_flat_file");
+    $self->register_hook('auth-plain',    'auth_flat_file');
+    $self->register_hook('auth-login',    'auth_flat_file');
+    $self->register_hook('auth-cram-md5', 'auth_flat_file');
 }
 
 sub auth_flat_file {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    my ( $pw_name, $pw_domain ) = split "@", lc($user);
+    if ( ! defined $passClear && ! defined $passHash ) {
+        $self->log(LOGINFO, "fail: missing password");
+        return ( DENY, "authflat - missing password" );
+    }
+
+    my ( $pw_name, $pw_domain ) = split '@', lc($user);
 
     unless ( defined $pw_domain ) {
+        $self->log(LOGINFO, "fail: missing domain");
         return DECLINED;
     }
-
-    $self->log(LOGINFO, "Authentication for: $pw_name\@$pw_domain");
 
     my ($auth_line) = grep {/^$pw_name\@$pw_domain:/} $self->qp->config('flat_auth_pw');
-    
-    unless (defined $auth_line) {
+
+    if ( ! defined $auth_line) {
+        $self->log(LOGINFO, "fail: no such user: $user");
         return DECLINED;
     }
-    
+
     my ($auth_user, $auth_pass) = split(/:/, $auth_line, 2);
-    
+
     # at this point we can assume the user name matched
-    if (
-        ( defined $passClear
-            and $auth_pass eq $passClear ) or
-        ( defined $passHash
-            and $passHash eq hmac_md5_hex($ticket, $auth_pass) )
-      )
-    {
-        return ( OK, "authflat/$method" );
-    }
-    else {
-        return ( DENY, "authflat/$method - wrong password" );
-    }
+    return Qpsmtpd::Auth::validate_password( $self,
+            src_clear     => $auth_pass,
+            src_crypt     => undef,
+            attempt_clear => $passClear,
+            attempt_hash  => $passHash,
+            method        => $method,
+            ticket        => $ticket,
+            deny          => DENY,
+        );
 }
 

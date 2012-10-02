@@ -1,9 +1,38 @@
 #!/bin/sh
-QMAILDUID=`id -u smtpd`
-NOFILESGID=`id -g smtpd`
-LANG=C
-exec /usr/local/bin/softlimit -m 50000000 \
-  /usr/local/bin/tcpserver -c 10 -v -R -p \
-  -u $QMAILDUID -g $NOFILESGID `head -1 config/IP` smtp \
-  ./qpsmtpd 2>&1
+#
+# You might want/need to to edit these settings
+QPUSER=smtpd
+# limit qpsmtpd to 150MB memory, should be several times what is needed.
+MAXRAM=150000000
+BIN=/usr/local/bin
+PERL=/usr/bin/perl
 
+# You should not need to edit these.
+QMAILDUID=`id -u $QPUSER`
+NOFILESGID=`id -g $QPUSER`
+IP=`head -1 config/IP`
+LANG=C
+
+# Remove the comments between the <start> and <end> tags to choose a
+# deployment model. See also: http://wiki.qpsmtpd.org/deploy:start
+
+# <start tcpserver>
+exec $BIN/softlimit -m $MAXRAM  \
+  $BIN/tcpserver -c 10 -v -R -p \
+  -u $QMAILDUID -g $NOFILESGID $IP smtp   \
+  ./qpsmtpd 2>&1
+# <end tcpserver>
+
+
+# <start forkserver>
+#exec 2>&1 \
+#sh -c "
+#  exec $BIN/softlimit -m $MAXRAM   \
+#    $PERL -T ./qpsmtpd-forkserver  \
+#      --listen-address $IP         \
+#      --port 25                    \
+#      --limit-connections 15       \
+#      --max-from-ip 5              \
+#      --user $QPUSER
+#"
+# <end forkserver>

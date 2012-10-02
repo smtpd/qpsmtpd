@@ -1,0 +1,38 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("test_auth_vpopmail", 3);
+}
+
+my @u_list = qw ( good bad none );
+my %u_data = (
+	      good => [ 'postmaster@example.com', OK, 'Good Strong Passphrase' ],
+	      bad  => [ 'bad@example.com', DENY, 'not_bad_pass' ],
+	      none => [ 'none@example.com', DECLINED, '' ],
+	      );
+
+sub test_auth_vpopmail {
+    my $self = shift;
+
+    if ( ! $self->test_vpopmail_module ) {
+        warn "vpopmail plugin not configured\n";
+        foreach ( 0..2) { ok( 1, "test_auth_vpopmail, skipped") };
+        return;
+    };
+
+    my ($tran, $ret, $note, $u, $r, $p, $a );
+    $tran = $self->qp->transaction;
+    for $u ( @u_list ) {
+        ( $a,$r,$p ) = @{$u_data{$u}};
+        ($ret, $note) = $self->auth_vpopmail($tran,'CRAMMD5',$a,$p);
+        defined $note or $note='auth_vpopmail: No-Message';
+        is ($ret, $r, $note);
+    }
+}

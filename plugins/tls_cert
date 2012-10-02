@@ -1,4 +1,8 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
 # Very basic script to create TLS certificates for qpsmtpd
 use File::Temp qw/ tempfile tempdir /;
 use Getopt::Long;
@@ -43,6 +47,7 @@ my $CA_key = 'ssl/qpsmtpd-ca.key';
 my $CA_crt = 'ssl/qpsmtpd-ca.crt';
 my $CA_serial = 'ssl/.cert.serial';
 
+my $template;
 my ($CA, $CAfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
 
 print ${CA} return_cfg('CA');

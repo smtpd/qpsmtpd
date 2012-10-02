@@ -1,20 +1,126 @@
-# this plugin checks the badrcptto config (like badmailfrom, but for rcpt address
-# rather than sender address)
+#!perl -w
+
+=head1 SYNOPSIS
+
+deny connections to recipients in the I<badrcptto> file
+
+like badmailfrom, but for recipient address rather than sender
+
+=head1 CONFIG
+
+Recipients are matched against entries in I<config/badrcptto>. Entries can be
+a complete email address, a host entry that starts with an @ symbol, or a
+regular expression. For regexp pattern matches, see PATTERNS.
+
+=head1 PATTERNS
+
+This allows special patterns to be denied (e.g. percent hack, bangs,
+double ats).
+
+Patterns are stored in the format pattern\sresponse, where pattern
+is a Perl pattern expression. Don't forget to anchor the pattern if
+you want to restrict it from matching anywhere in the string.
+
+qpsmtpd already ensures that the address contains an @, with something
+to the left and right of the @.
+
+=head1 AUTHOR
+
+2002 - original badrcptto plugin - apparently Jim Winstead
+       https://github.com/smtpd/qpsmtpd/commits/master/plugins/check_badrcptto
+
+2005 - pattern feature, (c) Gordon Rowell <gordonr@gormand.com.au>
+
+2012 - merged the two, refactored, added tests - Matt Simerson
+
+=head1 LICENSE
+
+This software is free software and may be distributed under the same
+terms as qpsmtpd itself.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {
   my ($self, $transaction, $recipient, %param) = @_;
-  my @badrcptto = $self->qp->config("badrcptto") or return (DECLINED);
-  return (DECLINED) unless $recipient->host && $recipient->user;
-  my $host = lc $recipient->host;
-  my $to = lc($recipient->user) . '@' . $host;
-  for my $bad (@badrcptto) {
-    $bad = lc $bad;
-    $bad =~ s/^\s*(\S+)/$1/;
-    return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here")
-      if $bad eq $to;
-    return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here")
-      if substr($bad,0,1) eq '@' && $bad eq "\@$host";
-  }
-  return (DECLINED);
+
+    return (DECLINED) if $self->qp->connection->relay_client();
+
+    my ($host, $to) = $self->get_host_and_to( $recipient )
+        or return (DECLINED);
+
+    my @badrcptto = $self->qp->config("badrcptto") or return (DECLINED);
+
+    for my $line (@badrcptto) {
+        $line =~ s/^\s+//g; # trim leading whitespace
+        my ($bad, $reason) = split /\s+/, $line, 2;
+        next if ! $bad;
+        if ( $self->is_match( $to, lc($bad), $host ) ) {
+            if ( $reason ) {
+                return (DENY, "mail to $bad not accepted here");
+            }
+            else {
+                return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here");
+            }
+        };
+    }
+    $self->log(LOGINFO, 'pass');
+    return (DECLINED);
 }
+
+sub is_match {
+    my ( $self, $to, $bad, $host ) = @_;
+
+    if ( $bad =~ /[\/\^\$\*\+\!\%]/ ) {  # it's a regexp
+        $self->log(LOGDEBUG, "badmailfrom pattern ($bad) match for $to");
+        if ( $to =~ /$bad/i ) {
+            $self->log(LOGINFO, 'fail: pattern match');
+            return 1;
+        };
+        return;
+    };
+
+    if ( $bad !~ m/\@/ ) {
+        $self->log(LOGERROR, "badrcptto: bad config: no \@ sign in $bad");
+        return;
+    };
+
+    $bad = lc $bad;
+    $to  = lc $to;
+
+    if ( substr($bad,0,1) eq '@' ) {
+        if ( $bad eq "\@$host" ) {
+            $self->log(LOGINFO, 'fail: host match');
+            return 1;
+        };
+        return;
+    };
+
+    if ( $bad eq $to ) {
+        $self->log(LOGINFO, 'fail: rcpt match');
+        return 1;
+    }
+    return;
+};
+
+sub get_host_and_to {
+    my ( $self, $recipient ) = @_;
+
+    if ( ! $recipient ) {
+        $self->log(LOGERROR, 'skip: no recipient!');
+        return;
+    };
+
+    if ( ! $recipient->host || ! $recipient->user ) {
+        $self->log(LOGINFO, 'skip: missing host or user');
+        return;
+    };
+
+    my $host = lc $recipient->host;
+    return ( $host, lc($recipient->user) . '@' . $host );
+};

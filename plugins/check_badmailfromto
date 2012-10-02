@@ -1,4 +1,4 @@
-#! perl
+#!perl -w
 
 =head1 NAME
 
@@ -17,14 +17,14 @@ Based heavily on check_badmailfrom.
 
 =cut
 
+use strict;
+use Qpsmtpd::Constants;
+
 sub hook_mail {
   my ($self, $transaction, $sender, %param) = @_;
 
-  my @badmailfromto = $self->qp->config("badmailfromto")
-    or return (DECLINED);
-
-  return (DECLINED) unless ($sender->format ne "<>"
-			    and $sender->host && $sender->user);
+    my @badmailfromto = $self->qp->config("badmailfromto");
+    return DECLINED if $self->is_sender_immune( $sender, \@badmailfromto );
 
   my $host = lc $sender->host;
   my $from = lc($sender->user) . '@' . $host;
@@ -33,27 +33,51 @@ sub hook_mail {
     $bad =~ s/^\s*(\S+).*/$1/;
     next unless $bad;
     $bad = lc $bad;
-    $self->log(LOGWARN, "Bad badmailfromto config: No \@ sign in $bad") and next unless $bad =~ m/\@/;
-    $transaction->notes('badmailfromto', "$bad")
-      if ($bad eq $from)
-      || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
+    if ( $bad !~ m/\@/ ) {
+        $self->log(LOGWARN, 'badmailfromto: bad config, no @ sign in '. $bad);
+        next;
+    };
+    if ( $bad eq $from || (substr($bad,0,1) eq '@' && $bad eq "\@$host") ) {
+        $transaction->notes('badmailfromto', $bad);
+    };
   }
   return (DECLINED);
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt, %param) = @_;
-  my $recipient = lc($rcpt->user) . '@' . lc($rcpt->host);
-  my $sender = $transaction->notes('badmailfromto');
-  if ($sender) {
-    my @badmailfromto = $self->qp->config("badmailfromto")
-      or return (DECLINED);
+    my ($self, $transaction, $rcpt, %param) = @_;
+    my $recipient = lc($rcpt->user) . '@' . lc($rcpt->host);
+    my $sender = $transaction->notes('badmailfromto') or do {
+        $self->log(LOGDEBUG, "pass: sender not listed");
+        return (DECLINED);
+    };
 
-    foreach (@badmailfromto) {
-      my ($from, $to) = m/^\s*(\S+)\t(\S+).*/;
-      return (DENY, "mail to $recipient not accepted here")
-        if lc($from) eq $sender and lc($to) eq $recipient;
+    foreach ( $self->qp->config("badmailfromto") ) {
+        my ($from, $to) = m/^\s*(\S+)\t(\S+).*/;
+        return (DENY, "mail to $recipient not accepted here")
+            if lc($from) eq $sender && lc($to) eq $recipient;
     }
-  }
-  return (DECLINED);
+    $self->log(LOGDEBUG, "pass: recipient not listed");
+    return (DECLINED);
 }
+
+sub is_sender_immune {
+    my ($self, $sender, $badmf ) = @_;
+
+    if ( ! scalar @$badmf ) {
+        $self->log(LOGDEBUG, 'skip: empty list');
+        return 1;
+    };
+
+    if ( ! $sender || $sender->format eq '<>' ) {
+        $self->log(LOGDEBUG, 'skip: null sender');
+        return 1;
+    };
+
+    if ( ! $sender->host || ! $sender->user ) {
+        $self->log(LOGDEBUG, 'skip: missing user or host');
+        return 1;
+    };
+
+    return;
+};

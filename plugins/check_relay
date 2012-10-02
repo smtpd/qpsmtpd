@@ -1,7 +1,19 @@
-# this plugin checks the relayclients config file and
-# $ENV{RELAYCLIENT} to see if relaying is allowed.
-#
+#!perl -w
 
+=head1 NAME
+
+check_relay
+
+=head1 SYNOPSIS
+
+Checks the relayclients config file and $ENV{RELAYCLIENT} to see if relaying is allowed.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use Net::IP qw(:PROC);
 
 sub hook_connect {

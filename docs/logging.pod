@@ -1,6 +1,123 @@
 #
-# read this with 'perldoc README.logging'  ...
+# read this with 'perldoc docs/logging.pod'
 #
+
+=head1 qpsmtpd logging; user documentation
+
+Qpsmtpd has a modular logging system. Here's a few things you need to know:
+
+ * The built-in logging prints log messages to STDERR.
+ * A variety of logging plugins is included, each with its own behavior.
+ * When a logging plugin is enabled, the built-in logging is disabled.
+ * plugins/logging/warn mimics the built-in logging.
+ * Multiple logging plugins can be enabled simultaneously.
+
+Read the POD within each logging plugin (perldoc plugins/logging/B<NAME>)
+to learn if it tickles your fancy.
+
+=head2 enabling plugins
+
+To enable logging plugins, edit the file I<config/logging> and uncomment the
+entries for the plugins you wish to use.
+
+=head2 logging level
+
+The 'master switch' for loglevel is I<config/loglevel>. Qpsmtpd and active
+plugins will output all messages that are less than or equal to the value
+specified. The log levels correspond to syslog levels:
+
+    LOGDEBUG   = 7
+    LOGINFO    = 6
+    LOGNOTICE  = 5
+    LOGWARN    = 4
+    LOGERROR   = 3
+    LOGCRIT    = 2
+    LOGALERT   = 1
+    LOGEMERG   = 0
+    LOGRADAR   = 0
+
+Level 6, LOGINFO, is the level at which most servers should start logging. At
+level 6, each plugin should log one and occasionally two entries that
+summarize their activity. Here's a few sample lines:
+
+ (connect) ident::geoip: SA, Saudi Arabia
+ (connect) ident::p0f: Windows 7 or 8
+ (connect) earlytalker: pass: remote host said nothing spontaneous
+ (data_post) domainkeys: skip: unsigned
+ (data_post) spamassassin: pass, Spam, 21.7 < 100
+ (data_post) dspam: fail: agree, Spam, 1.00 c
+ 552 we agree, no spam please (#5.6.1)
+
+Three plugins fired during the SMTP connection phase and 3 more ran during the
+data_post phase. Each plugin emitted one entry stating their findings.
+
+If you aren't processing the logs, you can save some disk I/O by reducing the
+loglevel, so that the only messages logged are ones that indicate a human
+should be taking some corrective action.
+
+=head2 log location
+
+If qpsmtpd is started using the distributed run file (cd ~smtpd; ./run), then
+you will see the log entries printed to your terminal. This solution works
+great for initial setup and testing and is the simplest case.
+
+A typical way to run qpsmtpd is as a supervised process with daemontools. If
+daemontools is already set up, setting up qpsmtpd may be as simple as:
+
+C<ln -s /usr/home/smtpd /var/service/>
+
+If svcscan is running, the symlink will be detected and tcpserver will
+run the 'run' files in the ./ and ./log directories. Any log entries
+emitted will get handled per the instructions in log/run. The default
+location specified in log/run is log/main/current.
+
+=head2 plugin loglevel
+
+Most plugins support a loglevel argument after their config/plugins entry.
+The value can be a whole number (N) or a relative number (+/-N), where
+N is a whole number from 0-7. See the descriptions of each below.
+
+C<ident/p0f loglevel 5>
+
+C<ident/p0f loglevel -1>
+
+ATTN plugin authors: To support loglevel in your plugin, you must store the
+loglevel settings from the plugins/config entry $self->{_args}{loglevel}. A
+simple and recommended example is as follows:
+
+ sub register {
+   my ( $self, $qp ) = shift, shift;
+   $self->log(LOGERROR, "Bad arguments") if @_ % 2;
+   $self->{_args} = { @_ };
+ }
+
+=head3 whole number
+
+If loglevel is a whole number, then all log activity in the plugin is logged
+at that level, regardless of the level the plugin author selected. This can
+be easily understood with a couple examples:
+
+The master loglevel is set at 6 (INFO). The mail admin sets a plugin loglevel
+to 7 (DEBUG). No messages from that plugin are emitted because DEBUG log
+entries are not <= 6 (INFO).
+
+The master loglevel is 6 (INFO) and the plugin loglevel is set to 5 or 6. All
+log entries will be logged because 5 is <= 6.
+
+This behavior is very useful to plugin authors. While testing and monitoring
+a plugin, they can set the level of their plugin to log everything. To return
+to 'normal' logging, they just update their config/plugins entry.
+
+=head3 relative
+
+Relative loglevel arguments adjust the loglevel of each logging call within
+a plugin. A value of I<loglevel +1> would make every logging entry one level
+less severe, where a value of I<loglevel -1> would make every logging entry
+one level more severe.
+
+For example, if a plugin has a loglevel setting of -1 and that same plugin
+logged a LOGDEBUG, it would instead be a LOGINFO message. Relative values
+makes it easy to control the verbosity and/or severity of individual plugins.
 
 =head1 qpsmtpd logging system; developer documentation
 
@@ -62,7 +179,7 @@ plugin (the system will not infinitely recurse in any case).
 =item C<@log>
 
 The remaining arguments are as passed by the caller, which may be a single
-term or may be a list of values.  It is usually sufficient to call 
+term or may be a list of values.  It is usually sufficient to call
 C<join(" ",@log)> to deal with these terms, but it is possible that some
 plugin might pass additional arguments with signficance.
 

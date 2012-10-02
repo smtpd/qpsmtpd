@@ -1,13 +1,21 @@
-# parse_addr_withhelo
-# 
-# strict RFC 821 forbids parameters after the 
-#   MAIL FROM:<user@example.net> 
-# and
-#   RCPT TO:<someone@example.com>
-# 
-# load this plugin to enforce, else the default EHLO parsing with 
-# parameters is done.
-#
+#!perl -w
+
+=head1 NAME
+
+parse_addr_withhelo
+
+=head1 SYNOPSIS
+
+strict RFC 821 forbids parameters after the
+
+   MAIL FROM:<user@example.net>
+ and
+   RCPT TO:<someone@example.com>
+
+load this plugin to enforce, else the default EHLO parsing with
+parameters is done.
+
+=cut
 
 sub hook_mail_parse {
     my $self = shift;

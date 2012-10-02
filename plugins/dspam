@@ -1,0 +1,406 @@
+#!perl -w
+
+=head1 NAME
+
+dspam - dspam integration for qpsmtpd
+
+=head1 DESCRIPTION
+
+qpsmtpd plugin that uses dspam to classify messages. Can use SpamAssassin to
+train dspam.
+
+Adds the X-DSPAM-Result and X-DSPAM-Signature headers to messages. The latter is essential for
+training dspam and the former is useful to MDAs, MUAs, and humans.
+
+Adds a transaction note to the qpsmtpd transaction. The notes is a hashref
+with at least the 'class' field (Spam,Innocent,Whitelisted). It will normally
+contain a probability and confidence ratings as well.
+
+=head1 TRAINING DSPAM
+
+Do not just enable dspam! Its false positive rate when untrained is high. The
+good news is; dspam learns very, very fast.
+
+To get dspam into a useful state, it must be trained. The best method way to
+train dspam is to feed it two large equal sized corpuses of spam and ham from
+your mail server. The dspam authors suggest avoiding public corpuses. I train
+dspam as follows:
+
+=over 4
+
+=item learn from SpamAssassin
+
+See the docs on the learn_from_sa feature in the CONFIG section.
+
+=item periodic training
+
+I have a script that searches the contents of every users maildir. Any read
+messages that have changed since the last processing run are learned as ham
+or spam.
+
+The ham message list consists of read messages in any folder not named like
+Spam, Junk, Trash, or Deleted. This catches messages that users have read
+and left in their inbox or filed away into subfolders.
+
+=item on-the-fly training
+
+The dovecot IMAP server has an antispam plugin that will train dspam when
+messages are moved to/from the Spam folder.
+
+=back
+
+=head1 CONFIG
+
+=head2 dspam_bin
+
+The path to the dspam binary. If yours is installed somewhere other
+than /usr/local/bin/dspam, you'll need to set this.
+
+=head2 learn_from_sa
+
+Dspam can be trained by SpamAssassin. This relationship between them requires
+attention to several important details:
+
+=over 4
+
+=item 1
+
+dspam must be listed B<after> spamassassin in the config/plugins file.
+Because SA runs first, I crank the SA reject_threshold up above 100 so that
+all spam messages will be used to train dspam.
+
+Once dspam is trained and errors are rare, I plan to run dspam first and
+reduce the SA load.
+
+=item 2
+
+Autolearn must be enabled and configured in SpamAssassin. SA autolearn
+preferences will determine whether a message is learned as spam or innocent
+by dspam. The settings to pay careful attention to in your SA local.cf file
+are bayes_auto_learn_threshold_spam and bayes_auto_learn_threshold_nonspam.
+Make sure they are both set to conservative values that are certain to
+yield no false positives.
+
+If you are using learn_from_sa and reject, then messages that exceed the SA
+threshholds will cause dspam to reject them. Again I say, make sure them SA
+autolearn threshholds are set high enough to avoid false positives.
+
+=item 3
+
+dspam must be configured and working properly. I have modified the following
+dspam values on my system:
+
+=over 4
+
+=item mysql storage
+
+=item Trust smtpd
+
+=item TrainingMode tum
+
+=item Tokenizer osb
+
+=item Preference "trainingMode=TOE"
+
+=item Preference "spamAction=deliver"
+
+=item Preference "signatureLocation=headers"
+
+=item TrainPristine off
+
+=item ParseToHeaders off
+
+=back
+
+Of those changes, the most important is the signature location. This plugin
+only supports storing the signature in the headers. If you want to train dspam
+after delivery (ie, users moving messages to/from spam folders), then the
+dspam signature must be in the headers.
+
+When using the dspam MySQL backend, use InnoDB tables. Dspam training
+is dramatically slowed by MyISAM table locks and dspam requires lots
+of training. InnoDB has row level locking and updates are much faster.
+
+=back
+
+=head2 reject
+
+Set to a floating point value between 0 and 1.00 where 0 is no confidence
+and 1.0 is 100% confidence.
+
+If dspam's confidence is greater than or equal to this threshold, the
+message will be rejected. The default is 1.00.
+
+=head2 reject_type
+
+ reject_type [ temp | perm ]
+
+By default, rejects are permanent (5xx). Set this to temp if you want to
+defer mail instead of rejecting it with dspam.
+
+=head1 MULTIPLE RECIPIENT BEHAVIOR
+
+For messages with multiple recipients, the user that dspam is running as will
+be the dspam username.
+
+When messages have a single recipient, the recipient address is used as the
+dspam username. For dspam to trust qpsmtpd with modifying the username, you
+B<must> add the username that qpsmtpd is running to to the dspamd.conf file.
+
+ie, (Trust smtpd).
+
+=head1 CHANGES
+
+=head1 AUTHOR
+
+ Matt Simerson - 2012
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+use Qpsmtpd::DSN;
+use IO::Handle;
+use Socket qw(:DEFAULT :crlf);
+
+sub register {
+    my ($self, $qp, %args) = @_;
+
+    $self->log(LOGERROR, "Bad parameters for the dspam plugin") if @_ % 2;
+
+    $self->{_args} = { %args };
+    $self->{_args}{reject} = defined $args{reject} ? $args{reject} : 1;
+    $self->{_args}{reject_type} = $args{reject_type} || 'perm';
+
+    $self->register_hook('data_post', 'dspam_reject');
+}
+
+sub hook_data_post {
+    my ($self, $transaction) = @_;
+
+    $self->log(LOGDEBUG, "check_dspam");
+    if ( $transaction->data_size > 500_000 ) {
+        $self->log(LOGINFO, "skip: message too large (" . $transaction->data_size . ")" );
+        return (DECLINED);
+    };
+
+    my $username = $self->select_username( $transaction );
+    my $message  = $self->assemble_message($transaction);
+    my $filtercmd = $self->get_filter_cmd( $transaction, $username );
+    $self->log(LOGDEBUG, $filtercmd);
+
+    my $response = $self->dspam_process( $filtercmd, $message );
+    if ( ! $response ) {
+        $self->log(LOGWARN, "skip: no response from dspam. Check logs for errors.");
+        return (DECLINED);
+    };
+
+    # X-DSPAM-Result: user@example.com; result="Spam"; class="Spam"; probability=1.0000; confidence=1.00; signature=N/A
+    # X-DSPAM-Result: smtpd; result="Innocent"; class="Innocent"; probability=0.0023; confidence=1.00; signature=4f8dae6a446008399211546
+    my ($result,$prob,$conf,$sig) = $response =~ /result=\"(Spam|Innocent)\";.*?probability=([\d\.]+); confidence=([\d\.]+); signature=(.*)/;
+    my $header_str = "$result, probability=$prob, confidence=$conf";
+    $self->log(LOGDEBUG, $header_str);
+    $transaction->header->replace('X-DSPAM-Result', $header_str, 0);
+
+    # the signature header is required if you intend to train dspam later.
+    # In dspam.conf, set: Preference "signatureLocation=headers"
+    $transaction->header->add('X-DSPAM-Signature', $sig, 0);
+
+    return (DECLINED);
+};
+
+sub select_username {
+    my ($self, $transaction) = @_;
+
+    my $recipient_count = scalar $transaction->recipients;
+    $self->log(LOGDEBUG, "Message has $recipient_count recipients");
+
+    if ( $recipient_count > 1 ) {
+        $self->log(LOGINFO, "skipping user prefs, $recipient_count recipients detected.");
+        return getpwuid($>);
+    };
+
+# use the recipients email address as username. This enables user prefs
+    my $username = ($transaction->recipients)[0]->address;
+    return lc($username);
+};
+
+sub assemble_message {
+    my ($self, $transaction) = @_;
+
+    $transaction->body_resetpos;
+
+    my $message = "X-Envelope-From: "
+        . $transaction->sender->format . "\n"
+        . $transaction->header->as_string . "\n\n";
+
+    while (my $line = $transaction->body_getline) { $message .= $line; };
+
+    $message = join(CRLF, split/\n/, $message);
+    return $message . CRLF;
+};
+
+sub dspam_process {
+    my ( $self, $filtercmd, $message ) = @_;
+
+    #return $self->dspam_process_open2( $filtercmd, $message );
+
+    my ($in_fh, $out_fh);
+    if (! open($in_fh, '-|')) {
+        open($out_fh, "|$filtercmd") or die "Can't run $filtercmd: $!\n";
+        print $out_fh $message;
+        close $out_fh;
+        exit(0);
+    };
+    #my $response = join('', <$in_fh>);
+    my $response = <$in_fh>;
+    close $in_fh;
+    chomp $response;
+    $self->log(LOGDEBUG, $response);
+    return $response;
+};
+
+sub dspam_process_open2 {
+    my ( $self, $filtercmd, $message ) = @_;
+
+# not sure why, but this is not as reliable as I'd like. What's a dspam
+# error -5 mean anyway?
+    use FileHandle;
+    use IPC::Open2;
+    my ($dspam_in, $dspam_out);
+    my $pid = open2($dspam_out, $dspam_in, $filtercmd);
+    print $dspam_in $message;
+    close $dspam_in;
+    #my $response = join('', <$dspam_out>);  # get full response
+    my $response = <$dspam_out>;             # get first line only
+    waitpid $pid, 0;
+    chomp $response;
+    $self->log(LOGDEBUG, $response);
+    return $response;
+};
+
+sub dspam_reject {
+    my ($self, $transaction) = @_;
+
+    my $d = $self->get_dspam_results( $transaction ) or return DECLINED;
+
+    if ( ! $d->{class} ) {
+        $self->log(LOGWARN, "skip: no dspam class detected");
+        return DECLINED;
+    };
+
+    my $status = "$d->{class}, $d->{confidence} c.";
+    my $reject = $self->{_args}{reject} or do {
+        $self->log(LOGINFO, "skip: reject disabled ($status)");
+        return DECLINED;
+    };
+
+    if ( $reject eq 'agree' ) {
+        return $self->dspam_reject_agree( $transaction, $d );
+    };
+    if ( $d->{class} eq 'Innocent' ) {
+        $self->log(LOGINFO, "pass: $status");
+        return DECLINED;
+    };
+    if ( $self->qp->connection->relay_client ) {
+        $self->log(LOGINFO, "skip: allowing spam, user authenticated ($status)");
+        return DECLINED;
+    };
+    if ( $d->{probability} <= $reject ) {
+        $self->log(LOGINFO, "pass, $d->{class} probability is too low ($d->{probability} < $reject)");
+        return DECLINED;
+    };
+    if ( $d->{confidence} != 1 ) {
+        $self->log(LOGINFO, "pass: $d->{class} confidence is too low ($d->{confidence})");
+        return DECLINED;
+    };
+
+    # dspam is more than $reject percent sure this message is spam
+    $self->log(LOGINFO, "fail: $d->{class}, ($d->{confidence} confident)");
+    my $deny = $self->{_args}{reject_type} eq 'temp' ? DENYSOFT : DENY;
+    return Qpsmtpd::DSN->media_unsupported($deny,'dspam says, no spam please');
+}
+
+sub dspam_reject_agree {
+    my ($self, $transaction, $d ) = @_;
+
+    my $sa = $transaction->notes('spamassassin' );
+
+    my $status = "$d->{class}, $d->{confidence} c";
+
+    if ( ! $sa->{is_spam} ) {
+        $self->log(LOGINFO, "pass: cannot agree, SA results missing ($status)");
+        return DECLINED;
+    };
+
+    if ( $d->{class} eq 'Spam' && $sa->{is_spam} eq 'Yes' ) {
+        $self->log(LOGINFO, "fail: agree, $status");
+        return Qpsmtpd::DSN->media_unsupported(DENY,'we agree, no spam please');
+    };
+
+    $self->log(LOGINFO, "pass: agree, $status");
+    return DECLINED;
+};
+
+sub get_dspam_results {
+    my ( $self, $transaction ) = @_;
+
+    if ( $transaction->notes('dspam') ) {
+        return $transaction->notes('dspam');
+    };
+
+    my $string = $transaction->header->get('X-DSPAM-Result') or do {
+        $self->log(LOGWARN, "get_dspam_results: failed to find the header");
+        return;
+    };
+
+    my @bits  = split(/,\s+/, $string); chomp @bits;
+    my $class = shift @bits;
+    my %d;
+    foreach (@bits) {
+        my ($key,$val) = split(/=/, $_);
+        $d{$key} = $val;
+    };
+    $d{class} = $class;
+
+    my $message = $d{class};
+    if ( defined $d{probability} && defined $d{confidence} ) {
+        $message .= ", prob: $d{probability}, conf: $d{confidence}";
+    };
+    $self->log(LOGDEBUG, $message);
+    $transaction->notes('dspam', \%d);
+    return \%d;
+};
+
+sub get_filter_cmd {
+    my ($self, $transaction, $user) = @_;
+
+    my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
+    my $default = "$dspam_bin --user $user --mode=tum --process --deliver=summary --stdout";
+    my $min_score = $self->{_args}{learn_from_sa} or return $default;
+
+    #$self->log(LOGDEBUG, "attempting to learn from SA");
+
+    my $sa = $transaction->notes('spamassassin' );
+    return $default if ! $sa || ! $sa->{is_spam};
+
+    if ( $sa->{is_spam} eq 'Yes' && $sa->{score} < $min_score ) {
+        $self->log(LOGNOTICE, "SA score $sa->{score} < $min_score, skip autolearn");
+        return $default;
+    };
+
+    return $default if ! $sa->{autolearn};
+
+    if ( $sa->{is_spam} eq 'Yes' && $sa->{autolearn} eq 'spam' ) {
+        return "$dspam_bin --user $user --mode=tum --source=corpus --class=spam --deliver=summary --stdout";
+    }
+    elsif ( $sa->{is_spam} eq 'No' && $sa->{autolearn} eq 'ham' ) {
+        return "$dspam_bin --user $user --mode=tum --source=corpus --class=innocent --deliver=summary --stdout";
+    };
+
+    return $default;
+};
+
+

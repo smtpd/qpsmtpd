@@ -1,4 +1,4 @@
-#!/usr/bin/perl -Tw
+#!perl -w
 
 =head1 NAME
 
@@ -109,6 +109,8 @@ Please see the LICENSE file included with qpsmtpd for details.
 use strict;
 use warnings;
  
+use Qpsmtpd::Constants;
+
 sub register {
   my ($self, $qp, @args) = @_;
   my %args;
@@ -226,6 +228,4 @@ sub hook_data_post {
   }
   return (DECLINED);
 } 
-
-1;
 

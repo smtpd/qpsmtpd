@@ -1,11 +1,31 @@
-# 
-# dont_require_anglebrackets - accept addresses in MAIL FROM:/RCPT TO: 
-#        commands without surrounding <>
-#
+#!perl -w
+ 
+=head1 NAME
+
+dont_require_anglebrackets 
+
+=head1 SYNOPSIS
+
+accept addresses in MAIL FROM:/RCPT TO: commands without surrounding <>
+
+=head1 DESCRIPTION
+
+RFC821 requires that email addresses presented during the SMTP conversation
+be enclosed in angle brackets. Like this:
+
+MAIL FROM:<user@example.com>
+
+This plugin relaxes that requirement, accepting messages in this format:
+
+MAIL FROM:user@example.com
+
+=cut
+
 sub hook_mail_pre {
     my ($self,$transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {
-        $addr = "<".$addr.">";
+        $self->log(LOGINFO, "added MAIL angle brackets");
+        $addr = '<'.$addr.'>';
     }
     return (OK, $addr);
 }
@@ -13,7 +33,8 @@ sub hook_mail_pre {
 sub hook_rcpt_pre {
     my ($self,$transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {
-        $addr = "<".$addr.">";
+        $self->log(LOGINFO, "added RCPT angle brackets");
+        $addr = '<'.$addr.'>';
     }
     return (OK, $addr);
 }

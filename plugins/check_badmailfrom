@@ -1,4 +1,4 @@
-# -*- perl -*-
+#!perl -w
 
 =head1 NAME
 
@@ -9,53 +9,118 @@ check_badmailfrom - checks the badmailfrom config, with per-line reasons
 Reads the "badmailfrom" configuration like qmail-smtpd does.  From the
 qmail-smtpd docs:
 
-"Unacceptable envelope sender addresses.  qmail-smtpd will reject every
+"Unacceptable envelope sender addresses. qmail-smtpd will reject every
 recipient address for a message if the envelope sender address is
-listed in badmailfrom.  A line in badmailfrom may be of the form
+listed in badmailfrom. A line in badmailfrom may be of the form
 @host, meaning every address at host."
 
-You may optionally include a message after the sender address (leave a space),
-which is used when rejecting the sender.
+You may include an optional message after the sender address (leave a space),
+to be used when rejecting the sender.
+
+
+=head1 PATTERNS
+
+This plugin also supports regular expression matches. This allows
+special patterns to be denied (e.g. FQDN-VERP, percent hack, bangs,
+double ats).
+
+Patterns are stored in the format pattern(\s+)response, where pattern
+is a Perl pattern expression. Don't forget to anchor the pattern
+(front ^ and back $) if you want to restrict it from matching
+anywhere in the string.
+
+ ^streamsendbouncer@.*\.mailengine1\.com$    Your right-hand side VERP doesn't fool me
+ ^return.*@.*\.pidplate\.biz$                I don' want it regardless of subdomain
+ ^admin.*\.ppoonn400\.com$
+
 
 =head1 NOTES
 
 According to the SMTP protocol, we can't reject until after the RCPT
 stage, so store it until later.
 
+
+=head1 AUTHORS
+
+initial author of badmailfrom - Jim Winstead
+
+pattern matching plugin - Johan Almqvist <johan-qpsmtpd@almqvist.net>
+
+merging of the two and plugin tests - Matt Simerson <matt@tnpi.net>
+
 =cut
 
-# TODO: add the ability to provide a custom default rejection reason
-
 sub hook_mail {
-  my ($self, $transaction, $sender, %param) = @_;
+    my ($self, $transaction, $sender, %param) = @_;
 
-  my @badmailfrom = $self->qp->config("badmailfrom")
-    or return (DECLINED);
+    my @badmailfrom = $self->qp->config('badmailfrom');
+    if ( defined $self->{_badmailfrom_config} ) {       # testing
+        @badmailfrom = @{$self->{_badmailfrom_config}};
+    };
 
-  return (DECLINED) unless ($sender->format ne "<>"
-                            and $sender->host && $sender->user);
+    return DECLINED if $self->is_immune( $sender, \@badmailfrom );
 
-  my $host = lc $sender->host;
-  my $from = lc($sender->user) . '@' . $host;
+    my $host = lc $sender->host;
+    my $from = lc($sender->user) . '@' . $host;
 
-  for my $config (@badmailfrom) {
-    my ($bad, $reason) = $config =~ /^\s*(\S+)(?:\s*(.*))?$/;
-    $reason = "sorry, your envelope sender is in my badmailfrom list" unless $reason;
-    next unless $bad;
-    $bad = lc $bad;
-    $self->log(LOGWARN, "Bad badmailfrom config: No \@ sign in $bad") and next unless $bad =~ m/\@/;
-    $transaction->notes('badmailfrom', $reason)
-      if ($bad eq $from) || (substr($bad,0,1) eq '@' && $bad eq "\@$host");
-  }
-  return (DECLINED);
+    for my $config (@badmailfrom) {
+        $config =~ s/^\s+//g;   # trim leading whitespace
+        my ($bad, $reason) = split /\s+/, $config, 2;
+        next unless $bad;
+        next unless $self->is_match( $from, $bad, $host );
+        $reason ||= "Your envelope sender is in my badmailfrom list";
+        $transaction->notes('badmailfrom', $reason);
+    }
+    return DECLINED;
 }
+
+sub is_match {
+    my ( $self, $from, $bad, $host ) = @_;
+
+    if ( $bad =~ /[\/\^\$\*\+]/ ) {  # it's a regexp
+        $self->log(LOGDEBUG, "badmailfrom pattern ($bad) match for $from");
+        return 1 if $from =~ /$bad/;
+        return;
+    };
+
+    $bad = lc $bad;
+    if ( $bad !~ m/\@/ ) {
+        $self->log(LOGWARN, "badmailfrom: bad config: no \@ sign in $bad");
+        return;
+    };
+    if ( substr($bad,0,1) eq '@' ) {
+        return 1 if $bad eq "\@$host";
+        return;
+    };
+    return if $bad ne $from;
+    return 1;
+};
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt, %param) = @_;
-  my $note = $transaction->notes('badmailfrom');
-  if ($note) {
+    my ($self, $transaction, $rcpt, %param) = @_;
+    my $note = $transaction->notes('badmailfrom') or return (DECLINED);
+
     $self->log(LOGINFO, $note);
     return (DENY, $note);
-  }
-  return (DECLINED);
 }
+
+sub is_immune {
+    my ($self, $sender, $badmf ) = @_;
+
+    if ( ! scalar @$badmf ) {
+        $self->log(LOGDEBUG, 'skip: empty list');
+        return 1;
+    };
+
+    if ( ! $sender || $sender->format eq '<>' ) {
+        $self->log(LOGDEBUG, 'skip: null sender');
+        return 1;
+    };
+
+    if ( ! $sender->host || ! $sender->user ) {
+        $self->log(LOGDEBUG, 'skip: missing user or host');
+        return 1;
+    };
+
+    return;
+};

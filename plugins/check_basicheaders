@@ -1,27 +1,64 @@
-#!/usr/bin/perl
+#!perl -w
 
 =head1 NAME
 
-check_basicheaders - Make sure both From and Date headers are present, and
-do optional range checking on the Date header.
+check_basicheaders
 
 =head1 DESCRIPTION
 
-Rejects messages that do not have a From or Date header or are completely
-empty.
+Checks for missing or empty values in the From or Date headers.
 
-Can also reject messages where the date in the Date header is more than
-some number of the days in the past or future.
+Optionally test if the Date header is too many days in the past or future. If
+I<future> or I<past> are not defined, they are not tested.
+
+If the remote IP is whitelisted, header validation is skipped.
 
 =head1 CONFIGURATION
 
-Takes one optional parameter, the number of days in the future or past
-beyond which to reject messages. (The default is to not reject messages
-based on the date.)
+The following optional settings exist:
+
+=head2 future
+
+The number of days in the future beyond which messages are invalid.
+
+  check_basicheaders [ future 1 ]
+
+=head2 past
+
+The number of days in the past beyond which a message is invalid. The Date header is added by the MUA, so there are many valid reasons a message may have an older date in the header. It could have been delayed by the client, the sending server, connectivity problems, recipient server problem, recipient server configuration, etc. The I<past> setting should take those factors into consideration.
+
+I would be surprised if a valid message ever had a date header older than a week.
+
+  check_basicheaders [ past 5 ]
+
+=head2 reject
+
+Determine if the connection is denied. Use the I<reject 0> option when first enabling the plugin, and then watch your logs to see what would have been rejected. When you are no longer concerned that valid messages will be rejected, enable with I<reject 1>.
+
+  check_basicheaders [ reject 0 | 1 ]
+
+Default policy is to reject.
+
+=head2 reject_type
+
+Whether to issue a permanent or temporary rejection. The default is permanent.
+
+  check_basicheaders reject_type [ temp | perm ]
+
+Using a temporary rejection is a cautious way to enable rejections. It allows an administrator to watch for a trial period and assure no valid messages are rejected. If a deferral of valid mail is noticed, I<reject 0> can be set to permit the deferred message to be delivered.
+
+Default policy is a permanent rejection.
+
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
 
 =head1 AUTHOR
 
-Written by Jim Winstead Jr.
+ 2004 - Written by Jim Winstead Jr.
+
+ 2012 - added logging, named arguments, reject_type, tests - Matt Simerson
+      - deprecate days for I<past> & I<future>. Improved POD
 
 =head1 LICENSE
 
@@ -29,43 +66,114 @@ Released to the public domain, 26 March 2004.
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 use Date::Parse qw(str2time);
 
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  if (@args > 0) {
-    $self->{_days} = $args[0];
-    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
-  }
+    if ( @args == 1 ) {
+        $self->{_args}{days} = $args[0];
+    }
+    elsif ( @args % 2 ) {
+        $self->log(LOGWARN, "invalid arguments");
+    }
+    else {
+        $self->{_args} = { @args };
+    };
+# provide backwards comptibility with the previous unnamed 'days' argument
+    if ( $self->{_args}{days} ) {
+        if ( ! defined $self->{_args}{future} ) {
+            $self->{_args}{future} = $self->{_args}{days};
+        };
+        if ( ! defined $self->{_args}{past} ) {
+            $self->{_args}{past} = $self->{_args}{days};
+        };
+    };
 }
 
 sub hook_data_post {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  return (DENY, "You have to send some data first")
-    if $transaction->data_size == 0;
+    my $deny = $self->{_args}{reject_type} eq 'temp' ? DENYSOFT : DENY;
+    $deny = DECLINED if defined $self->{_args}{reject} && ! $self->{_args}{reject};
 
-  my $header = $transaction->header;
-  return (DENY, "Mail with no From header not accepted here")
-    unless $header && $header->get('From');
+    if ( $transaction->data_size == 0 ) {
+        $self->log(LOGINFO, "fail: no data");
+        return ($deny, "You must send some data first");
+    };
 
-  my $date = $header->get('Date');
+    my $header = $transaction->header or do {
+        $self->log(LOGINFO, "fail: no headers");
+        return ($deny, "missing header");
+    };
 
-  return (DENY, "Mail with no Date header not accepted here")
-    unless $date;
+    return DECLINED if $self->is_immune();
 
-  return (DECLINED) unless defined $self->{_days};
+    if ( ! $header->get('From') ) {
+        $self->log(LOGINFO, "fail: no from");
+        return ($deny, "We require a valid From header")
+    };
 
-  my $ts = str2time($date);
+    my $date = $header->get('Date') or do {
+        $self->log(LOGINFO, "fail: no date");
+        return ($deny, "We require a valid Date header");
+    };
+    chomp $date;
 
-  return (DECLINED) unless $ts;
+    my $err_msg = $self->invalid_date_range($date);
+    if ( $err_msg ) {
+        return ($deny, $err_msg );
+    };
 
-  return (DENY, "The Date in the header was too far in the past")
-    if $ts < time - ($self->{_days}*24*3600);
+    return (DECLINED);
+};
 
-  return (DENY, "The Date in the header was too far in the future")
-    if $ts > time + ($self->{_days}*24*3600);
+sub invalid_date_range {
+    my ($self, $date) = @_;
 
-  return (DECLINED);
+    my $ts = str2time($date) or do {
+        $self->log(LOGINFO, "skip: date not parseable ($date)");
+        return;
+    };
+
+    my $past = $self->{_args}{past};
+    if ( $past && $ts < time - ($past*24*3600) ) {
+        $self->log(LOGINFO, "fail: date too old ($date)");
+        return "The Date header is too far in the past";
+    };
+
+    my $future = $self->{_args}{future};
+    if ( $future && $ts > time + ($future*24*3600) ) {
+        $self->log(LOGINFO, "fail: date in future ($date)");
+        return "The Date header is too far in the future";
+    };
+
+    $self->log(LOGINFO, "pass");
+    return;
 }
+
+sub is_immune {
+    my $self = shift;
+
+    if ( $self->qp->connection->relay_client() ) {
+        $self->log(LOGINFO, "skip: relay client");
+        return 1;
+    };
+
+    if ( $self->connection->notes('whitelisthost') ) {
+        $self->log(LOGINFO, "skip: whitelisted host");
+        return 1;
+    };
+
+    if ( $self->qp->transaction->notes('whitelistsender') ) {
+        $self->log(LOGINFO, "skip: whitelisted sender");
+        return 1;
+    };
+
+    return;
+};

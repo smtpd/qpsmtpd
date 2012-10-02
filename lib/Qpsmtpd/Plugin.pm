@@ -1,12 +1,15 @@
 package Qpsmtpd::Plugin;
-use Qpsmtpd::Constants;
+
 use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 
 # more or less in the order they will fire
 our @hooks = qw(
     logging config post-fork pre-connection connect ehlo_parse ehlo
     helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
-    rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre 
+    rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre
     data data_headers_end data_post queue_pre queue queue_post vrfy noop
     quit reset_transaction disconnect post-connection
     unrecognized_command deny ok received_line help
@@ -19,7 +22,7 @@ sub new {
   bless ({}, $class);
 }
 
-sub hook_name { 
+sub hook_name {
   return shift->{_hook};
 }
 
@@ -60,9 +63,34 @@ sub qp {
 
 sub log {
   my $self = shift;
-  $self->{_qp}->varlog(shift, $self->{_hook}, $self->plugin_name, @_)
-    unless defined $self->{_hook} and $self->{_hook} eq 'logging';
+  return if defined $self->{_hook} && $self->{_hook} eq 'logging';
+  my $level = $self->adjust_log_level( shift, $self->plugin_name );
+  $self->{_qp}->varlog($level, $self->{_hook}, $self->plugin_name, @_);
 }
+
+sub adjust_log_level {
+    my ( $self, $cur_level, $plugin_name) = @_;
+
+    my $adj = $self->{_args}{loglevel} or return $cur_level;
+
+    return $adj if $adj =~ m/^[01234567]$/;  # a raw syslog numeral
+
+    if ( $adj !~ /^[\+\-][\d]$/ ) {
+        $self->log( LOGERROR, $self-"invalid $plugin_name loglevel setting ($adj)" );
+        undef $self->{_args}{loglevel};  # only complain once per plugin
+        return $cur_level;
+    };
+
+    my $operator = substr($adj, 0, 1);
+    my $adjust  = substr($adj, -1, 1);
+
+    my $new_level = $operator eq '+' ? $cur_level + $adjust : $cur_level - $adjust;
+
+    $new_level = 7 if $new_level > 7;
+    $new_level = 0 if $new_level < 0;
+
+    return $new_level;
+};
 
 sub transaction {
   # not sure if this will work in a non-forking or a threaded daemon
@@ -138,10 +166,10 @@ sub isa_plugin {
 # why isn't compile private?  it's only called from Plugin and Qpsmtpd.
 sub compile {
     my ($class, $plugin, $package, $file, $test_mode, $orig_name) = @_;
-    
+
     my $sub;
     open F, $file or die "could not open $file: $!";
-    { 
+    {
       local $/ = undef;
       $sub = <F>;
     }

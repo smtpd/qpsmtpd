@@ -217,7 +217,7 @@ hook.
 Log messages can be written to the log file (or STDERR if you use the 
 F<logging/warn> plugin) with 
 
-  $self->qp->log($loglevel, $logmessage);
+  $self->log($loglevel, $logmessage);
 
 The log level is one of (from low to high priority)
 
@@ -257,49 +257,8 @@ LOGEMERG
 
 =back
 
-While debugging your plugins, you want to set the log level in the F<logging>
-config file to I<LOGDEBUG>. This will log very much data. To restrict this 
-output just to the plugin you are debugging, you can use the following plugin: 
-
-=cut
-
-FIXME: Test if this really works as inteded ;-)
-
-=pod
-
- # logging/debug_plugin - just show LOGDEBUG messages of one plugin
- # Usage: 
- #  logging/debug_plugin my_plugin LOGLEVEL
- #
- #  LOGLEVEL is the log level for all other log messages
- use Qpsmtpd::Constants;
-
- sub register {
-   my ($self, $qp, $plugin, $loglevel) = @_;
-   die "no plugin name given"
-     unless $plugin;
-   $loglevel = "LOGWARN"
-     unless defined $loglevel;
-   $self->{_plugin} = $plugin;
-   $self->{_level}  = Qpsmtpd::Constants::log_level($loglevel);
-   $self->{_level}  = LOGWARN 
-     unless defined $self->{_level};
- }
-
- sub hook_logging {
-   my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
-   return(OK) # drop these lines
-     if $plugin ne $self->{_plugin} and $trace > $self->{_level};
-   return(DECLINED);
- }
-
-The above plugin should be loaded before the default logging plugin, which 
-logs with I<LOGDEBUG>. The plugin name must be the one returned by the 
-C<plugin_name()> method of the debugged plugin. This is probably not 
-the same as the name of the plugin (i.e. not the same you write in the 
-F<plugins> config file). In doubt: take a look in the log file for lines 
-like C<queue::qmail_2dqueue hooking queue> (here: F<queue/qmail-queue> 
-=E<gt> F<queue::qmail_2dqueue>).
+While debugging your plugins, set your plugins loglevel to LOGDEBUG. This
+will log every logging statement within your plugin.
 
 For more information about logging, see F<docs/logging.pod>.
 

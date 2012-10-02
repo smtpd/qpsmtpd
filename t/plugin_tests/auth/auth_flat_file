@@ -1,4 +1,4 @@
-# -*-perl-*- [emacs]
+#!perl -w
 
 sub register_tests {
     my $self = shift;
@@ -19,7 +19,7 @@ sub test_auth_flat_file {
     for $u ( @u_list ) {
 	( $a,$r,$p ) = @{$u_data{$u}};
 	($ret, $note) = $self->auth_flat_file($tran,'CRAMMD5',$a,$p);
-	defined $note or $note='No-Message';
+	defined $note or $note='authflat: No-Message';
 	is ($ret, $r, $note);
 	# - for debugging.
 	# warn "$note\n";

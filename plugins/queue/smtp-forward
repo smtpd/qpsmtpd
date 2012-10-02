@@ -1,3 +1,4 @@
+#!perl -w
 =head1 NAME
 
 smtp-forward

@@ -1,38 +1,99 @@
-# this plugin checks the standard rcpthosts config
-#
-# It should be configured to be run _LAST_!
-#
+#!perl -w
+
+=head1 NAME
+
+rcpt_ok
+
+=head1 SYNOPSIS
+
+this plugin checks the standard rcpthosts config
+
+=head1 DESCRIPTION
+
+Check the recipient hostname and determine if we accept mail to that host.
+
+This is functionally identical to qmail's rcpthosts implementation, consulting
+both rcpthosts and morercpthosts.cdb.
+
+=head1 CONFIGURATION
+
+It should be configured to be run _LAST_!
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 
 sub hook_rcpt {
   my ($self, $transaction, $recipient, %param) = @_;
-  my $host = lc $recipient->host;
 
-  my @rcpt_hosts = ($self->qp->config("me"), $self->qp->config("rcpthosts"));
-  
   # Allow 'no @' addresses for 'postmaster' and 'abuse'
   # qmail-smtpd will do this for all users without a domain, but we'll
   # be a bit more picky.  Maybe that's a bad idea.
-  my $user = $recipient->user;
-  $host = $self->qp->config("me")
-    if ($host eq "" && (lc $user eq "postmaster" || lc $user eq "abuse"));
-  
-  # Check if this recipient host is allowed
-  for my $allowed (@rcpt_hosts) {
-    $allowed =~ s/^\s*(\S+)/$1/;
-    return (OK) if $host eq lc $allowed;
-    return (OK) if substr($allowed,0,1) eq "." and $host =~ m/\Q$allowed\E$/i;
-  }
+    my $host = $self->get_rcpt_host( $recipient ) or return (OK);
 
-  my $more_rcpt_hosts = $self->qp->config('morercpthosts', 'map');
-  return (OK) if exists $more_rcpt_hosts->{$host};
+    return (OK) if $self->is_in_rcpthosts( $host );
+    return (OK) if $self->is_in_morercpthosts( $host );
+    return (OK) if $self->qp->connection->relay_client;  # failsafe
 
-  if ( $self->qp->connection->relay_client ) { # failsafe
-    return (OK);
-  }
-  else {
-    # default of relaying_denied is obviously DENY, 
+    # default of relaying_denied is obviously DENY,
     # we use the default "Relaying denied" message...
     return Qpsmtpd::DSN->relaying_denied();
-  }
 }
+
+sub is_in_rcpthosts {
+    my ( $self, $host ) = @_;
+
+    my @rcpt_hosts = ($self->qp->config('me'), $self->qp->config('rcpthosts'));
+
+    # Check if this recipient host is allowed
+    for my $allowed (@rcpt_hosts) {
+        $allowed =~ s/^\s*(\S+)/$1/;
+        if ( $host eq lc $allowed ) {
+            $self->log( LOGINFO, "pass: $host in rcpthosts" );
+            return 1;
+        };
+
+        if ( substr($allowed,0,1) eq '.' and $host =~ m/\Q$allowed\E$/i ) {
+            $self->log( LOGINFO, "pass: $host in rcpthosts as $allowed" );
+            return 1;
+        };
+    }
+
+    return;
+};
+
+sub is_in_morercpthosts {
+    my ( $self, $host ) = @_;
+
+    my $more_rcpt_hosts = $self->qp->config('morercpthosts', 'map');
+
+    if ( exists $more_rcpt_hosts->{$host} ) {
+        $self->log( LOGINFO, "pass: $host found in morercpthosts" );
+        return 1;
+    };
+
+    $self->log( LOGINFO, "fail: $host not in morercpthosts" );
+    return;
+};
+
+sub get_rcpt_host {
+    my ( $self, $recipient ) = @_;
+
+    return if ! $recipient;  # Qpsmtpd::Address couldn't parse the recipient
+
+    if ( $recipient->host ) {
+        return lc $recipient->host;
+    };
+
+    # no host portion exists
+    my $user = $recipient->user or return;
+    if ( lc $user eq 'postmaster' || lc $user eq 'abuse' ) {
+        return $self->qp->config('me');
+    };
+    return;
+};
+

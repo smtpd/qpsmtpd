@@ -1,23 +1,29 @@
+#!perl -w
 
-=head1 NAME 
+=head1 NAME
 
-hosts_allow - decide if a host is allowed to send mail 
+hosts_allow - decide if a host is allowed to connect
 
 =head1 DESCRIPTION
 
 The B<hosts_allow> module decides before the SMTP-Greeting if a host is
 allowed to connect. It checks for too many (running) connections from one
-host (see -m/--max-from-ip options in qpsmtpd-forkserver) and the config 
+host (see -m/--max-from-ip options in qpsmtpd-forkserver) and the config
 file I<hosts_allow>.
-The plugin takes no arguments.
+
+The plugin takes no config/plugin arguments.
+
+This plugin only works with the forkserver and prefork deployment models. It
+does not work with the tcpserver deployment model. See SEE ALSO below.
 
 =head1 CONFIG
 
-The config file contains lines with two or three items. The first is either
-an IP address or a network/mask pair. The second is a (valid) return code
-from Qpsmtpd::Constants. The last is a comment which will be returned to the
-connecting client if the return code is DENY or DENYSOFT (and of course 
-DENY_DISCONNECT and DENYSOFT_DISCONNECT). 
+The I<hosts_allow> config file contains lines with two or three items. The
+first is an IP address or a network/mask pair. The second is a (valid) return
+code from Qpsmtpd::Constants. The last is a comment which will be returned to
+the connecting client if the return code is DENY or DENYSOFT (and of course
+DENY_DISCONNECT and DENYSOFT_DISCONNECT).
+
 Example:
 
   192.168.3.4    DECLINED
@@ -25,7 +31,27 @@ Example:
 
 This would exclude 192.168.3.4 from the DENY of 192.168.3.0/24.
 
+=head1 SEE ALSO
+
+To get similar functionality for the tcpserver deployment model, use
+tcpserver's -x feature. Create a tcp.smtp file with entries like this:
+
+  70.65.227.235:deny
+  183.7.90.207:deny
+  :allow
+
+compile the tcp.smtp file like this:
+
+  /usr/local/bin/tcprules tcp.smtp.cdb tcp.smtp.tmp < tcp.smtp
+
+and add the file to the chain of arguments to tcpserver in your run file.
+
+See also: http://cr.yp.to/ucspi-tcp.html
+
 =cut
+
+use strict;
+use warnings;
 
 use Qpsmtpd::Constants;
 use Socket;
@@ -38,43 +64,42 @@ sub hook_pre_connection {
     # local_ip     => inet_ntoa($laddr),
     # local_port   => $lport,
     # max_conn_ip  => $MAXCONNIP,
-    # child_addrs  => [values %childstatus],    
+    # child_addrs  => [values %childstatus],
 
     my $remote = $args{remote_ip};
+    my $max    = $args{max_conn_ip};
 
-    if ($args{max_conn_ip}) {
+    if ( $max ) {
         my $num_conn = 1; # seed with current value
         my $raddr    = inet_aton($remote);
         foreach my $rip (@{$args{child_addrs}}) {
             ++$num_conn if (defined $rip && $rip eq $raddr);
         }
-        if ($num_conn > $args{max_conn_ip}) {
-            $self->log(LOGINFO,
-                       "Too many connections from $remote: "
-                      . "$num_conn > " . $args{max_conn_ip} 
-                      . "Denying connection.");
-            return (DENYSOFT, "Sorry, too many connections from $remote, "
-                             ."try again later");
+        if ($num_conn > $max ) {
+            my $err_mess = "too many connections from $remote";
+            $self->log(LOGINFO, "fail: $err_mess ($num_conn > $max)");
+            return (DENYSOFT, "Sorry, $err_mess, try again later");
         }
     }
- 
+
     foreach ($self->qp->config("hosts_allow")) {
         s/^\s*//;
         my ($ipmask, $const, $message) = split /\s+/, $_, 3;
         next unless defined $const;
 
         my ($net,$mask) = split '/', $ipmask, 2;
-        if (!defined $mask) {
-            $mask = 32;
-        }
+        $mask = 32 if !defined $mask;
         $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
         if (join(".", unpack("C4", inet_aton($remote) & $mask)) eq $net) {
             $const = Qpsmtpd::Constants::return_code($const) || DECLINED;
+            if ( $const =~ /deny/i ) {
+                $self->log( LOGINFO, "fail: $message" );
+            };
+            $self->log( LOGDEBUG, "pass: $const, $message" );
             return($const, $message);
         }
     }
 
+    $self->log( LOGDEBUG, "pass" );
     return (DECLINED);
 }
-
-# vim: sw=4 ts=4 expandtab syn=perl

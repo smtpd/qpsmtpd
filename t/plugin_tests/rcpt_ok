@@ -1,22 +1,104 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("test_returnval", 2);
-    $self->register_test("rcpt_ok", 1);
+
+    $self->register_test('test_get_rcpt_host', 7);
+    $self->register_test('test_is_in_rcpthosts', 3);
+    $self->register_test('test_is_in_morercpthosts', 2);
+    $self->register_test('test_hook_rcpt', 3);
 }
 
-sub test_returnval {
+
+sub test_hook_rcpt {
     my $self = shift;
-    my $address = Qpsmtpd::Address->parse('<me@example.com>');
-    my ($ret, $note) = $self->hook_rcpt($self->qp->transaction, $address);
-    is($ret, DENY, "Check we got a DENY");
-    print("# rcpt_ok result: $note\n");
-    $address = Qpsmtpd::Address->parse('<me@localhost>');
-    ($ret, $note) = $self->hook_rcpt($self->qp->transaction, $address);
-    is($ret, OK, "Check we got a OK");
-#    print("# rcpt_ok result: $note\n");
-}
 
-sub rcpt_ok {
-    ok(1);
-}
+    my $transaction = $self->qp->transaction;
+
+    my $address = Qpsmtpd::Address->parse('<user@localhost>');
+    my ($r, $mess) = $self->hook_rcpt( $transaction, $address );
+    cmp_ok( $r, '==', OK, "hook_rcpt, localhost");
+
+    $address = Qpsmtpd::Address->parse('<user@example.com>');
+    ($r, $mess) = $self->hook_rcpt( $transaction, $address );
+    cmp_ok( $r, '==', DENY, "hook_rcpt, example.com");
+
+    $self->qp->connection->relay_client(1);
+    ($r, $mess) = $self->hook_rcpt( $transaction, $address );
+    cmp_ok( $r, '==', OK, "hook_rcpt, example.com");
+    $self->qp->connection->relay_client(0);
+};
+
+sub test_is_in_rcpthosts {
+    my $self = shift;
+
+    my @hosts = $self->qp->config('rcpthosts');
+    my $host = $hosts[0];
+
+    if ( $host ) {
+        ok( $self->is_in_rcpthosts( $host ), "is_in_rcpthosts, $host");
+    }
+    else {
+        ok(1, "is_in_rcpthosts (skip, no entries)" );
+    };
+
+    ok( $self->is_in_rcpthosts( 'localhost' ), "is_in_rcpthosts +");
+    ok( ! $self->is_in_rcpthosts( 'example.com' ), "is_in_rcpthosts -");
+};
+
+sub test_is_in_morercpthosts {
+    my $self = shift;
+
+    my $ref = $self->qp->config('morercpthosts', 'map');
+    my ($domain) = keys %$ref;
+    if ( $domain ) {
+        ok( $self->is_in_morercpthosts( $domain ), "is_in_morercpthosts, $domain");
+    }
+    else {
+        ok(1, "is_in_morercpthosts (skip, no entries)" );
+    };
+
+    ok( ! $self->is_in_morercpthosts( 'example.com' ), "is_in_morercpthosts -");
+};
+
+sub test_get_rcpt_host {
+    my $self = shift;
+
+    my $address = Qpsmtpd::Address->parse('<me@example.com>');
+    cmp_ok( $self->get_rcpt_host( $address ), 'eq', 'example.com', 
+        "get_rcpt_host, +" );
+    
+    $address = Qpsmtpd::Address->parse('<me@exaMple.com>');
+    cmp_ok( $self->get_rcpt_host( $address ), 'eq', 'example.com', 
+        "get_rcpt_host, +" );
+
+    $address = Qpsmtpd::Address->parse('<root@example.com>');
+    cmp_ok( $self->get_rcpt_host( $address ), 'eq', 'example.com', 
+        "get_rcpt_host, +" );
+
+    $address = Qpsmtpd::Address->parse('<postmaster>');
+    my $local_hostname = $self->get_rcpt_host( $address );
+    if ( $local_hostname eq 'some.host.example.org' ) {
+        cmp_ok( $self->get_rcpt_host( $address ), 'eq', 'some.host.example.org',
+            "get_rcpt_host, special postmaster +" );
+    }
+    else {
+        ok( 1, "get_rcpt_host, special postmaster + ($local_hostname)" );
+    }
+
+    # I think this is a bug. Qpsmtpd::Address fails to parse <abuse>
+    $address = Qpsmtpd::Address->parse('<abuse>');
+    ok( ! $self->get_rcpt_host( $address ), "get_rcpt_host, missing host" );
+
+    $address = Qpsmtpd::Address->parse('<>');
+    ok( ! $self->get_rcpt_host( $address ), "get_rcpt_host, null recipient" );
+
+    $address = Qpsmtpd::Address->parse('<@example.com>');
+    ok( ! $self->get_rcpt_host( $address ), "get_rcpt_host, missing user" );
+};
+

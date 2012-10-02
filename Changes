@@ -1,6 +1,14 @@
 
 Next Version
 
+  check_basicheaders. New arguments available: past, future, reject, reject_type
+
+  sender_permitted_from. see UPGRADING (Matt Simerson)
+
+  dspam plugin added (Matt Simerson)
+
+  p0f version 3 supported and new default. see UPGRADING (Matt Simerson)
+
   require_resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
 
   new plugin auth_vpopmaild (Robin Bowes)

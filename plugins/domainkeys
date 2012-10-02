@@ -1,94 +1,4 @@
-sub init {
-    my ($self, $qp, %args) = @_;
-
-    foreach my $key ( %args ) {
-	$self->{$key} = $args{$key};
-    }
-}
-
-sub hook_data_post {
-    use Mail::DomainKeys::Message;
-    use Mail::DomainKeys::Policy;
-
-    my ($self, $transaction) = @_;
-
-    # if this isn't signed, just move along
-    return DECLINED
-    	unless $transaction->header->get('DomainKey-Signature');
-	
-    my @body;
-
-    $transaction->body_resetpos;
-
-    $transaction->body_getline; # \r\n seperator is NOT part of the body
-
-    while (my $line = $transaction->body_getline) {
-        push @body, $line;
-    }
-
-    my $message = load Mail::DomainKeys::Message(
-        HeadString => $transaction->header->as_string,
-        BodyReference => \@body) or
-            $self->log(LOGWARN, "unable to load message"),
-            return DECLINED;
-
-    # no sender domain means no verification 
-    $message->senderdomain or
-        return DECLINED;
-
-    my $status;
-
-    # key testing
-    if ( $message->testing ) {
-	# Don't do anything else
-	$status = "testing";
-    }
-    elsif ( $message->signed and $message->verify ) {
-	# verified: add good header
-	$status = $message->signature->status;
-    }
-    else { # not signed or not verified
-	my $policy = fetch Mail::DomainKeys::Policy(
-	    Protocol => "dns",
-	    Domain => $message->senderdomain
-	);
-	if ( $policy ) {
-	    if ( $policy->testing ) {
-		# Don't do anything else
-		$status = "testing";
-	    }
-	    elsif ( $policy->signall ) {
-		# if policy requires all mail to be signed
-		$status = undef;
-	    }
-	    else { # $policy->signsome
-		# not signed and domain doesn't sign all
-		$status = "no signature";
-	    }
-	}
-	else {
-	    $status = $message->signed ? "non-participant" : "no signature";
-	}
-    }
-
-    
-    if ( defined $status ) {
-	$transaction->header->replace("DomainKey-Status", $status);
-	$self->log(LOGWARN, "DomainKeys-Status: $status");
-	return DECLINED;
-    }
-    else {	
-	$self->log(LOGERROR, "DomainKeys signature failed to verify");
-	if ( $self->{warn_only} ) {
-	    return DECLINED;
-	}
-	else {
-	    return (DENY, "DomainKeys signature failed to verify");
-	}
-    }
-}
-
-=cut
+#!perl -w
 
 =head1 NAME
 
@@ -96,16 +6,28 @@ domainkeys: validate a DomainKeys signature on an incoming mail
 
 =head1 SYNOPSIS
 
-  domainkeys [warn_only 1]
+  domainkeys [reject 1]
 
-Performs a DomainKeys validation on the message.  Takes a single
-configuration
+Performs a DomainKeys validation on the message.
 
-  warn_only 1
+=head1 CONFIGURATION
 
-which means that messages which are not correctly signed (i.e. signed but
-modified or deliberately forged) will not be DENY'd, but an error will still
-be issued to the logfile.
+=head2 reject
+
+  reject 1
+
+Reject is a boolean that toggles message rejection on or off. Messages failing
+DomainKeys validation are rejected by default.
+
+=head2 reject_type
+
+  reject_type [ temp | perm ]
+
+The default rejection type is permanent.
+
+=head2 warn_only
+
+A deprecated option that disables message rejection. See reject instead.
 
 =head1 COPYRIGHT
 
@@ -114,3 +36,129 @@ Copyright (C) 2005-2006 John Peacock.
 Portions Copyright (C) 2004 Anthony D. Urso.  All rights reserved.  This
 program is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.
+
+=head1 AUTHORS
+
+ Matt Simerson    - 2012
+ John Peacock     - 2005-2006
+ Anthony D. Urso. - 2004
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub init {
+    my ($self, $qp, %args) = @_;
+
+    foreach my $key ( %args ) {
+        $self->{$key} = $args{$key};
+    }
+    $self->{reject} = 1 if ! defined $self->{reject};  # default reject
+    $self->{reject_type} = 'perm' if ! defined $self->{reject_type};
+
+    if ( $args{'warn_only'} ) {
+        $self->log(LOGNOTICE, "warn_only is deprecated. Use reject instead");
+        $self->{'reject'} = 0;
+    };
+}
+
+sub register {
+    my $self = shift;
+
+    for my $m ( qw/ Mail::DomainKeys::Message Mail::DomainKeys::Policy / ) {
+        eval "use $m";
+        if ( $@ ) {
+            warn "skip: plugin disabled, could not load $m\n";
+            $self->log(LOGERROR, "skip: plugin disabled, is $m installed?");
+            return;
+        };
+    };
+
+    $self->register_hook('data_post', 'data_post_handler');
+};
+
+sub data_post_handler {
+    my ($self, $transaction) = @_;
+
+    if ( ! $transaction->header->get('DomainKey-Signature') ) {
+        $self->log(LOGINFO, "skip: unsigned");
+        return DECLINED;
+    };
+	
+    my $body = $self->assemble_body( $transaction );
+
+    my $message = load Mail::DomainKeys::Message(
+        HeadString => $transaction->header->as_string,
+        BodyReference => $body) or do {
+            $self->log(LOGWARN, "skip: unable to load message"),
+            return DECLINED;
+        };
+
+    # no sender domain means no verification
+    if ( ! $message->senderdomain ) {
+        $self->log(LOGINFO, "skip: failed to parse sender domain"),
+        return DECLINED;
+    };
+
+    my $status = $self->get_message_status( $message );
+
+    if ( defined $status ) {
+        $transaction->header->replace("DomainKey-Status", $status);
+        $self->log(LOGINFO, "pass: $status");
+        return DECLINED;
+    };
+
+    $self->log(LOGERROR, "fail: signature failed to verify");
+    return DECLINED if ! $self->{reject};
+    my $deny = $self->{reject_type} eq 'temp' ? DENYSOFT : DENY;
+    return ($deny, "DomainKeys signature failed to verify");
+}
+
+sub get_message_status {
+    my ($self, $message) = @_;
+
+    if ( $message->testing ) {
+        return "testing";   # key testing, don't do anything else
+    };
+
+    if ( $message->signed && $message->verify ) {
+        return $message->signature->status; # verified: add good header
+    };
+
+    # not signed or not verified
+    my $policy = fetch Mail::DomainKeys::Policy(
+        Protocol => 'dns',
+        Domain => $message->senderdomain
+    );
+
+    if ( ! $policy ) {
+        return $message->signed ? "non-participant" : "no signature";
+    };
+
+    if ( $policy->testing ) {
+        return "testing";  # Don't do anything else
+    };
+
+    if ( $policy->signall ) {
+        return undef;      # policy requires all mail to be signed
+    };
+
+    # $policy->signsome
+    return "no signature"; # not signed and domain doesn't sign all
+};
+
+sub assemble_body {
+    my ($self, $transaction) = @_;
+
+    $transaction->body_resetpos;
+    $transaction->body_getline; # \r\n seperator is NOT part of the body
+
+    my @body;
+    while (my $line = $transaction->body_getline) {
+        push @body, $line;
+    }
+    return \@body;
+};

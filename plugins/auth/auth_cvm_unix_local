@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 
 =head1 NAME
 
@@ -40,37 +40,39 @@ Version $Id: auth_cvm_unix_local,v 1.1 2005/06/09 22:50:06 gordonr Exp gordonr $
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 use Socket;
 use constant SMTP_PORT => getservbyname("smtp", "tcp") || 25;
 use constant SSMTP_PORT => getservbyname("ssmtp", "tcp") || 465;
 
-sub register 
-{
+sub register {
     my ( $self, $qp, %arg ) = @_;
 
-    unless ($arg{cvm_socket})
-    {
-        $self->log(LOGERROR, "authcvm - requires cvm_socket argument");
+    unless ($arg{cvm_socket}) {
+        $self->log(LOGERROR, "skip: requires cvm_socket argument");
         return 0;
-    }
+    };
 
+    $self->{_args} = { %arg };
     $self->{_enable_smtp} = $arg{enable_smtp} || 'no';
     $self->{_enable_ssmtp} = $arg{enable_ssmtp} || 'yes';
 
     my $port = $ENV{PORT} || SMTP_PORT;
 
-    return 0 if ($port == SMTP_PORT and $self->{_enable_smtp} ne 'yes');
-    return 0 if ($port == SSMTP_PORT and $self->{_enable_ssmtp} ne 'yes');
+    return 0 if ($port == SMTP_PORT && $arg{enable_smtp} ne 'yes');
+    return 0 if ($port == SSMTP_PORT && $arg{enable_ssmtp} ne 'yes');
 
-    if ($arg{cvm_socket} =~ /^([\w\/.-]+)$/)
-    {
+    if ($arg{cvm_socket} =~ /^([\w\/.-]+)$/) {
         $self->{_cvm_socket} = $1;
     }
 
-    unless (-S $self->{_cvm_socket})
-    {
-	$self->log(LOGERROR, "authcvm - cvm_socket missing or not usable");
-	return 0;
+    unless (-S $self->{_cvm_socket}) {
+        $self->log(LOGERROR, "skip: cvm_socket missing or not usable");
+        return 0;
     }
 
     $self->register_hook("auth-plain", "authcvm_plain");
@@ -78,18 +80,23 @@ sub register
 #    $self->register_hook("auth-cram-md5", "authcvm_hash");
 }
 
-sub authcvm_plain
-{
+sub authcvm_plain {
     my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
       @_;
 
-    $self->log(LOGINFO, "authcvm/$method authentication attempt for: $user");
+    socket(SOCK, PF_UNIX, SOCK_STREAM, 0) or do {
+        $self->log(LOGERROR, "skip: socket creation attempt for: $user");
+        return (DENY, "authcvm");
+    };
 
-    socket(SOCK, PF_UNIX, SOCK_STREAM, 0) 
-        or return (DENY, "authcvm/$method");
+# DENY, really? Should this plugin return a DENY when it cannot connect
+# to the cvs socket? I'd expect such a failure to return DECLINED, so
+# any other auth plugins could take a stab at authenticating the user
 
-    connect(SOCK, sockaddr_un($self->{_cvm_socket}))
-        or return (DENY, "authcvm/$method");
+    connect(SOCK, sockaddr_un($self->{_cvm_socket})) or do {
+        $self->log(LOGERROR, "skip: socket connection attempt for: $user");
+        return (DENY, "authcvm");
+    };
 
     my $o = select(SOCK); $| = 1; select($o);
 
@@ -98,12 +105,26 @@ sub authcvm_plain
 
     print SOCK "\001$u\000$host\000$passClear\000\000";
 
-    shutdown SOCK, 1;
+    shutdown SOCK, 1;   # tell remote we're finished
 
     my $ret = <SOCK>;
     my ($s) = unpack ("C", $ret);
-    return (
-	($s ? $s == 100 ? DENY : DECLINED
-	    : OK), 
-	"authcvm/$method");
+
+    if ( ! defined $s ) {
+        $self->log(LOGERROR, "skip: no response from cvm for $user");
+        return (DECLINED);
+    };
+
+    if ( $s == 0 ) {
+        $self->log(LOGINFO, "pass: authentication for: $user");
+        return (OK, "auth success for $user");
+    };
+
+    if ( $s == 100 ) {
+        $self->log(LOGINFO, "fail: authentication failure for: $user");
+        return (DENY, 'auth failure (100)');
+    };
+
+    $self->log(LOGERROR, "skip: unknown response from cvm for $user");
+    return (DECLINED, "unknown result code ($s)");
 }

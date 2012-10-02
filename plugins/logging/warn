@@ -1,46 +1,4 @@
-#!/usr/bin/perl
-# this is a simple 'warn' plugin like the default builtin logging
-#
-# It demonstrates that a logging plugin can call ->log itself as well
-# as how to ignore log entries from itself
-
-sub register {
-  my ($self, $qp, $loglevel) = @_;
-
-  $self->{_level} = LOGWARN;
-  if ( defined($loglevel) ) {
-      if ($loglevel =~ /^\d+$/) {
-	  $self->{_level} = $loglevel;
-      }
-      else {
-	  $self->{_level} = log_level($loglevel);
-      }
-  }
-
-  # If you want to capture this log entry with this plugin, you need to
-  # wait until after you register the plugin
-  $self->log(LOGINFO,'Initializing logging::warn plugin');
-}
-
-sub hook_logging {
-  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
-
-  # Don't log your own log entries!  If this is the only logging plugin
-  # then these lines will not be logged at all.  You can safely comment
-  # out this line and it will not cause an infinite loop.
-  return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
-
-  warn 
-    join(" ", $$ .
-         (defined $plugin ? " $plugin plugin:" :
-          defined $hook   ? " running plugin ($hook):"  : ""),
-         @log), "\n"
-    if ($trace <= $self->{_level});
-
-  return DECLINED;
-}
-
-=cut
+#!perl -w
 
 =head1 NAME
 
@@ -50,6 +8,9 @@ warn - Default logging plugin for qpsmtpd
 
 A qpsmtpd plugin which replicates the built in logging functionality, which
 is to send all logging messages to STDERR below a specific log level.
+
+It demonstrates that a logging plugin can call ->log itself as well
+as how to ignore log entries from itself
 
 =head1 INSTALL AND CONFIG
 
@@ -75,4 +36,41 @@ This plugin is licensed under the same terms as the qpsmtpd package itself.
 Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
+
+sub register {
+  my ($self, $qp, $loglevel) = @_;
+
+  $self->{_level} = LOGWARN;
+  if ( defined($loglevel) ) {
+      if ($loglevel =~ /^\d+$/) {
+	  $self->{_level} = $loglevel;
+      }
+      else {
+	  $self->{_level} = log_level($loglevel);
+      }
+  }
+
+  # If you want to capture this log entry with this plugin, you need to
+  # wait until after you register the plugin
+  $self->log(LOGINFO,'Initializing logging::warn plugin');
+}
+
+sub hook_logging {
+  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+
+  # Don't log your own log entries!  If this is the only logging plugin
+  # then these lines will not be logged at all.  You can safely comment
+  # out this line and it will not cause an infinite loop.
+    return DECLINED if defined $plugin && $plugin eq $self->plugin_name;
+
+    return DECLINED if $trace > $self->{_level};
+
+    my $prefix = defined $plugin && defined $hook ? " ($hook) $plugin:" :
+                 defined $plugin ? " $plugin:" :
+                 defined $hook   ? " ($hook) running plugin:" : '';
+
+    warn join(' ', $$ . $prefix, @log), "\n";
+
+    return DECLINED;
+}
 

@@ -1,3 +1,4 @@
+#!perl -w
 =head1 NAME
 
 milter
@@ -26,6 +27,7 @@ This plugin has so far only been tested with Brightmail's milter module.
 =cut
 
 use Net::Milter;
+use Qpsmtpd::Constants;
 no warnings;
 
 sub register {
@@ -47,11 +49,11 @@ sub register {
 sub hook_disconnect {
     my ($self) = @_;
 
-    my $milter = $self->qp->connection->notes('milter') || return DECLINED;
+    my $milter = $self->connection->notes('milter') || return DECLINED;
     $milter->send_quit();
     
-    $self->qp->connection->notes('spam', undef);
-    $self->qp->connection->notes('milter', undef);
+    $self->connection->notes('spam', undef);
+    $self->connection->notes('milter', undef);
 
     return DECLINED;
 }
@@ -95,9 +97,9 @@ sub hook_connect {
     $milter->open($self->{host}, $self->{port}, 'tcp');
     $milter->protocol_negotiation();
 
-    $self->qp->connection->notes(milter => $milter);
+    $self->connection->notes(milter => $milter);
 
-    $self->qp->connection->notes(
+    $self->connection->notes(
         milter_header_changes => { add => [], delete => [], replace => [], }
     );    
     my $remote_ip = $self->qp->connection->remote_ip;
@@ -108,7 +110,7 @@ sub hook_connect {
         $self->check_results($transaction, "connection",
             $milter->send_connect($remote_host, 'tcp4', 0, $remote_ip));
     };
-    $self->qp->connection->notes('spam', $@) if $@;
+    $self->connection->notes('spam', $@) if $@;
 
     return DECLINED;
 }
@@ -116,11 +118,11 @@ sub hook_connect {
 sub hook_helo {
     my ($self, $transaction) = @_;
 
-    if (my $txt = $self->qp->connection->notes('spam')) {
+    if (my $txt = $self->connection->notes('spam')) {
         return DENY, $txt;
     }
     
-    my $milter = $self->qp->connection->notes('milter');
+    my $milter = $self->connection->notes('milter');
     
     my $helo = $self->qp->connection->hello;
     my $host = $self->qp->connection->hello_host;
@@ -137,7 +139,7 @@ sub hook_helo {
 sub hook_mail {
     my ($self, $transaction, $address, %param) = @_;
     
-    my $milter = $self->qp->connection->notes('milter');
+    my $milter = $self->connection->notes('milter');
 
     $self->log(LOGDEBUG, "milter $self->{name} checking MAIL FROM " . $address->format);
     eval { $self->check_results($transaction, "MAIL FROM",
@@ -150,7 +152,7 @@ sub hook_mail {
 sub hook_rcpt {
     my ($self, $transaction, $address, %param) = @_;
     
-    my $milter = $self->qp->connection->notes('milter');
+    my $milter = $self->connection->notes('milter');
 
     $self->log(LOGDEBUG, "milter $self->{name} checking RCPT TO " . $address->format);
 
@@ -164,7 +166,7 @@ sub hook_rcpt {
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
-    my $milter = $self->qp->connection->notes('milter');
+    my $milter = $self->connection->notes('milter');
 
     $self->log(LOGDEBUG, "milter $self->{name} checking headers");
 
@@ -232,4 +234,3 @@ sub hook_data_post {
     
     return DECLINED;
 }
-

@@ -1,7 +1,12 @@
+#!perl -w
+
+use strict;
+use warnings;
+
 use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
 
 my $test_email = 'user@example.com';
-my $address = Qpsmtpd::Address->new( "<$test_email>" );
 
 my @greydbs = qw( denysoft_greylist.dbm denysoft_greylist.dbm.lock );
 foreach ( @greydbs ) {
@@ -10,102 +15,180 @@ foreach ( @greydbs ) {
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("test_greylist_p0f_genre_miss", 1);
-    $self->register_test("test_greylist_p0f_genre_hit", 1);
-    $self->register_test("test_greylist_p0f_distance_hit", 1);
-    $self->register_test("test_greylist_p0f_distance_miss", 1);
-    $self->register_test("test_greylist_p0f_link_hit", 1);
-    $self->register_test("test_greylist_p0f_link_miss", 1);
-    $self->register_test("test_greylist_p0f_uptime_hit", 1);
-    $self->register_test("test_greylist_p0f_uptime_miss", 1);
+
+    $self->register_test('test_hook_data', 4);
+    $self->register_test('test_is_immune', 6);
+    $self->register_test('test_get_db_key', 4);
+    $self->register_test('test_get_db_location', 1);
+    $self->register_test("test_greylist_geoip", 7);
+    $self->register_test("test_greylist_p0f_genre", 2);
+    $self->register_test("test_greylist_p0f_distance", 2);
+    $self->register_test("test_greylist_p0f_link", 2);
+    $self->register_test("test_greylist_p0f_uptime", 2);
 }
 
-sub test_greylist_p0f_genre_miss {
+sub test_hook_data {
+    my $self = shift;
+    my $transaction = $self->qp->transaction;
+
+    my ($code, $mess) = $self->hook_data( $transaction );
+    cmp_ok( $code, '==', DECLINED, "no note" );
+
+    $transaction->notes('greylist', 1);
+
+    ($code, $mess) = $self->hook_data( $transaction );
+    cmp_ok( $code, '==', DECLINED, "no recipients");
+
+    my $address = Qpsmtpd::Address->new( "<$test_email>" );
+    $transaction->recipients( $address );
+
+    $transaction->notes('whitelistrcpt', 2);
+    ($code, $mess) = $self->hook_data( $transaction );
+    cmp_ok( $code, '==', DENYSOFT, "missing recipients");
+
+    $transaction->notes('whitelistrcpt', 1);
+    ($code, $mess) = $self->hook_data( $transaction );
+    cmp_ok( $code, '==', DECLINED, "missing recipients");
+};
+
+sub test_is_immune {
     my $self = shift;
 
-    $self->{_greylist_config}{'p0f'} = 'genre,Linux';
-    $self->connection->notes('p0f'=> { genre => 'windows', link => 'dsl' } );
-    my $r = $self->rcpt_handler( $self->qp->transaction );
+    $self->_reset_transaction();
 
-    ok( $r == 909, 'p0f genre miss');
-}
+    $self->qp->connection->relay_client(1);
+    ok( $self->is_immune(), 'relayclient');
 
-sub test_greylist_p0f_genre_hit {
+    $self->qp->connection->relay_client(0);
+    ok( ! $self->is_immune(), "nope -" );
+
+    foreach ( qw/ whitelisthost / ) {
+        $self->connection->notes($_, 1);
+        ok( $self->is_immune(), $_);
+        $self->connection->notes($_, undef);
+    };
+
+    foreach ( qw/ whitelistsender tls_enabled / ) {
+        $self->qp->transaction->notes($_, 1);
+        ok( $self->is_immune(), $_);
+        $self->qp->transaction->notes($_, undef);
+    };
+
+    ok( ! $self->is_immune(), "nope -" );
+};
+
+sub test_get_db_key {
     my $self = shift;
 
-    $self->{_greylist_config}{'p0f'} = 'genre,Windows';
-    $self->connection->notes('p0f'=> { genre => 'windows', link => 'dsl' } );
+    $self->{_args}{sender}    = 0;
+    $self->{_args}{recipient} = 0;
+    $self->{_args}{remote_ip} = 0;
+
+    my $test_ip = '192.168.1.1';
+
+    my $address = Qpsmtpd::Address->new( "<$test_email>" );
     $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
+    $self->qp->transaction->add_recipient( $address );
+    $self->qp->connection->remote_ip($test_ip);
 
-    ok( $r eq 'This mail is temporarily denied', 'p0f genre hit');
-}
+    my $key = $self->get_db_key();
+    ok( ! $key, "db key empty: -");
 
-sub test_greylist_p0f_distance_hit {
+    $self->{_args}{remote_ip} = 1;
+    $key = $self->get_db_key( $address, $address );
+    cmp_ok( $key, 'eq', '3232235777', "db key: $key");
+
+    $self->{_args}{sender} = 1;
+    $key = $self->get_db_key( $address, $address );
+    cmp_ok( $key, 'eq', "3232235777:$test_email", "db key: $key");
+
+    $self->{_args}{recipient} = 1;
+    $key = $self->get_db_key( $address, $address );
+    cmp_ok( $key, 'eq', "3232235777:$test_email:$test_email", "db key: $key");
+};
+
+sub test_get_db_location {
     my $self = shift;
 
-    $self->{_greylist_config}{'p0f'} = 'distance,8';
+    my $db = $self->get_db_location();
+    ok( $db, "db location: $db");
+};
+
+sub test_greylist_geoip {
+    my $self = shift;
+
+    $self->{_args}{'geoip'} = 'US,UK,HU';
+
+    my @valid = qw/ US us UK hu /;
+    my @invalid = qw/ PK RU ru /;
+
+    foreach my $cc ( @valid ) {
+        $self->connection->notes('geoip_country', $cc );
+        ok( $self->geoip_match(), "match + ($cc)");
+    };
+
+    foreach my $cc ( @invalid ) {
+        $self->connection->notes('geoip_country', $cc );
+        ok( ! $self->geoip_match(), "bad - ($cc)");
+    };
+};
+
+sub test_greylist_p0f_genre {
+    my $self = shift;
+
+    $self->{_args}{'p0f'} = 'genre,Linux';
+    $self->connection->notes('p0f'=> { genre => 'windows', link => 'dsl' } );
+    ok( ! $self->p0f_match(), 'p0f genre miss');
+
+    $self->{_args}{'p0f'} = 'genre,Windows';
+    $self->connection->notes('p0f'=> { genre => 'windows', link => 'dsl' } );
+    ok( $self->p0f_match(), 'p0f genre hit');
+}
+
+sub test_greylist_p0f_distance {
+    my $self = shift;
+
+    $self->{_args}{'p0f'} = 'distance,8';
     $self->connection->notes('p0f'=> { distance=>9 } );
-    $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
+    ok( $self->p0f_match(), 'p0f distance hit');
 
-    ok( $r eq 'This mail is temporarily denied', 'p0f distance hit');
-}
-
-sub test_greylist_p0f_distance_miss {
-    my $self = shift;
-
-    $self->{_greylist_config}{'p0f'} = 'distance,8';
+    $self->{_args}{'p0f'} = 'distance,8';
     $self->connection->notes('p0f'=> { distance=>7 } );
-    $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
-
-    ok( $r == 909, 'p0f distance miss');
+    ok( ! $self->p0f_match(), 'p0f distance miss');
 }
 
-sub test_greylist_p0f_link_hit {
+sub test_greylist_p0f_link {
     my $self = shift;
 
-    $self->{_greylist_config}{'p0f'} = 'link,dsl';
+    $self->{_args}{'p0f'} = 'link,dsl';
     $self->connection->notes('p0f'=> { link=>'DSL' } );
-    $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
+    ok( $self->p0f_match(), 'p0f link hit');
 
-    ok( $r eq 'This mail is temporarily denied', 'p0f link hit');
-}
-
-sub test_greylist_p0f_link_miss {
-    my $self = shift;
-
-    $self->{_greylist_config}{'p0f'} = 'link,dsl';
+    $self->{_args}{'p0f'} = 'link,dsl';
     $self->connection->notes('p0f'=> { link=>'Ethernet' } );
-    $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
-
-    ok( $r == 909, 'p0f link miss');
+    ok( ! $self->p0f_match(), 'p0f link miss');
 }
 
-sub test_greylist_p0f_uptime_hit {
+sub test_greylist_p0f_uptime {
     my $self = shift;
 
-    $self->{_greylist_config}{'p0f'} = 'uptime,100';
+    $self->{_args}{'p0f'} = 'uptime,100';
     $self->connection->notes('p0f'=> { uptime=> 99 } );
-    $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
+    ok( $self->p0f_match(), 'p0f uptime hit');
 
-    ok( $r eq 'This mail is temporarily denied', 'p0f uptime hit');
+    $self->{_args}{'p0f'} = 'uptime,100';
+    $self->connection->notes('p0f'=> { uptime=>500 } );
+    ok( ! $self->p0f_match(), 'p0f uptime miss');
 }
 
-sub test_greylist_p0f_uptime_miss {
+sub _reset_transaction {
     my $self = shift;
 
-    $self->{_greylist_config}{'p0f'} = 'uptime,100';
-    $self->connection->notes('p0f'=> { uptime=>500 } );
-    $self->qp->transaction->sender( $address );
-    my $r = $self->rcpt_handler( $self->qp->transaction  );
-
-    ok( $r == 909, 'p0f uptime miss');
-}
-
-
+    $self->qp->connection->relay_client(0);
+    $self->qp->transaction->notes('whitelistsender',0);
+    $self->connection->notes('whitelisthost',0);
+    $self->qp->transaction->notes('tls_enabled',0);
+    $self->{_args}{p0f} = undef;
+    $self->{_args}{geoip} = undef;
+};
 

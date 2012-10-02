@@ -59,13 +59,13 @@ directory.
 Put the files there.  If you install from git you can just do
 run the following command in the /home/smtpd/ directory.
 
-   git clone git://github.com/abh/qpsmtpd.git
+   git clone git://github.com/smtpd/qpsmtpd.git
 
 Beware that the master branch might be unstable and unsuitable for anything
 but development, so you might want to get a specific release, for
 example (after running git clone):
 
-   git checkout -b local_branch v0.40
+   git checkout -b local_branch v0.84
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
@@ -73,7 +73,7 @@ in) to make supervise start the log process.
 Edit the file config/IP and put the ip address you want to use for
 qpsmtpd on the first line (or use 0 to bind to all interfaces).
 
-If you use the supervise tools, then you are practically done now!
+If you use the supervise tools, then you are practically done!
 Just symlink /home/smtpd/qpsmtpd into your /services (or /var/services
 or /var/svscan or whatever) directory.  Remember to shutdown
 qmail-smtpd if you are replacing it with qpsmtpd.
@@ -122,14 +122,14 @@ interest in various "hooks" provided by the qpsmtpd core engine.
 
 At least one plugin MUST allow or deny the RCPT command to enable
 receiving mail.  The "rcpt_ok" is one basic plugin that does
-this.  Other plugins provides extra functionality related to this; for
+this.  Other plugins provide extra functionality related to this; for
 example the require_resolvable_fromhost plugin described above.
 
 
 =head1 Configuration files
 
 All the files used by qmail-smtpd should be supported; so see the man
-page for qmail-smtpd.  Extra files used by qpsmtpd includes: 
+page for qmail-smtpd.  Extra files used by qpsmtpd include:
 
 =over 4
 
@@ -141,7 +141,7 @@ a subdirectory of there).
 
 
 =item rhsbl_zones
- 
+
 Right hand side blocking lists, one per line. For example:
 
     dsn.rfc-ignorant.org does not accept bounces - http://www.rfc-ignorant.org/
@@ -158,11 +158,10 @@ Normal ip based DNS blocking lists ("RBLs"). For example:
 
 
 =item require_resolvable_fromhost
-         
+
 If this file contains anything but a 0 on the first line, envelope
 senders will be checked against DNS. If an A or a MX record can't be
 found the mail command will return a soft rejection (450).
-
 
 =item spool_dir
 
@@ -171,36 +170,36 @@ smtpd uses during the data transactions. If this file doesn't exist, it
 will default to use $ENV{HOME}/tmp/. This directory should be set with
 a mode of 700 and owned by the smtpd user.
 
+=item spool_perms
+
+The default spool permissions are 0700. If you need some other value,
+chmod the directory and set it's octal value in config/spool_perms.
+
 =item tls_before_auth
 
-If this file contains anything except a 0 on the first noncomment line, then 
-AUTH will not be offered unless TLS/SSL are in place, either with STARTTLS, 
+If this file contains anything except a 0 on the first noncomment line, then
+AUTH will not be offered unless TLS/SSL are in place, either with STARTTLS,
 or SMTP-SSL on port 465.
 
-=item everything (?) that qmail-smtpd supports. 
+=item everything (?) that qmail-smtpd supports.
 
 In my test qpsmtpd installation I have a "config/me" file containing
 the hostname I use for testing qpsmtpd (so it doesn't introduce itself
 with the normal name of the server).
-     
-=back
 
+=back
 
 
 =head1 Problems
 
-In case of problems always first check the logfile.
+In case of problems, always check the logfile first.
 
-As default it goes into log/main/current.  Qpsmtpd can log a lot of
-debug information.  You can get more or less by adjusting $TRACE_LEVEL
-in lib/Qpsmtpd.pm (sorry, no easy switch for that yet).  Something
-between 1 and 3 should give you just a little bit.  If you set it to
-10 or higher you will get lots of information in the logs.
+By default, qpsmtpd logs to log/main/current.  Qpsmtpd can log a lot of
+debug information. You can get more or less by adjusting the number in
+config/loglevel. Between 1 and 3 should give you a little. Setting it
+to 10 or higher will get lots of information in the logs.
 
 If the logfile doesn't give away the problem, then post to the
-mailinglist (subscription instructions above).  If possibly then put
+mailinglist (subscription instructions above).  If possible, put
 the logfile on a webserver and include a reference to it in the mail.
-
-
-
 

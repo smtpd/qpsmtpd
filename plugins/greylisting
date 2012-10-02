@@ -1,84 +1,100 @@
+#!perl -w
+
 =head1 NAME
 
-denysoft_greylist
+greylisting - delay mail from unknown senders
 
 =head1 DESCRIPTION
 
-Plugin to implement the 'greylisting' algorithm proposed by Evan 
-Harris in http://projects.puremagic.com/greylisting/. Greylisting is 
-a form of denysoft filter, where unrecognised new connections are 
-temporarily denied for some initial period, to foil spammers using 
+Plugin implementing the 'greylisting' algorithm proposed by Evan
+Harris in http://projects.puremagic.com/greylisting/. Greylisting is
+a form of denysoft filter, where unrecognised new connections are
+temporarily denied for some initial period, to foil spammers using
 fire-and-forget spamware, http_proxies, etc.
 
-Greylisting adds two main features: it tracks incoming connections 
-using a triplet of remote IP address, sender, and recipient, rather 
-than just using the remote IP; and it uses a set of timeout periods 
-(black/grey/white) to control whether connections are allowed, instead 
-of using connection counts or rates.
+Greylisting tracks incoming connections using a triplet (see TRIPLET). It
+has configurable timeout periods (black/grey/white) to control whether
+connections are allowed, instead of using connection counts or rates.
 
-This plugin allows connection tracking on any or all of IP address, 
-sender, and recipient (but uses IP address only, by default), with 
-configurable greylist timeout periods. A simple dbm database is used 
-for tracking connections, and relayclients are always allowed 
-through. The plugin supports whitelisting using the whitelist_soft
-plugin (optional).
+Automatic whitelisting is enabled for relayclients, whitelisted hosts,
+whitelisted senders, TLS connections, p0f matches, and geoip matches.
 
+=head1 TRIPLETS
+
+In greylisting, I<remote_ip>, I<sender>, and I<recipient> are referred to
+as the triplet that connections are deferred based on. This plugin allows
+tracking on any or all of the three, using only the IP address by default.
+A simple dbm database is used for tracking connections.
+
+How that works is best explained by example:
+
+A new connection arrives from the host shvj1.jpmchase.com. The sender is
+chase@alerts.chase.com and the recipient is londonwhale@example.com. This is
+the first connection for that triplet so the connection is deferred for
+I<black_timeout> minutes. After the timeout, but before the I<grey_timeout>
+elapses, shvj1.jpmchase.com retries and successfully delivers the mail. For
+the next I<white_timeout> days, emails for that triplet are not delayed.
+
+The next day, shvj1.jpmchase.com tries to deliver a new email from
+alerts@alerts.chase.com to jdimon@example.com. Since this triplet is new, it
+will be delayed as our initial connection in the last scenario was. This
+delay could end up costing over US $4B.
+
+By default, this plugin does not enable the sender or recipient in the triplet.
+Once an email from a remote server has been delivered to anyone on our server,
+that remote server is whitelisted for any sender and any recipient. This is a
+policy that delays less mail and is less likely to impoverish your bank.
 
 =head1 CONFIG
 
-The following parameters can be passed to denysoft_greylist:
+The following parameters can be passed to greylisting:
 
-=over 4
+=head2 remote_ip <bool>
 
-=item remote_ip <bool>
+Include the remote ip in the connection triplet? Default: 1
 
-Whether to include the remote ip address in tracking connections.
-Default: 1.
+=head2 sender <bool>
 
-=item sender <bool>
+Include the sender in the connection triplet? Default: 0.
 
-Whether to include the sender in tracking connections. Default: 0.
+=head2 recipient <bool>
 
-=item recipient <bool>
+Include the recipient in the connection triplet? Default: 0.
 
-Whether to include the recipient in tracking connections. Default: 0.
+=head2 deny_late <bool>
 
-=item deny_late <bool>
-
-Whether to defer denials during the 'mail' hook until 'data_post'
+Whether to defer denials during the 'mail' hook or later during 'data_post'
 e.g. to allow per-recipient logging. Default: 0.
 
-=item black_timeout <timeout_seconds>
+=head2 black_timeout <timeout_seconds>
 
-The initial period, in seconds, for which we issue DENYSOFTs for 
-connections from an unknown (or timed out) IP address and/or sender
-and/or recipient (a 'connection triplet'). Default: 50 minutes.
+The initial period during which we issue DENYSOFTs for connections from an
+unknown (or timed out) 'connection triplet'. Default: 50 minutes.
 
-=item grey_timeout <timeout_seconds>
+=head2 grey_timeout <timeout_seconds>
 
 The subsequent 'grey' period, after the initial black blocking period,
 when we will accept a delivery from a formerly-unknown connection
-triplet. If a new connection is received during this time, we will 
-record a successful delivery against this IP address, which whitelists 
+triplet. If a new connection is received during this time, we will
+record a successful delivery against this IP address, which whitelists
 it for future deliveries (see following). Default: 3 hours 20 minutes.
 
-=item white_timeout <timeout_seconds>
+=head2 white_timeout <timeout_seconds>
 
-The period after which a known connection triplet will be considered 
-stale, and we will issue DENYSOFTs again. New deliveries reset the 
+The period after which a known connection triplet will be considered
+stale, and we will issue DENYSOFTs again. New deliveries reset the
 timestamp on the address and renew this timeout. Default: 36 days.
 
-=item mode ( denysoft | testonly | off )
+=head2 reject <bool>
 
-Operating mode. In 'denysoft' mode we log and track connections and 
-issue DENYSOFTs for black connections; in 'testonly' mode we log and 
-track connections as normal, but never actually issue DENYSOFTs 
-(useful for seeding the database and testing without impacting 
-deliveries); in 'off' mode we do nothing (useful for turning 
-greylisting off globally if using per_recipient configs). 
-Default: denysoft.
+Whether to issue deferrals (DENYSOFT) for black connections. Having reject
+disabled is useful for seeding the database and testing without impacting
+deliveries. It is recommended to begin with I<reject 0> for a week or two
+before enabling I<reject>.
 
-=item db_dir <path>
+Default: 1
+
+=head2 db_dir <path>
 
 Path to a directory in which the greylisting DB will be stored.  This
 directory must be writable by the qpsmtpd user.  By default, the first
@@ -94,249 +110,470 @@ usable directory from the following list will be used:
 
 =back
 
-=item per_recipient <bool>
+=head2 per_recipient <bool>
 
-Flag to indicate whether to use per-recipient configs. 
+Flag to indicate whether to use per-recipient configs.
 
-=item per_recipient_db <bool>
+=head2 per_recipient_db <bool>
 
-Flag to indicate whether to use per-recipient greylisting 
+Flag to indicate whether to use per-recipient greylisting
 databases (default is to use a shared database).  Per-recipient configuration
 directories, if determined, supercede I<db_dir>.
 
-=back
+=head2 nfslock <bool>
 
-=item p0f
+Flag to indicate the database is stored on NFS.  Uses File::NFSLock
+instead of flock.
 
-Enable greylisting only when certain p0f criteria is met. The single
-required argument is a comma delimited list of key/value pairs. The keys
-are the following p0f TCP fingerprint elements: genre, detail, uptime,
-link, and distance.
+=head2 p0f
 
-To greylist emails from computers whose remote OS is windows, you'd use
-this syntax:
+Enable greylisting only when certain p0f criteria is met. The required
+argument is a comma delimited list of key/value pairs. The keys are the
+following p0f TCP fingerprint elements: genre, detail, uptime, link, and
+distance.
 
-  p0f genre,windows
+To greylist emails from computers whose remote OS is windows:
 
-To greylist only windows computers on DSL links more than 3 network hops
-away:
+  greylisting p0f genre,windows
 
-  p0f genre,windows,link,dsl,distance,3
+To greylist only windows computers on DSL links more than 3 network hops away:
 
-=head1 BUGS
+  greylisting p0f genre,windows,link,dsl,distance,3
 
-Database locking is implemented using flock, which may not work on 
-network filesystems e.g. NFS. If this is a problem, you may want to
-use something like File::NFSLock instead.
+=head2 geoip
+
+Do not greylist connections that are in the comma separated list of countries.
+
+  greylisting geoip US,UK
+
+Prior to adding GeoIP support, I greylisted all connections from windows computers. That deters the vast majority of spam connections, but it also delays legit mail from @msn, @live.com, and a small handful of other servers. Since adding geoip support, I haven't seen a single valid mail delivery delayed.
+
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
+
 
 =head1 AUTHOR
 
 Written by Gavin Carr <gavin@openfusion.com.au>.
 
-Added p0f section <msimerson@cpan.org> (2010-05-03)
+nfslock feature by JT Moree <jtmoree@kahalacorp.com> - 2007-01-22
+
+p0f feature by Matt Simerson <msimerson@cpan.org> - 2010-05-03
+
+geoip, loglevel, reject added. Refactored into subs - Matt Simerson - 2012-05
 
 =cut
 
+use strict;
+use warnings;
+use Qpsmtpd::Constants;
+
+my $VERSION = '0.10';
+
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
-use Fcntl qw(:DEFAULT :flock);
-use strict;
+use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
+use Net::IP;
 
-my $VERSION = '0.08';
-
-my $DENYMSG = "This mail is temporarily denied";
+my $DENYMSG  = "This mail is temporarily denied";
 my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
-my $DB = "denysoft_greylist.dbm";
-my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender recipient 
-  black_timeout grey_timeout white_timeout deny_late mode db_dir p0f );
+my $DB       = "greylist.dbm";
+my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
+  recipient black_timeout grey_timeout white_timeout deny_late db_dir
+  nfslock p0f reject loglevel geoip upgrade );
 
 my %DEFAULTS = (
     remote_ip => 1,
-    sender => 0,
+    sender    => 0,
     recipient => 0,
-    black_timeout => 50 * 60,
-    grey_timeout =>  3 * 3600 + 20 * 60,
-    white_timeout => 36 * 24 * 3600,
-    mode => 'denysoft',
+    reject    => 1,
+    black_timeout => 50 * 60,             # 50m
+    grey_timeout  =>  3 * 3600 + 20 * 60, # 3h:20m
+    white_timeout => 36 * 3600 * 24,      # 36 days
+    nfslock => 0,
     p0f  => undef,
 );
 
 sub register {
-  my ($self, $qp, %arg) = @_;
-  my $config = { %DEFAULTS, 
-    map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'), 
-    %arg };
-  if (my @bad = grep { ! exists $PERMITTED_ARGS{$_} } sort keys %$config) {
-    $self->log(LOGALERT, "invalid parameter(s): " . join(',',@bad));
-  }
-  $self->{_greylist_config} = $config;
-  unless ($config->{recipient} || $config->{per_recipient}) {
-    $self->register_hook("mail", "mail_handler");
-  } else {
-    $self->register_hook("rcpt", "rcpt_handler");
-  }
+    my ($self, $qp, %arg) = @_;
+    my $config = { %DEFAULTS,
+        map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'),
+        %arg };
+    if (my @bad = grep { ! exists $PERMITTED_ARGS{$_} } sort keys %$config) {
+        $self->log(LOGALERT, "invalid parameter(s): " . join(',',@bad));
+    }
+    # backwards compatibility with deprecated 'mode' setting
+    if ( defined $config->{mode} && ! defined $config->{reject} ) {
+        $config->{reject} = $config->{mode} =~ /testonly|off/i ? 0 : 1;
+    };
+    $self->{_args} = $config;
+    unless ($config->{recipient} || $config->{per_recipient}) {
+        $self->register_hook('mail', 'mail_handler');
+    } else {
+        $self->register_hook('rcpt', 'rcpt_handler');
+    }
+    $self->prune_db();
+    if ( $self->{_args}{upgrade} ) {
+        $self->convert_db();
+    };
 }
 
 sub mail_handler {
-  my ($self, $transaction, $sender) = @_;
-  my ($status, $msg) = $self->denysoft_greylist($transaction, $sender, undef);
-  if ($status == DENYSOFT) {
-    my $config = $self->{_greylist_config};
-    return DENYSOFT, $msg unless $config->{deny_late};
-    $transaction->notes('denysoft_greylist', $msg) 
-  }
-  return DECLINED;
+    my ($self, $transaction, $sender) = @_;
+
+    my ($status, $msg) = $self->greylist($transaction, $sender);
+
+    return DECLINED if $status != DENYSOFT;
+
+    if ( ! $self->{_args}{deny_late} ) {
+        return (DENYSOFT, $msg);
+    };
+
+    $transaction->notes('greylist', $msg);
+    return DECLINED;
 }
 
 sub rcpt_handler {
   my ($self, $transaction, $rcpt) = @_;
   # Load per_recipient configs
-  my $config = { %{$self->{_greylist_config}},
+  my $config = { %{$self->{_args}},
     map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist', { rcpt => $rcpt }) };
   # Check greylisting
   my $sender = $transaction->sender;
-  my ($status, $msg) = $self->denysoft_greylist($transaction, $sender, $rcpt, $config);
+  my ($status, $msg) = $self->greylist($transaction, $sender, $rcpt, $config);
   if ($status == DENYSOFT) {
     # Deny here (per-rcpt) unless this is a <> sender, for smtp probes
     return DENYSOFT, $msg if $sender->address;
-    $transaction->notes('denysoft_greylist', $msg);
+    $transaction->notes('greylist', $msg);
   }
   return DECLINED;
 }
 
 sub hook_data {
   my ($self, $transaction) = @_;
-  my $note = $transaction->notes('denysoft_greylist');
-  return DECLINED unless $note;
+  return DECLINED unless $transaction->notes('greylist');
   # Decline if ALL recipients are whitelisted
   if (($transaction->notes('whitelistrcpt')||0) == scalar($transaction->recipients)) {
-    $self->log(LOGWARN,"all recipients whitelisted - skipping");
+    $self->log(LOGWARN,"skip: all recipients whitelisted");
     return DECLINED;
   }
-  return DENYSOFT, $note;
+  return DENYSOFT, $transaction->notes('greylist');
 }
 
-sub denysoft_greylist {
-  my ($self, $transaction, $sender, $rcpt, $config) = @_;
-  $config ||= $self->{_greylist_config};
-  $self->log(LOGDEBUG, "config: " . join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
+sub greylist {
+    my ($self, $transaction, $sender, $rcpt, $config) = @_;
+    $config ||= $self->{_args};
+    $self->log(LOGDEBUG, "config: " .
+        join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
-  # Always allow relayclients and whitelisted hosts/senders
-  return DECLINED if $self->qp->connection->relay_client();
-  return DECLINED if $self->qp->connection->notes('whitelisthost');
-  return DECLINED if $transaction->notes('whitelistsender');
+    return DECLINED if $self->is_immune();
 
-  # do not greylist if p0f matching is selected and message does not match
-  return DECLINED if $config->{'p0f'} && !$self->p0f_match( $config );
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $key  = $self->get_db_key( $sender, $rcpt ) or return DECLINED;
 
-  if ($config->{db_dir} && $config->{db_dir} =~ m{^([-a-zA-Z0-9./_]+)$}) {
-    $config->{db_dir} = $1; 
-  }
+    my $fmt  = "%s:%d:%d:%d";
 
-  # Setup database location
-  my $dbdir = $transaction->notes('per_rcpt_configdir') 
-    if $config->{per_recipient_db};
-  for my $d ($dbdir, $config->{db_dir}, "/var/lib/qpsmtpd/greylisting",
-             "$QPHOME/var/db", "$QPHOME/config", '.' ) {
-      last if $dbdir && -d $dbdir;
-      next if ( ! $d || ! -d $d );
-      $dbdir = $d;
-  }
-  my $db = "$dbdir/$DB";
-  $self->log(LOGINFO,"using $db as greylisting database");
+# new IP or entry timed out - record new
+    if ( ! $tied->{$key} ) {
+        $tied->{$key} = sprintf $fmt, time, 1, 0, 0;
+        $self->log(LOGWARN, "fail: initial DENYSOFT, unknown");
+        return $self->cleanup_and_return( $tied, $lock );
+    };
 
-  my $remote_ip = $self->qp->connection->remote_ip;
-  my $fmt = "%s:%d:%d:%d";
+    my ($ts, $new, $black, $white) = split /:/, $tied->{$key};
+    $self->log(LOGDEBUG, "ts: " . localtime($ts) . ", now: " . localtime);
 
-  # Check denysoft db
-  unless (open LOCK, ">$db.lock") {
-    $self->log(LOGCRIT, "opening lockfile failed: $!");
-    return DECLINED;
-  }
-  unless (flock LOCK, LOCK_EX) {
-    $self->log(LOGCRIT, "flock of lockfile failed: $!");
-    close LOCK;
-    return DECLINED;
-  }
-  my %db = ();
-  unless (tie %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) {
-    $self->log(LOGCRIT, "tie to database $db failed: $!");
-    close LOCK;
-    return DECLINED;
-  }
-  my @key;
-  push @key, $remote_ip             if $config->{remote_ip};
-  push @key, $sender->address || '' if $config->{sender};
-  push @key, $rcpt->address         if $rcpt && $config->{recipient};
-  my $key = join ':', @key;
-  my ($ts, $new, $black, $white) = (0,0,0,0);
-  if ($db{$key}) {
-    ($ts, $new, $black, $white) = split /:/, $db{$key};
-    $self->log(LOGERROR, "ts: " . localtime($ts) . ", now: " . localtime);
-    if (! $white) {
-      # Black IP - deny, but don't update timestamp
-      if (time - $ts < $config->{black_timeout}) {
-        $db{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
-        $self->log(LOGCRIT, "key $key black DENYSOFT - $black failed connections");
-        untie %db;
-        close LOCK;
-        return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
-      }
-      # Grey IP - accept unless timed out
-      elsif (time - $ts < $config->{grey_timeout}) {
-        $db{$key} = sprintf $fmt, time, $new, $black, 1;
-        $self->log(LOGCRIT, "key $key updated grey->white");
-        untie %db;
-        close LOCK;
-        return DECLINED;
-      }
-      else {
-        $self->log(LOGERROR, "key $key has timed out (grey)");
-      }
+    if ( $white ) {
+# white IP - accept unless timed out
+        if (time - $ts < $config->{white_timeout}) {
+            $tied->{$key} = sprintf $fmt, time, $new, $black, ++$white;
+            $self->log(LOGINFO, "pass: white, $white deliveries");
+            return $self->cleanup_and_return( $tied, $lock, DECLINED );
+        }
+        else {
+            $self->log(LOGINFO, "key $key has timed out (white)");
+        }
+    };
+
+# Black IP - deny, but don't update timestamp
+    if (time - $ts < $config->{black_timeout}) {
+        $tied->{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
+        $self->log(LOGWARN, "fail: black DENYSOFT - $black deferred connections");
+        return $self->cleanup_and_return( $tied, $lock );
     }
-    # White IP - accept unless timed out
-    else {
-      if (time - $ts < $config->{white_timeout}) {
-        $db{$key} = sprintf $fmt, time, $new, $black, ++$white;
-        $self->log(LOGCRIT, "key $key is white, $white deliveries");
-        untie %db;
-        close LOCK;
-        return DECLINED;
-      }
-      else {
-        $self->log(LOGERROR, "key $key has timed out (white)");
-      }
-    }
-  }
 
-  # New ip or entry timed out - record new and return DENYSOFT
-  $db{$key} = sprintf $fmt, time, ++$new, $black, 0;
-  $self->log(LOGCRIT, "key $key initial DENYSOFT, unknown");
-  untie %db;
-  close LOCK;
-  return $config->{mode} eq 'testonly' ? DECLINED : DENYSOFT, $DENYMSG;
+# Grey IP - accept unless timed out
+    elsif (time - $ts < $config->{grey_timeout}) {
+        $tied->{$key} = sprintf $fmt, time, $new, $black, 1;
+        $self->log(LOGWARN, "pass: updated grey->white");
+        return $self->cleanup_and_return( $tied, $lock, DECLINED );
+    }
+
+    $self->log(LOGWARN, "pass: timed out (grey)");
+    return $self->cleanup_and_return( $tied, $lock, DECLINED );
 }
+
+sub is_immune {
+    my $self = shift;
+
+    # Always allow relayclients and whitelisted hosts/senders
+    if ( $self->qp->connection->relay_client() ) {
+        $self->log(LOGINFO, "skip: relay client");
+        return 1;
+    };
+    if ( $self->connection->notes('whitelisthost') ) {
+        $self->log(LOGINFO, "skip: whitelisted host");
+        return 1;
+    };
+    if ( $self->qp->transaction->notes('whitelistsender') ) {
+        $self->log(LOGINFO, "skip: whitelisted sender");
+        return 1;
+    };
+    if ( $self->qp->transaction->notes('tls_enabled') ) {
+        $self->log(LOGINFO, "skip: tls");
+        return 1;
+    };
+
+    if ( $self->{_args}{p0f} && ! $self->p0f_match() ) {
+        return 1;
+    };
+
+    if ( $self->{_args}{geoip} && $self->geoip_match() ) {
+        $self->log(LOGDEBUG, "skip: geoip");
+        return 1;
+    };
+
+    return;
+};
+
+sub cleanup_and_return {
+    my ($self, $tied, $lock, $return_val ) = @_;
+
+    untie $tied;
+    close $lock;
+    return $return_val if defined $return_val;  # explicit override
+    return DECLINED if defined $self->{_args}{reject} && ! $self->{_args}{reject};
+    return (DENYSOFT, $DENYMSG);
+};
+
+sub get_db_key {
+    my $self = shift;
+    my $sender = shift || $self->qp->transaction->sender;
+    my $rcpt = shift || ($self->qp->transaction->recipients)[0];
+
+    my @key;
+    if ( $self->{_args}{remote_ip} ) {
+        my $nip = Net::IP->new( $self->qp->connection->remote_ip );
+        push @key, $nip->intip;             # convert IP to integer
+    };
+
+    push @key, $sender->address || '' if $self->{_args}{sender};
+    push @key, $rcpt->address         if $rcpt && $self->{_args}{recipient};
+    if ( ! scalar @key ) {
+        $self->log(LOGERROR, "enable one of remote_ip, sender, or recipient!");
+        return;
+    };
+    return join ':', @key;
+};
+
+sub get_db_tie {
+    my ( $self, $db, $lock ) = @_;
+
+    tie( my %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) or do {
+        $self->log(LOGCRIT, "tie to database $db failed: $!");
+        close $lock;
+        return;
+    };
+    return \%db;
+};
+
+sub get_db_location {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $config = $self->{_args};
+
+    if ($config->{db_dir} && $config->{db_dir} =~ m{^([-a-zA-Z0-9./_]+)$}) {
+        $config->{db_dir} = $1;
+    }
+
+    # Setup database location
+    my $dbdir;
+    if ( $config->{per_recipient_db} ) {
+        $dbdir = $transaction->notes('per_rcpt_configdir');
+    };
+
+    my @candidate_dirs = ( $dbdir, $config->{db_dir},
+        "/var/lib/qpsmtpd/greylisting", "$QPHOME/var/db", "$QPHOME/config", '.' );
+
+    for my $d ( @candidate_dirs ) {
+        next if ! $d || ! -d $d;   # impossible
+        $dbdir = $d;
+        last;   # first match wins
+    }
+    my $db = "$dbdir/$DB";
+    if ( ! -f $db && -f "$dbdir/denysoft_greylist.dbm" ) {
+        $db = "$dbdir/denysoft_greylist.dbm";  # old DB name
+    }
+    $self->log(LOGDEBUG,"using $db as greylisting database");
+    return $db;
+};
+
+sub get_db_lock {
+    my ($self, $db) = @_;
+
+    return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
+
+    # Check denysoft db
+    open( my $lock, ">$db.lock" ) or do {
+        $self->log(LOGCRIT, "opening lockfile failed: $!");
+        return;
+    };
+
+    flock( $lock, LOCK_EX ) or do {
+        $self->log(LOGCRIT, "flock of lockfile failed: $!");
+        close $lock;
+        return;
+    };
+
+    return $lock;
+}
+
+sub get_db_lock_nfs {
+    my ($self, $db) = @_;
+
+    require File::NFSLock;
+
+    ### set up a lock - lasts until object looses scope
+    my $nfslock = new File::NFSLock {
+        file      => "$db.lock",
+        lock_type => LOCK_EX|LOCK_NB,
+        blocking_timeout   => 10,      # 10 sec
+        stale_lock_timeout => 30 * 60, # 30 min
+    } or do {
+        $self->log(LOGCRIT, "nfs lockfile failed: $!");
+        return;
+    };
+
+    open( my $lock, "+<$db.lock") or do {
+        $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
+        return;
+    };
+
+    return $lock;
+};
+
+sub convert_db {
+    my $self = shift;
+
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $count = keys %$tied;
+
+    my $converted = 0;
+    foreach my $key ( keys %$tied ) {
+        my ( @parts ) = split /:/, $key;
+        next if $parts[0] =~ /^[\d]+$/;      # already converted
+        $converted++;
+        my $nip = Net::IP->new( $parts[0] );
+        $parts[0] = $nip->intip;             # convert IP to integer
+        my $new_key = join ':', @parts;
+        $tied->{$new_key} = $tied->{$key};
+        delete $tied->{$key};
+    };
+    untie $tied;
+    close $lock;
+    $self->log( LOGINFO, "converted $converted of $count DB entries" );
+    return $self->cleanup_and_return( $tied, $lock, DECLINED );
+};
+
+sub prune_db {
+    my $self = shift;
+
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $count = keys %$tied;
+
+    my $pruned = 0;
+    foreach my $key ( keys %$tied ) {
+        my ($ts, $new, $black, $white) = split /:/, $tied->{$key};
+        my $age = time - $ts;
+        next if $age < $self->{_args}{white_timeout};
+        $pruned++;
+        delete $tied->{$key};
+    };
+    untie $tied;
+    close $lock;
+    $self->log( LOGINFO, "pruned $pruned of $count DB entries" );
+    return $self->cleanup_and_return( $tied, $lock, DECLINED );
+};
 
 sub p0f_match {
     my $self = shift;
-    my $config = shift;
 
     my $p0f = $self->connection->notes('p0f');
-    return if !$p0f || !ref $p0f;     # p0f fingerprint info not found
+    if ( !$p0f || !ref $p0f ) {   # p0f fingerprint info not found
+        $self->LOGINFO(LOGERROR, "p0f info missing");
+        return;
+    };
 
     my %valid_matches = map { $_ => 1 } qw( genre detail uptime link distance );
-    my %requested_matches = split(/\,/, $config->{'p0f'} );
+    my %requested_matches = split(/\,/, $self->{_args}{p0f} );
 
     foreach my $key (keys %requested_matches) {
-        next if !defined $valid_matches{$key}; # discard invalid match keys
+        next if ! $key;
+        if ( ! defined $valid_matches{$key} ) {
+            $self->log(LOGERROR, "discarding invalid match key ($key)" );
+            next;
+        };
         my $value = $requested_matches{$key};
-        return 1 if $key eq 'distance' && $p0f->{$key} > $value;
-        return 1 if $key eq 'genre'    && $p0f->{$key} =~ /$value/i;
-        return 1 if $key eq 'uptime'   && $p0f->{$key} < $value;
-        return 1 if $key eq 'link'     && $p0f->{$key} =~ /$value/i;
+        next if ! defined $value;       # bad config setting?
+        next if ! defined $p0f->{$key}; # p0f didn't detect the value
+
+        if ( $key eq 'distance' && $p0f->{$key} > $value ) {
+            $self->log(LOGDEBUG, "p0f distance match ($value)");
+            return 1;
+        };
+        if ( $key eq 'genre'    && $p0f->{$key} =~ /$value/i ) {
+            $self->log(LOGDEBUG, "p0f genre match ($value)");
+            return 1;
+        };
+        if ( $key eq 'uptime'   && $p0f->{$key} < $value ) {
+            $self->log(LOGDEBUG, "p0f uptime match ($value)");
+            return 1;
+        };
+        if ( $key eq 'link'     && $p0f->{$key} =~ /$value/i ) {
+            $self->log(LOGDEBUG, "p0f link match ($value)");
+            return 1;
+        };
     }
+    $self->log(LOGINFO, "skip: no p0f match");
     return;
 }
 
-# arch-tag: 6ef5919e-404b-4c87-bcfe-7e9f383f3901
+sub geoip_match {
+    my $self = shift;
+
+    my $country = $self->connection->notes('geoip_country');
+    my $c_name  = $self->connection->notes('geoip_country_name') || '';
+
+    if ( !$country ) {
+        $self->LOGINFO(LOGNOTICE, "skip: no geoip country");
+        return;
+    };
+
+    my @countries = split /,/, $self->{_args}{geoip};
+    foreach ( @countries ) {
+        $self->LOGINFO(LOGINFO, "pass: geoip country match ($_, $c_name)");
+        return 1 if lc $_ eq lc $country;
+    };
+
+    $self->LOGINFO(LOGINFO, "skip: no geoip match ($c_name)");
+    return;
+}
 

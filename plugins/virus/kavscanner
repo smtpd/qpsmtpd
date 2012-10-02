@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!perl -w
 # Kasperski-AV plugin.
 
 =head1 NAME
@@ -174,4 +174,3 @@ sub hook_data_post {
   return (DECLINED);
 } 
 
-# vim: ts=2 sw=2 expandtab

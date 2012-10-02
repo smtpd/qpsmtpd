@@ -1,59 +1,77 @@
-#!/usr/bin/env perl
+#!perl -w
 
 use strict;
 use warnings;
+
+use Qpsmtpd::Constants;
 use IO::Socket;
-use version; my $VERSION = qv('1.0.0');
+use version; 
+my $VERSION = qv('1.0.3');
 
 sub register {
     my ($self, $qp, %args) = @_;
 
-    my %DEFAULT = (
-                   host => q{localhost},
-                   port => 89,
-                  );
-
-    $self->{_vpopmaild_host} =
-      defined $args{host} ? $args{host} : $DEFAULT{host};
-    $self->{_vpopmaild_port} =
-      defined $args{port} ? $args{port} : $DEFAULT{port};
+    $self->{_vpopmaild_host} = $args{host} || 'localhost';
+    $self->{_vpopmaild_port} = $args{port} || '89';
 
     $self->register_hook('auth-plain', 'auth_vpopmaild');
     $self->register_hook('auth-login', 'auth_vpopmaild');
+    #$self->register_hook('auth-cram-md5', 'auth_vpopmaild'); # not supported
 }
 
 sub auth_vpopmaild {
-    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
-      @_;
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) = @_;
+
+    if ( ! $passClear ) {
+        $self->log(LOGINFO, "skip: vpopmaild does not support cram-md5");
+        return DECLINED;
+    }
 
     # create socket
-    my $vpopmaild_socket =
-      IO::Socket::INET->new(
+    my $vpopmaild_socket = IO::Socket::INET->new(
                             PeerAddr => $self->{_vpopmaild_host},
                             PeerPort => $self->{_vpopmaild_port},
                             Proto    => 'tcp',
                             Type     => SOCK_STREAM
-                           ) or return DECLINED;
+                           ) or do {
+        $self->log(LOGERROR, "skip: socket connection to vpopmaild failed");
+        return DECLINED;
+    };
+
+    $self->log(LOGDEBUG, "attempting $method");
 
     # Get server greeting (+OK)
     my $connect_response = <$vpopmaild_socket>;
-    return DECLINED unless $connect_response eq '+OK \r\n';
+    if ( ! $connect_response ) {
+        $self->log(LOGERROR, "skip: no connection response");
+        close($vpopmaild_socket);
+        return DECLINED;
+    };
 
-    # send login details
-    print $vpopmaild_socket "login $user $passClear\n\r";
+    if ( $connect_response !~ /^\+OK/ ) {
+        $self->log(LOGERROR, "skip: bad connection response: $connect_response");
+        close($vpopmaild_socket);
+        return DECLINED;
+    };
 
-    # get response from server
-    my $login_response = <$vpopmaild_socket>;
-
+    print $vpopmaild_socket "login $user $passClear\n\r"; # send login details
+    my $login_response = <$vpopmaild_socket>;       # get response from server
     close($vpopmaild_socket);
 
-    # check for successful login
-    if ($login_response eq '+OK+\r\n') {
-        return (OK, 'authcheckpassword');
-    }
-    else {
+    if ( ! $login_response ) {
+        $self->log(LOGERROR, "skip: no login response");
         return DECLINED;
-    }
+    };
+
+    # check for successful login (single line (+OK) or multiline (+OK+))
+    if ( $login_response =~ /^\+OK/ ) {
+        $self->log(LOGINFO, "pass: clear");
+        return (OK, 'auth_vpopmaild');
+    };
+
+    chomp $login_response;
+    $self->log(LOGNOTICE, "fail: $login_response");
+    return DECLINED;
 }
 
 __END__
@@ -89,6 +107,8 @@ please read the VPOPMAIL section in doc/authentication.pod
 =head1 AUTHOR
 
 Robin Bowes <robin.bowes@yo61.com>
+
+Matt Simerson (updated response parsing, added logging)
 
 =head1 COPYRIGHT AND LICENSE
 

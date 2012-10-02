@@ -1,0 +1,43 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("auth_vpopmail_sql", 3);
+}
+
+sub auth_vpopmail_sql {
+    my $self = shift;
+    my ( $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
+
+    my $dbh = $self->get_db_handle() or do {
+            foreach ( 0..2 ) {
+                ok( 1, "auth_vpopmail_sql, skipped (no DB)" );
+            };
+            return;
+        };
+    ok( $dbh, "auth_vpopmail_sql, got a dbh" );
+
+    my $vuser = $self->get_vpopmail_user( $dbh, 'postmaster@example.com' );
+    if ( ! $vuser || ! $vuser->{pw_passwd} ) {
+        foreach ( 0..1 ) {
+            ok( 1, "auth_vpopmail_sql, no example.com domain" );
+        };
+        return;
+    };
+    ok( ref $vuser, "auth_vpopmail_sql, found example.com domain" );
+
+    ok( $self->auth_vmysql(
+            $self->qp->transaction,
+            'PLAIN',
+            'postmaster@example.com',
+            $vuser->{pw_clear_passwd},
+            $vuser->{pw_passwd},
+            $ticket,
+        ),
+        "auth_vpopmail_sql, postmaster"
+    );
+}

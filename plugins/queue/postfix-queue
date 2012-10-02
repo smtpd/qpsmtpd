@@ -1,3 +1,4 @@
+#!perl -w
 
 =head1 NAME
 
@@ -195,4 +196,3 @@ sub hook_queue {
     return (OK, "Queued! $msg_id (Queue-Id: $qid)");
 }
 
-# vim: sw=2 ts=8 syn=perl
