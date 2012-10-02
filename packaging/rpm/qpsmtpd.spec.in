@@ -1,6 +1,6 @@
-Name:           %{_package}
-Version:        %{_version}
-Release:        %{_release}
+Name:           @PACKAGE@
+Version:        @VERSION@
+Release:        @RELEASE@
 
 Summary: qpsmtpd + qpsmtpd-apache + qpsmtpd-async
 License: MIT
@@ -8,7 +8,7 @@ Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
 BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
 BuildRequires: perl >= 0:5.00503
-BuildArchitectures: noarch
+BuildArch: noarch
 Requires: perl(Mail::Header), perl(Net::DNS) perl(Net::IP) perl(IPC::Shareable)
 Requires(pre): coreutils, shadow-utils, perl
 
@@ -52,7 +52,7 @@ qpsmpd-async which uses it.
 %setup -q -n %{name}-%{version}-%{release}
 
 %build
-CFLAGS="$RPM_OPT_FLAGS" perl Makefile.PL INSTALLSITELIB=%{_prefix}/lib/perl5/site_perl
+CFLAGS="$RPM_OPT_FLAGS" perl Makefile.PL PREFIX=%{_prefix}
 make
 
 %clean
@@ -69,9 +69,9 @@ then
         make DESTDIR=$RPM_BUILD_ROOT install
 
 else
-        make PREFIX=$RPM_BUILD_ROOT/usr
+        make PREFIX=$RPM_BUILD_ROOT%{_prefix}
         find blib/lib -name '*.pm.*' -exec rm -f {} \;
-        make PREFIX=$RPM_BUILD_ROOT/usr install
+        make PREFIX=$RPM_BUILD_ROOT%{_prefix} install
 fi
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}
 rm -f ${RPM_BUILD_ROOT}%{_datadir}/%{name}/plugins/*.*
@@ -127,7 +127,7 @@ fi
 
 %files apache
 %defattr(-,root,root)
-%{_prefix}/lib/perl5/site_perl/Apache/Qpsmtpd.pm
+%{_datadir}/perl5/Apache/Qpsmtpd.pm
 %{_mandir}/man3/Apache::Qpsmtpd.3pm.gz
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/*
 %doc %{_docdir}/%{name}-apache-%{version}/README.selinux
@@ -135,11 +135,11 @@ fi
 %files async
 %defattr(-,root,root)
 %{_bindir}/qpsmtpd-async
-%{_prefix}/lib/perl5/site_perl/Danga/Client.pm
-%{_prefix}/lib/perl5/site_perl/Danga/TimeoutSocket.pm
-%{_prefix}/lib/perl5/site_perl/Qpsmtpd/ConfigServer.pm
-%{_prefix}/lib/perl5/site_perl/Qpsmtpd/Plugin/Async/DNSBLBase.pm
-%{_prefix}/lib/perl5/site_perl/Qpsmtpd/PollServer.pm
+%{_datadir}/perl5/Danga/Client.pm
+%{_datadir}/perl5/Danga/TimeoutSocket.pm
+%{_datadir}/perl5/Qpsmtpd/ConfigServer.pm
+%{_datadir}/perl5/Qpsmtpd/Plugin/Async/DNSBLBase.pm
+%{_datadir}/perl5/Qpsmtpd/PollServer.pm
 %{_mandir}/man1/qpsmtpd-async.1.gz
 %{_datadir}/%{name}/plugins/async/*
 
@@ -157,6 +157,9 @@ then
 fi
 
 %changelog
+* Tue Oct 02 2012 <robin.bowes@yo61.com>
+- Fix up spec file to build directly from git repo
+
 * Sun Jul 12 2009 <rpmbuild@robinbowes.com> 0.82-0.1
 - Update to latest release
 - don't add qpsmtpd to start-up by default
