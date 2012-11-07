@@ -405,7 +405,7 @@ sub check_spam_munge_subject {
     };
     return DECLINED unless $sa->{score} > $required;
 
-    my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
+    my $subject_prefix = $self->{_args}{subject_prefix} || '*** SPAM ***';
     my $subject = $transaction->header->get('Subject') || '';
     $transaction->header->replace('Subject', "$subject_prefix $subject");
 
