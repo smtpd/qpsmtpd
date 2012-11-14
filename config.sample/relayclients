@@ -4,3 +4,9 @@
 127.0.0.1 
 # leading/trailing whitespace is ignored
  192.0. 
+#
+# IPv6 formats ends in a nibble (not a netmask, prefixlen, or colon)
+# RFC 3849 example
+2001:DB8
+2001:DB8::1
+2001:0DB8:0000:0000:0000:0000:0000:0001
