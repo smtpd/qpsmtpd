@@ -18,7 +18,7 @@ These are the common ones: score,required,autolearn,tests,version
 =head1 CONFIG
 
 Configured in the plugins file without any parameters, the
-spamassassin plugin will add relevant headers from the spamd
+spamassassin plugin will add relevant headers from spamd
 (X-Spam-Status etc).
 
 The format goes like
@@ -66,6 +66,11 @@ Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix
 domain sockets for spamd. This is faster and more secure than using a
 TCP connection, but if you run spamd on a remote machine, you need to
 use a TCP connection.
+
+=item headers [none]
+
+By default, spamassasin headers are added to messages. To suppress header
+insertion, use 'headers none'.
 
 =item leave_old_headers [drop|rename|keep]
 
@@ -139,6 +144,7 @@ Make the "subject munge string" configurable
 use strict;
 use warnings;
 
+use lib 'lib';
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 
@@ -240,6 +246,12 @@ sub parse_spamd_response {
 
 sub insert_spam_headers {
     my ( $self, $transaction, $new_headers, $username ) = @_;
+
+    if ( $self->{_args}{headers} && $self->{_args}{headers} eq 'none' ) {
+        my $r = $self->parse_spam_header( $new_headers->{'X-Spam-Status'} );
+        $transaction->notes('spamassassin', $r);
+        return;
+    };
 
     my $recipient_count = scalar $transaction->recipients;
 
@@ -409,6 +421,8 @@ sub reject {
 
 sub munge_subject {
     my ($self, $transaction) = @_;
+
+    return if ($self->{_args}{headers} && $self->{_args}{headers} eq 'none');
 
     my $sa = $self->get_spam_results($transaction) or return;
     my $qp_num = $self->{_args}{munge_subject_threshold};
