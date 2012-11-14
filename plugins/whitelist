@@ -94,6 +94,12 @@ automatically allow relaying from that IP.
 
 =cut
 
+use strict;
+use warnings;
+
+use lib 'lib';
+use Qpsmtpd::Constants;
+
 my $VERSION = 0.02;
 
 # Default is to merge whitelists in per_recipient mode
@@ -144,6 +150,7 @@ sub check_host {
             return OK;
         }
     }
+    $self->log(LOGDEBUG, "skip: $ip is not whitelisted");
     return DECLINED;
 }
 
