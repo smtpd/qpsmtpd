@@ -636,7 +636,7 @@ sub data_respond {
   while (defined($_ = $self->getline($timeout))) {
     if ( $_ eq ".\r\n" ) {
         $complete++;
-        $_ eq '';
+        $_ = '';
     };
     $i++;
 
