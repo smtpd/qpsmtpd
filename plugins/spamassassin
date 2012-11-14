@@ -392,7 +392,7 @@ sub reject {
 
     my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
     my $status = "$ham_or_spam, $score";
-    my $learn;
+    my $learn = '';
     if ( $sa_results->{autolearn} ) {
         $learn = "learn=". $sa_results->{autolearn};
     };
