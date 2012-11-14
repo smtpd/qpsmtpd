@@ -20,10 +20,6 @@ $| = 1;
 
 my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
-if ($has_ipv6) {
-  eval 'use Socket6';
-}
-
 # Configuration
 my $MAXCONN   = 15;                  # max simultaneous connections
 my @PORT;                            # port number(s)
