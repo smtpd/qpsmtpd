@@ -31,10 +31,6 @@ defined $Config{sig_name} || die "No signals?";
 
 my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
-if ($has_ipv6) {
-  use Socket6;
-}
-
 #use Time::HiRes qw(gettimeofday tv_interval);
 
 #get available signals

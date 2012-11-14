@@ -14,7 +14,7 @@ if (
     # INET6 prior to 2.01 will not work; sorry.
     eval {require IO::Socket::INET6; IO::Socket::INET6->VERSION("2.00");}
     ) {
-    import Socket6;
+    Socket6->import(qw(inet_ntop));
     $has_ipv6=1;
 }
 
