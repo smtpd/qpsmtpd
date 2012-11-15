@@ -26,7 +26,7 @@ is($smtpd->config('me'), 'some.host.example.org', 'config("me")');
 # line with both)
 my $relayclients = join ",", sort $smtpd->config('relayclients');
 is($relayclients,
-	'127.0.0.1,192.0.,2001:0DB8:0000:0000:0000:0000:0000:0001,2001:DB8::1/32,2001:DB8,2001:DB8::1',
+	'127.0.0.1,192.0.,2001:0DB8,2001:0DB8:0000:0000:0000:0000:0000:0001,2001:DB8::1,2001:DB8::1/32',
 	'config("relayclients") are trimmed');
 
 foreach my $f ( @mes ) {
