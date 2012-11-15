@@ -1,12 +1,14 @@
 # used by plugins/relay
-# Format is IP, or IP part with trailing dot
+# IPv4 format is IP, or IP part with trailing dot
 # e.g. "127.0.0.1", or "192.168."
 127.0.0.1 
 # leading/trailing whitespace is ignored
  192.0. 
 #
-# IPv6 formats ends in a nibble (not a netmask, prefixlen, or colon)
-# RFC 3849 example
-2001:DB8
+# IPv6 formats can be compressed or expanded, may include a prefixlen,
+# and can end on any nibble boundary. Nibble boundaries must be expressed
+# in expanded format.  (RFC 3849 example)
+2001:0DB8
 2001:DB8::1
+2001:DB8::1/32
 2001:0DB8:0000:0000:0000:0000:0000:0001

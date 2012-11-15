@@ -59,8 +59,6 @@ use warnings;
 #use Mail::SPF 2.000;   # eval'ed in ->register
 use Qpsmtpd::Constants;
 
-use Net::IP;
-
 sub register {
     my ($self, $qp, %args) = @_;
     eval 'use Mail::SPF';
@@ -92,8 +90,8 @@ sub mail_handler {
         return (DECLINED, "SPF - null sender");
     };
 
-    if ( $self->is_in_relayclients() ) {
-        $self->log( LOGINFO, "skip, in relayclients" );
+    if ( $self->qp->connection->relay_client ) {
+        $self->log( LOGINFO, "skip, relay_client" );
         return (DECLINED, "SPF - relaying permitted");
     };
 
@@ -230,39 +228,6 @@ sub data_post_handler {
 
     return DECLINED;
 }
-
-sub is_in_relayclients {
-    my $self = shift;
-
-    my $client_ip          = $self->qp->connection->remote_ip;
-    my @relay_clients      = $self->qp->config('relayclients');
-    my $more_relay_clients = $self->qp->config('morerelayclients', 'map');
-    my %relay_clients      = map { $_ => 1 } @relay_clients;
-
-    my $ipv6 = $client_ip =~ /:/ ? 1 : 0;
-
-    if ( $ipv6 && $client_ip =~ /::/ ) {  # IPv6 compressed notation
-        $client_ip = Net::IP::ip_expand_address($client_ip,6);
-    };
-
-    while ($client_ip) {
-        if ( exists $relay_clients{$client_ip} ||
-             exists $more_relay_clients->{$client_ip} ) {
-            $self->log( LOGDEBUG, "skip, IP in relayclients" );
-            return 1;
-        };
-
-        # added IPv6 support (Michael Holzt - 2012-11-14)
-        if ( $ipv6 ) {
-            $client_ip =~ s/[0-9a-f]:*$//;       # strip off another nibble
-            chop $client_ip if ':' eq substr($client_ip, -1, 1);
-        }
-        else {
-            $client_ip =~ s/\d+\.?$// or last;   # strip off another 8 bits
-        }
-    }
-    return;
-};
 
 sub is_special_recipient {
     my ($self, $rcpt) = @_;
