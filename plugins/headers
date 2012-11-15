@@ -132,11 +132,8 @@ sub hook_data_post {
     return (DECLINED, "immune") if $self->is_immune();
 
     foreach my $h ( @required_headers ) {
-        if ( ! $header->get($h) ) {
-            return $self->get_reject( 
-                "We require a valid $h header", "no $h header"
-            );
-        };
+        next if $header->get($h);
+        return $self->get_reject( "We require a valid $h header", "no $h header");
     };
 
     foreach my $h ( @singular_headers ) {
