@@ -37,12 +37,12 @@ Each line in I<relayclients> is one of:
 
  - partial IP address terminated by a dot or colon for matching whole networks
      192.168.42.
-     fdda:b13d:e431:ae06:
+     2001:db8:e431:ae06:
      ...
 
  - a network/mask, aka a CIDR block
      10.1.0.0/24
-     fdda:b13d:e431:ae06::/64
+     2001:db8:e431:ae06::/64
      ...
 
 =head2 morerelayclients
@@ -175,14 +175,19 @@ sub is_octet_match {
     my $self = shift;
 
     my $ip = $self->qp->connection->remote_ip;
-    $ip =~ s/::/:/;
 
-    if ( $ip eq ':1' ) {
+    if ( $ip eq '::1' ) {
         $self->log(LOGINFO, "pass, octet matched localhost ($ip)");
         return 1;
     };
 
     my $more_relay_clients = $self->qp->config('morerelayclients', 'map');
+
+    my $ipv6 = $ip =~ /:/ ? 1 : 0;
+
+    if ( $ipv6 && $ip =~ /::/ ) {  # IPv6 compressed notation
+        $ip = Net::IP::ip_expand_address($ip,6);
+    };
 
     while ($ip) {
         if ( exists $self->{_octets}{$ip} ) {
@@ -194,7 +199,15 @@ sub is_octet_match {
             $self->log(LOGINFO, "pass, octet match in morerelayclients ($ip)");
             return 1;
         };
-        $ip =~ s/(\d|\w)+(:|\.)?$// or last; # strip off another 8 bits
+
+        # added IPv6 support (Michael Holzt - 2012-11-14)
+        if ( $ipv6 ) {
+            $ip =~ s/[0-9a-f]:?$//;       # strip off another nibble
+            chop $ip if ':' eq substr($ip, -1, 1);
+        }
+        else {
+            $ip =~ s/\d+\.?$// or last;   # strip off another 8 bits
+        }
     }
 
     $self->log(LOGDEBUG, "no octet match" );
