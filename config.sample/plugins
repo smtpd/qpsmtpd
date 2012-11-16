@@ -15,38 +15,33 @@
 # from one IP!
 hosts_allow
 
-# information plugins
+# connection / informational plugins
+#connection_time
 ident/geoip
 #ident/p0f /tmp/.p0f_socket version 3
-#connection_time
-
-# enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
-dont_require_anglebrackets
-
-# enable to reject MAIL FROM:/RCPT TO: parameters if client helo was HELO
-# (strict RFC 821)... this is not used in EHLO ...
-# parse_addr_withhelo
 
 quit_fortune
-#karma penalty_box 1 reject naughty
-
 # tls should load before count_unrecognized_commands
 #tls
 earlytalker
 count_unrecognized_commands 4
+
 relay
-
-resolvable_fromhost
-
-rhsbl
+#whitelist
+#karma penalty_box 1 reject naughty
 dnsbl reject naughty reject_type disconnect
-badmailfrom
-badrcptto
+rhsbl
+# greylisting reject 0 p0f genre,windows
+
+
+# HELO plugins
 helo policy lenient
+# enable to reject MAIL FROM:/RCPT TO: parameters if client helo was HELO
+# (strict RFC 821)... this is not used in EHLO ...
+# parse_addr_withhelo
 
-# sender_permitted_from
-# greylisting p0f genre,windows
 
+# AUTH plugins
 #auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
 #auth/auth_vpopmail
 #auth/auth_vpopmaild
@@ -54,14 +49,29 @@ helo policy lenient
 auth/auth_flat_file
 auth/authdeny
 
+# enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
+dont_require_anglebrackets
+
+# MAIL FROM plugins
+badmailfrom
+#badmailfromto
+resolvable_fromhost
+# sender_permitted_from
+
+# RCPT TO plugins
+badrcptto
+#qmail_deliverable
 # this plugin needs to run after all other "rcpt" plugins
 rcpt_ok
 
+# DATA plugins
+#uribl
 headers reject 1 reject_type temp require From,Date future 2 past 15
+#bogus_bounce
+#loop
 dkim
 
 # content filters
-#uribl
 virus/klez_filter
 
 # You can run the spamassassin plugin with options.  See perldoc
@@ -75,7 +85,7 @@ spamassassin reject 12
 #   spamassassin reject 20 munge_subject_threshold 10
 
 # dspam must run after spamassassin for the learn_from_sa feature to work
-dspam learn_from_sa 7 reject 1
+dspam autolearn spamassassin reject agree
 
 # run the clamav virus checking plugin
 # virus/clamav
