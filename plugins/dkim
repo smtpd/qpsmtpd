@@ -54,7 +54,9 @@ David Summers - http://www.nntp.perl.org/group/perl.qpsmtpd/2010/08/msg9417.html
 
 Matthew Harrell - http://alecto.bittwiddlers.com/files/qpsmtpd/dkimcheck
 
-I first attempted to fix the dkimcheck plugin, but soon scrapped that effort and wrote this one.
+I first attempted to fix the dkimcheck plugin, but soon scrapped that effort and wrote this one. Why?
+
+=over 4
 
 The nine 'if' brackets with 19 conditionals, and my inability to easily determine which of the 15 possible permutations (5 signature validation results x 3 possible policy results) were covered.
 
@@ -63,6 +65,8 @@ The use of $dkim->fetch_author_policy, which is deprecated by Mail::DKIM.
 The paradim of a single policy, when DKIM supports 0 or many. Although I may yet implement the 'local' policy idea, so long as I'm confident it will never result in a false positive.
 
 The OBF programming style, which is nigh impossible to test.
+
+=back
 
 =cut
 
