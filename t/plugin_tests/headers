@@ -86,6 +86,7 @@ sub test_hook_data_post {
     my $transaction = $self->qp->transaction;
 
     my ($code, $mess) = $self->hook_data_post( $transaction );
+    $mess ||= '';  # avoid undef warning
     cmp_ok( DECLINED, '==', $code, "okay $code, $mess" );
 
     $transaction->header->delete('Date');
