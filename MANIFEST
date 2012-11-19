@@ -54,14 +54,19 @@ lib/Qpsmtpd/TcpServer/Prefork.pm
 lib/Qpsmtpd/Transaction.pm
 lib/Qpsmtpd/Utils.pm
 LICENSE
+log/log2sql
+log/log2sql.sql
 log/run
+log/show_message
+log/summarize
+log/watch
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml			Module meta-data (added by MakeMaker)
-plugins/async/earlytalker
 plugins/async/dns_whitelist_soft
 plugins/async/dnsbl
+plugins/async/earlytalker
 plugins/async/queue/smtp-forward
 plugins/async/resolvable_fromhost
 plugins/async/rhsbl
@@ -78,16 +83,16 @@ plugins/badmailfrom
 plugins/badmailfromto
 plugins/badrcptto
 plugins/bogus_bounce
-plugins/earlytalker
-plugins/loop
 plugins/connection_time
 plugins/content_log
 plugins/count_unrecognized_commands
+plugins/dkim
 plugins/dns_whitelist_soft
 plugins/dnsbl
 plugins/domainkeys
 plugins/dont_require_anglebrackets
 plugins/dspam
+plugins/earlytalker
 plugins/greylisting
 plugins/headers
 plugins/helo
@@ -106,10 +111,12 @@ plugins/logging/file
 plugins/logging/syslog
 plugins/logging/transaction_id
 plugins/logging/warn
+plugins/loop
 plugins/milter
 plugins/naughty
 plugins/noop_counter
 plugins/parse_addr_withhelo
+plugins/qmail_deliverable
 plugins/queue/exim-bsmtp
 plugins/queue/maildir
 plugins/queue/postfix-queue
@@ -120,8 +127,8 @@ plugins/random_error
 plugins/rcpt_map
 plugins/rcpt_ok
 plugins/rcpt_regexp
+plugins/registry.txt
 plugins/relay
-plugins/resolvable_fromhost
 plugins/resolvable_fromhost
 plugins/rhsbl
 plugins/sender_permitted_from
@@ -138,6 +145,7 @@ plugins/virus/kavscanner
 plugins/virus/klez_filter
 plugins/virus/sophie
 plugins/virus/uvscan
+plugins/whitelist
 qpsmtpd
 qpsmtpd-async
 qpsmtpd-forkserver
@@ -174,7 +182,6 @@ t/plugin_tests/auth/authnull
 t/plugin_tests/badmailfrom
 t/plugin_tests/badmailfromto
 t/plugin_tests/badrcptto
-t/plugin_tests/earlytalker
 t/plugin_tests/count_unrecognized_commands
 t/plugin_tests/dnsbl
 t/plugin_tests/dspam
