@@ -471,6 +471,7 @@ sub check_name_match {
     my ($dns_name, $helo_name) = @_;
 
     return if ! $dns_name;
+    return if split(/\./, $dns_name) < 2;  # not a FQDN
 
     if ( $dns_name eq $helo_name ) {
         $self->log( LOGDEBUG, "reverse name match" );
