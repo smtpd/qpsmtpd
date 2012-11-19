@@ -149,7 +149,10 @@ sub populate_relayclients {
 sub is_in_cidr_block {
     my $self = shift;
 
-    my $ip = $self->qp->connection->remote_ip;
+    my $ip = $self->qp->connection->remote_ip or do {
+        $self->log(LOGINFO, "err, no remote_ip?");
+        return;
+    };
     my $cversion = ip_get_version($ip);
     for ( @{ $self->{_cidr_blocks} } ) {
         my ($network, $mask) = ip_splitprefix($_); # split IP & CIDR range
@@ -157,7 +160,10 @@ sub is_in_cidr_block {
         my ($begin, $end) = ip_normalize($_, $rversion); # get pool start/end
 
 # expand the client address (zero pad it) before converting to binary
-        my $bin_ip = ip_iptobin(ip_expand_address($ip, $cversion), $cversion);
+        my $bin_ip = ip_iptobin(ip_expand_address($ip, $cversion), $cversion)
+            or next;
+
+        next if ! $begin || ! $end;  # probably not a netmask entry
 
         if (    ip_bincomp($bin_ip, 'gt', ip_iptobin($begin, $rversion))
              && ip_bincomp($bin_ip, 'lt', ip_iptobin($end,   $rversion))
