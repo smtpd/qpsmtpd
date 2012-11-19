@@ -140,7 +140,10 @@ sub data_post_handler {
 
     my $filename = $self->get_filename( $transaction ) or return DECLINED;
 
-    #return (DECLINED) if $self->is_immune();
+    if ( $self->connection->notes('naughty') ) {
+        $self->log( LOGINFO, "skip, naughty" );
+        return (DECLINED);
+    };
     return (DECLINED) if $self->is_too_big( $transaction );
     return (DECLINED) if $self->is_not_multipart( $transaction );
 
