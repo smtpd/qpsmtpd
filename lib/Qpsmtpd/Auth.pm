@@ -144,7 +144,7 @@ sub get_auth_details_cram_md5 {
         return;
     };
 
-    my ( $user, $passHash ) = split( ' ', decode_base64($line) );
+    my ( $user, $passHash ) = split( / /, decode_base64($line) );
     unless ( $user && $passHash ) {
         $session->respond(504, "Invalid authentication string");
         return;
@@ -170,7 +170,7 @@ sub validate_password {
     my ( $self, %a ) = @_;
 
     my ($pkg, $file, $line) = caller();
-    $file = (split '/', $file)[-1];     # strip off the path
+    $file = (split /\//, $file)[-1];     # strip off the path
 
     my $src_clear     = $a{src_clear};
     my $src_crypt     = $a{src_crypt};

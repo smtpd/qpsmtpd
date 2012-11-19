@@ -457,8 +457,8 @@ sub check_ip_match {
         return;
     };
 
-    my $dns_net = join('.', (split('\.', $ip))[0,1,2] );
-    my $rem_net = join('.', (split('\.', $self->qp->connection->remote_ip))[0,1,2] );
+    my $dns_net = join('.', (split(/\./, $ip))[0,1,2] );
+    my $rem_net = join('.', (split(/\./, $self->qp->connection->remote_ip))[0,1,2] );
 
     if ( $dns_net eq $rem_net ) {
         $self->log( LOGNOTICE, "forward network match" );
@@ -470,14 +470,16 @@ sub check_name_match {
     my $self = shift;
     my ($dns_name, $helo_name) = @_;
 
+    return if ! $dns_name;
+
     if ( $dns_name eq $helo_name ) {
         $self->log( LOGDEBUG, "reverse name match" );
         $self->connection->notes('helo_reverse_match', 1);
         return;
     };
 
-    my $dns_dom  = join('.', (split('\.', $dns_name ))[-2,-1] );
-    my $helo_dom = join('.', (split('\.', $helo_name))[-2,-1] );
+    my $dns_dom  = join('.', (split(/\./, $dns_name ))[-2,-1] );
+    my $helo_dom = join('.', (split(/\./, $helo_name))[-2,-1] );
 
     if ( $dns_dom eq $helo_dom ) {
         $self->log( LOGNOTICE, "reverse domain match" );
