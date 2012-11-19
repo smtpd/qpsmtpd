@@ -180,6 +180,12 @@ sub rcpt_handler {
     $self->log(LOGINFO, "error, permission failure"),       $k++ if $rv == 0x11;
     $self->log(LOGINFO, "pass, qmail-command in dot-qmail"),$k++ if $rv == 0x12;
     $self->log(LOGINFO, "pass, bouncesaying with program"), $k++ if $rv == 0x13;
+    if ( $rv == 0x14 ) {
+        my $s = $transaction->sender->address;
+        return (DENY, "fail, mailing lists do not accept null senders")
+            if ( ! $s || $s eq '<>');
+        $self->log(LOGINFO, "pass, ezmlm list"); $k++;
+    };
     $self->log(LOGINFO, "Temporarily undeliverable: group/world writable"), $k++
                                                                  if $rv == 0x21;
     $self->log(LOGINFO, "Temporarily undeliverable: sticky home directory"),$k++
