@@ -587,6 +587,15 @@ sub autolearn {
 
     defined $self->{_args}{autolearn} or return;
 
+    if (   $self->{_args}{autolearn} ne 'any'
+        && $self->{_args}{autolearn} ne 'karma'
+        && $self->{_args}{autolearn} ne 'naughty'
+        && $self->{_args}{autolearn} ne 'spamassassin'
+        ) {
+        $self->log(LOGERROR, "bad autolearn setting! Read 'perldoc plugins/dspam' again!");
+        return;
+    };
+
     # only train once.
     $self->autolearn_naughty( $response, $transaction ) and return;
     $self->autolearn_karma( $response, $transaction ) and return;
@@ -598,7 +607,10 @@ sub autolearn_naughty {
 
     my $learn = $self->{_args}{autolearn} or return;
 
-    return if ( $learn ne 'naughty' && $learn ne 'any' );
+    if ( $learn ne 'naughty' && $learn ne 'any' ) {
+        $self->log(LOGINFO, "skipping naughty autolearn");
+        return;
+    };
 
     if ( $self->connection->notes('naughty') && $response->{result} eq 'Innocent' ) {
         $self->log(LOGINFO, "training naughty FN message as spam");
@@ -606,6 +618,7 @@ sub autolearn_naughty {
         return 1;
     };
 
+    $self->log(LOGDEBUG, "falling through naughty autolearn");
     return;
 };
 
