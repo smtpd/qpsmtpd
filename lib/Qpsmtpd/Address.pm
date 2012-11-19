@@ -342,8 +342,8 @@ sub _addr_cmp {
     }
 
     #invert the address so we can sort by domain then user    
-    ($left  = join( '=', reverse( split('@', $left->format))) ) =~ tr/[<>]//d;
-    ($right = join( '=', reverse( split('@',$right->format))) ) =~ tr/[<>]//d;
+    ($left  = join( '=', reverse( split(/@/, $left->format))) ) =~ tr/[<>]//d;
+    ($right = join( '=', reverse( split(/@/,$right->format))) ) =~ tr/[<>]//d;
 
     if ( $swap ) {
 	($right, $left) = ($left, $right);
