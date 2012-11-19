@@ -32,6 +32,7 @@ exec $BIN/softlimit -m $MAXRAM  \
 #    $PERL -T ./qpsmtpd-forkserver  \
 #      --listen-address $IP         \
 #      --port $PORT                 \
+#      --port 587                   \
 #      --limit-connections 15       \
 #      --max-from-ip 5              \
 #      --user $QPUSER
