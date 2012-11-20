@@ -185,6 +185,7 @@ t/plugin_tests/badrcptto
 t/plugin_tests/count_unrecognized_commands
 t/plugin_tests/dnsbl
 t/plugin_tests/dspam
+t/plugin_tests/earlytalker
 t/plugin_tests/greylisting
 t/plugin_tests/headers
 t/plugin_tests/helo
