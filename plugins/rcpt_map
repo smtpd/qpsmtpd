@@ -153,7 +153,7 @@ sub read_map {
         s/^\s*//;
         next if /^#/;
         next unless $_;
-        my ($addr, $code, $msg) = split ' ', $_, 3;
+        my ($addr, $code, $msg) = split / /, $_, 3;
         next unless $addr;
 
         unless ($code) {

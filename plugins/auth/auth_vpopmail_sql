@@ -104,7 +104,7 @@ sub get_db_handle {
 sub get_vpopmail_user {
     my ( $self, $dbh, $user ) = @_;
 
-    my ( $pw_name, $pw_domain ) = split '@', lc($user);
+    my ( $pw_name, $pw_domain ) = split /@/, lc($user);
 
     if ( ! defined $pw_domain ) {
         $self->log(LOGINFO, "skip: missing domain: " . lc $user );

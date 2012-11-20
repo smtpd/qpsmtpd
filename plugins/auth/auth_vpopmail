@@ -61,7 +61,7 @@ sub auth_vpopmail {
     my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
       @_;
 
-    my $pw              = vauth_getpw( split '@', lc($user) );
+    my $pw              = vauth_getpw( split /@/, lc($user) );
     my $pw_clear_passwd = $pw->{pw_clear_passwd};
     my $pw_passwd       = $pw->{pw_passwd};
 

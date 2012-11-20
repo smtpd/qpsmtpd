@@ -354,7 +354,7 @@ sub _load_plugin {
   my $self = shift;
   my ($plugin_line, @plugin_dirs) = @_;
 
-  my ($plugin, @args) = split ' ', $plugin_line;
+  my ($plugin, @args) = split / /, $plugin_line;
 
   my $package;
 

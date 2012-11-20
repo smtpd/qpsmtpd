@@ -195,7 +195,7 @@ sub parse_line_plugin {
     my ($tai, $pid, $hook, $plugin, $message ) = split /\s/, $line, 5;
     $plugin =~ s/:$//;
     if ( $plugin =~ /_3a/ ) {
-        ($plugin) = split '_3a', $plugin;  # trim :N off the plugin log entry
+        ($plugin) = split /_3a/, $plugin;  # trim :N off the plugin log entry
     };
     $plugin =~ s/_2d/-/g;
 
@@ -320,7 +320,7 @@ sub populate_plugins_from_registry {
         next if ! $aliases;
         $aliases =~ s/\s+//g;
         $plugins{$name}{aliases} = $aliases;
-        foreach my $a ( split ',', $aliases ) {
+        foreach my $a ( split /,/, $aliases ) {
             $plugin_aliases{$a} = $name;
         };
     };
