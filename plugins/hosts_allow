@@ -98,7 +98,7 @@ sub in_hosts_allow {
         my ($ipmask, $const, $message) = split /\s+/, $_, 3;
         next unless defined $const;
 
-        my ($net,$mask) = split '/', $ipmask, 2;
+        my ($net,$mask) = split /\//, $ipmask, 2;
         $mask = 32 if ! defined $mask;
         $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
         if (join('.', unpack('C4', inet_aton($remote) & $mask)) eq $net) {
