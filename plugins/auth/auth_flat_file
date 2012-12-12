@@ -53,7 +53,7 @@ sub auth_flat_file {
         return ( DENY, "authflat - missing password" );
     }
 
-    my ( $pw_name, $pw_domain ) = split '@', lc($user);
+    my ( $pw_name, $pw_domain ) = split /@/, lc($user);
 
     unless ( defined $pw_domain ) {
         $self->log(LOGINFO, "fail: missing domain");

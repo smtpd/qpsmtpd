@@ -260,7 +260,7 @@ sub select_username {
     $self->log(LOGDEBUG, "Message has $recipient_count recipients");
 
     if ( $recipient_count > 1 ) {
-        $self->log(LOGINFO, "skipping user prefs, $recipient_count recipients detected.");
+        $self->log(LOGINFO, "multiple recipients ($recipient_count), ignoring user prefs");
         return getpwuid($>);
     };
 
@@ -296,13 +296,13 @@ sub parse_response {
 
     #return $self->parse_response_regexp( $response );  # probably slower
 
-    my ($user, $result, $class, $prob, $conf, $sig) = split '; ', $response;
+    my ($user, $result, $class, $prob, $conf, $sig) = split /; /, $response;
 
-    (undef, $result) = split '=', $result;
-    (undef, $class ) = split '=', $class;
-    (undef, $prob  ) = split '=', $prob;
-    (undef, $conf  ) = split '=', $conf;
-    (undef, $sig   ) = split '=', $sig;
+    (undef, $result) = split /=/, $result;
+    (undef, $class ) = split /=/, $class;
+    (undef, $prob  ) = split /=/, $prob;
+    (undef, $conf  ) = split /=/, $conf;
+    (undef, $sig   ) = split /=/, $sig;
 
     $result = substr($result, 1, -1);  # strip off quotes
     $class  = substr($class,  1, -1);
@@ -656,7 +656,9 @@ sub autolearn_spamassassin {
 
     my $sa = $transaction->notes('spamassassin' );
     if ( ! $sa || ! $sa->{is_spam} ) {
-        $self->log(LOGERROR, "SA results missing");
+        if ( ! $self->connection->notes('naughty') ) {
+            $self->log(LOGERROR, "SA results missing"); # SA skips naughty
+        };
         return;
     };
 

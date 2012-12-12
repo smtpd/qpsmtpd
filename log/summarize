@@ -80,6 +80,7 @@ while ( defined (my $line = $fh->read) ) {
         next if $type ne 'connect';    # ignore unless connect
         my ($host, $ip) = split /\s/, $message;
         $ip = substr $ip, 1, -1;
+        foreach ( keys %seen_plugins, qw/ helo_host from to / ) { $pids{$pid}{$_} = ''; };
         $pids{$pid}{ip} = $ip;      
         $pids{$pid}{hostname} = $host if $host ne 'Unknown';
     };
@@ -195,7 +196,7 @@ sub parse_line_plugin {
     my ($tai, $pid, $hook, $plugin, $message ) = split /\s/, $line, 5;
     $plugin =~ s/:$//;
     if ( $plugin =~ /_3a/ ) {
-        ($plugin) = split '_3a', $plugin;  # trim :N off the plugin log entry
+        ($plugin) = split /_3a/, $plugin;  # trim :N off the plugin log entry
     };
     $plugin =~ s/_2d/-/g;
 
@@ -231,11 +232,11 @@ sub print_auto_format {
             $seen_plugins{$plugin}++;
         };
 
-        next if ! $seen_plugins{$plugin};     # hide plugins not used
+        next if ! $seen_plugins{$plugin};     # hide unused plugins
         if ( $hide_plugins{$plugin} ) {       # user doesn't want to see
             delete $pids{$pid}{$plugin};
             next;
-        };               
+        };
 
         if ( defined $pids{$pid}{helo_host} && $plugin =~ /helo/ ) {
             $format .= " %-18.18s";
@@ -320,7 +321,7 @@ sub populate_plugins_from_registry {
         next if ! $aliases;
         $aliases =~ s/\s+//g;
         $plugins{$name}{aliases} = $aliases;
-        foreach my $a ( split ',', $aliases ) {
+        foreach my $a ( split /,/, $aliases ) {
             $plugin_aliases{$a} = $name;
         };
     };

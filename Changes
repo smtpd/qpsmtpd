@@ -1,6 +1,70 @@
 
-Next Version
+0.91  Nov 20, 2012
 
+  a handful of minor changes to log messages, similar to v0.90
+
+  replace all instances of split '' with split // (required for 5.1?+)
+
+  clamdscan: skip processing of naughty messages
+
+  TcpServer: improved IPv6 support (Michael Holzt)
+
+  SPF: improved support for IPv6, removed is_in_relayclient in favor
+    of checking if relayclient() note is set.
+
+  spamassassin: added 'headers none' option
+
+  qmail_deliverable: added vpopmail extension support, reject null
+    senders to ezmlm mailing lists.
+
+  dnsbl rejections handled by naughty plugin
+
+  changed default loglevel from 9 to 6
+
+  allow messages with no body: (Robin's patch)
+
+  ordered config.sample/plugins roughly in SMTP phase order
+
+  added Plugins::adjust_karma, reduces code requirements in other plugins
+
+  added whitelist plugin
+
+  helo: added is_plain_ip to lenient checks
+
+  dspam improvements
+
+  added log2sql, log/watch.pl, log/summarize.pl, and plugins/registry.txt
+
+  new dkim plugin added (deprecates domainkeys plugin).
+
+0.90  Jun 27, 2012
+
+  Many logging adjustments for plugins, to achieve the goal of emitting
+     a single message per plugin that provides a summary of that plugins
+     action(s) and/or outcome(s).
+
+  qmail_deliverable plugin added (depends on Qmail::Deliverable).
+
+  karma plugin added.
+
+  naughty plugin added.
+
+  count_unrecognized_commands: corrected variable assignment error
+
+  connection_time: added tcpserver deployment compatibility
+
+  loop: max_hops was sometimes unset
+
+  dnsbl,rhsbl: process DNS queries syncronously to improve overall efficiency
+
+  insert headers at top of message (consistent SMTP behavior) in uribl
+     domainkeys, spamassassin plugins.
+
+  spamassassin: consolidated two data_post methods (more linear, simpler)
+
+  rewrote check_basicheaders  -> headers
+
+  renamed check_loop          -> loop
   renamed check_badrcptto     -> badrcptto
   renamed check_badmailfromto -> badmailfromto
   renamed check_badmailfrom   -> badmailfrom
@@ -27,7 +91,7 @@ Next Version
 
   new plugin check_bogus_bounce (Steve Kemp)
 
-  clamav: added ClamAV version to the X-Virus-Checked header, 
+  clamav: added ClamAV version to the X-Virus-Checked header,
   as well as noting "no virus found".  (Matt Simerson)
 
   assorted documentation cleanups (Steve Kemp, Robert Spier)
@@ -49,7 +113,7 @@ Next Version
 
   Note Net::IP dependency (Larry Nedry)
 
-  Various minor spelling cleanups and such (Steve Kemp, Devin Carraway) 
+  Various minor spelling cleanups and such (Steve Kemp, Devin Carraway)
 
   rpm: create .rpm files from the packaging/rpm directory (Peter J. Holzer,
   Robin Bowes, Filippo Carletti, Richard Siddell)
