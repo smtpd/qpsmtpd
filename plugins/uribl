@@ -486,7 +486,7 @@ sub data_handler {
     });
 
     unless ($queries) {
-        $self->log(LOGINFO, "No URIs found in mail");
+        $self->log(LOGINFO, "pass, No URIs found in mail");
         return DECLINED;
     }
 
