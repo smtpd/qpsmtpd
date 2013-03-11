@@ -75,6 +75,9 @@ Make sure the HELO hostname has an A or AAAA record that matches the senders
 IP address, and make sure that the senders IP has a PTR that resolves to the
 HELO hostname.
 
+Per RFC 5321 section 4.1.4, it is impermissible to block a message I<soley>
+on the basis of the HELO hostname not matching the senders IP.
+
 Since the dawn of SMTP, having matching DNS has been a minimum standard
 expected and oft required of mail servers. While requiring matching DNS is
 prudent, requiring an exact match will reject valid email. While testing this
@@ -121,10 +124,10 @@ address literal. When I<policy rfc> is selected, all the lenient checks and
 the following are enforced: is_not_fqdn, no_forward_dns, and no_reverse_dns.
 
 If you have Windows users that send mail via your server, do not choose
-I<policy rfc> without settings I<reject naughty> and using the B<naughty>
+I<policy rfc> without setting I<reject naughty> and using the B<naughty>
 plugin. Windows PCs often send unqualified HELO names and will have trouble
-sending mail. The B<naughty> plugin defers the rejection, and if the user
-subsequently authenticates, the rejection is be cancelled.
+sending mail. The B<naughty> plugin defers the rejection, giving the user
+the opportunity to authenticate and bypass the rejection.
 
 =head3 strict
 
@@ -185,6 +188,20 @@ The domain name, as described in this document and in [22], is the
 entire, fully-qualified name (often referred to as an "FQDN").  A domain name
 that is not in FQDN form is no more than a local alias.  Local aliases MUST
 NOT appear in any SMTP transaction.
+
+
+=head1 RFC 5321
+
+=head2 4.1.4
+
+An SMTP server MAY verify that the domain name argument in the EHLO
+command actually corresponds to the IP address of the client.
+However, if the verification fails, the server MUST NOT refuse to
+accept a message on that basis.  Information captured in the
+verification attempt is for logging and tracing purposes.  Note that
+this prohibition applies to the matching of the parameter to its IP
+address only; see Section 7.9 for a more extensive discussion of
+rejecting incoming connections or mail messages.
 
 
 =head1 AUTHOR
