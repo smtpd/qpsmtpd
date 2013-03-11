@@ -36,15 +36,10 @@ Deny with a soft error code.
 
 2010 - Steve Kemp - http://steve.org.uk/Software/qpsmtpd/
 
-=cut
-
-=begin doc
-
-Look for our single expected argument and configure "action" appropriately.
-
-=end doc
+2013 - Matt  Simerson - added Return Path check
 
 =cut
+
 
 sub register {
     my ($self, $qp) = (shift, shift);
@@ -66,21 +61,11 @@ sub register {
     }
 }
 
-=begin doc
-
-Handle the detection of bounces here.
-
-If we find a match then we'll react with our expected action.
-
-=end doc
-
-=cut
-
 sub hook_data_post {
     my ($self, $transaction) = (@_);
 
     #
-    # Find the sender, and return unless it wasn't a bounce.
+    # Find the sender, quit processing if this isn't a bounce.
     #
     my $sender = $transaction->sender->address || undef;
     if ( $sender && $sender ne '<>') {
@@ -88,22 +73,24 @@ sub hook_data_post {
         return DECLINED;
     };
 
+    #  at this point we know it is a bounce, via the null-envelope.
     #
-    #  Get the recipients.
+    #  Count the recipients. Valid bounces have a single recipient
     #
     my @to = $transaction->recipients || ();
-    if (scalar @to == 1) {
-        $self->log(LOGINFO, "pass, only 1 recipient");
-        return DECLINED;
+    if (scalar @to != 1) {
+        $self->log(LOGINFO, "fail, bogus bounce to: " . join(',', @to));
+        return $self->get_reject( "fail, this bounce message does not have 1 recipient" );
     };
 
-    #
-    #  at this point we know:
-    #
-    #   1.  It is a bounce, via the null-envelope.
-    #   2.  It is a bogus bounce, because there are more than one recipients.
-    #
-    $self->log(LOGINFO, "fail, bogus bounce for :" . join(',', @to));
+    # validate that Return-Path is empty, RFC 3834
 
-    $self->get_reject( "fail, this is a bogus bounce" );
+    my $rp = $transaction->header->get('Return-Path');
+    if ( $rp && $rp ne '<>' ) {
+        $self->log(LOGINFO, "fail, bounce messages must not have a Return-Path");
+        return $self->get_reject( "a bounce return path must be empty (RFC 3834)" );
+    };
+
+    $self->log(LOGINFO, "pass, single recipient, empty Return-Path");
+    return DECLINED;
 }
