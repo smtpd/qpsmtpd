@@ -256,7 +256,7 @@ sub query_p0f_v2 {
     socket(SOCK, PF_UNIX, SOCK_STREAM, 0)
         or $self->log(LOGERROR, "socket: $!"), return;
     connect(SOCK, sockaddr_un($p0f_socket))
-        or $self->log(LOGERROR, "connect: $!"), return;
+        or $self->log(LOGERROR, "connect: $! ($p0f_socket)"), return;
     defined syswrite SOCK, $query
         or $self->log(LOGERROR, "write: $!"), close SOCK, return;
 
