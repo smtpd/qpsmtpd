@@ -21,7 +21,7 @@ elsif ( $command eq 'capture' ) {
     $self->capture( $ARGV[1] );
 }
 elsif ( $command eq 'release' ) {
-    $self->capture( $ARGV[1] );
+    $self->release( $ARGV[1] );
 }
 elsif ( $command eq 'prune' ) {
     $self->prune_db( $ARGV[1] || 7 );
@@ -67,7 +67,9 @@ sub capture {
     my $tied = $self->get_db_tie( $db, $lock ) or return;
     my $key  = $self->get_db_key( $ip );
 
-    $tied->{$key} = join(':', time, 1, 0, 1);
+    my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/, $tied->{$key};
+
+    $tied->{$key} = join(':', time, $naughty+1, $nice, $connects);
     return $self->cleanup_and_return( $tied, $lock );
 };
 
@@ -84,7 +86,9 @@ sub release {
     my $tied = $self->get_db_tie( $db, $lock ) or return;
     my $key  = $self->get_db_key( $ip );
 
-    $tied->{$key} = join(':', 0, 1, 0, 1);
+    my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/, $tied->{$key};
+
+    $tied->{$key} = join(':', 0, 0, $nice, $connects);
     return $self->cleanup_and_return( $tied, $lock );
 };
 
@@ -124,7 +128,7 @@ sub main {
         };
         my $hostname = '';
         if ( $naughty && $nice ) {
-            $hostname = `dig +short -x $ip`; chomp $hostname;
+            #$hostname = `dig +short -x $ip`; chomp $hostname;
         };
         printf(" %-18s  %24s    %3s     %3s     %3s    %30s\n", $ip, $time_human, $naughty, $nice, $connects, $hostname);
         $totals{naughty}  += $naughty  if $naughty;
