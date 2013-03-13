@@ -6,7 +6,7 @@ karma - reward nice and penalize naughty mail senders
 
 =head1 SYNOPSIS
 
-Karma tracks sender history, providing the ability to deliver differing levels
+Karma tracks sender history, allowing us to provide differing levels
 of service to naughty, nice, and unknown senders.
 
 =head1 DESCRIPTION
@@ -14,7 +14,7 @@ of service to naughty, nice, and unknown senders.
 Karma records the number of nice, naughty, and total connections from mail
 senders. After sending a naughty message, if a sender has more naughty than
 nice connections, they are penalized for I<penalty_days>. Connections
-from senders in the penalty box are tersely disconnected.
+from senders in the penalty box are rejected per the settings in I<reject>.
 
 Karma provides other plugins with a karma value they can use to be more
 lenient, strict, or skip processing entirely.
@@ -24,10 +24,9 @@ custom connection policies such as these two examples:
 
 =over 4 
 
-Hi there, well behaved sender. Please help yourself to TLS, AUTH, greater
-concurrency, multiple recipients, no delays, and other privileges.
+Hi there, well behaved sender. Please help yourself to greater concurrency, multiple recipients, no delays, and other privileges.
 
-Hi there, naughty sender. Enjoy this poke in the eye with a sharp stick. Bye.
+Hi there, naughty sender. You get a max concurrency of 1, and SMTP delays.
 
 =back 
 
@@ -114,13 +113,7 @@ run before B<karma> for that to work.
 No attempt is made by this plugin to determine what karma is. It is up to
 other plugins to make that determination and communicate it to this plugin by
 incrementing or decrementing the transaction note B<karma>. Raise it for good
-karma and lower it for bad karma. This is best done like so:
-
- # only if karma plugin loaded
- if ( defined $connection->notes('karma') ) {   
-   $connection->notes('karma', $connection->notes('karma') - 1); # bad
-   $connection->notes('karma', $connection->notes('karma') + 1); # good 
- };
+karma and lower it for bad karma. See B<USING KARMA IN OTHER PLUGINS>.
 
 After the connection ends, B<karma> will record the result. Mail servers whose
 naughty connections exceed nice ones are sent to the penalty box. Servers in
@@ -133,7 +126,7 @@ an example connection from an IP in the penalty box:
  73122 (connect) earlytalker: pass: 64.185.226.65 said nothing spontaneous
  73122 (connect) relay: skip: no match
  73122 (connect) karma: fail
- 73122 550 You were naughty. You are penalized for 0.99 more days.
+ 73122 550 You were naughty. You are cannot connect for 0.99 more days.
  73122 click, disconnecting
  73122 (post-connection) connection_time: 1.048 s.
 
@@ -211,12 +204,11 @@ karma_tool script.
 
 =head1 BUGS & LIMITATIONS
 
-This plugin is reactionary. Like the FBI, it doesn't punish until
-after a crime has been committed. It an "abuse me once, shame on you,
-abuse me twice, shame on me" policy.
+This plugin is reactionary. Like the FBI, it doesn't do anything until
+after a crime has been committed.
 
 There is little to be gained by listing servers that are already on DNS
-blacklists, send to non-existent users, earlytalkers, etc. Those already have
+blacklists, send to invalid users, earlytalkers, etc. Those already have
 very lightweight tests.
 
 =head1 AUTHOR
@@ -254,6 +246,32 @@ sub register {
     $self->register_hook('connect',           'connect_handler');
     $self->register_hook('disconnect',        'disconnect_handler');
 }
+
+sub hook_pre_connection {
+    my ($self,$transaction,%args) = @_;
+
+    $self->connection->notes('karma_history', 0);
+
+    my $remote_ip = $args{remote_ip};
+    #my $max_conn = $args{max_conn_ip};
+
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return DECLINED;
+    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $key  = $self->get_db_key( $remote_ip ) or do {
+        $self->log( LOGINFO, "skip, unable to get DB key" );
+        return DECLINED;
+    };
+
+    if ( ! $tied->{$key} ) {
+        $self->log(LOGINFO, "pass, no record");
+        return $self->cleanup_and_return($tied, $lock );
+    };
+
+    my ($penalty_start_ts, $naughty, $nice, $connects) = $self->parse_value( $tied->{$key} );
+    $self->calc_karma($naughty, $nice);
+    return $self->cleanup_and_return($tied, $lock );
+};
 
 sub connect_handler {
     my $self = shift;
@@ -294,7 +312,7 @@ sub connect_handler {
     $self->cleanup_and_return($tied, $lock );
 
     my $left = sprintf "%.2f", $self->{_args}{penalty_days} - $days_old;
-    my $mess = "You were naughty. You are penalized for $left more days.";
+    my $mess = "You were naughty. You cannot connect for $left more days.";
 
     return $self->get_reject( $mess, $karma );
 }
@@ -313,11 +331,11 @@ sub disconnect_handler {
     my $key  = $self->get_db_key();
 
     my ($penalty_start_ts, $naughty, $nice, $connects) = $self->parse_value( $tied->{$key} );
+    my $history  = ($nice || 0) - $naughty;
 
     if ( $karma < 0 ) {
-        $naughty++;
+        $history--;
         my $negative_limit = 0 - $self->{_args}{negative};
-        my $history  = ($nice || 0) - $naughty;
         if ( $history <= $negative_limit ) {
             if ( $nice == 0 && $history < -5 ) {
                 $self->log(LOGINFO, "penalty box bonus!");
@@ -326,15 +344,15 @@ sub disconnect_handler {
             else {
                 $penalty_start_ts = sprintf "%s", time;
             };
-            $self->log(LOGINFO, "negative, sent to penalty box ($history)");
+            $self->log(LOGINFO, "negative, sent to penalty box (k: $karma, h: $history)");
         }
         else {
-            $self->log(LOGINFO, "negative");
+            $self->log(LOGINFO, "negative (k: $karma, h: $history)");
         };
     }
     elsif ($karma > 1) {
         $nice++;
-        $self->log(LOGINFO, "positive");
+        $self->log(LOGINFO, "positive (k: $karma, h: $history)");
     }
 
     $tied->{$key} = join(':', $penalty_start_ts, $naughty, $nice, ++$connects);
@@ -375,7 +393,11 @@ sub cleanup_and_return {
 
 sub get_db_key {
     my $self = shift;
-    my $nip = Net::IP->new( $self->qp->connection->remote_ip ) or return;
+    my $ip = shift || $self->qp->connection->remote_ip;
+    my $nip = Net::IP->new( $ip ) or do {
+        $self->log(LOGERROR, "skip, unable to determine remote IP");
+        return;
+    };
     return $nip->intip;   # convert IP to an int
 };
 

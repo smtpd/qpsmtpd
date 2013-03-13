@@ -163,6 +163,9 @@ sub connect_handler {
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
     return DECLINED if $self->is_immune();
 
+    my $karma = $self->connection->notes('karma_history');
+    return DECLINED if (defined $karma && $karma > 5);
+
     $in->add(\*STDIN) or return DECLINED;
     if (! $in->can_read($self->{_args}{'wait'})) {
         return $self->log_and_pass();
