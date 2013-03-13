@@ -138,7 +138,7 @@ sub check_host {
     # From tcpserver
     if (exists $ENV{WHITELISTCLIENT}) {
         $self->qp->connection->notes('whitelistclient', 1);
-        $self->log(2, "host $ip is a whitelisted client");
+        $self->log(2, "pass, host $ip is a whitelisted client");
         return OK;
     }
 
@@ -146,7 +146,7 @@ sub check_host {
     for my $h ($self->qp->config('whitelisthosts', $config_arg)) {
         if ($h eq $ip or $ip =~ /^\Q$h\E/) {
             $self->qp->connection->notes('whitelisthost', 1);
-            $self->log(2, "host $ip is a whitelisted host");
+            $self->log(2, "pass, host $ip is a whitelisted host");
             return OK;
         }
     }
