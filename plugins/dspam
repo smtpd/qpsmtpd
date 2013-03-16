@@ -200,6 +200,8 @@ ie, (Trust smtpd).
 use strict;
 use warnings;
 
+use lib 'lib';
+
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 use IO::Handle;
@@ -279,7 +281,7 @@ sub assemble_message {
     $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) { $message .= $line; };
 
-    $message = join(CRLF, split/\n/, $message);
+    $message = join(CRLF, split /\n/, $message);
     return $message . CRLF;
 };
 
@@ -517,11 +519,11 @@ sub get_dspam_results {
         return;
     };
 
-    my @bits  = split(/,\s+/, $string); chomp @bits;
+    my @bits  = split /,\s+/, $string; chomp @bits;
     my $class = shift @bits;
     my %d;
     foreach (@bits) {
-        my ($key,$val) = split(/=/, $_);
+        my ($key,$val) = split /=/, $_;
         $d{$key} = $val;
     };
     $d{class} = $class;
