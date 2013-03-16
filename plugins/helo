@@ -368,6 +368,7 @@ sub is_forged_literal {
     my ( $self, $host ) = @_;
     return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
 
+# should we add exceptions for reserved internal IP space? (192.168,10., etc?)
     $host = substr $host, 1, -1;
     return if $host eq $self->qp->connection->remote_ip;
     return ("Forged IPs not accepted here", "forged IP literal");
@@ -443,6 +444,9 @@ sub no_reverse_dns {
 
 sub no_matching_dns {
     my ( $self, $host ) = @_;
+
+# this is called iprev, or "Forward-confirmed reverse DNS" and is discussed in RFC 5451
+# consider adding header: Authentication-Results
 
     if ( $self->connection->notes('helo_forward_match') &&
          $self->connection->notes('helo_reverse_match') ) {
