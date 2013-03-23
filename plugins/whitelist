@@ -1,3 +1,4 @@
+#!perl -w
 
 =head1 NAME
 
@@ -97,7 +98,6 @@ automatically allow relaying from that IP.
 use strict;
 use warnings;
 
-use lib 'lib';
 use Qpsmtpd::Constants;
 
 my $VERSION = 0.02;
@@ -138,7 +138,8 @@ sub check_host {
     # From tcpserver
     if (exists $ENV{WHITELISTCLIENT}) {
         $self->qp->connection->notes('whitelistclient', 1);
-        $self->log(2, "pass, host $ip is a whitelisted client");
+        $self->log(2, "pass, is whitelisted client");
+        $self->adjust_karma( 5 );
         return OK;
     }
 
@@ -146,7 +147,8 @@ sub check_host {
     for my $h ($self->qp->config('whitelisthosts', $config_arg)) {
         if ($h eq $ip or $ip =~ /^\Q$h\E/) {
             $self->qp->connection->notes('whitelisthost', 1);
-            $self->log(2, "pass, host $ip is a whitelisted host");
+            $self->log(2, "pass, is a whitelisted host");
+            $self->adjust_karma( 5 );
             return OK;
         }
     }
