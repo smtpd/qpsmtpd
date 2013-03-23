@@ -33,6 +33,7 @@ my %formats = (
     rhsbl                 => "%-3.3s",
     relay                 => "%-3.3s",
     karma                 => "%-3.3s",
+    fcrdns                => "%-3.3s",
     earlytalker           => "%-3.3s",
     check_earlytalker     => "%-3.3s",
     helo                  => "%-3.3s",
