@@ -80,14 +80,14 @@ sub hook_pre_connection {
         if ($num_conn > $max ) {
             my $err_mess = "too many connections from $remote";
             $self->log(LOGINFO, "fail: $err_mess ($num_conn > $max)");
-            return (DENYSOFT, "Sorry, $err_mess, try again later");
+            return (DENYSOFT, "$err_mess, try again later");
         }
     }
 
     my @r = $self->in_hosts_allow( $remote );
     return @r if scalar @r;
 
-    $self->log( LOGDEBUG, "pass" );
+    $self->log(LOGDEBUG, "pass" );
     return (DECLINED);
 }
 
@@ -118,8 +118,13 @@ sub in_hosts_allow {
 
 sub karma_bump {
     my ($self, $karma, $max) = @_;
+
+    if ( $karma  > 5 ) {
+        $self->log(LOGDEBUG, "increasing max connects for positive karma");
+        return $max + 3;
+    };
     if ( $karma <= 0 ) {
-        $self->log(LOGINFO, "limiting max connects to 1 for negative karma ($karma)");
+        $self->log(LOGINFO, "limiting max connects to 1 (karma $karma)");
         return 1;
     };
     return $max;
