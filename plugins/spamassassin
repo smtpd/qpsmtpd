@@ -314,6 +314,10 @@ sub connect_to_spamd_socket {
         return;
     };
 
+    # Sanitize for use with taint mode
+    $socket =~ /^([\w\/.-]+)$/;
+    $socket = $1;
+
     socket(my $SPAMD, PF_UNIX, SOCK_STREAM, 0) or do {
         $self->log(LOGERROR, "Could not open socket: $!");
         return;
