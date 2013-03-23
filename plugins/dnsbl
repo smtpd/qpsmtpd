@@ -191,6 +191,8 @@ sub hook_connect {
 
             next if ! $result;
 
+            $self->adjust_karma( -1 );
+
             if ( ! $dnsbl ) { ($dnsbl) = ($result =~ m/(?:\d+\.){4}(.*)/); };
             if ( ! $dnsbl ) {  $dnsbl = $result; };
 
