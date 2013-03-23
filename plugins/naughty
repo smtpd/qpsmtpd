@@ -30,8 +30,8 @@ For efficiency, other plugins should skip processing naughty connections.
 Plugins like SpamAssassin and DSPAM can benefit from using naughty connections
 to train their filters.
 
-Since so many connections are from blacklisted IPs, naughty significantly
-reduces the resources required to disposing of them. Over 80% of my
+Since many connections are from blacklisted IPs, naughty significantly
+reduces the resources required to dispose of them. Over 80% of my
 connections are disposed of after after a few DNS queries (B<dnsbl> or one DB
 query (B<karma>) and 0.01s of compute time.
 
@@ -56,7 +56,7 @@ deployment models.
 
 When a user authenticates, the naughty flag on their connection is cleared.
 This is to allow users to send email from IPs that fail connection tests such
-as B<dnsbl>. Keep in mind that if I<reject connect> is set, connections will
+as B<dnsbl>. Note that if I<reject connect> is set, connections will
 not get the chance to authenticate. To allow clients a chance to authenticate,
 I<reject mail> works well.
 
@@ -86,7 +86,7 @@ Solutions are to make sure B<naughty> is listed before rcpt_ok in config/plugins
 or set naughty to run in a phase after the one you wish to complete.
 In this case, use data instead of rcpt to disconnect after rcpt_ok. The latter
 is particularly useful if your rcpt plugins skip naughty testing. In that case,
-any recipient is accepted for naughty connections, which prevents spammers
+any recipient is accepted for naughty connections, which inhibits spammers
 from detecting address validity.
 
 =head2 reject_type [ temp | perm | disconnect ]
