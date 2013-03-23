@@ -287,7 +287,8 @@ sub adjust_karma {
 
     my $karma = $self->connection->notes('karma') || 0;
     $karma += $value;
-    $self->connection->notes('karma', $value);
+    $self->log(LOGDEBUG, "karma adjust: $value ($karma)");
+    $self->connection->notes('karma', $karma);
     return $value;
 };
 
