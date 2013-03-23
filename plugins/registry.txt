@@ -10,6 +10,7 @@
 5	karma						krm		karma
 6	dnsbl						dbl		dnsbl
 7	relay						rly		relay       check_relay,check_norelay,relay_only
+8   fcrdns						dns		fcrdn
 9	earlytalker					ear		early		check_earlytalker
 15	helo						hlo		helo		check_spamhelo
 16	tls							tls		tls
