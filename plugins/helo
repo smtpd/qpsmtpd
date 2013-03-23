@@ -256,7 +256,10 @@ sub helo_handler {
 
     foreach my $test ( @{ $self->{_helo_tests} } ) {
         my @err = $self->$test( $host );
-        return $self->get_reject( @err ) if scalar @err;
+        if ( scalar @err ) {
+            $self->adjust_karma( -1 );
+            return $self->get_reject( @err );
+        };
     };
 
     $self->log(LOGINFO, "pass");
@@ -388,6 +391,8 @@ sub is_not_fqdn {
 sub no_forward_dns {
     my ( $self, $host ) = @_;
 
+    return if $self->is_address_literal( $host );
+
     my $res = $self->init_resolver();
 
     $host = "$host." if $host !~ /\.$/;   # fully qualify name
@@ -395,7 +400,7 @@ sub no_forward_dns {
 
     if (! $query) {
         if ( $res->errorstring eq 'NXDOMAIN' ) {
-            return ("HELO hostname does not exist", "HELO hostname does not exist");
+            return ("HELO hostname does not exist", "no such host");
         }
         $self->log(LOGERROR, "skip, query failed (", $res->errorstring, ")" );
         return;
@@ -410,7 +415,7 @@ sub no_forward_dns {
         $self->log(LOGDEBUG, "pass, forward DNS") if $hits;
         return;
     };
-    return ("helo hostname did not resolve", "fail, HELO forward DNS");
+    return ("HELO hostname did not resolve", "no forward DNS");
 };
 
 sub no_reverse_dns {
@@ -447,7 +452,7 @@ sub no_matching_dns {
     if ( $self->connection->notes('helo_forward_match') &&
          $self->connection->notes('helo_reverse_match') ) {
         $self->log( LOGDEBUG, "foward and reverse match" );
-        $self->adjust_karma( 1 );  # whoppee, a match!
+        $self->adjust_karma( 1 );  # a perfect match
         return;
     };
 
@@ -461,7 +466,7 @@ sub no_matching_dns {
     };
 
     $self->log( LOGINFO, "fail, no forward or reverse DNS match" );
-    return ("That HELO hostname fails forward and reverse DNS checks", "no matching DNS");
+    return ("That HELO hostname fails FCrDNS", "no matching DNS");
 };
 
 sub check_ip_match {
