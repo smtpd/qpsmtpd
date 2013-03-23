@@ -163,8 +163,12 @@ sub connect_handler {
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
     return DECLINED if $self->is_immune();
 
+    # senders with good karma skip the delay
     my $karma = $self->connection->notes('karma_history');
-    return DECLINED if (defined $karma && $karma > 5);
+    if (defined $karma && $karma > 5) {
+        $self->log(LOGINFO, "skip, karma $karma");
+        return DECLINED;
+    };
 
     $in->add(\*STDIN) or return DECLINED;
     if (! $in->can_read($self->{_args}{'wait'})) {
@@ -198,7 +202,7 @@ sub data_handler {
 sub log_and_pass {
     my $self = shift;
     my $ip = $self->qp->connection->remote_ip || 'remote host';
-    $self->log(LOGINFO, "pass, $ip said nothing spontaneous");
+    $self->log(LOGINFO, "pass, not spontaneous");
     return DECLINED;
 }
 
@@ -210,7 +214,7 @@ sub log_and_deny {
     $self->connection->notes('earlytalker', 1);
     $self->adjust_karma( -1 );
 
-    my $log_mess = "$ip started talking before we said hello";
+    my $log_mess = "remote started talking before we said hello";
     my $smtp_msg = 'Connecting host started transmitting before SMTP greeting';
 
     return $self->get_reject( $smtp_msg, $log_mess );
