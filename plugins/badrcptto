@@ -64,6 +64,7 @@ sub hook_rcpt {
         my ($bad, $reason) = split /\s+/, $line, 2;
         next if ! $bad;
         if ( $self->is_match( $to, lc($bad), $host ) ) {
+            $self->adjust_karma( -2 );
             if ( $reason ) {
                 return (DENY, "mail to $bad not accepted here");
             }
