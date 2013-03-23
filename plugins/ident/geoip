@@ -58,6 +58,12 @@ IP of your mail server.
 
 Default: none. (no distance calculations)
 
+=head2 too_far <distance in km>
+
+Assign negative karma to connections further than this many km.
+
+Default: none
+
 =head2 db_dir </path/to/GeoIP>
 
 The path to the GeoIP database directory.
@@ -159,7 +165,12 @@ sub connect_handler {
     push @msg_parts, $c_code          if $c_code;
     #push @msg_parts, $c_name          if $c_name;
     push @msg_parts, $city            if $city;
-    push @msg_parts, "\t$distance km" if $distance;
+    if ( $distance ) {
+        push @msg_parts, "\t$distance km";
+        if ( $self->{_args}{too_far} && $distance > $self->{_args}{too_far} ) {
+            $self->adjust_karma( -1 );
+        };
+    };
     $self->log(LOGINFO, join( ", ", @msg_parts) );
 
     return DECLINED;
