@@ -9,7 +9,7 @@ use File::Tail;
 
 my $dir = get_qp_dir() or die "unable to find QP home dir";
 my $file = "$dir/log/main/current";
-my $fh = File::Tail->new(name=>$file, interval=>1, maxinterval=>1, debug =>1, tail =>100 );
+my $fh = File::Tail->new(name=>$file, interval=>1, maxinterval=>1, debug =>1, tail =>300 );
 
 while ( defined (my $line = $fh->read) ) {
     my (undef, $line) = split /\s/, $line, 2; # strip off tai timestamps
