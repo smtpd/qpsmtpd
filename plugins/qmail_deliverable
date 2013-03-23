@@ -45,6 +45,19 @@ option must be enabled in order for user-ext@example.org addresses to work.
 
 Default: 0
 
+=item reject
+
+karma reject [ 0 | 1 | connect | naughty ]
+
+I<0> will not reject any connections.
+
+I<1> will reject naughty senders.
+
+I<connect> is the most efficient setting.
+
+To reject at any other connection hook, use the I<naughty> setting and the
+B<naughty> plugin.
+
 =back
 
 =head1 CAVEATS
@@ -155,6 +168,9 @@ sub register {
         if ( $args{vpopmail_ext} ) {
             $Qmail::Deliverable::VPOPMAIL_EXT = $args{vpopmail_ext};
         };
+        if ( $args{reject} ) {
+            $self->{_args}{reject} = $args{reject};
+        };
     }
     $self->register_hook("rcpt", "rcpt_handler");
 }
@@ -206,7 +222,8 @@ sub rcpt_handler {
         return DECLINED;
     };
 
-    return (DENY, "Sorry, no mailbox by that name. qd (#5.1.1)" );
+    $self->adjust_karma( -1 );
+    return $self->get_reject( "Sorry, no mailbox by that name. qd (#5.1.1)" );
 }
 
 sub _smtproute {
