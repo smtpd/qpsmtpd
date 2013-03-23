@@ -98,7 +98,7 @@ Karma reduces the resources wasted by naughty mailers.  When used with
 I<reject connect>, naughty senders are disconnected in about 0.1 seconds.
 
 The biggest gains to be had are by having heavy plugins (spamassassin, dspam,
-virus filters) set the B<karma> transaction note (see KARMA) when they encounter
+virus filters) set the B<karma> connection note (see KARMA) when they encounter
 naughty senders. Reasons to send servers to the penalty box could include
 sending a virus, early talking, or sending messages with a very high spam
 score.
@@ -110,10 +110,9 @@ run before B<karma> for that to work.
 
 =head1 KARMA
 
-No attempt is made by this plugin to determine what karma is. It is up to
-other plugins to make that determination and communicate it to this plugin by
-incrementing or decrementing the transaction note B<karma>. Raise it for good
-karma and lower it for bad karma. See B<USING KARMA IN OTHER PLUGINS>.
+No attempt is made by this plugin to determine karma. It is up to other
+plugins to reward well behaved senders with positive karma and smite poorly
+behaved senders with negative karma. See B<USING KARMA IN OTHER PLUGINS>
 
 After the connection ends, B<karma> will record the result. Mail servers whose
 naughty connections exceed nice ones are sent to the penalty box. Servers in
@@ -141,11 +140,11 @@ the time if we are careful to also set positive karma.
 Karma maintains a history for each IP. When a senders history has decreased
 below -5 and they have never sent a good message, they get a karma bonus.
 The bonus tacks on an extra day of blocking for every naughty message they
-sent us.
+send.
 
 Example: an unknown sender delivers a spam. They get a one day penalty_box.
 After 5 days, 5 spams, 5 penalties, and 0 nice messages, they get a six day
-penalty. The next offence gets a 7 day penalty, and so on.
+penalty. The next offense gets a 7 day penalty, and so on.
 
 =head1 USING KARMA
 
@@ -164,7 +163,7 @@ ident plugins.
  88798 cleaning up after 89011
 
 Unlike RBLs, B<karma> only penalizes IPs that have sent us spam, and only when
-those senders haven't sent us any ham. As such, it's much safer to use.
+those senders have sent us more spam than ham.
 
 =head1 USING KARMA IN OTHER PLUGINS
 
@@ -196,8 +195,8 @@ seems to be a very big win.
 
 =head1 DATABASE
 
-Connection summaries are stored in a database. The database key is the int
-form of the remote IP. The value is a : delimited list containing a penalty
+Connection summaries are stored in a database. The database key is the integer
+value of the remote IP. The DB value is a : delimited list containing a penalty
 box start time (if the server is/was on timeout) and the count of naughty,
 nice, and total connections. The database can be listed and searched with the
 karma_tool script.
@@ -264,7 +263,7 @@ sub hook_pre_connection {
     };
 
     if ( ! $tied->{$key} ) {
-        $self->log(LOGINFO, "pass, no record");
+        $self->log(LOGDEBUG, "pass, no record");
         return $self->cleanup_and_return($tied, $lock );
     };
 
@@ -332,28 +331,33 @@ sub disconnect_handler {
 
     my ($penalty_start_ts, $naughty, $nice, $connects) = $self->parse_value( $tied->{$key} );
     my $history  = ($nice || 0) - $naughty;
+    my $log_mess = '';
 
-    if ( $karma < 0 ) {
+    if ( $karma < -1 ) {   # they achieved at least 2 strikes
         $history--;
         my $negative_limit = 0 - $self->{_args}{negative};
         if ( $history <= $negative_limit ) {
             if ( $nice == 0 && $history < -5 ) {
-                $self->log(LOGINFO, "penalty box bonus!");
+                $log_mess = ", penalty box bonus!";
                 $penalty_start_ts = sprintf "%s", time + abs($history) * 86400;
             }
             else {
                 $penalty_start_ts = sprintf "%s", time;
             };
-            $self->log(LOGINFO, "negative, sent to penalty box (k: $karma, h: $history)");
+            $log_mess = "negative, sent to penalty box" . $log_mess;
         }
         else {
-            $self->log(LOGINFO, "negative (k: $karma, h: $history)");
+            $log_mess = "negative";
         };
     }
     elsif ($karma > 1) {
         $nice++;
-        $self->log(LOGINFO, "positive (k: $karma, h: $history)");
+        $log_mess = "positive";
     }
+    else {
+        $log_mess = "neutral";
+    }
+    $self->log(LOGINFO, $log_mess . ", (msg: $karma, his: $history)" );
 
     $tied->{$key} = join(':', $penalty_start_ts, $naughty, $nice, ++$connects);
     return $self->cleanup_and_return($tied, $lock );
@@ -379,6 +383,7 @@ sub calc_karma {
 
     my $karma = ( $nice || 0 ) - ( $naughty || 0 );
     $self->connection->notes('karma_history', $karma );
+    $self->adjust_karma( 1 ) if $karma > 10;
     return $karma;
 };
 
