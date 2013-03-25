@@ -396,10 +396,11 @@ sub reject {
     my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
     my $status = "$ham_or_spam, $score";
     my $learn = '';
-    if ( $sa_results->{autolearn} ) {
-        $self->adjust_karma( 1 )  if $ham_or_spam eq 'Ham';
-        $self->adjust_karma( -1 ) if $ham_or_spam eq 'Spam';
-        $learn = "learn=". $sa_results->{autolearn};
+    my $al = $sa_results->{autolearn};
+    if ( $al ) {
+        $self->adjust_karma( 1 )  if $al eq 'ham';
+        $self->adjust_karma( -1 ) if $al eq 'spam';
+        $learn = "learn=". $al;
     };
 
     my $reject = $self->{_args}{reject} or do {
