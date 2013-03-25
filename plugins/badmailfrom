@@ -44,7 +44,7 @@ is a Perl pattern expression. Don't forget to anchor the pattern
 anywhere in the string.
 
  ^streamsendbouncer@.*\.mailengine1\.com$    Your right-hand side VERP doesn't fool me
- ^return.*@.*\.pidplate\.biz$                I don' want it regardless of subdomain
+ ^return.*@.*\.pidplate\.biz$                I don't want it regardless of subdomain
  ^admin.*\.ppoonn400\.com$
 
 
