@@ -17,8 +17,10 @@ hosts_allow
 
 # connection / informational plugins
 #connection_time
+#karma penalty_box 1 reject naughty
 ident/geoip
 #ident/p0f /tmp/.p0f_socket version 3
+fcrdns
 
 quit_fortune
 # tls should load before count_unrecognized_commands
@@ -28,14 +30,13 @@ count_unrecognized_commands 4
 
 relay
 #whitelist
-#karma penalty_box 1 reject naughty
 dnsbl reject naughty reject_type disconnect
 rhsbl
 # greylisting reject 0 p0f genre,windows
 
 
 # HELO plugins
-helo policy lenient
+helo policy strict reject 0
 # enable to reject MAIL FROM:/RCPT TO: parameters if client helo was HELO
 # (strict RFC 821)... this is not used in EHLO ...
 # parse_addr_withhelo
@@ -53,10 +54,10 @@ auth/authdeny
 dont_require_anglebrackets
 
 # MAIL FROM plugins
-badmailfrom
+badmailfrom reject naughty
 #badmailfromto
-resolvable_fromhost
-# sender_permitted_from
+resolvable_fromhost reject 0
+# sender_permitted_from reject 2
 
 # RCPT TO plugins
 badrcptto
@@ -66,10 +67,10 @@ rcpt_ok
 
 # DATA plugins
 #uribl
-headers reject 1 reject_type temp require From,Date future 2 past 15
-#bogus_bounce
+headers reject 0 reject_type temp require From,Date future 2 past 15
+bogus_bounce log
 #loop
-dkim
+dkim reject 0
 
 # content filters
 virus/klez_filter
