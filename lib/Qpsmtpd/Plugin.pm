@@ -3,6 +3,8 @@ package Qpsmtpd::Plugin;
 use strict;
 use warnings;
 
+use Net::DNS;
+
 use Qpsmtpd::Constants;
 
 # more or less in the order they will fire
@@ -261,6 +263,17 @@ sub store_deferred_reject {
         $self->connection->notes('naughty_reject_type', $self->{_args}{reject_type} );
     }
     return (DECLINED);
+};
+
+sub init_resolver {
+    my $self = shift;
+    return $self->{_resolver} if $self->{_resolver};
+    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
+    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
+    my $timeout = $self->{_args}{dns_timeout} || 5;
+    $self->{_resolver}->tcp_timeout($timeout);
+    $self->{_resolver}->udp_timeout($timeout);
+    return $self->{_resolver};
 };
 
 sub is_immune {

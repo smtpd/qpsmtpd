@@ -100,8 +100,6 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-use Net::DNS;
-
 sub register {
     my ($self, $qp) = (shift, shift);
     $self->{_args} = { @_ };
@@ -113,7 +111,7 @@ sub register {
         $self->{_args}{reject} = 0;
     };
 
-    $self->init_resolver();
+    $self->init_resolver() or return;
 
     $self->register_hook('connect',   'connect_handler');
     $self->register_hook('data_post', 'data_post_handler');
@@ -142,17 +140,6 @@ sub data_post_handler {
     my $match = $self->connection->notes('fcrdns_match') || 0;
     $transaction->header->add('X-Fcrdns', $match ? 'Yes' : 'No', 0 );
     return (DECLINED);
-};
-
-sub init_resolver {
-    my $self = shift;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    my $timeout = $self->{_args}{timeout} || 5;
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
 };
 
 sub invalid_localhost {
