@@ -32,7 +32,7 @@ exit;
 
 sub trim_message {
     my $mess = shift;
-    
+
     return '' if $mess eq 'skip, naughty';
     return '' if $mess eq 'skip, relay client';
     return '' if $mess eq 'skip, no match';
@@ -120,10 +120,9 @@ sub create_message {
     my ( $fid, $ts, $pid, $message ) = @_;
 
     my ($host, $ip) = split /\s/, $message;
-    $ip = substr $ip, 1, -1;   # remote brackets
-    #print "new from $ip\n";
+    $ip = substr $ip, 1, -1;   # remove brackets
 
-    my $id = exec_query( 
+    my $id = exec_query(
         "INSERT INTO message SET file_id=?, connect_start=FROM_UNIXTIME(?), qp_pid=?, ip=INET_ATON(?)",
         [ $fid, $ts, $pid, $ip ]
     );
@@ -131,6 +130,7 @@ sub create_message {
     if ( $host && $host ne 'Unknown' ) {
         exec_query( "UPDATE message SET hostname=? WHERE id=?", [ $host, $id ] );
     };
+    #warn "host updated: $host\n";
 };
 
 sub insert_plugin {
@@ -200,6 +200,7 @@ sub parse_logfile {
             next;
         };
 
+        #warn "type: $type\n";
         if ( $type eq 'plugin' ) {
             next if $plugin eq 'naughty';    # housekeeping only
             insert_plugin( $msg_id, $plugin, $message );
@@ -255,45 +256,45 @@ sub check_logfile {
     my $size  = stat($path)->size or die "unable to get size for $path\n";
     my $exists;
 
-    # check if this tai file is in the DB as 'current'
+    #warn "check if file $file is in the DB as 'current'\n";
     if ( $file =~ /^\@/ ) {
-        $exists = exec_query( 
+        $exists = exec_query(
             'SELECT * FROM log WHERE inode=? AND name=?',
-            [ $inode, 'current' ] 
+            [ $inode, 'current' ]
         );
         if ( @$exists ) {
             print "Updating current -> $file\n";
             exec_query(
                 'UPDATE log SET name=? WHERE inode=? AND name=?',
-                [ $file, $inode, 'current' ] 
+                [ $file, $inode, 'current' ]
             );
             return ( $exists->[0]{id}, $exists->[0]{size} );      # continue parsing
         };
     };
 
     if ( $file eq 'current' ) {
-        $exists = exec_query( 
+        $exists = exec_query(
             'SELECT * FROM log WHERE inode=? AND name=?',
-            [ $inode, $file ] 
+            [ $inode, $file ]
         );
         if ( @$exists ) {
-            $exists = exec_query( 
+            exec_query(
                 'UPDATE log SET size=? WHERE inode=? AND name=?',
-                [ $size, $inode, 'current' ] 
+                [ $size, $inode, 'current' ]
             );
             return ( $exists->[0]{id}, $exists->[0]{size} );      # continue parsing
         };
     };
 
-    $exists = exec_query( 
+    $exists = exec_query(
         'SELECT * FROM log WHERE name=? AND size=?',
-        [ $file, $size ] 
+        [ $file, $size ]
     );
     return if @$exists;    # log file hasn't changed, ignore it
     #print Dumper($exists);
 
     # file is a new one we haven't seen, add to DB and parse
-    my $id = exec_query( 
+    my $id = exec_query(
         'INSERT INTO log SET inode=?, size=?, name=?, created=FROM_UNIXTIME(?)',
         [ $inode, $size, $file, stat($path)->ctime ]
     );
@@ -443,7 +444,7 @@ sub parse_line_plugin_spamassassin {
     if ( $message =~ /^fail, Spam,\s([\d\.]+)\s< 100/ ) {
         $message = "fail, $1";
     };
-       
+
     return ( 'plugin', $pid, $hook, $plugin, $message );
 };
 
@@ -483,7 +484,7 @@ sub parse_line_plugin_p0f {
 sub parse_line_cleanup {
     my ($line) = @_;
     # @tai 85931 cleaning up after 3210
-    my $pid = (split /\s+/, $line)[-1];   
+    my $pid = (split /\s+/, $line)[-1];
     $has_cleanup++;
     return ( 'cleanup', $pid, undef, undef, $line );
 };
@@ -522,6 +523,7 @@ sub exec_query {
         $err .= join(',', @params);
     };
 
+    #warn "err: $err\n";
     if ( $query =~ /INSERT INTO/ ) {
         my ( $table ) = $query =~ /INSERT INTO (\w+)\s/;
         $db->query( $query, @params );
@@ -529,8 +531,11 @@ sub exec_query {
         my $id = $db->last_insert_id(undef,undef,$table,undef) or die $err;
         return $id;
     }
+    elsif ( $query =~ /^UPDATE/i ) {
+        return $db->query( $query, @params );
+    }
     elsif ( $query =~ /DELETE/ ) {
-        $db->query( $query, @params )->hashes or die $err;
+        $db->query( $query, @params ) or die $err;
         return $db->query("SELECT ROW_COUNT()")->list;
     };
 
