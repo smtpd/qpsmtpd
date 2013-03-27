@@ -33,25 +33,27 @@ use Qpsmtpd::Constants;
 sub register {
     my ($self, $qp ) = (shift, shift);
 
-    my $denial;
     if ( @_ == 1 ) {
-        $denial = shift;
-        if ( defined $denial && $denial =~ /^disconnect$/i ) {
-            $self->{_args}{reject_type} = 'disconnect';
-        }
-        else {
-            $self->{_args}{reject_type} = 'perm';
-        }
+        $self->legacy_positional_args( @_ );
     }
     else {
         $self->{_args} = { @_ };
     };
 
-    if ( ! defined $self->{_args}{reject}  ) {
-        $self->{_args}{reject} = 1;
-    };
+    $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
 }
+
+sub legacy_positional_args {
+    my ($self, $denial) = @_;
+
+    if ( defined $denial && $denial =~ /^disconnect$/i ) {
+        $self->{_args}{reject_type} = 'disconnect';
+    }
+    else {
+        $self->{_args}{reject_type} = 'perm';
+    }
+};
 
 sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
@@ -133,16 +135,5 @@ sub populate_zones {
     };
 
     return %rhsbl_zones;
-};
-
-sub init_resolver {
-    my $self = shift;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    my $timeout = $self->{_args}{timeout} || 8;
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
 };
 

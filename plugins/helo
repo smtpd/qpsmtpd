@@ -109,7 +109,7 @@ Default: lenient
 
 =head3 lenient
 
-Reject failures of the following tests: is_in_badhelo, invalid_localhost,
+Runs the following tests: is_in_badhelo, invalid_localhost,
 is_forged_literal, and is_plain_ip.
 
 This setting is lenient enough not to cause problems for your Windows users.
@@ -121,11 +121,11 @@ IPs.
 
 Per RFC 2821, the HELO hostname is the FQDN of the sending server or an
 address literal. When I<policy rfc> is selected, all the lenient checks and
-the following are enforced: is_not_fqdn, no_forward_dns, and no_reverse_dns.
+the following are tested: is_not_fqdn, no_forward_dns, and no_reverse_dns.
 
 If you have Windows users that send mail via your server, do not choose
-I<policy rfc> without setting I<reject naughty> and using the B<naughty>
-plugin. Windows PCs often send unqualified HELO names and will have trouble
+I<policy rfc> without setting I<reject> to 0 or naughty.
+Windows PCs often send unqualified HELO names and will have trouble
 sending mail. The B<naughty> plugin defers the rejection, giving the user
 the opportunity to authenticate and bypass the rejection.
 
@@ -138,7 +138,7 @@ I have yet to see an address literal being used by a hammy sender. But I am
 not certain that blocking them all is prudent.
 
 It is recommended that I<policy strict> be used with <reject 0> and that you
-monitor your logs for false positives before enabling rejection.
+examine your logs for false positives.
 
 =head2 badhelo
 
@@ -223,21 +223,19 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-use Net::DNS;
-
 sub register {
     my ($self, $qp) = (shift, shift);
     $self->{_args} = { @_ };
+
     $self->{_args}{reject_type} = 'disconnect';
     $self->{_args}{policy} ||= 'lenient';
-    $self->{_args}{timeout} ||= 5;
+    $self->{_args}{dns_timeout} ||= $self->{_args}{timeout} || 5;
 
     if ( ! defined $self->{_args}{reject} ) {
         $self->{_args}{reject} = 1;
     };
-
     $self->populate_tests();
-    $self->init_resolver();
+    $self->init_resolver() or return;
 
     $self->register_hook('helo', 'helo_handler');
     $self->register_hook('ehlo', 'helo_handler');
@@ -288,17 +286,6 @@ sub populate_tests {
     if ( $policy eq 'strict' ) {
         push @{ $self->{_helo_tests} }, qw/ is_address_literal no_matching_dns /;
     };
-};
-
-sub init_resolver {
-    my $self = shift;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    my $timeout = $self->{_args}{timeout} || 5;
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
 };
 
 sub is_in_badhelo {
@@ -451,8 +438,10 @@ sub no_reverse_dns {
 sub no_matching_dns {
     my ( $self, $host ) = @_;
 
-# this is called iprev, or "Forward-confirmed reverse DNS" and is discussed in RFC 5451
-# consider adding header: Authentication-Results
+# this is called iprev, or "Forward-confirmed reverse DNS" and is discussed
+# in RFC 5451. FCrDNS is done for the remote IP in the fcrdns plugin. Here
+# we do it on the HELO hostname.
+# consider adding status to Authentication-Results header
 
     if ( $self->connection->notes('helo_forward_match') &&
          $self->connection->notes('helo_reverse_match') ) {
