@@ -12,6 +12,8 @@ web:
 mailinglist:
   qpsmtpd-subscribe@perl.org
 
+FAQ:
+  https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/faq
 
 =head1 DESCRIPTION
 
