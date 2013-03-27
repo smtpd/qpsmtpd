@@ -32,12 +32,12 @@ I<resolvable_fromhost_host>, making it accessible when $sender is not.
 
 =head1 CONFIGURATION
 
-=head2 reject <bool>
+=head2 reject < 0 | 1 | naughty >
 
 If I<reject 1> is set, the old require_resolvable_fromhost plugin behavior of
 temporary rejection is the default.
 
- resolvable_fromhost reject [ 0 | 1 ]
+ resolvable_fromhost reject [ 0 | 1 | naughty ]
 
 Default: 1
 
