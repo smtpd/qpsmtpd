@@ -79,6 +79,7 @@ sub test_invalid_date_range {
 sub test_hook_data_post {
     my $self = shift;
 
+    $self->{_args}{reject} = 1;
     my $reject = $self->{_args}{reject_type};
     my $deny   = $reject =~ /^temp|soft$/i ? DENYSOFT : DENY;
 
