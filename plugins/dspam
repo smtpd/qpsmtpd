@@ -217,13 +217,25 @@ sub register {
     $self->{_args}{reject_type} ||= 'perm';
     $self->{_args}{dspam_bin} ||= '/usr/local/bin/dspam';
 
-    if ( ! -x $self->{_args}{dspam_bin} ) {
-        $self->log(LOGERROR, "dspam CLI binary not found: install dspam and/or set dspam_bin");
-        return DECLINED;
-    };
+    $self->get_dspam_bin() or return DECLINED;
 
     $self->register_hook('data_post', 'data_post_handler');
 }
+
+sub get_dspam_bin {
+    my $self = shift;
+
+    my $bin = $self->{_args}{dspam_bin};
+    if ( ! -e $bin ) {
+        $self->log(LOGERROR, "error, dspam CLI binary not found: install dspam and/or set dspam_bin");
+        return;
+    };
+    if ( ! -x $bin ) {
+        $self->log(LOGERROR, "error, no permission to run $bin");
+        return;
+    };
+    return $bin;
+};
 
 sub data_post_handler {
     my $self = shift;
