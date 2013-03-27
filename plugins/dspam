@@ -622,7 +622,7 @@ sub autolearn_naughty {
     my $learn = $self->{_args}{autolearn} or return;
 
     if ( $learn ne 'naughty' && $learn ne 'any' ) {
-        $self->log(LOGINFO, "skipping naughty autolearn");
+        $self->log(LOGDEBUG, "skipping naughty autolearn");
         return;
     };
 
