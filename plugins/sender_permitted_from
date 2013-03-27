@@ -231,6 +231,7 @@ sub data_post_handler {
     };
 
     $transaction->header->add('Received-SPF', $result->received_spf_header, 0);
+# consider also adding SPF status to Authentication-Results header
 
     return DECLINED;
 }
