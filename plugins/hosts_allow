@@ -68,6 +68,7 @@ sub hook_pre_connection {
 
     my $remote = $args{remote_ip};
     my $max    = $args{max_conn_ip};
+    my $karma  = $self->connection->notes('karma_history');
 
     if ( $max ) {
         my $num_conn = 1; # seed with current value
@@ -75,17 +76,18 @@ sub hook_pre_connection {
         foreach my $rip (@{$args{child_addrs}}) {
             ++$num_conn if (defined $rip && $rip eq $raddr);
         }
+        $max = $self->karma_bump( $karma, $max ) if defined $karma;
         if ($num_conn > $max ) {
             my $err_mess = "too many connections from $remote";
             $self->log(LOGINFO, "fail: $err_mess ($num_conn > $max)");
-            return (DENYSOFT, "Sorry, $err_mess, try again later");
+            return (DENYSOFT, "$err_mess, try again later");
         }
     }
 
     my @r = $self->in_hosts_allow( $remote );
     return @r if scalar @r;
 
-    $self->log( LOGDEBUG, "pass" );
+    $self->log(LOGDEBUG, "pass" );
     return (DECLINED);
 }
 
@@ -112,4 +114,18 @@ sub in_hosts_allow {
     }
 
     return;
+};
+
+sub karma_bump {
+    my ($self, $karma, $max) = @_;
+
+    if ( $karma  > 5 ) {
+        $self->log(LOGDEBUG, "increasing max connects for positive karma");
+        return $max + 3;
+    };
+    if ( $karma <= 0 ) {
+        $self->log(LOGINFO, "limiting max connects to 1 (karma $karma)");
+        return 1;
+    };
+    return $max;
 };

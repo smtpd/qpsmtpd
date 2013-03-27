@@ -99,6 +99,14 @@ Example entry specifying p0f version 2
 
   ident/p0f /tmp/.p0f_socket version 2
 
+=head2 smite_os
+
+Assign -1 karma to senders whose OS match the regex pattern supplied. I only recommend using with this p0f 3, as it's OS database is far more reliable than p0f v2.
+
+Example entry:
+
+  ident/p0f /tmp/.p0f_socket smite_os windows
+
 =head1 Environment requirements
 
 p0f v3 requires only the remote IP.
@@ -119,7 +127,7 @@ Version 2 code heavily based upon the p0fq.pl included with the p0f distribution
 
 2010 - Matt Simerson - added local_ip option
 
-2012 - Matt Simerson - refactored, v3 support
+2012 - Matt Simerson - refactored, added v3 support
 
 =cut
 
@@ -284,7 +292,7 @@ sub test_v2_response {
         return;
     }
     elsif ($type == 2) {
-        $self->log(LOGWARN, "skip, this connection is no longer in the cache");
+        $self->log(LOGWARN, "skip, connection not in the cache");
         return;
     }
     return 1;
@@ -358,6 +366,10 @@ sub store_v3_results {
         $r{uptime} = $r{uptime_min} if $r{uptime_min};
     };
 
+    if ( $r{genre} && $self->{_args}{smite_os} ) {
+        my $sos = $self->{_args}{smite_os};
+        $self->adjust_karma( -1 ) if $r{genre} =~ /$sos/i;
+    };
     $self->connection->notes('p0f', \%r);
     $self->log(LOGINFO, "$r{os_name} $r{os_flavor}");
     $self->log(LOGDEBUG, join(' ', @values ));

@@ -134,7 +134,7 @@ Make the "subject munge string" configurable
   * added support for per-user SpamAssassin preferences
   * updated get_spam_results so that score=N.N works (as well as hits=N.N)
   * rewrote the X-Spam-* header additions so that SA generated headers are
-    not discarded. Admin can alter SA headers with add_header in their SA
+    preserved. Admins can alter SA headers with add_header in their SA
     config. Subverting their changes there is unexpected. Making them read
     code to figure out why is an unnecessary hurdle.
   * added assemble_message, so we can calc content size which spamd wants
@@ -144,7 +144,6 @@ Make the "subject munge string" configurable
 use strict;
 use warnings;
 
-use lib 'lib';
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 
@@ -314,6 +313,10 @@ sub connect_to_spamd_socket {
         return;
     };
 
+    # Sanitize for use with taint mode
+    $socket =~ /^([\w\/.-]+)$/;
+    $socket = $1;
+
     socket(my $SPAMD, PF_UNIX, SOCK_STREAM, 0) or do {
         $self->log(LOGERROR, "Could not open socket: $!");
         return;
@@ -393,8 +396,11 @@ sub reject {
     my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
     my $status = "$ham_or_spam, $score";
     my $learn = '';
-    if ( $sa_results->{autolearn} ) {
-        $learn = "learn=". $sa_results->{autolearn};
+    my $al = $sa_results->{autolearn};
+    if ( $al ) {
+        $self->adjust_karma( 1 )  if $al eq 'ham';
+        $self->adjust_karma( -1 ) if $al eq 'spam';
+        $learn = "learn=". $al;
     };
 
     my $reject = $self->{_args}{reject} or do {
@@ -413,8 +419,6 @@ sub reject {
         }
     }
 
-    $self->adjust_karma( -1 );
-# default of media_unsupported is DENY, so just change the message
     $self->log(LOGINFO, "fail, $status, > $reject, $learn");
     return ($self->get_reject_type(), "spam score exceeded threshold");
 }
@@ -473,7 +477,7 @@ sub parse_spam_header {
     }
     $r{is_spam} = $is_spam;
 
-    # backwards compatibility for SA versions < 3
+    # compatibility for SA versions < 3
     if ( defined $r{hits} && ! defined $r{score} ) {
         $r{score} = delete $r{hits};
     };

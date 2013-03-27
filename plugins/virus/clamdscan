@@ -168,10 +168,7 @@ sub data_post_handler {
         $self->log( LOGNOTICE, "fail, found virus $found" );
 
         $self->connection->notes('naughty', 1); # see plugins/naughty
-
-        if ( defined $self->connection->notes('karma') ) {
-            $self->connection->notes('karma', ($self->connection->notes('karma') - 1));
-        };
+        $self->adjust_karma( -1 );
 
         if ( $self->{_args}{deny_viruses} ) {
             return ( DENY, "Virus found: $found" );

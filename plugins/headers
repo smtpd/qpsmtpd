@@ -126,13 +126,14 @@ sub hook_data_post {
     };
 
     my $header = $transaction->header or do {
-        return $self->get_reject( "missing headers", "missing headers" );
+        return $self->get_reject( "Headers are missing", "missing headers" );
     };
 
     return (DECLINED, "immune") if $self->is_immune();
 
     foreach my $h ( @required_headers ) {
         next if $header->get($h);
+        $self->adjust_karma( -1 );
         return $self->get_reject( "We require a valid $h header", "no $h header");
     };
 
@@ -140,11 +141,18 @@ sub hook_data_post {
         next if ! $header->get($h);          # doesn't exist
         my @qty = $header->get($h);
         next if @qty == 1;                   # only 1 header
-        return $self->get_reject("Only one $h header allowed. See RFC 5322", "too many $h headers");
+        $self->adjust_karma( -1 );
+        return $self->get_reject(
+            "Only one $h header allowed. See RFC 5322, Section 3.6",
+            "too many $h headers",
+        );
     };
 
     my $err_msg = $self->invalid_date_range();
-    return $self->get_reject($err_msg, $err_msg) if $err_msg;
+    if ( $err_msg ) {
+        $self->adjust_karma( -1 );
+        return $self->get_reject($err_msg, $err_msg);
+    };
 
     $self->log( LOGINFO, 'pass' );
     return (DECLINED);

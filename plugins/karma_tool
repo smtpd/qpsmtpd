@@ -26,6 +26,9 @@ elsif ( $command eq 'release' ) {
 elsif ( $command eq 'prune' ) {
     $self->prune_db( $ARGV[1] || 7 );
 }
+elsif ( $command eq 'search' && is_ip( $ARGV[1] ) ) {
+    $self->show_ip( $ARGV[1] );
+}
 elsif ( $command eq 'list' | $command eq 'search' ) {
     $self->main();
 };
@@ -76,10 +79,7 @@ sub capture {
 sub release {
     my $self = shift;
     my $ip = shift or return;
-    is_ip( $ip ) or do {
-        warn "not an IP: $ip\n";
-        return;
-    };
+    is_ip( $ip ) or do { warn "not an IP: $ip\n"; return; };
 
     my $db   = $self->get_db_location();
     my $lock = $self->get_db_lock( $db ) or return;
@@ -90,6 +90,27 @@ sub release {
 
     $tied->{$key} = join(':', 0, 0, $nice, $connects);
     return $self->cleanup_and_return( $tied, $lock );
+};
+
+sub show_ip {
+    my $self = shift;
+    my $ip = shift or return;
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock( $db ) or return;
+    my $tied = $self->get_db_tie( $db, $lock ) or return;
+    my $key  = $self->get_db_key( $ip );
+
+    my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/, $tied->{$key};
+    $naughty ||= 0;
+    $nice    ||= 0;
+    $connects ||= 0;
+    my $time_human = '';
+    if ( $penalty_start_ts ) {
+        $time_human = strftime "%a %b %e %H:%M", localtime $penalty_start_ts;
+    };
+    my $hostname = `dig +short -x $ip` || ''; chomp $hostname;
+    print "      IP Address                 Penalty        Naughty  Nice  Connects  Hostname\n";
+    printf(" %-18s  %24s    %3s     %3s     %3s    %-30s\n", $ip, $time_human, $naughty, $nice, $connects, $hostname);
 };
 
 sub main {
@@ -140,8 +161,8 @@ sub main {
 
 sub is_ip {
     my $ip = shift || $ARGV[0];
-    return 1 if $ip =~ /^(\d{1,3}\.){3}\d{1,3}$/;
-    return;
+    new Net::IP( $ip ) or return;
+    return 1;
 };
 
 sub cleanup_and_return {
@@ -152,7 +173,7 @@ sub cleanup_and_return {
 
 sub get_db_key {
     my $self = shift;
-    my $nip = Net::IP->new( shift );
+    my $nip = Net::IP->new( shift ) or return;
     return $nip->intip;   # convert IP to an int
 };
 

@@ -493,7 +493,7 @@ sub reject_agree {
     if ( $d->{class} eq 'Innocent' ) {
         if ( $sa->{is_spam} eq 'No' ) {
             if ( $d->{confidence} > .9 ) {
-                $self->adjust_karma( 2 );
+                $self->adjust_karma( 1 );
             };
             $self->log(LOGINFO, "pass, agree, $status");
             return DECLINED;
@@ -634,14 +634,14 @@ sub autolearn_karma {
     my $karma = $self->connection->notes('karma');
     return if ! defined $karma;
 
-    if ( $karma <= -1  && $response->{result} eq 'Innocent' ) {
-        $self->log(LOGINFO, "training bad karma FN as spam");
+    if ( $karma < -1  && $response->{result} eq 'Innocent' ) {
+        $self->log(LOGINFO, "training bad karma ($karma) FN as spam");
         $self->train_error_as_spam( $transaction );
         return 1;
     };
 
-    if ( $karma >= 1 && $response->{result} eq 'Spam' ) {
-        $self->log(LOGINFO, "training good karma FP as ham");
+    if ( $karma > 1 && $response->{result} eq 'Spam' ) {
+        $self->log(LOGINFO, "training good karma ($karma) FP as ham");
         $self->train_error_as_ham( $transaction );
         return 1;
     };
