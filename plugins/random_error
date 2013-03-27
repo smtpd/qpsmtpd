@@ -1,4 +1,10 @@
 #!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 =head1 NAME
 
 random_error
@@ -12,7 +18,7 @@ This plugin randomly disconnects and issues DENYSOFTs.
 one parameter is allowed, which is how often to error, as a percentage
 of messages.  The default is 1. Use a negative number to disable.
 
-2/5 of failures are DENYSOFT_DISOCNNECT, 3/5 simply DENYSOFT.
+2/5 of failures are DENYSOFT_DISCONNECT, 3/5 simply DENYSOFT.
 
 For use with other plugins, scribble the revised failure rate to
 
