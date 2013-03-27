@@ -411,6 +411,7 @@ sub no_forward_dns {
         next unless $rr->type =~ /^(?:A|AAAA)$/;
         $self->check_ip_match( $rr->address );
         $hits++;
+        last if $self->connection->notes('helo_forward_match');
     }
     if ( $hits ) {
         $self->log(LOGDEBUG, "pass, forward DNS") if $hits;
