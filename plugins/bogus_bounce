@@ -56,7 +56,7 @@ sub register {
     };
 
     # we only need to check for deferral, default is DENY
-    if ( $self->{_args}{action} =~ /soft/i ) {
+    if ( $self->{_args}{action} && $self->{_args}{action} =~ /soft/i ) {
         $self->{_args}{reject_type} = 'temp';
     }
 }
