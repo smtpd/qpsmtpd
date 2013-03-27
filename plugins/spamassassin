@@ -394,9 +394,12 @@ sub reject {
     };
 
     my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
+    if ( $ham_or_spam eq 'Spam' ) {
+        $self->adjust_karma( -1 );
+    };
     my $status = "$ham_or_spam, $score";
     my $learn = '';
-    my $al = $sa_results->{autolearn};
+    my $al = $sa_results->{autolearn}; # subject to local SA learn scores
     if ( $al ) {
         $self->adjust_karma( 1 )  if $al eq 'ham';
         $self->adjust_karma( -1 ) if $al eq 'spam';
@@ -404,7 +407,7 @@ sub reject {
     };
 
     my $reject = $self->{_args}{reject} or do {
-        $self->log(LOGERROR, "pass, reject disabled ($status, $learn)");
+        $self->log(LOGERROR, "error, reject disabled ($status, $learn)");
         return DECLINED;
     };
 
