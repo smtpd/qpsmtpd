@@ -225,13 +225,7 @@ sub get_reject {
     # the naughty plugin will reject later
     if ( $reject eq 'naughty' ) {
         $self->log(LOGINFO, "fail, NAUGHTY" . $log_mess);
-        if ( ! $self->connection->notes('naughty') ) {
-            $self->connection->notes('naughty', $smtp_mess);
-        };
-        if ( ! $self->connection->notes('naughty_reject_type') ) {
-            $self->connection->notes('naughty_reject_type', $self->{_args}{reject_type} );
-        }
-        return (DECLINED);
+        return $self->store_deferred_reject( $smtp_mess );
     };
 
     # they asked for reject, we give them reject
@@ -249,6 +243,24 @@ sub get_reject_type {
          : $deny eq 'disconnect'      ? DENY_DISCONNECT
          : $deny eq 'temp_disconnect' ? DENYSOFT_DISCONNECT
          : $default;
+};
+
+sub store_deferred_reject {
+    my ($self, $smtp_mess) = @_;
+
+    # store the reject message that the naughty plugin will return later 
+    if ( ! $self->connection->notes('naughty') ) {
+        $self->connection->notes('naughty', $smtp_mess);
+    }
+    else {
+        # append this reject message to the message
+        my $prev = $self->connection->notes('naughty');
+        $self->connection->notes('naughty', "$prev\015\012$smtp_mess");
+    };
+    if ( ! $self->connection->notes('naughty_reject_type') ) {
+        $self->connection->notes('naughty_reject_type', $self->{_args}{reject_type} );
+    }
+    return (DECLINED);
 };
 
 sub is_immune {
