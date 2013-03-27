@@ -25,7 +25,6 @@ docs/advanced.pod
 docs/authentication.pod
 docs/config.pod
 docs/development.pod
-docs/FAQ.pod
 docs/hooks.pod
 docs/logging.pod
 docs/plugins.pod
