@@ -152,6 +152,7 @@ sub get_details {
 sub handle_sig_fail {
     my ( $self, $dkim, $mess ) = @_;
 
+    $self->adjust_karma( -1 );
     return $self->get_reject( "DKIM signature invalid: " . $dkim->result_detail, $mess );
 };
 
@@ -179,6 +180,7 @@ sub handle_sig_invalid {
         };
     };
 
+    $self->adjust_karma( -1 );
     $self->log(LOGINFO, $mess );
 
     if ( $prs->{accept} ) {
@@ -212,6 +214,7 @@ sub handle_sig_pass {
     if ( $prs->{accept} ) {
         $self->add_header( $mess );
         $self->log(LOGINFO, "pass, valid signature, accept policy");
+        $self->adjust_karma( 1 );
         return DECLINED;
     }
     elsif ( $prs->{neutral} ) {
@@ -222,6 +225,7 @@ sub handle_sig_pass {
     }
     elsif ( $prs->{reject} ) {
         $self->log(LOGINFO, $mess );
+        $self->adjust_karma( -1 );
         return $self->get_reject(
                 "DKIM signature valid but fails policy, $mess",
                 "fail, valid sig, reject policy"
@@ -251,7 +255,6 @@ sub handle_sig_none {
             }
         };
     };
-
 
     if ( $prs->{accept} ) {
         $self->log( LOGINFO, "pass, no signature, accept policy" );
