@@ -10,6 +10,10 @@ domainkeys: validate a DomainKeys signature on an incoming mail
 
 Performs a DomainKeys validation on the message.
 
+=head1 DEPRECATION
+
+You should probably not be using this plugin. DomainKeys has been deprecated in favor of DKIM. That being said, it's March 2013 and I'll still seeing quite a few hams arrive with DomainKeys signatures.
+
 =head1 CONFIGURATION
 
 =head2 reject
