@@ -6,17 +6,17 @@ dkim: validate DomainKeys and (DKIM) Domain Keys Indentified Messages
 
 =head1 SYNOPSIS
 
-Validate the DKIM and Domainkeys signatures of a message, and enforce DKIM
-sending policies.
+Validate the DKIM and Domainkeys signatures of a message, enforce DKIM
+sending policies, and DKIM sign outgoing messages.
 
 =head1 CONFIGURATION
 
-=head2 reject [ 0 | 1 ]
+=head2 reject [ 0 | 1 | naughty ]
 
-  dkim reject 1
+  dkim reject 0
 
-Reject is a boolean that toggles message rejection on or off. Messages failing
-validation are rejected by default.
+Reject is a boolean that toggles message rejection on or off, or naughty,
+which offloads a deferred rejection to the B<naughty> plugin.
 
 Default: 1
 
@@ -26,11 +26,72 @@ Default: 1
 
 Default: perm
 
+=head1 HOW TO SIGN
+
+=head2 generate DKIM key(s)
+
+  mkdir -p ~smtpd/config/dkim/example.org
+  cd       ~smtpd/config/dkim/example.org
+  echo 'mar2013' > selector
+  openssl genrsa -out private 2048
+  chmod 400 private
+  openssl rsa -in private -out public -pubout
+  chown -R smtpd:smtpd ~smtpd/config/dkim/example.org
+
+After running the commands, you'll have a directory with three files:
+
+  example.org
+  example.org/selector
+  example.org/private
+  example.org/public
+
+=head3 selector
+
+The selector can be any value that is a valid DNS label.
+
+=head3 key length
+
+The minimum recommended key length for short duration keys (ones that will be replaced within a few months) is 1024. If you are unlikely to rotate your keys frequently, go with 2048, at the expense of more CPU.
+
+=head2 publish public key in DNS
+
+  mar2013._domainkey TXT "v=DKIM1;p=[public key stripped of whitespace];"
+
+  hash: h=[ sha1 | sha256 ]
+  test; t=[ s | s:y ]
+  granularity: g=[ ]
+  notes: n=[ ]
+  services: s=[email]
+  keytypes: [ rsa ]
+
+Prepare the DNS record with these commands:
+
+  cd ~smtpd/config/dkim/example.org
+  cat selector | tr -d "\n" > dns
+  echo -n '._domainkey TXT "v=DKIM1;p=' >> dns
+  grep -v -e '^-' public | tr -d "\n" >> dns
+  echo '"' >> dns
+
+The contents of I<dns> are ready to be copy/pasted into a BIND zone file, or better yet, NicTool, and published to most any DNS server.
+
+=head2 testing
+
+After confirming that the DKIM public key can be fetched with DNS, send test messages via QP to a Gmail box and check the Authentication-Results header. There are also DKIM relays (check-auth@verifier.port25.com, checkmyauth@auth.returnpath.net) that provide more debugging information in a nice email report.
+
+=head2 Sign for others
+
+Following the directions above will configure QP to DKIM sign messages from authenticated senders from example.org. Suppose you host client.com and would like to DKIM sign their messages too? Do that as follows:
+
+  cd ~smtpd/config/dkim/example.org
+  ln -s example.org client.com
+
+QP will follow the symlink target and sign client.com emails with the example.org DKIM key.
+
 =head1 SEE ALSO
 
 http://www.dkim.org/
 
-http://tools.ietf.org/html/rfc6376 - DKIM Signatures 
+http://tools.ietf.org/html/rfc6376 - DKIM Signatures
 
 http://tools.ietf.org/html/rfc5863 - DKIM Development, Deployment, & Operations
 
@@ -40,9 +101,13 @@ http://tools.ietf.org/html/rfc5585 - DKIM Service Overview
 
 http://tools.ietf.org/html/rfc5016 - DKIM Signing Practices Protocol
 
-http://tools.ietf.org/html/rfc4871 - DKIM Signatures 
+http://tools.ietf.org/html/rfc4871 - DKIM Signatures
 
 http://tools.ietf.org/html/rfc4870 - DomainKeys
+
+http://dkimcore.org/tools/
+
+http://www.protodave.com/tools/dkim-key-checker/
 
 =head1 AUTHORS
 
@@ -88,11 +153,13 @@ sub init {
 sub register {
     my $self = shift;
 
-    eval "use  Mail::DKIM::Verifier";
-    if ( $@ ) {
-        warn "skip, plugin disabled, could not load Mail::DKIM::Verifier\n";
-        $self->log(LOGERROR, "skip, plugin disabled, is Mail::DKIM installed?");
-        return;
+    foreach my $mod ( qw/ Mail::DKIM::Verifier Mail::DKIM::Signer Mail::DKIM::TextWrap / ) {
+        eval "use $mod";
+        if ( $@ ) {
+            warn "error, plugin disabled, could not load $mod\n";
+            $self->log(LOGERROR, "skip, plugin disabled, is Mail::DKIM installed?");
+            return;
+        };
     };
 
     $self->register_hook('data_post', 'data_post_handler');
@@ -101,14 +168,27 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
+    if ( $self->qp->connection->relay_client() ) {
+        # this is one of our authenticated users sending a message.
+        return $self->sign_it( $transaction );
+    };
+
     return DECLINED if $self->is_immune();
 
+    return $self->validate_it( $transaction );
+};
+
+sub validate_it {
+    my ($self, $transaction) = @_;
+
+    # Incoming message, perform DKIM validation
     my $dkim = Mail::DKIM::Verifier->new() or do {
         $self->log(LOGERROR, "error, could not instantiate a new Mail::DKIM::Verifier");
         return DECLINED;
     };
 
-    my $result = $self->get_dkim_result( $dkim, $transaction );
+    $self->send_message_to_dkim( $dkim, $transaction );
+    my $result = $dkim->result;
     my $mess   = $self->get_details( $dkim );
 
     foreach my $r ( qw/ pass fail invalid temperror none / ) {
@@ -122,6 +202,30 @@ sub data_post_handler {
     $self->log( LOGERROR, "unknown result: $result, $mess" );
     return DECLINED;
 }
+
+sub sign_it {
+    my ($self, $transaction) = @_;
+
+    my ($domain, $keydir) = $self->get_keydir($transaction) or return DECLINED;
+    my $selector = $self->get_selector($keydir);
+
+    my $dkim = Mail::DKIM::Signer->new(
+            Algorithm => "rsa-sha256",
+            Method    => "relaxed",
+            Domain    => $domain,
+            Selector  => $selector,
+            KeyFile   => "$keydir/private",
+            );
+
+    $self->send_message_to_dkim( $dkim, $transaction );
+
+    my $signature = $dkim->signature;  # what is the signature result?
+    $self->qp->transaction->header->add(
+        'DKIM-Signature', $signature->as_string, 0 );
+
+    $self->log(LOGINFO, "pass, signed message, ", $signature->as_string );
+    return DECLINED;
+};
 
 sub get_details {
     my ($self, $dkim ) = @_;
@@ -166,16 +270,14 @@ sub handle_sig_invalid {
 
     my ( $prs, $policies) = $self->get_policy_results( $dkim );
 
-    if ( ! $self->qp->connection->relay_client() ) {
-        foreach my $policy ( @$policies ) {
-            if ( $policy->signall && ! $policy->is_implied_default_policy ) {
-                $self->log(LOGINFO, $mess );
-                return $self->get_reject( 
-                    "invalid DKIM signature with sign-all policy",
-                    "invalid signature, sign-all policy" 
-                );
-            }
-        };
+    foreach my $policy ( @$policies ) {
+        if ( $policy->signall && ! $policy->is_implied_default_policy ) {
+            $self->log(LOGINFO, $mess );
+            return $self->get_reject(
+                "invalid DKIM signature with sign-all policy",
+                "invalid signature, sign-all policy"
+            );
+        }
     };
 
     $self->adjust_karma( -1 );
@@ -192,9 +294,9 @@ sub handle_sig_invalid {
         return DECLINED;
     }
     elsif ( $prs->{reject} ) {
-        return $self->get_reject( 
+        return $self->get_reject(
                 "invalid DKIM signature: " . $dkim->result_detail,
-                "invalid signature, reject policy"
+                "fail, invalid signature, reject policy"
             );
     }
 
@@ -242,16 +344,14 @@ sub handle_sig_none {
 
     my ( $prs, $policies) = $self->get_policy_results( $dkim );
 
-    if ( ! $self->qp->connection->relay_client() ) {
-        foreach my $policy ( @$policies ) {
-            if ( $policy->signall && ! $policy->is_implied_default_policy ) {
-                $self->log(LOGINFO, $mess );
-                return $self->get_reject( 
-                    "no DKIM signature with sign-all policy",
-                    "no signature, sign-all policy" 
-                );
-            }
-        };
+    foreach my $policy ( @$policies ) {
+        if ( $policy->signall && ! $policy->is_implied_default_policy ) {
+            $self->log(LOGINFO, $mess );
+            return $self->get_reject(
+                "no DKIM signature with sign-all policy",
+                "no signature, sign-all policy"
+            );
+        }
     };
 
     if ( $prs->{accept} ) {
@@ -264,7 +364,7 @@ sub handle_sig_none {
     }
     elsif ( $prs->{reject} ) {
         $self->log(LOGINFO, $mess );
-        $self->get_reject( 
+        $self->get_reject(
             "no DKIM signature, policy says reject: " . $dkim->result_detail,
             "no signature, reject policy"
         );
@@ -276,9 +376,35 @@ sub handle_sig_none {
     return DECLINED;
 };
 
-sub get_dkim_result {
-    my $self = shift;
-    my ($dkim, $transaction) = @_;
+sub get_keydir {
+    my ($self, $transaction) = @_;
+
+    my $domain = $transaction->sender->host;
+    my $dir = "config/dkim/$domain";
+
+    if ( -l $dir ) {
+        $dir = readlink($dir);
+        $dir = "config/dkim/$dir" if $dir !~ /\//;  # no /, relative path
+        ($domain) = (split /\//, $dir)[-1];
+    };
+
+    if ( ! -d $dir ) {
+        $self->log(LOGINFO, "skip, DKIM not configured for $domain");
+        return;
+    };
+    if ( ! -r $dir ) {
+        $self->log(LOGINFO, "error, unable to read key from $dir");
+        return;
+    };
+    if ( ! -r "$dir/private" ) {
+        $self->log(LOGINFO, "error, unable to read dkim key from $dir/private");
+        return;
+    };
+    return ($domain, $dir);
+};
+
+sub send_message_to_dkim {
+    my ($self, $dkim, $transaction) = @_;
 
     foreach ( split ( /\n/s, $transaction->header->as_string ) ) {
         $_ =~ s/\r?$//s;
@@ -289,14 +415,12 @@ sub get_dkim_result {
     $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) {
         chomp $line;
-        s/\015$//;
+        $line =~ s/\015$//;
         eval { $dkim->PRINT($line . CRLF ); };
         $self->log(LOGERROR, $@ ) if $@;
     };
 
     $dkim->CLOSE;
-
-    return $dkim->result;
 };
 
 sub get_policies {
@@ -326,11 +450,25 @@ sub get_policy_results {
     return \%prs, \@policies;
 };
 
+sub get_selector {
+    my ($self, $keydir) = @_;
+
+    open my $SFH, '<', "$keydir/selector" or do {
+        $self->log(LOGINFO, "error, unable to read selector from $keydir/selector");
+        return DECLINED;
+    };
+    my $selector = <$SFH>;
+    chomp $selector;
+    close $SFH;
+    $self->log(LOGINFO, "info, selector: $selector");
+    return $selector;
+};
+
 sub add_header {
     my $self = shift;
     my $header = shift or return;
 
-# consider adding Authentication-Results header here as well
+# consider adding Authentication-Results header, (RFC 5451)
     $self->qp->transaction->header->add( 'X-DKIM-Authentication', $header, 0 );
 }
 
