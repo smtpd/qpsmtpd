@@ -80,9 +80,7 @@ use Socket qw(:DEFAULT :crlf);
 
 sub init {
     my ($self, $qp) = (shift, shift);
-
     $self->{_args} = { @_ };
-
     $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
 }
@@ -196,7 +194,7 @@ sub handle_sig_invalid {
     elsif ( $prs->{reject} ) {
         return $self->get_reject( 
                 "invalid DKIM signature: " . $dkim->result_detail,
-                "fail, invalid signature, reject policy"
+                "invalid signature, reject policy"
             );
     }
 
@@ -332,6 +330,7 @@ sub add_header {
     my $self = shift;
     my $header = shift or return;
 
+# consider adding Authentication-Results header here as well
     $self->qp->transaction->header->add( 'X-DKIM-Authentication', $header, 0 );
 }
 
