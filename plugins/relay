@@ -241,7 +241,6 @@ sub hook_connect {
 # 95586 (connect) relay: pass, octet match in relayclients (127.0.0.)
 
     if ( $self->is_in_cidr_block() || $self->is_octet_match() ) {
-        $self->adjust_karma( 2 ); # big karma boost!
         $self->qp->connection->relay_client(1);
         return (DECLINED);
     };
