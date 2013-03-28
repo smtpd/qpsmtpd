@@ -243,6 +243,7 @@ sub register {
     };
     #$self->prune_db();    # keep the DB compact
     $self->register_hook('connect',           'connect_handler');
+    $self->register_hook('data',              'data_handler'   );
     $self->register_hook('disconnect',        'disconnect_handler');
 }
 
@@ -315,6 +316,14 @@ sub connect_handler {
 
     return $self->get_reject( $mess, $karma );
 }
+
+sub data_handler {
+    my ($self, $transaction) = @_;
+    return DECLINED if ! $self->qp->connection->relay_client;
+
+    $self->adjust_karma( 5 ); # big karma boost for authenticated user/IP
+    return DECLINED;
+};
 
 sub disconnect_handler {
     my $self = shift;
