@@ -47,6 +47,7 @@ The reject options are modeled after, and aim to match the functionality of thos
 =head1 AUTHOR
 
 Matt Simerson - 2012 - increased policy options from 3 to 6
+
 Matt Simerson - 2011 - rewrote using Mail::SPF
 
 Matt Sergeant - 2003 - initial plugin
