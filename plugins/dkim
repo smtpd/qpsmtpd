@@ -15,8 +15,9 @@ sending policies, and DKIM sign outgoing messages.
 
   dkim reject 0
 
-Reject is a boolean that toggles message rejection on or off, or naughty,
-which offloads a deferred rejection to the B<naughty> plugin.
+ 0       - do not reject
+ 1       - reject messages that fail DKIM policy
+ naughty - defer rejection to the B<naughty> plugin
 
 Default: 1
 
@@ -28,22 +29,23 @@ Default: perm
 
 =head1 HOW TO SIGN
 
-=head2 generate DKIM key(s)
+=head2 generate DKIM keys
+
+=head3 the easy way
+
+  cd ~smtpd/config/dkim; ./dkim_key_gen.sh example.org
+
+=head3 the manual way
 
   mkdir -p ~smtpd/config/dkim/example.org
   cd       ~smtpd/config/dkim/example.org
-  echo 'mar2013' > selector
+  echo 'may2013' > selector
   openssl genrsa -out private 2048
   chmod 400 private
   openssl rsa -in private -out public -pubout
-  chown -R smtpd:smtpd ~smtpd/config/dkim/example.org
+  chown -R smtpd:smtpd ../example.org
 
-After running the commands, you'll have a directory with three files:
-
-  example.org
-  example.org/selector
-  example.org/private
-  example.org/public
+After generating the keys, there will be three files in the example.org directory: selector, private, and public.
 
 =head3 selector
 
@@ -51,11 +53,19 @@ The selector can be any value that is a valid DNS label.
 
 =head3 key length
 
-The minimum recommended key length for short duration keys (ones that will be replaced within a few months) is 1024. If you are unlikely to rotate your keys frequently, go with 2048, at the expense of more CPU.
+The minimum recommended key length for short duration keys (ones that will be replaced within a few months) is 1024. If you are unlikely to rotate your keys frequently, go with 2048, at the expense of a bit more CPU.
 
 =head2 publish public key in DNS
 
-  mar2013._domainkey TXT "v=DKIM1;p=[public key stripped of whitespace];"
+If the DKIM keys were generated the easy way, there will be a fourth file named I<dns>. The contents contain the DNS formatted record of the public key, as well as suggestions for DKIM, SPF, and DMARC policy records. The records are ready to be copy/pasted into a BIND zone file, or better yet, NicTool, and published to most any DNS server. If you didn't create your keys the easy way, look inside the dkim_key_gen.sh script to see the commands used to format the DKIM public key.
+
+The example DKIM, SPF, and DMARC policy records in the I<dns> file are strict, telling other mail servers that if a sender claims to be from example.org, but the message is not DKIM signed and not SPF aligned, then the message should be rejected. Many email servers, including the largest email providers (Gmail, Yahoo, Outlook/Live/Hotmail) will refuse to accept such messages, greatly reducing the harm caused by miscreants who send out spam with your domain name in the From header.
+
+The DKIM record will look like this:
+
+  may2013._domainkey TXT "v=DKIM1;p=[public key stripped of whitespace];"
+
+And the values in the address have the following meaning:
 
   hash: h=[ sha1 | sha256 ]
   test; t=[ s | s:y ]
@@ -64,19 +74,30 @@ The minimum recommended key length for short duration keys (ones that will be re
   services: s=[email]
   keytypes: [ rsa ]
 
-Prepare the DNS record with these commands:
-
-  cd ~smtpd/config/dkim/example.org
-  cat selector | tr -d "\n" > dns
-  echo -n '._domainkey TXT "v=DKIM1;p=' >> dns
-  grep -v -e '^-' public | tr -d "\n" >> dns
-  echo '"' >> dns
-
-The contents of I<dns> are ready to be copy/pasted into a BIND zone file, or better yet, NicTool, and published to most any DNS server.
 
 =head2 testing
 
-After confirming that the DKIM public key can be fetched with DNS, send test messages via QP to a Gmail box and check the Authentication-Results header. There are also DKIM relays (check-auth@verifier.port25.com, checkmyauth@auth.returnpath.net) that provide more debugging information in a nice email report.
+After confirming that the DKIM public key can be fetched with DNS (dig TXT may2013._domainkey.example.org. @ns1.example.org.), send test messages. There are a number of ways to test your DKIM:
+
+  * email to a Gmail address and inspect the Authentication-Results header.
+  * email to check-auth@verifier.port25.com
+  * email to checkmyauth@auth.returnpath.net
+
+The two DKIM relays provide a nice email report with additional debugging information.
+
+=head2 publish DKIM policy in DNS
+
+_domainkey TXT "o=~; t=y; r=postmaster@example.org"
+
+  o=-       - all are signed
+  o=~       - some are signed
+  t=y       - test mode
+  r=[email] - responsible email address
+  n=[notes]
+
+Once DKIM and SPF are tested and working, update the policy, changing o=~ to o=-, so that other mail servers reject unsigned messages claiming to be from your domain.
+
+As of this writing, most mail servers do not reject messages that fail DKIM policy, unless they also fail SPF, and no DMARC policy is published. The same holds true for SPF. There are technical reasons for this. See DMARC for more information, how you can control change that behavior, as well as receiving feedback from remote servers about messages they have accepted and rejected from senders claiming the identity of your domain(s).
 
 =head2 Sign for others
 
@@ -86,6 +107,8 @@ Following the directions above will configure QP to DKIM sign messages from auth
   ln -s example.org client.com
 
 QP will follow the symlink target and sign client.com emails with the example.org DKIM key.
+
+CAUTION: just because you can, doesn't mean you should. Even with a relaxed DKIM policy, if you don't have a suitable DMARC record published for client.com, they may encounter deliverability problems. It is better to have keys generated and published for each domain.
 
 =head1 SEE ALSO
 
@@ -110,6 +133,8 @@ http://dkimcore.org/tools/
 http://www.protodave.com/tools/dkim-key-checker/
 
 =head1 AUTHORS
+
+  2013 - Matt Simerson - added DKIM signing and key creation script
 
   2012 - Matt Simerson - initial plugin
 
