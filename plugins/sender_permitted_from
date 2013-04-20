@@ -8,6 +8,8 @@ SPF - implement Sender Permitted From
 
 Prevents email sender address spoofing by checking the SPF policy of the purported senders domain.
 
+Sets the transaction note spf_pass_host if the SPF result is pass.
+
 =head1 DESCRIPTION
 
 Sender Policy Framework (SPF) is an email validation system designed to prevent source address spoofing. SPF allows administrators to specify which hosts are allowed to send email from a given domain by creating a specific SPF record in the public DNS. Mail exchangers then use the DNS to verify that mail is being sent by a host sanctioned by a given domain administrators. -- http://en.wikipedia.org/wiki/Sender_Policy_Framework
