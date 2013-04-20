@@ -3,6 +3,8 @@
 use strict;
 use warnings;
 
+$|++;   # OUTPUT_AUTOFLUSH
+
 use Cwd;
 use Data::Dumper;
 use File::Tail;
