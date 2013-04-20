@@ -4,6 +4,7 @@ Changes
 config.sample/badhelo
 config.sample/badmailfrom
 config.sample/badrcptto
+config.sample/dkim/dkim_key_gen.sh
 config.sample/dnsbl_allow
 config.sample/dnsbl_zones
 config.sample/flat_auth_pw
@@ -13,6 +14,7 @@ config.sample/logging
 config.sample/loglevel
 config.sample/norelayclients
 config.sample/plugins
+config.sample/public_suffix_list
 config.sample/rcpthosts
 config.sample/relayclients
 config.sample/rhsbl_zones
@@ -86,12 +88,14 @@ plugins/connection_time
 plugins/content_log
 plugins/count_unrecognized_commands
 plugins/dkim
+plugins/dmarc
 plugins/dns_whitelist_soft
 plugins/dnsbl
 plugins/domainkeys
 plugins/dont_require_anglebrackets
 plugins/dspam
 plugins/earlytalker
+plugins/fcrdns
 plugins/greylisting
 plugins/headers
 plugins/helo
@@ -153,8 +157,6 @@ README
 README.plugins
 run
 STATUS
-t/01-syntax.t
-t/02-pod.t
 t/addresses.t
 t/auth.t
 t/config.t
@@ -166,6 +168,7 @@ t/config/flat_auth_pw
 t/config/invalid_resolvable_fromhost
 t/config/norelayclients
 t/config/plugins
+t/config/public_suffix_list
 t/config/rcpthosts
 t/config/relayclients
 t/helo.t
@@ -182,6 +185,7 @@ t/plugin_tests/badmailfrom
 t/plugin_tests/badmailfromto
 t/plugin_tests/badrcptto
 t/plugin_tests/count_unrecognized_commands
+t/plugin_tests/dmarc
 t/plugin_tests/dnsbl
 t/plugin_tests/dspam
 t/plugin_tests/earlytalker
@@ -202,3 +206,5 @@ t/tempstuff.t
 t/Test/Qpsmtpd.pm
 t/Test/Qpsmtpd/Plugin.pm
 UPGRADING
+xt/01-syntax.t
+xt/02-pod.t
