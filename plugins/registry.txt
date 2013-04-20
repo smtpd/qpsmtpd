@@ -59,6 +59,7 @@
 64	dkim						dkm		dkim
 65	spamassassin				spm		spama
 66	dspam						dsp		dspam
+67  dmarc                       dmc     dmarc
 #
 # Anti-Virus Plugins
 #

@@ -71,6 +71,7 @@ headers reject 0 reject_type temp require From,Date future 2 past 15
 bogus_bounce log
 #loop
 dkim reject 0
+dmarc
 
 # content filters
 virus/klez_filter

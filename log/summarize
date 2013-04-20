@@ -63,6 +63,7 @@ my %formats3 = (
     check_bogus_bounce   => "%-3.3s",
     domainkeys           => "%-3.3s",
     dkim                 => "%-3.3s",
+    dmarc                => "%-3.3s",
     spamassassin         => "%-3.3s",
     dspam                => "%-3.3s",
     'virus::clamdscan'   => "%-3.3s",
