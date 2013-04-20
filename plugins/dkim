@@ -13,11 +13,11 @@ sending policies, and DKIM sign outgoing messages.
 
 =head2 reject [ 0 | 1 | naughty ]
 
-  dkim reject 0
+  dkim [ reject 0 ]
 
- 0       - do not reject
- 1       - reject messages that fail DKIM policy
- naughty - defer rejection to the B<naughty> plugin
+    0        - do not reject
+    1        - reject messages that fail DKIM policy
+    naughty  - defer rejection to the B<naughty> plugin
 
 Default: 1
 
@@ -53,13 +53,13 @@ The selector can be any value that is a valid DNS label.
 
 =head3 key length
 
-The minimum recommended key length for short duration keys (ones that will be replaced within a few months) is 1024. If you are unlikely to rotate your keys frequently, go with 2048, at the expense of a bit more CPU.
+The minimum recommended key length for short duration keys (ones that will be replaced within a few months) is 1024. If you are unlikely to rotate your keys frequently, choose 2048, at the expense of a bit more CPU.
 
 =head2 publish public key in DNS
 
-If the DKIM keys were generated the easy way, there will be a fourth file named I<dns>. The contents contain the DNS formatted record of the public key, as well as suggestions for DKIM, SPF, and DMARC policy records. The records are ready to be copy/pasted into a BIND zone file, or better yet, NicTool, and published to most any DNS server. If you didn't create your keys the easy way, look inside the dkim_key_gen.sh script to see the commands used to format the DKIM public key.
+If the DKIM keys were generated the easy way, there will be a fourth file named I<dns>. The contents contain the DNS formatted record of the public key, as well as suggestions for DKIM, SPF, and DMARC policy records. The records are ready to be copy/pasted into a BIND zone file, or better yet, NicTool. If you created your keys manually, look in the dkim_key_gen.sh script to see the commands used to format the DKIM public key.
 
-The example DKIM, SPF, and DMARC policy records in the I<dns> file are strict, telling other mail servers that if a sender claims to be from example.org, but the message is not DKIM signed and not SPF aligned, then the message should be rejected. Many email servers, including the largest email providers (Gmail, Yahoo, Outlook/Live/Hotmail) will refuse to accept such messages, greatly reducing the harm caused by miscreants who send out spam with your domain name in the From header.
+The combination of the three example DKIM, SPF, and DMARC policy records in the I<dns> file tell other mail servers that if a sender claims to be from example.org, but the message is not DKIM nor SPF aligned, then the message should be rejected. Many email servers, including the largest email providers (Gmail, Yahoo, Outlook/Live/Hotmail) will refuse to accept such messages, greatly reducing the harm caused by miscreants who forge your domain(s) in the From header of their spam.
 
 The DKIM record will look like this:
 
@@ -74,14 +74,13 @@ And the values in the address have the following meaning:
   services: s=[email]
   keytypes: [ rsa ]
 
-
 =head2 testing
 
-After confirming that the DKIM public key can be fetched with DNS (dig TXT may2013._domainkey.example.org. @ns1.example.org.), send test messages. There are a number of ways to test your DKIM:
+After confirming that the DKIM public key can be fetched with DNS (dig TXT may2013._domainkey.example.org. @ns1.example.org.), send test messages. You can testing DKIM by sending an email to:
 
-  * email to a Gmail address and inspect the Authentication-Results header.
-  * email to check-auth@verifier.port25.com
-  * email to checkmyauth@auth.returnpath.net
+  * a Gmail address and inspect the Authentication-Results header.
+  * check-auth@verifier.port25.com
+  * checkmyauth@auth.returnpath.net
 
 The two DKIM relays provide a nice email report with additional debugging information.
 
@@ -95,20 +94,22 @@ _domainkey TXT "o=~; t=y; r=postmaster@example.org"
   r=[email] - responsible email address
   n=[notes]
 
-Once DKIM and SPF are tested and working, update the policy, changing o=~ to o=-, so that other mail servers reject unsigned messages claiming to be from your domain.
+After DKIM and SPF are tested and working, update the policy, changing o=~ to o=-, so that other mail servers reject unsigned messages claiming to be from your domain.
 
 As of this writing, most mail servers do not reject messages that fail DKIM policy, unless they also fail SPF, and no DMARC policy is published. The same holds true for SPF. There are technical reasons for this. See DMARC for more information, how you can control change that behavior, as well as receiving feedback from remote servers about messages they have accepted and rejected from senders claiming the identity of your domain(s).
 
 =head2 Sign for others
 
-Following the directions above will configure QP to DKIM sign messages from authenticated senders from example.org. Suppose you host client.com and would like to DKIM sign their messages too? Do that as follows:
+Following the directions above will configure QP to DKIM sign messages from authenticated senders of example.org. Suppose you host client.com and would like to DKIM sign their messages too? Do that as follows:
 
-  cd ~smtpd/config/dkim/example.org
+  cd ~smtpd/config/dkim
   ln -s example.org client.com
 
 QP will follow the symlink target and sign client.com emails with the example.org DKIM key.
 
-CAUTION: just because you can, doesn't mean you should. Even with a relaxed DKIM policy, if you don't have a suitable DMARC record published for client.com, they may encounter deliverability problems. It is better to have keys generated and published for each domain.
+This is B<not> necessary for hosts or subdomains. If the DKIM key for host.example.com does not exist, and a key for example.com does exist, the parent DKIM key will be used to sign the message. So long as your DKIM and DMARC policies are set to relaxed alignment, these signed messages for subdomains will pass.
+
+CAUTION: just because you can sign for other domains, doesn't mean you should. Even with a relaxed DKIM policy, if the other domain doesn't have a suitable DMARC record for client.com, they may encounter deliverability problems. It is better to have keys generated and published for each domain.
 
 =head1 SEE ALSO
 
@@ -148,13 +149,13 @@ I first attempted to fix the dkimcheck plugin, but soon scrapped that effort and
 
 =over 4
 
-The nine 'if' brackets with 19 conditionals, and my inability to easily determine which of the 15 possible permutations (5 signature validation results x 3 possible policy results) were covered.
-
 The use of $dkim->fetch_author_policy, which is deprecated by Mail::DKIM.
 
-The paradim of a single policy, when DKIM supports 0 or many. Although I may yet implement the 'local' policy idea, so long as I'm confident it will never result in a false positive.
+The paradim of a single policy, when DKIM supports 0 or many.
 
 The OBF programming style, which is nigh impossible to test.
+
+The nine 'if' brackets with 19 conditionals, and my inability to easily determine which of the 15 possible permutations (5 signature validation results x 3 possible policy results) were covered.
 
 =back
 
@@ -166,6 +167,7 @@ use warnings;
 use Qpsmtpd::Constants;
 
 # use Mail::DKIM::Verifier;  # eval'ed in register()
+# use Mail::DKIM::Signer;
 use Socket qw(:DEFAULT :crlf);
 
 sub init {
@@ -178,7 +180,8 @@ sub init {
 sub register {
     my $self = shift;
 
-    foreach my $mod ( qw/ Mail::DKIM::Verifier Mail::DKIM::Signer Mail::DKIM::TextWrap / ) {
+    #  Mail::DKIM::TextWrap - nice idea, clients get mangled headers though
+    foreach my $mod ( qw/ Mail::DKIM::Verifier Mail::DKIM::Signer / ) {
         eval "use $mod";
         if ( $@ ) {
             warn "error, plugin disabled, could not load $mod\n";
@@ -194,7 +197,7 @@ sub data_post_handler {
     my ($self, $transaction) = @_;
 
     if ( $self->qp->connection->relay_client() ) {
-        # this is one of our authenticated users sending a message.
+        # this is an authenticated user sending a message.
         return $self->sign_it( $transaction );
     };
 
@@ -216,15 +219,14 @@ sub validate_it {
     my $result = $dkim->result;
     my $mess   = $self->get_details( $dkim );
 
-    foreach my $r ( qw/ pass fail invalid temperror none / ) {
-        my $handler = 'handle_sig_' . $r;
-        if ( $result eq $r && $self->can( $handler ) ) {
-            #$self->log(LOGINFO, "dispatching $result to $handler");
-            return $self->$handler( $dkim, $mess );
-        };
+    foreach my $t ( qw/ pass fail invalid temperror none / ) {
+        next if $t ne $result;
+        my $handler = 'handle_sig_' . $t;
+        $self->log(LOGDEBUG, "dispatching $result to $handler");
+        return $self->$handler( $dkim, $mess );
     };
 
-    $self->log( LOGERROR, "unknown result: $result, $mess" );
+    $self->log( LOGERROR, "error, unknown result: $result, $mess" );
     return DECLINED;
 }
 
@@ -248,7 +250,7 @@ sub sign_it {
     $self->qp->transaction->header->add(
         'DKIM-Signature', $signature->as_string, 0 );
 
-    $self->log(LOGINFO, "pass, signed message, ", $signature->as_string );
+    $self->log(LOGINFO, "pass, we signed the message" );
     return DECLINED;
 };
 
@@ -334,6 +336,8 @@ sub handle_sig_invalid {
 sub handle_sig_pass {
     my ( $self, $dkim, $mess ) = @_;
 
+    $self->save_signatures_to_note( $dkim );
+
     my ($prs) = $self->get_policy_results( $dkim );
 
     if ( $prs->{accept} ) {
@@ -407,6 +411,18 @@ sub get_keydir {
     my $domain = $transaction->sender->host;
     my $dir = "config/dkim/$domain";
 
+    if ( ! -e $dir ) {                      # the dkim key dir doesn't exist
+        my @labels = split /\./, $domain;   # split the domain into labels
+        while ( @labels > 1 ) {
+            shift @labels;                  # remove the first label (ie: www)
+            my $zone = join '.', @labels;   # reassemble the labels
+            if ( -e "config/dkim/$zone" ) { # if the directory exists
+                $dir = "config/dkim/$zone"; # use the parent domain's key
+                $self->log(LOGINFO, "info, using $zone key for $domain");
+            };
+        };
+    };
+
     if ( -l $dir ) {
         $dir = readlink($dir);
         $dir = "config/dkim/$dir" if $dir !~ /\//;  # no /, relative path
@@ -426,6 +442,18 @@ sub get_keydir {
         return;
     };
     return ($domain, $dir);
+};
+
+sub save_signatures_to_note {
+    my ( $self, $dkim ) = @_;
+
+    foreach my $sig ( $dkim->signatures ) {
+        next if $sig->result ne 'pass';
+        my $doms = $self->connection->notes('dkim_pass_domains') || [];
+        push @$doms, $sig->domain;
+        $self->connection->notes('dkim_pass_domains', $doms);
+        $self->log(LOGINFO, "info, added " . $sig->domain );
+    };
 };
 
 sub send_message_to_dkim {

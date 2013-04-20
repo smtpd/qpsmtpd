@@ -35,9 +35,7 @@ cat > dns <<EO_DKIM_DNS
 
 `cat selector | tr -d "\n"`._domainkey TXT "v=DKIM1;p=`grep -v -e '^-' public | tr -d "\n"`"
 
-_domainkey TXT "o=-; t=y; r=postmaster@$DOMAIN"
-
-Tell the world that the ONLY mail servers that send mail from this domain bear our MX and A records.
+Tell the world that the ONLY mail servers that send mail from this domain are DKIM signed and/or bear our MX and A records.
 
 With SPF:
 
@@ -46,7 +44,11 @@ With SPF:
 
 With DMARC:
 
-_dmarc  TXT "v=DMARC1; p=reject; rua=mailto:dmarc-feedback@$DOMAIN; ruf=mailto:dmarc-feedback@'$DOMAIN; adkim=s; aspf=s; pct=100"
+_dmarc  TXT "v=DMARC1; p=reject; adkim=s; aspf=r; rua=mailto:dmarc-feedback@$DOMAIN; ruf=mailto:dmarc-feedback@'$DOMAIN; pct=100"
+
+With DomainKeys (deprecated)
+
+_domainkey TXT "o=-; t=y; r=postmaster@$DOMAIN"
 
 For more information about DKIM and SPF policy, the documentation within each plugin contains a longer discussion and links to more detailed information:
 
