@@ -14,7 +14,7 @@ sub register_tests {
 
     $self->register_test('test_get_organizational_domain', 2);
     $self->register_test("test_fetch_dmarc_record", 3);
-    $self->register_test("test_discover_policy", 3);
+    $self->register_test("test_discover_policy", 1);
 }
 
 sub setup_test_headers {
@@ -62,7 +62,6 @@ sub test_discover_policy {
     my $self = shift;
 
     $self->setup_test_headers();
-    my $transaction = $self->qp->transaction;
 
-    ok( $self->discover_policy( $transaction ), 'discover_policy' );
+    ok( $self->discover_policy( 'tnpi.net' ), 'discover_policy' );
 };

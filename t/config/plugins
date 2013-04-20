@@ -59,6 +59,7 @@ rcpt_ok
 headers days 5 reject_type temp require From,Date
 domainkeys
 dkim
+dmarc
 
 # content filters
 virus/klez_filter
