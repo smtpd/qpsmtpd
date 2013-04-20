@@ -40,17 +40,20 @@ SPF levels above 4 are for crusaders who don't mind rejecting some valid mail wh
  http://spf.pobox.com/
  http://en.wikipedia.org/wiki/Sender_Policy_Framework
 
+=head1 TODO
+
+Check the scope of the SPF policy. If it's too broad (ie, the whole internet is valid), apply karma penalty
+Examples of too broad: +all,
+
 =head1 ACKNOWLDGEMENTS
 
 The reject options are modeled after, and aim to match the functionality of those found in the SPF patch for qmail-smtpd.
 
 =head1 AUTHOR
 
-Matt Simerson - 2012 - increased policy options from 3 to 6
-
-Matt Simerson - 2011 - rewrote using Mail::SPF
-
-Matt Sergeant - 2003 - initial plugin
+ Matt Simerson - 2012 - increased policy options from 3 to 6
+ Matt Simerson - 2011 - rewrote using Mail::SPF
+ Matt Sergeant - 2003 - initial plugin
 
 =cut
 
@@ -155,6 +158,7 @@ sub mail_handler {
     }
     elsif ( $code eq 'pass' ) {
         $self->adjust_karma( 1 );
+        $transaction->notes('spf_pass_host', lc $sender->host);
         $self->log(LOGINFO, "pass, $code: $why" );
         return (DECLINED);
     }
@@ -223,6 +227,9 @@ sub data_post_handler {
     my ($self, $transaction) = @_;
 
     my $result = $transaction->notes('spfquery') or return DECLINED;
+
+# if we skipped processing in mail_handler, we should skip here too
+    return (DECLINED) if $self->is_immune();
 
     $self->log(LOGDEBUG, "result was $result->code");
 
