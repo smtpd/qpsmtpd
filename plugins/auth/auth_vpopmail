@@ -50,10 +50,10 @@ use Qpsmtpd::Constants;
 sub register {
     my ($self, $qp) = @_;
 
-    return (DECLINED) if ! $self->test_vpopmail_module();
+    return (DECLINED) if !$self->test_vpopmail_module();
 
-    $self->register_hook("auth-plain", "auth_vpopmail" );
-    $self->register_hook("auth-login", "auth_vpopmail" );
+    $self->register_hook("auth-plain",    "auth_vpopmail");
+    $self->register_hook("auth-login",    "auth_vpopmail");
     $self->register_hook("auth-cram-md5", "auth_vpopmail");
 }
 
@@ -61,41 +61,45 @@ sub auth_vpopmail {
     my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
       @_;
 
-    my $pw              = vauth_getpw( split /@/, lc($user) );
+    my $pw              = vauth_getpw(split /@/, lc($user));
     my $pw_clear_passwd = $pw->{pw_clear_passwd};
     my $pw_passwd       = $pw->{pw_passwd};
 
     if (!$pw || (!$pw_clear_passwd && !$pw_passwd)) {
         $self->log(LOGINFO, "fail: invalid user $user");
         return (DENY, "auth_vpopmail - invalid user");
+
         # change DENY to DECLINED to support multiple auth plugins
     }
 
-    return Qpsmtpd::Auth::validate_password( $self,
-        src_clear     => $pw->{pw_clear_passwd},
-        src_crypt     => $pw->{pw_passwd},
-        attempt_clear => $passClear,
-        attempt_hash  => $passHash,
-        method        => $method,
-        ticket        => $ticket,
-        deny          => DENY,
-    );
+    return
+      Qpsmtpd::Auth::validate_password(
+                                       $self,
+                                       src_clear     => $pw->{pw_clear_passwd},
+                                       src_crypt     => $pw->{pw_passwd},
+                                       attempt_clear => $passClear,
+                                       attempt_hash  => $passHash,
+                                       method        => $method,
+                                       ticket        => $ticket,
+                                       deny          => DENY,
+                                      );
 }
 
 sub test_vpopmail_module {
     my $self = shift;
+
 # vpopmail will not allow vauth_getpw to succeed unless the requesting user is vpopmail or root.
 # by default, qpsmtpd runs as the user 'qpsmtpd' and does not have permission.
     eval 'use vpopmail';
-    if ( $@ ) {
+    if ($@) {
         $self->log(LOGERROR, "skip: is vpopmail perl module installed?");
         return;
-    };
+    }
 
     my ($domain) = vpopmail::vlistdomains();
     my $r = vauth_getpw('postmaster', $domain) or do {
-            $self->log(LOGERROR, "skip: could not query vpopmail");
-            return;
-        };
+        $self->log(LOGERROR, "skip: could not query vpopmail");
+        return;
+    };
     return 1;
 }

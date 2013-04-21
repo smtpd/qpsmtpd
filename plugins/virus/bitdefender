@@ -67,10 +67,10 @@ use File::Path;
 use Qpsmtpd::Constants;
 
 sub register {
-    my ( $self, $qp, @args ) = @_;
+    my ($self, $qp, @args) = @_;
 
     while (@args) {
-        $self->{"_bitd"}->{ pop @args } = pop @args;
+        $self->{"_bitd"}->{pop @args} = pop @args;
     }
     $self->{"_bitd"}->{"bitdefender_location"} ||= "/opt/bdc/bdc";
     $self->{"_bitd"}->{"deny_viruses"}         ||= "yes";
@@ -79,31 +79,31 @@ sub register {
 }
 
 sub hook_data_post {
-    my ( $self, $transaction ) = @_;
+    my ($self, $transaction) = @_;
 
-    if ( $transaction->data_size > $self->{"_bitd"}->{"max_size"} ) {
-        $self->log( LOGWARN,
-                'Mail too large to scan ('
-              . $transaction->data_size . " vs "
-              . $self->{"_bitd"}->{"max_size"}
-              . ")" );
+    if ($transaction->data_size > $self->{"_bitd"}->{"max_size"}) {
+        $self->log(LOGWARN,
+                       'Mail too large to scan ('
+                     . $transaction->data_size . " vs "
+                     . $self->{"_bitd"}->{"max_size"} . ")"
+                  );
         return (DECLINED);
     }
 
     # Ignore non-multipart emails
     my $content_type = $transaction->header->get('Content-Type');
     $content_type =~ s/\s/ /g if defined $content_type;
-    unless ( $content_type
-        && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
+    unless (   $content_type
+            && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i)
     {
-        $self->log( LOGERROR, "non-multipart mail - skipping" );
+        $self->log(LOGERROR, "non-multipart mail - skipping");
         return DECLINED;
     }
 
     my $filename = $transaction->body_filename;
     unless (defined $filename) {
-	$self->log(LOGERROR, "didn't get a filename");
-	return DECLINED;
+        $self->log(LOGERROR, "didn't get a filename");
+        return DECLINED;
     }
 
     # Now do the actual scanning!
@@ -121,9 +121,9 @@ sub hook_data_post {
     close $bdc;
 
     if ($output) {
-        $self->log( LOGINFO, "Virus(es) found: $output" );
-        if ( $self->{"_bitd"}->{"deny_viruses"} eq "yes" ) {
-            return ( DENY, "Virus Found: $output" );
+        $self->log(LOGINFO, "Virus(es) found: $output");
+        if ($self->{"_bitd"}->{"deny_viruses"} eq "yes") {
+            return (DENY, "Virus Found: $output");
         }
     }
 

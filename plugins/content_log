@@ -6,20 +6,20 @@
 use POSIX qw:strftime:;
 
 sub hook_data_post {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  # as a decent default, log on a per-day-basis
-  my $date = strftime("%Y%m%d",localtime(time));
-  open(my $out,">>mail/$date")
-    or return(DECLINED,"Could not open log file.. continuing anyway");
+    # as a decent default, log on a per-day-basis
+    my $date = strftime("%Y%m%d", localtime(time));
+    open(my $out, ">>mail/$date")
+      or return (DECLINED, "Could not open log file.. continuing anyway");
 
-  $transaction->header->print($out);
-  $transaction->body_resetpos;
-  while (my $line = $transaction->body_getline) {
-    print $out $line;
-  }
+    $transaction->header->print($out);
+    $transaction->body_resetpos;
+    while (my $line = $transaction->body_getline) {
+        print $out $line;
+    }
 
-  close $out;
+    close $out;
 
-  return (DECLINED, "successfully saved message.. continuing");
+    return (DECLINED, "successfully saved message.. continuing");
 }

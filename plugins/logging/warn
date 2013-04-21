@@ -38,36 +38,38 @@ Please see the LICENSE file included with qpsmtpd for details.
 =cut
 
 sub register {
-  my ($self, $qp, $loglevel) = @_;
+    my ($self, $qp, $loglevel) = @_;
 
-  $self->{_level} = LOGWARN;
-  if ( defined($loglevel) ) {
-      if ($loglevel =~ /^\d+$/) {
-	  $self->{_level} = $loglevel;
-      }
-      else {
-	  $self->{_level} = log_level($loglevel);
-      }
-  }
+    $self->{_level} = LOGWARN;
+    if (defined($loglevel)) {
+        if ($loglevel =~ /^\d+$/) {
+            $self->{_level} = $loglevel;
+        }
+        else {
+            $self->{_level} = log_level($loglevel);
+        }
+    }
 
-  # If you want to capture this log entry with this plugin, you need to
-  # wait until after you register the plugin
-  $self->log(LOGINFO,'Initializing logging::warn plugin');
+    # If you want to capture this log entry with this plugin, you need to
+    # wait until after you register the plugin
+    $self->log(LOGINFO, 'Initializing logging::warn plugin');
 }
 
 sub hook_logging {
-  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
-  # Don't log your own log entries!  If this is the only logging plugin
-  # then these lines will not be logged at all.  You can safely comment
-  # out this line and it will not cause an infinite loop.
+    # Don't log your own log entries!  If this is the only logging plugin
+    # then these lines will not be logged at all.  You can safely comment
+    # out this line and it will not cause an infinite loop.
     return DECLINED if defined $plugin && $plugin eq $self->plugin_name;
 
     return DECLINED if $trace > $self->{_level};
 
-    my $prefix = defined $plugin && defined $hook ? " ($hook) $plugin:" :
-                 defined $plugin ? " $plugin:" :
-                 defined $hook   ? " ($hook) running plugin:" : '';
+    my $prefix =
+        defined $plugin && defined $hook ? " ($hook) $plugin:"
+      : defined $plugin ? " $plugin:"
+      : defined $hook   ? " ($hook) running plugin:"
+      :                   '';
 
     warn join(' ', $$ . $prefix, @log), "\n";
 

@@ -31,29 +31,29 @@ use warnings;
 use Qpsmtpd::Constants;
 
 sub register {
-    my ($self, $qp ) = (shift, shift);
+    my ($self, $qp) = (shift, shift);
 
-    if ( @_ == 1 ) {
-        $self->legacy_positional_args( @_ );
+    if (@_ == 1) {
+        $self->legacy_positional_args(@_);
     }
     else {
-        $self->{_args} = { @_ };
-    };
+        $self->{_args} = {@_};
+    }
 
-    $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
+    $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
 }
 
 sub legacy_positional_args {
     my ($self, $denial) = @_;
 
-    if ( defined $denial && $denial =~ /^disconnect$/i ) {
+    if (defined $denial && $denial =~ /^disconnect$/i) {
         $self->{_args}{reject_type} = 'disconnect';
     }
     else {
         $self->{_args}{reject_type} = 'perm';
     }
-};
+}
 
 sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
@@ -63,7 +63,7 @@ sub hook_mail {
     if ($sender->format eq '<>') {
         $self->log(LOGINFO, 'pass, null sender');
         return DECLINED;
-    };
+    }
 
     my %rhsbl_zones = $self->populate_zones() or return DECLINED;
 
@@ -73,47 +73,53 @@ sub hook_mail {
     for my $host (@hosts) {
         for my $rhsbl (keys %rhsbl_zones) {
             my $query;
-# fix to find TXT records, if the rhsbl_zones line doesn't have second field
+
+    # fix to find TXT records, if the rhsbl_zones line doesn't have second field
             if (defined($rhsbl_zones{$rhsbl})) {
                 $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record");
                 $query = $res->query("$host.$rhsbl");
-            } else {
+            }
+            else {
                 $self->log(LOGDEBUG, "Checking $host.$rhsbl for TXT record");
                 $query = $res->query("$host.$rhsbl", 'TXT');
             }
 
-            if ( ! $query) {
-                if  ( $res->errorstring ne 'NXDOMAIN' ) {
+            if (!$query) {
+                if ($res->errorstring ne 'NXDOMAIN') {
                     $self->log(LOGCRIT, "query failed: ", $res->errorstring);
-                };
+                }
                 next;
-            };
+            }
 
             my $result;
             foreach my $rr ($query->answer) {
-                $self->log(LOGDEBUG, 'got an ' . $rr->type . ' record ' . $rr->name);
+                $self->log(LOGDEBUG,
+                           'got an ' . $rr->type . ' record ' . $rr->name);
                 if ($rr->type eq 'A') {
-                    $self->log(LOGDEBUG, "A record found for $result with IP " . $rr->address);
+                    $self->log(LOGDEBUG,
+                          "A record found for $result with IP " . $rr->address);
                     $result = $rr->name;
                 }
                 elsif ($rr->type eq 'TXT') {
                     $result = $rr->txtdata;
                     $self->log(LOGDEBUG, "TXT record found: " . $rr->txtdata);
-                };
+                }
 
-                next if ! $result;
+                next if !$result;
 
                 $self->log(LOGINFO, "fail, $result");
 
-                if ( $transaction->sender ) {
+                if ($transaction->sender) {
                     my $host = $transaction->sender->host;
-                    if ($result =~ /^$host\./ ) {
-                        return $self->get_reject( "Mail from $host rejected because it $result" );
-                    };
-                };
+                    if ($result =~ /^$host\./) {
+                        return $self->get_reject(
+                                 "Mail from $host rejected because it $result");
+                    }
+                }
 
                 my $hello = $self->qp->connection->hello_host;
-                return $self->get_reject( "Mail from HELO $hello rejected because it $result" );
+                return $self->get_reject(
+                           "Mail from HELO $hello rejected because it $result");
             }
         }
     }
@@ -125,15 +131,14 @@ sub hook_mail {
 sub populate_zones {
     my $self = shift;
 
-    my %rhsbl_zones
-        = map { (split /\s+/, $_, 2)[0,1] }
-            $self->qp->config('rhsbl_zones');
+    my %rhsbl_zones =
+      map { (split /\s+/, $_, 2)[0, 1] } $self->qp->config('rhsbl_zones');
 
-    if ( ! keys %rhsbl_zones ) {
+    if (!keys %rhsbl_zones) {
         $self->log(LOGINFO, 'pass, no zones');
         return;
-    };
+    }
 
     return %rhsbl_zones;
-};
+}
 

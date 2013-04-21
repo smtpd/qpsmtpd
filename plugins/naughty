@@ -109,28 +109,28 @@ use Qpsmtpd::Constants;
 sub register {
     my ($self, $qp) = (shift, shift);
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
-    $self->{_args} = { @_ };
-    $self->{_args}{reject} ||= 'rcpt';
+    $self->{_args} = {@_};
+    $self->{_args}{reject}      ||= 'rcpt';
     $self->{_args}{reject_type} ||= 'disconnect';
 
     my $reject = lc $self->{_args}{reject};
-    my %hooks  = map { $_ => 1 }
-        qw/ connect mail rcpt data data_post hook_queue_post /;
+    my %hooks =
+      map { $_ => 1 } qw/ connect mail rcpt data data_post hook_queue_post /;
 
-    if ( ! $hooks{$reject} ) {
-        $self->log( LOGERROR, "fail, invalid hook $reject" );
-        $self->register_hook( 'data_post', 'naughty');
+    if (!$hooks{$reject}) {
+        $self->log(LOGERROR, "fail, invalid hook $reject");
+        $self->register_hook('data_post', 'naughty');
         return;
-    };
+    }
 
     # just in case naughty doesn't disconnect, which can happen if a plugin
     # with the same hook returned OK before naughty ran, or ....
-    if ( $reject ne 'data_post' && $reject ne 'hook_queue_post' ) {
-        $self->register_hook( 'data_post', 'naughty');
-    };
+    if ($reject ne 'data_post' && $reject ne 'hook_queue_post') {
+        $self->register_hook('data_post', 'naughty');
+    }
 
     $self->log(LOGDEBUG, "registering hook $reject");
-    $self->register_hook( $reject, 'naughty');
+    $self->register_hook($reject, 'naughty');
 }
 
 sub naughty {
@@ -140,8 +140,11 @@ sub naughty {
         return DECLINED;
     };
     $self->log(LOGINFO, "disconnecting");
-    my $type = $self->get_reject_type( 'disconnect',
-        $self->connection->notes('naughty_reject_type') );
-    return ( $type, $naughty );
-};
+    my $type = $self->get_reject_type(
+                                      'disconnect',
+                                      $self->connection->notes(
+                                                          'naughty_reject_type')
+                                     );
+    return ($type, $naughty);
+}
 

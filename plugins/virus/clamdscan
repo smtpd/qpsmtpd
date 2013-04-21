@@ -109,17 +109,17 @@ use warnings;
 use Qpsmtpd::Constants;
 
 sub register {
-    my ( $self, $qp ) = shift, shift;
+    my ($self, $qp) = shift, shift;
 
     $self->log(LOGERROR, "Bad parameters for the clamdscan plugin") if @_ % 2;
-    $self->{'_args'} = { @_ };
+    $self->{'_args'} = {@_};
 
     eval 'use ClamAV::Client';
-    if ( $@ ) {
+    if ($@) {
         warn "unable to load ClamAV::Client\n";
         $self->log(LOGERROR, "unable to load ClamAV::Client");
         return;
-    };
+    }
 
     # Set some sensible defaults
     $self->{'_args'}{'deny_viruses'} ||= 'yes';
@@ -127,73 +127,75 @@ sub register {
     $self->{'_args'}{'scan_all'}     ||= 0;
     for my $setting ('deny_viruses', 'defer_on_error') {
         next unless $self->{'_args'}{$setting};
-        if ( lc $self->{'_args'}{$setting} eq 'no' ) {
+        if (lc $self->{'_args'}{$setting} eq 'no') {
             $self->{'_args'}{$setting} = 0;
-        };
+        }
     }
 
     $self->register_hook('data_post', 'data_post_handler');
 }
 
 sub data_post_handler {
-    my ( $self, $transaction ) = @_;
+    my ($self, $transaction) = @_;
 
-    my $filename = $self->get_filename( $transaction ) or return DECLINED;
+    my $filename = $self->get_filename($transaction) or return DECLINED;
 
-    if ( $self->connection->notes('naughty') ) {
-        $self->log( LOGINFO, "skip, naughty" );
+    if ($self->connection->notes('naughty')) {
+        $self->log(LOGINFO, "skip, naughty");
         return (DECLINED);
-    };
-    return (DECLINED) if $self->is_too_big( $transaction );
-    return (DECLINED) if $self->is_not_multipart( $transaction );
+    }
+    return (DECLINED) if $self->is_too_big($transaction);
+    return (DECLINED) if $self->is_not_multipart($transaction);
 
-    $self->set_permission( $filename ) or return DECLINED;
+    $self->set_permission($filename) or return DECLINED;
 
     my $clamd = $self->get_clamd()
-        or return $self->err_and_return( "Cannot instantiate ClamAV::Client" );
+      or return $self->err_and_return("Cannot instantiate ClamAV::Client");
 
-    unless ( eval { $clamd->ping() } ) {
-        return $self->err_and_return( "Cannot ping clamd server: $@" );
+    unless (eval { $clamd->ping() }) {
+        return $self->err_and_return("Cannot ping clamd server: $@");
     }
 
     my ($version) = split(/\//, $clamd->version);
     $version ||= 'ClamAV';
 
-    my ( $path, $found ) = eval { $clamd->scan_path( $filename ) };
+    my ($path, $found) = eval { $clamd->scan_path($filename) };
     if ($@) {
-        return $self->err_and_return( "Error scanning mail: $@" );
-    };
+        return $self->err_and_return("Error scanning mail: $@");
+    }
 
-    if ( $found ) {
-        $self->log( LOGNOTICE, "fail, found virus $found" );
+    if ($found) {
+        $self->log(LOGNOTICE, "fail, found virus $found");
 
-        $self->connection->notes('naughty', 1); # see plugins/naughty
-        $self->adjust_karma( -1 );
+        $self->connection->notes('naughty', 1);    # see plugins/naughty
+        $self->adjust_karma(-1);
 
-        if ( $self->{_args}{deny_viruses} ) {
-            return ( DENY, "Virus found: $found" );
+        if ($self->{_args}{deny_viruses}) {
+            return (DENY, "Virus found: $found");
         }
 
-        $transaction->header->add( 'X-Virus-Found',   'Yes', 0 );
-        $transaction->header->add( 'X-Virus-Details', $found, 0 );
+        $transaction->header->add('X-Virus-Found',   'Yes',  0);
+        $transaction->header->add('X-Virus-Details', $found, 0);
         return (DECLINED);
     }
 
-    $self->log( LOGINFO, "pass, clean");
-    $transaction->header->add( 'X-Virus-Found',   'No', 0 );
-    $transaction->header->add( 'X-Virus-Checked', "by $version on " . $self->qp->config('me'), 0);
+    $self->log(LOGINFO, "pass, clean");
+    $transaction->header->add('X-Virus-Found', 'No', 0);
+    $transaction->header->add('X-Virus-Checked',
+                              "by $version on " . $self->qp->config('me'), 0);
     return (DECLINED);
 }
 
 sub err_and_return {
-    my $self = shift;
+    my $self    = shift;
     my $message = shift;
-    if ( $message ) {
-        $self->log( LOGERROR, $message );
-    };
-    return (DENYSOFT, "Unable to scan for viruses") if $self->{_args}{defer_on_error};
+    if ($message) {
+        $self->log(LOGERROR, $message);
+    }
+    return (DENYSOFT, "Unable to scan for viruses")
+      if $self->{_args}{defer_on_error};
     return (DECLINED, "skip");
-};
+}
 
 sub get_filename {
     my $self = shift;
@@ -201,25 +203,25 @@ sub get_filename {
 
     my $filename = $transaction->body_filename;
 
-    if ( ! $filename ) {
-        $self->log( LOGWARN, "Cannot process due to lack of filename" );
+    if (!$filename) {
+        $self->log(LOGWARN, "Cannot process due to lack of filename");
         return;
     }
 
-    if ( ! -f $filename ) {
-        $self->log( LOGERROR, "spool file missing! Attempting to respool" );
+    if (!-f $filename) {
+        $self->log(LOGERROR, "spool file missing! Attempting to respool");
         $transaction->body_spool;
         $filename = $transaction->body_filename;
-        if ( ! -f $filename ) {
-            $self->log( LOGERROR, "skip: failed spool to $filename! Giving up" );
+        if (!-f $filename) {
+            $self->log(LOGERROR, "skip: failed spool to $filename! Giving up");
             return;
-        };
+        }
         my $size = (stat($filename))[7];
-        $self->log( LOGDEBUG, "Spooled $size bytes to $filename" );
+        $self->log(LOGDEBUG, "Spooled $size bytes to $filename");
     }
 
     return $filename;
-};
+}
 
 sub set_permission {
     my ($self, $filename) = @_;
@@ -227,26 +229,28 @@ sub set_permission {
     # the spool directory must be readable and executable by the scanner;
     # this generally means either group or world exec; if
     # neither of these is set, issue a warning but try to proceed anyway
-    my $dir_mode = ( stat( $self->spool_dir() ) )[2];
-    $self->log( LOGDEBUG, "spool dir mode: $dir_mode" );
+    my $dir_mode = (stat($self->spool_dir()))[2];
+    $self->log(LOGDEBUG, "spool dir mode: $dir_mode");
 
-    if ( $dir_mode & 0010 || $dir_mode & 0001 ) {
+    if ($dir_mode & 0010 || $dir_mode & 0001) {
+
         # match the spool file mode with the mode of the directory -- add
         # the read bit for group, world, or both, depending on what the
         # spool dir had, and strip all other bits, especially the sticky bit
-        my $fmode = ($dir_mode & 0044) |
-                    ($dir_mode & 0010 ? 0040 : 0) |
-                    ($dir_mode & 0001 ? 0004 : 0);
+        my $fmode =
+          ($dir_mode & 0044) | ($dir_mode & 0010 ? 0040 : 0) |
+          ($dir_mode & 0001 ? 0004 : 0);
 
-        unless ( chmod $fmode, $filename ) {
-            $self->log( LOGERROR, "chmod: $filename: $!" );
+        unless (chmod $fmode, $filename) {
+            $self->log(LOGERROR, "chmod: $filename: $!");
             return;
         }
         return 1;
     }
-    $self->log( LOGWARN, "spool directory permissions do not permit scanner access" );
+    $self->log(LOGWARN,
+               "spool directory permissions do not permit scanner access");
     return 1;
-};
+}
 
 sub get_clamd {
     my $self = shift;
@@ -254,34 +258,34 @@ sub get_clamd {
     my $port = $self->{'_args'}{'clamd_port'};
     my $host = $self->{'_args'}{'clamd_host'} || 'localhost';
 
-    if ( $port && $port =~ /^(\d+)/ ) {
-        return new ClamAV::Client( socket_host => $host, socket_port => $1 );
-    };
+    if ($port && $port =~ /^(\d+)/) {
+        return new ClamAV::Client(socket_host => $host, socket_port => $1);
+    }
 
     my $socket = $self->{'_args'}{'clamd_socket'};
-    if ( $socket ) {
-        if ( $socket =~ /([\w\/.]+)/ ) {
-            return new ClamAV::Client( socket_name => $1 );
+    if ($socket) {
+        if ($socket =~ /([\w\/.]+)/) {
+            return new ClamAV::Client(socket_name => $1);
         }
-        $self->log( LOGERROR, "invalid characters in socket name" );
+        $self->log(LOGERROR, "invalid characters in socket name");
     }
 
     return new ClamAV::Client;
-};
+}
 
 sub is_too_big {
     my $self = shift;
     my $transaction = shift || $self->qp->transaction;
 
     my $size = $transaction->data_size;
-    if ( $size > $self->{_args}{max_size} * 1024 ) {
-        $self->log( LOGINFO, "skip, too big ($size)" );
+    if ($size > $self->{_args}{max_size} * 1024) {
+        $self->log(LOGINFO, "skip, too big ($size)");
         return 1;
     }
 
-    $self->log( LOGDEBUG, "data_size, $size" );
+    $self->log(LOGDEBUG, "data_size, $size");
     return;
-};
+}
 
 sub is_not_multipart {
     my $self = shift;
@@ -289,15 +293,15 @@ sub is_not_multipart {
 
     return if $self->{'_args'}{'scan_all'};
 
-    return 1 if ! $transaction->header;
+    return 1 if !$transaction->header;
 
     # Ignore non-multipart emails
     my $content_type = $transaction->header->get('Content-Type') or return 1;
     $content_type =~ s/\s/ /g;
-    if ( $content_type !~ m!\bmultipart/.*\bboundary="?([^"]+)!i ) {
-        $self->log( LOGNOTICE, "skip, not multipart" );
+    if ($content_type !~ m!\bmultipart/.*\bboundary="?([^"]+)!i) {
+        $self->log(LOGNOTICE, "skip, not multipart");
         return 1;
     }
 
     return;
-};
+}

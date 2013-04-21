@@ -70,52 +70,57 @@ use IO::Select;
 use Qpsmtpd::Constants;
 
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  if (@args % 2) {
+    if (@args % 2) {
         $self->log(LOGERROR, "Unrecognized/mismatched arguments");
         return;
-  }
-  my %check_at;
-  for (0..$#args) {
-    next if $_ % 2;
-    if (lc($args[$_]) eq 'check-at') {
-      my $val = $args[$_ + 1];
-      $check_at{uc($val)}++;
     }
-  }
-  if (!%check_at) {
-    $check_at{CONNECT} = 1;
-  }
-  $self->{_args} = {
-        'wait' => 1,
-        @args,
-        'check-at' => \%check_at,
-  };
-# backwards compat with old 'action' argument
-  if ( defined $self->{_args}{action} && ! defined $self->{_args}{reject} ) {
-       $self->{_args}{reject} = $self->{_args}{action} =~ /^deny/i ? 1 : 0;
-  };
-  if ( defined $self->{_args}{'defer-reject'} && ! defined $self->{_args}{reject_type} ) {
-       $self->{_args}{reject_type} = $self->{_args}{action} == 'denysoft' ? 'temp' : 'perm';
-  };
-  if ( ! defined $self->{_args}{reject_type} ) {
-       $self->{_args}{reject_type} = 'perm';
-  };
-# /end compat
-  if ( $qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
-      require APR::Const;
-      APR::Const->import(qw(POLLIN SUCCESS));
-      $self->register_hook('connect', 'apr_connect_handler');
-      $self->register_hook('data', 'apr_data_handler');
-  }
-  else {
-      $self->register_hook('connect', 'connect_handler');
-      $self->register_hook('data', 'data_handler');
-  }
-  $self->register_hook('mail', 'mail_handler')
-    if $self->{_args}{'defer-reject'};
-  $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
+    my %check_at;
+    for (0 .. $#args) {
+        next if $_ % 2;
+        if (lc($args[$_]) eq 'check-at') {
+            my $val = $args[$_ + 1];
+            $check_at{uc($val)}++;
+        }
+    }
+    if (!%check_at) {
+        $check_at{CONNECT} = 1;
+    }
+    $self->{_args} = {
+                      'wait' => 1,
+                      @args,
+                      'check-at' => \%check_at,
+                     };
+
+    # backwards compat with old 'action' argument
+    if (defined $self->{_args}{action} && !defined $self->{_args}{reject}) {
+        $self->{_args}{reject} = $self->{_args}{action} =~ /^deny/i ? 1 : 0;
+    }
+    if (defined $self->{_args}{'defer-reject'}
+        && !defined $self->{_args}{reject_type})
+    {
+        $self->{_args}{reject_type} =
+          $self->{_args}{action} == 'denysoft' ? 'temp' : 'perm';
+    }
+    if (!defined $self->{_args}{reject_type}) {
+        $self->{_args}{reject_type} = 'perm';
+    }
+
+    # /end compat
+    if ($qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
+        require APR::Const;
+        APR::Const->import(qw(POLLIN SUCCESS));
+        $self->register_hook('connect', 'apr_connect_handler');
+        $self->register_hook('data',    'apr_data_handler');
+    }
+    else {
+        $self->register_hook('connect', 'connect_handler');
+        $self->register_hook('data',    'data_handler');
+    }
+    $self->register_hook('mail', 'mail_handler')
+      if $self->{_args}{'defer-reject'};
+    $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
 }
 
 sub apr_connect_handler {
@@ -124,7 +129,7 @@ sub apr_connect_handler {
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
     return DECLINED if $self->is_immune();
 
-    my $c = $self->qp->{conn} or return DECLINED;
+    my $c      = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;
     my $timeout = $self->{_args}{'wait'} * 1_000_000;
 
@@ -133,9 +138,9 @@ sub apr_connect_handler {
         if ($self->{_args}{'defer-reject'}) {
             $self->connection->notes('earlytalker', 1);
             return DECLINED;
-        };
+        }
         return $self->log_and_deny();
-    };
+    }
     return $self->log_and_pass();
 }
 
@@ -145,14 +150,14 @@ sub apr_data_handler {
     return DECLINED unless $self->{_args}{'check-at'}{DATA};
     return DECLINED if $self->is_immune();
 
-    my $c = $self->qp->{conn} or return DECLINED;
+    my $c      = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;
     my $timeout = $self->{_args}{'wait'} * 1_000_000;
 
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
         return $self->log_and_deny();
-    };
+    }
     return $self->log_and_pass();
 }
 
@@ -168,19 +173,19 @@ sub connect_handler {
     if (defined $karma && $karma > 5) {
         $self->log(LOGINFO, "skip, karma $karma");
         return DECLINED;
-    };
+    }
 
     $in->add(\*STDIN) or return DECLINED;
-    if (! $in->can_read($self->{_args}{'wait'})) {
+    if (!$in->can_read($self->{_args}{'wait'})) {
         return $self->log_and_pass();
-    };
+    }
 
-    if ( ! $self->{_args}{'defer-reject'}) {
+    if (!$self->{_args}{'defer-reject'}) {
         return $self->log_and_deny();
-    };
+    }
 
     $self->connection->notes('earlytalker', 1);
-    $self->adjust_karma( -1 );
+    $self->adjust_karma(-1);
     return DECLINED;
 }
 
@@ -192,12 +197,12 @@ sub data_handler {
     return DECLINED if $self->is_immune();
 
     $in->add(\*STDIN) or return DECLINED;
-    if ( ! $in->can_read($self->{_args}{'wait'})) {
+    if (!$in->can_read($self->{_args}{'wait'})) {
         return $self->log_and_pass();
-    };
+    }
 
     return $self->log_and_deny();
-};
+}
 
 sub log_and_pass {
     my $self = shift;
@@ -212,18 +217,18 @@ sub log_and_deny {
     my $ip = $self->qp->connection->remote_ip || 'remote host';
 
     $self->connection->notes('earlytalker', 1);
-    $self->adjust_karma( -1 );
+    $self->adjust_karma(-1);
 
     my $log_mess = "remote started talking before we said hello";
     my $smtp_msg = 'Connecting host started transmitting before SMTP greeting';
 
-    return $self->get_reject( $smtp_msg, $log_mess );
+    return $self->get_reject($smtp_msg, $log_mess);
 }
 
 sub mail_handler {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  return DECLINED unless $self->connection->notes('earlytalker');
-  return $self->log_and_deny();
+    return DECLINED unless $self->connection->notes('earlytalker');
+    return $self->log_and_deny();
 }
 

@@ -72,14 +72,14 @@ use Qpsmtpd::Constants;
 #use DBI;  # done in ->register
 
 sub register {
-    my ( $self, $qp ) = @_;
+    my ($self, $qp) = @_;
 
     eval 'use DBI';
-    if ( $@ ) {
+    if ($@) {
         warn "plugin disabled. is DBI installed?\n";
         $self->log(LOGERROR, "skip: plugin disabled. is DBI installed?\n");
         return;
-    };
+    }
 
     $self->register_hook('auth-plain',    'auth_vmysql');
     $self->register_hook('auth-login',    'auth_vmysql');
@@ -89,27 +89,28 @@ sub register {
 sub get_db_handle {
     my $self = shift;
 
-    my $dsn    = $self->qp->config("vpopmail_mysql_dsn") || "dbi:mysql:dbname=vpopmail;host=127.0.0.1";
+    my $dsn = $self->qp->config("vpopmail_mysql_dsn")
+      || "dbi:mysql:dbname=vpopmail;host=127.0.0.1";
     my $dbuser = $self->qp->config("vpopmail_mysql_user") || "vpopmailuser";
     my $dbpass = $self->qp->config("vpopmail_mysql_pass") || "vpoppasswd";
 
-    my $dbh = DBI->connect( $dsn, $dbuser, $dbpass ) or do {
-            $self->log(LOGERROR, "skip: db connection failed");
-            return;
-        };
-    $dbh->{ShowErrorStatement} = 1;
-    return $dbh;
-};
-
-sub get_vpopmail_user {
-    my ( $self, $dbh, $user ) = @_;
-
-    my ( $pw_name, $pw_domain ) = split /@/, lc($user);
-
-    if ( ! defined $pw_domain ) {
-        $self->log(LOGINFO, "skip: missing domain: " . lc $user );
+    my $dbh = DBI->connect($dsn, $dbuser, $dbpass) or do {
+        $self->log(LOGERROR, "skip: db connection failed");
         return;
     };
+    $dbh->{ShowErrorStatement} = 1;
+    return $dbh;
+}
+
+sub get_vpopmail_user {
+    my ($self, $dbh, $user) = @_;
+
+    my ($pw_name, $pw_domain) = split /@/, lc($user);
+
+    if (!defined $pw_domain) {
+        $self->log(LOGINFO, "skip: missing domain: " . lc $user);
+        return;
+    }
 
     $self->log(LOGDEBUG, "auth_vpopmail_sql: $user");
 
@@ -118,16 +119,17 @@ FROM vpopmail
   WHERE pw_name = ?
     AND pw_domain = ?";
 
-    my $sth = $dbh->prepare( $query );
-    $sth->execute( $pw_name, $pw_domain );
+    my $sth = $dbh->prepare($query);
+    $sth->execute($pw_name, $pw_domain);
     my $userd_ref = $sth->fetchrow_hashref;
     $sth->finish;
     $dbh->disconnect;
     return $userd_ref;
-};
+}
 
 sub auth_vmysql {
-    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) = @_;
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
+      @_;
 
     my $dbh = $self->get_db_handle() or return DECLINED;
     my $u = $self->get_vpopmail_user($dbh, $user) or return DECLINED;
@@ -136,21 +138,23 @@ sub auth_vmysql {
     # then pw_clear_passwd may not even exist
     # my $pw_clear_passwd = $db_user->{'pw_clear_passwd'};
 
-    if ( ! $u->{pw_passwd} && ! $u->{pw_clear_passwd} ) {
+    if (!$u->{pw_passwd} && !$u->{pw_clear_passwd}) {
         $self->log(LOGINFO, "fail: no such user");
-        return ( DENY, "auth_vmysql - no such user" );
-    };
+        return (DENY, "auth_vmysql - no such user");
+    }
 
     # at this point, the user name has matched
 
-    return Qpsmtpd::Auth::validate_password( $self,
-            src_clear     => $u->{pw_clear_passwd},
-            src_crypt     => $u->{pw_passwd},
-            attempt_clear => $passClear,
-            attempt_hash  => $passHash,
-            method        => $method,
-            ticket        => $ticket,
-            deny          => DENY,
-        );
+    return
+      Qpsmtpd::Auth::validate_password(
+                                       $self,
+                                       src_clear     => $u->{pw_clear_passwd},
+                                       src_crypt     => $u->{pw_passwd},
+                                       attempt_clear => $passClear,
+                                       attempt_hash  => $passHash,
+                                       method        => $method,
+                                       ticket        => $ticket,
+                                       deny          => DENY,
+                                      );
 }
 

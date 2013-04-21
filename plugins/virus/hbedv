@@ -49,110 +49,120 @@ Written by Hanno Hecker E<lt>hah@uu-x.deE<gt>.
 The B<hbedv> plugin is published under the same licence as qpsmtpd itself.
 
 =cut 
- 
+
 sub register {
-  my ($self, $qp, @args) = @_;
-  
-  if (@args % 2) {
-     $self->log(LOGERROR, "FATAL ERROR: odd number of arguments");
-     exit 3;
-  } 
-  my %args = @args;
-  if (!exists $args{hbedvscanner}) {
-    $self->{_hbedvscan_loc} = "/usr/bin/antivir";
-  } else {
-    if ($args{hbedvscanner} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
-      $self->{_hbedvscan_loc} = $1;
-    } else {
-      $self->log(LOGERROR, "FATAL ERROR: Unexpected characters in hbedvscanner argument");
-      exit 3;
+    my ($self, $qp, @args) = @_;
+
+    if (@args % 2) {
+        $self->log(LOGERROR, "FATAL ERROR: odd number of arguments");
+        exit 3;
     }
-  }
-}
- 
-sub hook_data_post {
-  my ($self, $transaction) = @_;
- 
-  my $filename = $transaction->body_filename;
-  unless (defined $filename) {
-    $self->log(LOGWARN, "didn't get a file name"); 
-    return (DECLINED);
-  }
- 
-  # Now do the actual scanning!
-  my $cmd = $self->{_hbedvscan_loc}." --archive-max-recursion=50 --alltypes -z -noboot -nombr -rs $filename 2>&1";
-  $self->log(LOGDEBUG, "Running: $cmd");
-  my @output = `$cmd`;
- 
-  my $result = ($? >> 8);
-  my $signal = ($? & 127);
- 
-  chomp(@output);
-  my @virii = ();
-  foreach my $line (@output) {
-    next unless $line =~ /^ALERT: \[([^\]]+)\s+(\w+)?\]/; # $2 =~ /^(virus|worm)$/;
-    push @virii, $1;
-  }
-  @virii = unique(@virii);
-
-  $self->log(LOGDEBUG, "results: ".join("//",@output));
- 
-  if ($signal) {
-    $self->log(LOGWARN, "scanner exited with signal: $signal");
-    return (DECLINED);
-  }
-  my $output = join(", ", @virii);
-  $output = substr($output, 0, 60);
-  if ($result == 1 || $result == 3) {
-    $self->log(LOGWARN, "Virus(es) found: $output");
-    # return (DENY, "Virus Found: $output");
-    # $transaction->header->add('X-Virus-Found', 'Yes', 0);
-    # $transaction->header->add('X-Virus-Details', $output, 0);
-    $transaction->header->add('X-H+BEDV-Virus-Found', 'Yes', 0);
-    $transaction->header->add('X-H+BEDV-Virus-Details', $output, 0);
-  }
-  elsif ($result == 200) {
-    $self->log(LOGWARN, "Program aborted, not enough memory available");
-  } 
-  elsif ($result == 211) {
-    $self->log(LOGWARN, "Programm aborted, because the self check failed");
-  }
-  elsif ($result == 214) {
-    $self->log(LOGWARN, "License key not found");
-  }
-  elsif ($result) {
-    $self->log(LOGWARN, "Error: $result, look for exit codes in the output of '"
-                        .$self->{_hbedvscan_loc}." --help' for more info\n");
-  } 
-
-  # $transaction->header->add('X-Virus-Checked', 'Checked', 0);
-  $transaction->header->add('X-H+BEDV-Virus-Checked', 'Checked', 0);
-  return (DECLINED) unless $result;
-
-  if (@virii) {
-    return(DENY, "Virus found: $output")
-      unless $self->qp->config("hbedv_deny");
-    foreach my $d ($self->qp->config("hbedv_deny")) {
-      foreach my $v (@virii) {
-        if ($v =~ /^$d$/i) {
-          $self->log(LOGWARN, "Denying mail with virus '$v'");
-          return(DENY, "Virus found: $output");
+    my %args = @args;
+    if (!exists $args{hbedvscanner}) {
+        $self->{_hbedvscan_loc} = "/usr/bin/antivir";
+    }
+    else {
+        if ($args{hbedvscanner} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+            $self->{_hbedvscan_loc} = $1;
         }
-      }
+        else {
+            $self->log(LOGERROR,
+                 "FATAL ERROR: Unexpected characters in hbedvscanner argument");
+            exit 3;
+        }
     }
-  }
-  return (DECLINED);
-} 
+}
+
+sub hook_data_post {
+    my ($self, $transaction) = @_;
+
+    my $filename = $transaction->body_filename;
+    unless (defined $filename) {
+        $self->log(LOGWARN, "didn't get a file name");
+        return (DECLINED);
+    }
+
+    # Now do the actual scanning!
+    my $cmd = $self->{_hbedvscan_loc}
+      . " --archive-max-recursion=50 --alltypes -z -noboot -nombr -rs $filename 2>&1";
+    $self->log(LOGDEBUG, "Running: $cmd");
+    my @output = `$cmd`;
+
+    my $result = ($? >> 8);
+    my $signal = ($? & 127);
+
+    chomp(@output);
+    my @virii = ();
+    foreach my $line (@output) {
+        next
+          unless $line =~
+          /^ALERT: \[([^\]]+)\s+(\w+)?\]/;    # $2 =~ /^(virus|worm)$/;
+        push @virii, $1;
+    }
+    @virii = unique(@virii);
+
+    $self->log(LOGDEBUG, "results: " . join("//", @output));
+
+    if ($signal) {
+        $self->log(LOGWARN, "scanner exited with signal: $signal");
+        return (DECLINED);
+    }
+    my $output = join(", ", @virii);
+    $output = substr($output, 0, 60);
+    if ($result == 1 || $result == 3) {
+        $self->log(LOGWARN, "Virus(es) found: $output");
+
+        # return (DENY, "Virus Found: $output");
+        # $transaction->header->add('X-Virus-Found', 'Yes', 0);
+        # $transaction->header->add('X-Virus-Details', $output, 0);
+        $transaction->header->add('X-H+BEDV-Virus-Found',   'Yes',   0);
+        $transaction->header->add('X-H+BEDV-Virus-Details', $output, 0);
+    }
+    elsif ($result == 200) {
+        $self->log(LOGWARN, "Program aborted, not enough memory available");
+    }
+    elsif ($result == 211) {
+        $self->log(LOGWARN, "Programm aborted, because the self check failed");
+    }
+    elsif ($result == 214) {
+        $self->log(LOGWARN, "License key not found");
+    }
+    elsif ($result) {
+        $self->log(LOGWARN,
+                       "Error: $result, look for exit codes in the output of '"
+                     . $self->{_hbedvscan_loc}
+                     . " --help' for more info\n"
+                  );
+    }
+
+    # $transaction->header->add('X-Virus-Checked', 'Checked', 0);
+    $transaction->header->add('X-H+BEDV-Virus-Checked', 'Checked', 0);
+    return (DECLINED) unless $result;
+
+    if (@virii) {
+        return (DENY, "Virus found: $output")
+          unless $self->qp->config("hbedv_deny");
+        foreach my $d ($self->qp->config("hbedv_deny")) {
+            foreach my $v (@virii) {
+                if ($v =~ /^$d$/i) {
+                    $self->log(LOGWARN, "Denying mail with virus '$v'");
+                    return (DENY, "Virus found: $output");
+                }
+            }
+        }
+    }
+    return (DECLINED);
+}
 
 sub unique {
-  ## This is the short version, I haven't tried if any warnings
-  ## are generated by perl if you use just this... if you need 
-  ## every cpu cycle, try this:
-  ## my %h;foreach (@_) { ++$h{$_}; }; return keys(%h);
-  my @list = @_;
-  my %hash;
-  foreach my $item (@list) {
-    exists $hash{$item} || ($hash{$item} = 1); 
-  }
-  return keys(%hash)
+    ## This is the short version, I haven't tried if any warnings
+    ## are generated by perl if you use just this... if you need
+    ## every cpu cycle, try this:
+    ## my %h;foreach (@_) { ++$h{$_}; }; return keys(%h);
+    my @list = @_;
+    my %hash;
+    foreach my $item (@list) {
+        exists $hash{$item} || ($hash{$item} = 1);
+    }
+    return keys(%hash);
 }

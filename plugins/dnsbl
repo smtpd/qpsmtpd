@@ -135,20 +135,20 @@ See: https://github.com/smtpd/qpsmtpd/commits/master/plugins/dnsbl
 sub register {
     my ($self, $qp) = (shift, shift);
 
-    if ( @_ % 2 ) {
-        $self->{_args}{reject_type} = shift;   # backwards compatibility
+    if (@_ % 2) {
+        $self->{_args}{reject_type} = shift;    # backwards compatibility
     }
     else {
-        $self->{_args} = { @_ };
-    };
+        $self->{_args} = {@_};
+    }
 
     # explicitly state legacy reject behavior
-    if ( ! defined $self->{_args}{reject_type} ) {
+    if (!defined $self->{_args}{reject_type}) {
         $self->{_args}{reject_type} = 'perm';
-    };
-    if ( ! defined $self->{_args}{reject} ) {
+    }
+    if (!defined $self->{_args}{reject}) {
         $self->{_args}{reject} = 1;
-    };
+    }
 }
 
 sub hook_connect {
@@ -156,76 +156,79 @@ sub hook_connect {
 
     # perform RBLSMTPD checks to mimic DJB's rblsmtpd
     # RBLSMTPD being non-empty means it contains the failure message to return
-    if ( defined $ENV{'RBLSMTPD'} && $ENV{'RBLSMTPD'} ne '' ) {
+    if (defined $ENV{'RBLSMTPD'} && $ENV{'RBLSMTPD'} ne '') {
         my $reject = $self->{_args}{reject};
         return $self->return_env_message() if $reject && $reject eq 'connect';
-    };
+    }
 
     return DECLINED if $self->is_immune();
     return DECLINED if $self->is_set_rblsmtpd();
     return DECLINED if $self->ip_whitelisted();
 
     my $dnsbl_zones = $self->get_dnsbl_zones() or return DECLINED;
-    my $resolv      = $self->get_resolver() or return DECLINED;
+    my $resolv      = $self->get_resolver()    or return DECLINED;
 
-    for my $dnsbl ( keys %$dnsbl_zones ) {
+    for my $dnsbl (keys %$dnsbl_zones) {
 
-        my $query = $self->get_query( $dnsbl ) or do {
-            if ( $resolv->errorstring ne 'NXDOMAIN' ) {
-                $self->log(LOGERROR, "$dnsbl query failed: ", $resolv->errorstring);
-            };
+        my $query = $self->get_query($dnsbl) or do {
+            if ($resolv->errorstring ne 'NXDOMAIN') {
+                $self->log(LOGERROR, "$dnsbl query failed: ",
+                           $resolv->errorstring);
+            }
             next;
         };
 
         my $a_record = 0;
         my $result;
         foreach my $rr ($query->answer) {
-            if ( $rr->type eq 'A' ) {
+            if ($rr->type eq 'A') {
                 $result = $rr->name;
-                $self->log(LOGDEBUG, "found A for $result with IP " . $rr->address);
+                $self->log(LOGDEBUG,
+                           "found A for $result with IP " . $rr->address);
             }
             elsif ($rr->type eq 'TXT') {
                 $self->log(LOGDEBUG, "found TXT, " . $rr->txtdata);
                 $result = $rr->txtdata;
-            };
+            }
 
-            next if ! $result;
+            next if !$result;
 
-            $self->adjust_karma( -1 );
+            $self->adjust_karma(-1);
 
-            if ( ! $dnsbl ) { ($dnsbl) = ($result =~ m/(?:\d+\.){4}(.*)/); };
-            if ( ! $dnsbl ) {  $dnsbl = $result; };
+            if (!$dnsbl) { ($dnsbl) = ($result =~ m/(?:\d+\.){4}(.*)/); }
+            if (!$dnsbl) { $dnsbl = $result; }
 
             if ($a_record) {
                 if (defined $dnsbl_zones->{$dnsbl}) {
-                    my $smtp_msg = $dnsbl_zones->{$dnsbl};
-                    my $remote_ip= $self->qp->connection->remote_ip;
+                    my $smtp_msg  = $dnsbl_zones->{$dnsbl};
+                    my $remote_ip = $self->qp->connection->remote_ip;
                     $smtp_msg =~ s/%IP%/$remote_ip/g;
-                    return $self->get_reject( $smtp_msg, $dnsbl );
+                    return $self->get_reject($smtp_msg, $dnsbl);
                 }
-                return $self->get_reject( "Blocked by $dnsbl" );
+                return $self->get_reject("Blocked by $dnsbl");
             }
 
-            return $self->get_reject( $result, $dnsbl );
+            return $self->get_reject($result, $dnsbl);
         }
     }
 
     $self->log(LOGINFO, 'pass');
     return DECLINED;
-};
+}
 
 sub get_dnsbl_zones {
     my $self = shift;
 
-    my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
-    if ( ! %dnsbl_zones ) {
-        $self->log( LOGDEBUG, "skip, no zones");
+    my %dnsbl_zones =
+      map { (split /:/, $_, 2)[0, 1] } $self->qp->config('dnsbl_zones');
+    if (!%dnsbl_zones) {
+        $self->log(LOGDEBUG, "skip, no zones");
         return;
-    };
+    }
 
     $self->{_dnsbl}{zones} = \%dnsbl_zones;
     return \%dnsbl_zones;
-};
+}
 
 sub get_query {
     my ($self, $dnsbl) = @_;
@@ -234,24 +237,24 @@ sub get_query {
     my $reversed_ip = join('.', reverse(split(/\./, $remote_ip)));
 
 # fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
-    if ( defined $self->{_dnsbl}{zones}{$dnsbl} ) {
+    if (defined $self->{_dnsbl}{zones}{$dnsbl}) {
         $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record");
         return $self->{_resolver}->query("$reversed_ip.$dnsbl");
-    };
+    }
 
     $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record");
     return $self->{_resolver}->query("$reversed_ip.$dnsbl", 'TXT');
-};
+}
 
 sub is_set_rblsmtpd {
     my $self = shift;
 
     my $remote_ip = $self->qp->connection->remote_ip;
 
-    if ( ! defined $ENV{'RBLSMTPD'} ) {
+    if (!defined $ENV{'RBLSMTPD'}) {
         $self->log(LOGDEBUG, "RBLSMTPD not set for $remote_ip");
         return;
-    };
+    }
 
     if ($ENV{'RBLSMTPD'} ne '') {
         $self->log(LOGINFO, "RBLSMTPD=\"$ENV{'RBLSMTPD'}\" for $remote_ip");
@@ -259,38 +262,39 @@ sub is_set_rblsmtpd {
     }
 
     $self->log(LOGINFO, "RBLSMTPD set, but empty for $remote_ip");
-    return 1;  # don't return empty string, it evaluates to false
-};
+    return 1;    # don't return empty string, it evaluates to false
+}
 
 sub ip_whitelisted {
     my ($self) = @_;
 
     my $remote_ip = $self->qp->connection->remote_ip;
 
-    return grep { s/\.?$/./;
-            $_ eq substr($remote_ip . '.', 0, length $_)
-        }
-        $self->qp->config('dnsbl_allow');
-};
+    return grep {
+        s/\.?$/./;
+        $_ eq substr($remote_ip . '.', 0, length $_)
+    } $self->qp->config('dnsbl_allow');
+}
 
 sub return_env_message {
-    my $self = shift;
-    my $result = $ENV{'RBLSMTPD'};
+    my $self      = shift;
+    my $result    = $ENV{'RBLSMTPD'};
     my $remote_ip = $self->qp->connection->remote_ip;
     $result =~ s/%IP%/$remote_ip/g;
-    my $msg =  $self->qp->config('dnsbl_rejectmsg');
+    my $msg = $self->qp->config('dnsbl_rejectmsg');
     $self->log(LOGINFO, "fail, $msg");
-    return ( $self->get_reject_type(), join(' ', $msg, $result));
+    return ($self->get_reject_type(), join(' ', $msg, $result));
 }
 
 sub hook_rcpt {
     my ($self, $transaction, $rcpt, %param) = @_;
 
-    if ( $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i ) {
-        $self->log(LOGWARN, "skip, don't blacklist special account: ".$rcpt->user);
+    if ($rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i) {
+        $self->log(LOGWARN,
+                   "skip, don't blacklist special account: " . $rcpt->user);
 
         # clear the naughty connection note here, if desired.
-        $self->connection->notes('naughty', 0 );
+        $self->connection->notes('naughty', 0);
     }
 
     return DECLINED;
@@ -299,11 +303,11 @@ sub hook_rcpt {
 sub get_resolver {
     my $self = shift;
     return $self->{_resolver} if $self->{_resolver};
-    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
+    $self->log(LOGDEBUG, "initializing Net::DNS::Resolver");
     $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
     my $timeout = $self->{_args}{timeout} || 30;
     $self->{_resolver}->tcp_timeout($timeout);
     $self->{_resolver}->udp_timeout($timeout);
     return $self->{_resolver};
-};
+}
 

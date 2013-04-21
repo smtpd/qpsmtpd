@@ -128,20 +128,22 @@ use Qpsmtpd::Postfix::Constants;
 sub register {
     my ($self, $qp, @args) = @_;
 
-    $self->log(LOGDEBUG, "using constants generated from Postfix"
-                        ."v$postfix_version");
+    $self->log(LOGDEBUG,
+               "using constants generated from Postfix" . "v$postfix_version");
     $self->{_queue_flags} = 0;
     if (@args > 0) {
         if ($args[0] =~ m#^(/.+)#) {
+
             # untaint socket path
             $self->{_queue_socket} = $1;
             shift @args;
         }
 
         foreach (@args) {
-            if ($self->can("CLEANUP_".$_) and /^(FLAG_[A-Z0-9_]+)$/) {
+            if ($self->can("CLEANUP_" . $_) and /^(FLAG_[A-Z0-9_]+)$/) {
                 $_ = $1;
                 $self->{_queue_flags} |= (eval "CLEANUP_$_;" || 0);
+
                 #print STDERR "queue flag: $_: ".$self->{_queue_flags}."\n";
             }
             else {
@@ -166,29 +168,32 @@ sub hook_queue {
     @queue = ($self->{_queue_socket} // ()) unless @queue;
     $transaction->notes('postfix-queue-sockets', \@queue) if @queue;
 
-    # $self->log(LOGDEBUG, "queue-flags=".$transaction->notes('postfix-queue-flags'));
+# $self->log(LOGDEBUG, "queue-flags=".$transaction->notes('postfix-queue-flags'));
     my ($status, $qid, $reason) = Qpsmtpd::Postfix->inject_mail($transaction);
     if ($status) {
-      # this split is needed, because if cleanup returns
-      # CLEANUP_STAT_MASK_INCOMPLETE we might return DENY (CLEANUP_STAT_SIZE)
-      # instead of DENYSOFT (CLEANUP_STAT_WRITE, CLEANUP_STAT_BAD, 
-      # CLEANUP_STAT_DEFER) ... n.b. this is the behaviour of 667.
-      foreach my $key (keys %cleanup_soft) {
-        my $stat = eval $key # keys have the same names as the constants
-          or next;
-        if ($status & $stat) {
-          return (DENYSOFT, $reason || $cleanup_soft{$key});
+
+        # this split is needed, because if cleanup returns
+        # CLEANUP_STAT_MASK_INCOMPLETE we might return DENY (CLEANUP_STAT_SIZE)
+        # instead of DENYSOFT (CLEANUP_STAT_WRITE, CLEANUP_STAT_BAD,
+        # CLEANUP_STAT_DEFER) ... n.b. this is the behaviour of 667.
+        foreach my $key (keys %cleanup_soft) {
+            my $stat = eval $key    # keys have the same names as the constants
+              or next;
+            if ($status & $stat) {
+                return (DENYSOFT, $reason || $cleanup_soft{$key});
+            }
         }
-      }
-      foreach my $key (keys %cleanup_hard) {
-        my $stat = eval $key # keys have the same names as the constants
-          or next;
-        if ($status & $stat) {
-          return (DENY, $reason || $cleanup_hard{$key});
+        foreach my $key (keys %cleanup_hard) {
+            my $stat = eval $key    # keys have the same names as the constants
+              or next;
+            if ($status & $stat) {
+                return (DENY, $reason || $cleanup_hard{$key});
+            }
         }
-      }
-      # we have no idea why we're here.
-      return (DECLINED, $reason || "Unable to queue message ($status, $reason)");
+
+        # we have no idea why we're here.
+        return (DECLINED,
+                $reason || "Unable to queue message ($status, $reason)");
     }
 
     my $msg_id = $transaction->header->get('Message-Id') || '';

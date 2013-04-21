@@ -1,4 +1,5 @@
 #!perl -w
+
 =head1 NAME
 
 http_config
@@ -30,21 +31,22 @@ use LWP::Simple qw(get);
 my @urls;
 
 sub register {
-  my ($self, $qp, @args) = @_;
-  @urls = @args;
+    my ($self, $qp, @args) = @_;
+    @urls = @args;
 }
 
 sub hook_config {
-  my ($self, $transaction, $config) = @_; 
-  $self->log(LOGNOTICE, "http_config called with $config");
-  for my $url (@urls) {
-    $self->log(LOGDEBUG, "http_config loading from $url");
-    my @config = split /[\r\n]+/, (get "$url$config" || "");
-    chomp @config;
-    @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
-    close CF;
-    # $self->log(LOGNOTICE, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
-    return (OK, @config) if @config;
-  }
-  return DECLINED;
+    my ($self, $transaction, $config) = @_;
+    $self->log(LOGNOTICE, "http_config called with $config");
+    for my $url (@urls) {
+        $self->log(LOGDEBUG, "http_config loading from $url");
+        my @config = split /[\r\n]+/, (get "$url$config" || "");
+        chomp @config;
+        @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
+        close CF;
+
+# $self->log(LOGNOTICE, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
+        return (OK, @config) if @config;
+    }
+    return DECLINED;
 }

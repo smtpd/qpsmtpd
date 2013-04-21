@@ -5,41 +5,48 @@
 # as how to ignore log entries from itself
 
 sub register {
-  my ($self, $qp, $loglevel) = @_;
-  die "The connection ID feature is currently unsupported";
-  $self->{_level} = LOGWARN;
-  if ( defined($loglevel) ) {
-      if ($loglevel =~ /^\d+$/) {
-	  $self->{_level} = $loglevel;
-      }
-      else {
-	  $self->{_level} = log_level($loglevel);
-      }
-  }
+    my ($self, $qp, $loglevel) = @_;
+    die "The connection ID feature is currently unsupported";
+    $self->{_level} = LOGWARN;
+    if (defined($loglevel)) {
+        if ($loglevel =~ /^\d+$/) {
+            $self->{_level} = $loglevel;
+        }
+        else {
+            $self->{_level} = log_level($loglevel);
+        }
+    }
 
-  # If you want to capture this log entry with this plugin, you need to
-  # wait until after you register the plugin
-  $self->log(LOGINFO,'Initializing logging::connection_id plugin');
+    # If you want to capture this log entry with this plugin, you need to
+    # wait until after you register the plugin
+    $self->log(LOGINFO, 'Initializing logging::connection_id plugin');
 }
 
 sub hook_logging {
-  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
-  # Don't log your own log entries!  If this is the only logging plugin
-  # then these lines will not be logged at all.  You can safely comment
-  # out this line and it will not cause an infinite loop.
-  return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
+    # Don't log your own log entries!  If this is the only logging plugin
+    # then these lines will not be logged at all.  You can safely comment
+    # out this line and it will not cause an infinite loop.
+    return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
 
-  my $connection = $self->qp && $self->qp->connection;
-  # warn "connection = $connection\n";
-  warn 
-    join(" ", ($connection ? $connection->id : "???") .
-         (defined $plugin ? " $plugin plugin:" :
-          defined $hook   ? " running plugin ($hook):"  : ""),
-         @log), "\n"
-    if ($trace <= $self->{_level});
+    my $connection = $self->qp && $self->qp->connection;
 
-  return DECLINED;
+    # warn "connection = $connection\n";
+    warn join(
+              " ",
+              ($connection ? $connection->id : "???")
+                . (
+                     defined $plugin ? " $plugin plugin:"
+                   : defined $hook   ? " running plugin ($hook):"
+                   :                   ""
+                  ),
+              @log
+             ),
+      "\n"
+      if ($trace <= $self->{_level});
+
+    return DECLINED;
 }
 
 =head1 NAME

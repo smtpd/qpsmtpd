@@ -59,11 +59,11 @@ anywhere in the string.
 =cut
 
 sub register {
-    my ($self,$qp) = (shift, shift);
-    $self->{_args} = { @_ };
+    my ($self, $qp) = (shift, shift);
+    $self->{_args} = {@_};
 
-    $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
-};
+    $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
+}
 
 sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
@@ -71,22 +71,22 @@ sub hook_mail {
     return DECLINED if $self->is_immune();
 
     my @badmailfrom = $self->qp->config('badmailfrom');
-    if ( defined $self->{_badmailfrom_config} ) {       # testing
+    if (defined $self->{_badmailfrom_config}) {    # testing
         @badmailfrom = @{$self->{_badmailfrom_config}};
-    };
-    return DECLINED if $self->is_immune_sender( $sender, \@badmailfrom );
+    }
+    return DECLINED if $self->is_immune_sender($sender, \@badmailfrom);
 
     my $host = lc $sender->host;
     my $from = lc($sender->user) . '@' . $host;
 
     for my $config (@badmailfrom) {
-        $config =~ s/^\s+//g;   # trim leading whitespace
+        $config =~ s/^\s+//g;                      # trim leading whitespace
         my ($bad, $reason) = split /\s+/, $config, 2;
         next unless $bad;
-        next unless $self->is_match( $from, $bad, $host );
+        next unless $self->is_match($from, $bad, $host);
         $reason ||= "Your envelope sender is in my badmailfrom list";
-        $self->adjust_karma( -1 );
-        return $self->get_reject( $reason );
+        $self->adjust_karma(-1);
+        return $self->get_reject($reason);
     }
 
     $self->log(LOGINFO, "pass");
@@ -94,46 +94,46 @@ sub hook_mail {
 }
 
 sub is_match {
-    my ( $self, $from, $bad, $host ) = @_;
+    my ($self, $from, $bad, $host) = @_;
 
-    if ( $bad =~ /[\/\^\$\*\+\!\%\?\\]/ ) {  # it's a regexp
-        if ( $from =~ /$bad/ ) {
+    if ($bad =~ /[\/\^\$\*\+\!\%\?\\]/) {    # it's a regexp
+        if ($from =~ /$bad/) {
             $self->log(LOGDEBUG, "badmailfrom pattern ($bad) match for $from");
             return 1;
-        };
+        }
         return;
-    };
+    }
 
     $bad = lc $bad;
-    if ( $bad !~ m/\@/ ) {
+    if ($bad !~ m/\@/) {
         $self->log(LOGWARN, "badmailfrom: bad config: no \@ sign in $bad");
         return;
-    };
-    if ( substr($bad,0,1) eq '@' ) {
+    }
+    if (substr($bad, 0, 1) eq '@') {
         return 1 if $bad eq "\@$host";
         return;
-    };
+    }
     return if $bad ne $from;
     return 1;
-};
+}
 
 sub is_immune_sender {
-    my ($self, $sender, $badmf ) = @_;
+    my ($self, $sender, $badmf) = @_;
 
-    if ( ! scalar @$badmf ) {
+    if (!scalar @$badmf) {
         $self->log(LOGDEBUG, 'skip, empty list');
         return 1;
-    };
+    }
 
-    if ( ! $sender || $sender->format eq '<>' ) {
+    if (!$sender || $sender->format eq '<>') {
         $self->log(LOGDEBUG, 'skip, null sender');
         return 1;
-    };
+    }
 
-    if ( ! $sender->host || ! $sender->user ) {
+    if (!$sender->host || !$sender->user) {
         $self->log(LOGDEBUG, 'skip, missing user or host');
         return 1;
-    };
+    }
 
     return;
-};
+}

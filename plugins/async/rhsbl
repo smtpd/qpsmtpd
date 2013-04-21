@@ -3,7 +3,7 @@
 use Qpsmtpd::Plugin::Async::DNSBLBase;
 
 sub init {
-    my $self = shift;
+    my $self  = shift;
     my $class = ref $self;
 
     no strict 'refs';

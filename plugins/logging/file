@@ -128,11 +128,11 @@ sub register {
     my %args;
 
     $self->{_loglevel} = LOGWARN;
-    $self->{_tsformat} = '%a %b %d %T %Y'; # same as scalar localtime
+    $self->{_tsformat} = '%a %b %d %T %Y';    # same as scalar localtime
 
     while (1) {
-    	last if !@args;
-    	if (lc $args[0] eq 'loglevel') {
+        last if !@args;
+        if (lc $args[0] eq 'loglevel') {
             shift @args;
             my $ll = shift @args;
             if (!defined $ll) {
@@ -147,19 +147,19 @@ sub register {
                 defined $self->{_loglevel} or $self->{_loglevel} = LOGWARN;
             }
         }
-	elsif (lc $args[0] eq 'nosplit') {
-		shift @args;
-		$self->{_nosplit} = 1;
-	}
-	elsif (lc $args[0] eq 'reopen') {
-		shift @args;
-		$self->{_reopen} = 1;
-	}
-	    elsif (lc $args[0] eq 'tsformat') {
-	        shift @args;
-	        my $format = shift @args;
-	        $self->{_tsformat} = $format;
-	    }
+        elsif (lc $args[0] eq 'nosplit') {
+            shift @args;
+            $self->{_nosplit} = 1;
+        }
+        elsif (lc $args[0] eq 'reopen') {
+            shift @args;
+            $self->{_reopen} = 1;
+        }
+        elsif (lc $args[0] eq 'tsformat') {
+            shift @args;
+            my $format = shift @args;
+            $self->{_tsformat} = $format;
+        }
         else { last }
     }
 
@@ -171,13 +171,14 @@ sub register {
     my $output = join(' ', @args);
 
     if ($output =~ /^\s*\|(.*)/) {
-    	$self->{_log_pipe} = 1;
-        $self->{_log_format} = $1;
-    } else {
-        $output =~ /^(.*)/; # detaint
+        $self->{_log_pipe}   = 1;
         $self->{_log_format} = $1;
     }
-    $self->{_current_output} = '';
+    else {
+        $output =~ /^(.*)/;    # detaint
+        $self->{_log_format} = $1;
+    }
+    $self->{_current_output}  = '';
     $self->{_session_counter} = 0;
     1;
 }
@@ -191,14 +192,15 @@ sub log_output {
 }
 
 sub open_log {
-    my ($self,$output,$qp) = @_;
+    my ($self, $output, $qp) = @_;
 
     if ($self->{_log_pipe}) {
         unless ($self->{_f} = new IO::File "|$output") {
             warn "Error opening log output to command $output: $!";
             return undef;
         }
-    } else {
+    }
+    else {
         unless ($self->{_f} = new IO::File ">>$output") {
             warn "Error opening log output to path $output: $!";
             return undef;
@@ -209,7 +211,6 @@ sub open_log {
     1;
 }
 
-
 # Reopen the output iff the interpolated output filename has changed
 # from the one currently open, or if reopening was selected and we haven't
 # yet done so during this session.
@@ -219,10 +220,13 @@ sub maybe_reopen {
     my ($self, $transaction) = @_;
 
     my $new_output = $self->log_output($transaction);
-    if (!$self->{_current_output} ||
-        $self->{_current_output} ne $new_output ||
-        ($self->{_reopen} &&
-         !$transaction->notes('file-reopened-this-session'))) {
+    if (
+          !$self->{_current_output}
+        || $self->{_current_output} ne $new_output
+        || ($self->{_reopen}
+            && !$transaction->notes('file-reopened-this-session'))
+       )
+    {
         unless ($self->open_log($new_output, $transaction)) {
             return undef;
         }
@@ -235,11 +239,14 @@ sub maybe_reopen {
 sub hook_connect {
     my ($self, $transaction) = @_;
 
-    $transaction->notes('file-logged-this-session', 0);
+    $transaction->notes('file-logged-this-session',   0);
     $transaction->notes('file-reopened-this-session', 0);
-    $transaction->notes('logging-session-id',
-                sprintf("%08d-%04d-%d",
-                        scalar time, $$, ++$self->{_session_counter}));
+    $transaction->notes(
+                        'logging-session-id',
+                        sprintf("%08d-%04d-%d",
+                                scalar time, $$,
+                                ++$self->{_session_counter})
+                       );
     return DECLINED;
 }
 
@@ -255,8 +262,9 @@ sub hook_disconnect {
 sub hook_logging {
     my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
-    return DECLINED if !defined $self->{_loglevel} or
-                       $trace > $self->{_loglevel};
+    return DECLINED
+      if !defined $self->{_loglevel}
+      or $trace > $self->{_loglevel};
     return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
 
     # Possibly reopen the log iff:
@@ -264,10 +272,11 @@ sub hook_logging {
     # - We're allowed to split sessions across logfiles
     # - We haven't logged anything yet this session
     # - We aren't in a session
-    if (!$self->{_f} ||
-        !$self->{_nosplit} ||
-        !$transaction ||
-        !$transaction->notes('file-logged-this-session')) {
+    if (   !$self->{_f}
+        || !$self->{_nosplit}
+        || !$transaction
+        || !$transaction->notes('file-logged-this-session'))
+    {
         unless (defined $self->maybe_reopen($transaction)) {
             return DECLINED;
         }
@@ -276,7 +285,7 @@ sub hook_logging {
 
     my $f = $self->{_f};
     print $f strftime($self->{_tsformat}, localtime), ' ',
-             hostname(), '[', $$, ']: ', @log, "\n";
+      hostname(), '[', $$, ']: ', @log, "\n";
     return DECLINED;
 }
 

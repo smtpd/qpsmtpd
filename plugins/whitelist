@@ -139,7 +139,7 @@ sub check_host {
     if (exists $ENV{WHITELISTCLIENT}) {
         $self->qp->connection->notes('whitelistclient', 1);
         $self->log(2, "pass, is whitelisted client");
-        $self->adjust_karma( 5 );
+        $self->adjust_karma(5);
         return OK;
     }
 
@@ -148,7 +148,7 @@ sub check_host {
         if ($h eq $ip or $ip =~ /^\Q$h\E/) {
             $self->qp->connection->notes('whitelisthost', 1);
             $self->log(2, "pass, is a whitelisted host");
-            $self->adjust_karma( 5 );
+            $self->adjust_karma(5);
             return OK;
         }
     }

@@ -44,91 +44,99 @@ Please see the LICENSE file included with qpsmtpd for details.
 =cut
 
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  while (@args) {
-  	$self->{"_uvscan"}->{pop @args}=pop @args;
-  }
-  $self->{"_uvscan"}->{"uvscan_location"}||="/usr/local/bin/uvscan";
+    while (@args) {
+        $self->{"_uvscan"}->{pop @args} = pop @args;
+    }
+    $self->{"_uvscan"}->{"uvscan_location"} ||= "/usr/local/bin/uvscan";
 }
- 
+
 sub hook_data_post {
-  my ($self, $transaction) = @_;
- 
-  return (DECLINED)
-    if $transaction->data_size > 250_000;
+    my ($self, $transaction) = @_;
 
-  # Ignore non-multipart emails
-  my $content_type = $transaction->header->get('Content-Type');
-  $content_type =~ s/\s/ /g if defined $content_type;
-  unless ( $content_type
-      && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
-  {
-      $self->log( LOGWARN, "non-multipart mail - skipping" );
-      return DECLINED;
-  }
+    return (DECLINED)
+      if $transaction->data_size > 250_000;
 
-  my $filename = $transaction->body_filename;
-  return (DECLINED) unless $filename;
-
-  # Now do the actual scanning!
-  my @cmd =($self->{"_uvscan"}->{"uvscan_location"},
-	'--mime', '--unzip', '--secure', '--noboot',
-	$filename, '2>&1 |');
-  $self->log(LOGINFO, "Running: ",join(' ', @cmd));
-  open(FILE, join(' ', @cmd)); #perl 5.6 doesn't properly support the pipe
-  # mode list form of open, but this is basically the same thing. This form
-  # of exec is safe(ish).
-  my $output;
-  while (<FILE>) { $output.=$_; }
-  close FILE;
-
-  my $result = ($? >> 8);
-  my $signal = ($? & 127);
- 
-  my $virus;
-  if ($output && $output =~ m/.*\W+Found (.*)\n/m) {
-    $virus=$1;
-  }
-  if ($output && $output =~ m/password-protected/m) {
-    return (DENY, 'We do not accept password-protected zip files!');
-  }
-
-  if ($signal) {
-    $self->log(LOGWARN, "uvscan exited with signal: $signal");
-    return (DECLINED);
-  }
-  if ($result == 2) {
-      $self->log(LOGERROR, "Integrity check for a DAT file failed.");
-      return (DECLINED);
-  } elsif ($result == 6) {
-      $self->log(LOGERROR, "A general problem has occurred.");
-      return (DECLINED);
-  } elsif ($result == 8) {
-      $self->log(LOGERROR, "The program could not find a DAT file.");
-      return (DECLINED);
-  } elsif ($result == 15) {
-      $self->log(LOGERROR, "The program self-check failed");
-      return (DECLINED);
-  } elsif ( $result ) { # all of the possible virus returns
-    if ($result == 12) {
-      $self->log(LOGERROR, "The program tried to clean a file but failed.");
-    } elsif ($result == 13) {
-      $self->log(LOGERROR, "One or more virus(es) found");
-    } elsif ($result == 19) {
-      $self->log(LOGERROR, "Successfully cleaned the file");
+    # Ignore non-multipart emails
+    my $content_type = $transaction->header->get('Content-Type');
+    $content_type =~ s/\s/ /g if defined $content_type;
+    unless (   $content_type
+            && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i)
+    {
+        $self->log(LOGWARN, "non-multipart mail - skipping");
+        return DECLINED;
     }
 
-    if (lc($self->{"_uvscan"}->{"deny_viruses"}) eq "yes") {
-       return (DENY, "Virus Found: $virus");
-    }
-    $transaction->header->add('X-Virus-Found', 'Yes');
-    $transaction->header->add('X-Virus-Details', $virus);
-    return (DECLINED);
-  }
-  
-  $transaction->header->add('X-Virus-Checked',
-    "Checked by McAfee uvscan on ".$self->qp->config("me"));
+    my $filename = $transaction->body_filename;
+    return (DECLINED) unless $filename;
 
-  return (DECLINED);
-} 
+    # Now do the actual scanning!
+    my @cmd = (
+               $self->{"_uvscan"}->{"uvscan_location"},
+               '--mime', '--unzip', '--secure', '--noboot', $filename, '2>&1 |'
+              );
+    $self->log(LOGINFO, "Running: ", join(' ', @cmd));
+    open(FILE, join(' ', @cmd));    #perl 5.6 doesn't properly support the pipe
+       # mode list form of open, but this is basically the same thing. This form
+       # of exec is safe(ish).
+    my $output;
+    while (<FILE>) { $output .= $_; }
+    close FILE;
+
+    my $result = ($? >> 8);
+    my $signal = ($? & 127);
+
+    my $virus;
+    if ($output && $output =~ m/.*\W+Found (.*)\n/m) {
+        $virus = $1;
+    }
+    if ($output && $output =~ m/password-protected/m) {
+        return (DENY, 'We do not accept password-protected zip files!');
+    }
+
+    if ($signal) {
+        $self->log(LOGWARN, "uvscan exited with signal: $signal");
+        return (DECLINED);
+    }
+    if ($result == 2) {
+        $self->log(LOGERROR, "Integrity check for a DAT file failed.");
+        return (DECLINED);
+    }
+    elsif ($result == 6) {
+        $self->log(LOGERROR, "A general problem has occurred.");
+        return (DECLINED);
+    }
+    elsif ($result == 8) {
+        $self->log(LOGERROR, "The program could not find a DAT file.");
+        return (DECLINED);
+    }
+    elsif ($result == 15) {
+        $self->log(LOGERROR, "The program self-check failed");
+        return (DECLINED);
+    }
+    elsif ($result) {    # all of the possible virus returns
+        if ($result == 12) {
+            $self->log(LOGERROR,
+                       "The program tried to clean a file but failed.");
+        }
+        elsif ($result == 13) {
+            $self->log(LOGERROR, "One or more virus(es) found");
+        }
+        elsif ($result == 19) {
+            $self->log(LOGERROR, "Successfully cleaned the file");
+        }
+
+        if (lc($self->{"_uvscan"}->{"deny_viruses"}) eq "yes") {
+            return (DENY, "Virus Found: $virus");
+        }
+        $transaction->header->add('X-Virus-Found',   'Yes');
+        $transaction->header->add('X-Virus-Details', $virus);
+        return (DECLINED);
+    }
+
+    $transaction->header->add('X-Virus-Checked',
+                      "Checked by McAfee uvscan on " . $self->qp->config("me"));
+
+    return (DECLINED);
+}

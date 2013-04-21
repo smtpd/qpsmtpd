@@ -176,47 +176,51 @@ use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 use Net::IP;
 
-my $DENYMSG  = "This mail is temporarily denied";
-my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
-my $DB       = "greylist.dbm";
+my $DENYMSG        = "This mail is temporarily denied";
+my ($QPHOME)       = ($0 =~ m!(.*?)/([^/]+)$!);
+my $DB             = "greylist.dbm";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
   recipient black_timeout grey_timeout white_timeout deny_late db_dir
   nfslock p0f reject loglevel geoip upgrade );
 
 my %DEFAULTS = (
-    remote_ip => 1,
-    sender    => 0,
-    recipient => 0,
-    reject    => 1,
-    black_timeout => 50 * 60,             # 50m
-    grey_timeout  =>  3 * 3600 + 20 * 60, # 3h:20m
-    white_timeout => 36 * 3600 * 24,      # 36 days
-    nfslock => 0,
-    p0f  => undef,
-);
+                remote_ip     => 1,
+                sender        => 0,
+                recipient     => 0,
+                reject        => 1,
+                black_timeout => 50 * 60,               # 50m
+                grey_timeout  => 3 * 3600 + 20 * 60,    # 3h:20m
+                white_timeout => 36 * 3600 * 24,        # 36 days
+                nfslock       => 0,
+                p0f           => undef,
+               );
 
 sub register {
     my ($self, $qp, %arg) = @_;
-    my $config = { %DEFAULTS,
-        map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'),
-        %arg };
-    if (my @bad = grep { ! exists $PERMITTED_ARGS{$_} } sort keys %$config) {
-        $self->log(LOGALERT, "invalid parameter(s): " . join(',',@bad));
-    }
-    # backwards compatibility with deprecated 'mode' setting
-    if ( defined $config->{mode} && ! defined $config->{reject} ) {
-        $config->{reject} = $config->{mode} =~ /testonly|off/i ? 0 : 1;
+    my $config = {
+              %DEFAULTS,
+              map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'),
+              %arg
     };
+    if (my @bad = grep { !exists $PERMITTED_ARGS{$_} } sort keys %$config) {
+        $self->log(LOGALERT, "invalid parameter(s): " . join(',', @bad));
+    }
+
+    # backwards compatibility with deprecated 'mode' setting
+    if (defined $config->{mode} && !defined $config->{reject}) {
+        $config->{reject} = $config->{mode} =~ /testonly|off/i ? 0 : 1;
+    }
     $self->{_args} = $config;
     unless ($config->{recipient} || $config->{per_recipient}) {
         $self->register_hook('mail', 'mail_handler');
-    } else {
+    }
+    else {
         $self->register_hook('rcpt', 'rcpt_handler');
     }
     $self->prune_db();
-    if ( $self->{_args}{upgrade} ) {
+    if ($self->{_args}{upgrade}) {
         $self->convert_db();
-    };
+    }
 }
 
 sub mail_handler {
@@ -226,144 +230,159 @@ sub mail_handler {
 
     return DECLINED if $status != DENYSOFT;
 
-    if ( ! $self->{_args}{deny_late} ) {
+    if (!$self->{_args}{deny_late}) {
         return (DENYSOFT, $msg);
-    };
+    }
 
     $transaction->notes('greylist', $msg);
     return DECLINED;
 }
 
 sub rcpt_handler {
-  my ($self, $transaction, $rcpt) = @_;
-  # Load per_recipient configs
-  my $config = { %{$self->{_args}},
-    map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist', { rcpt => $rcpt }) };
-  # Check greylisting
-  my $sender = $transaction->sender;
-  my ($status, $msg) = $self->greylist($transaction, $sender, $rcpt, $config);
-  if ($status == DENYSOFT) {
-    # Deny here (per-rcpt) unless this is a <> sender, for smtp probes
-    return DENYSOFT, $msg if $sender->address;
-    $transaction->notes('greylist', $msg);
-  }
-  return DECLINED;
+    my ($self, $transaction, $rcpt) = @_;
+
+    # Load per_recipient configs
+    my $config = {
+                  %{$self->{_args}},
+                  map { split /\s+/, $_, 2 }
+                    $self->qp->config('denysoft_greylist', {rcpt => $rcpt})
+                 };
+
+    # Check greylisting
+    my $sender = $transaction->sender;
+    my ($status, $msg) = $self->greylist($transaction, $sender, $rcpt, $config);
+    if ($status == DENYSOFT) {
+
+        # Deny here (per-rcpt) unless this is a <> sender, for smtp probes
+        return DENYSOFT, $msg if $sender->address;
+        $transaction->notes('greylist', $msg);
+    }
+    return DECLINED;
 }
 
 sub hook_data {
-  my ($self, $transaction) = @_;
-  return DECLINED unless $transaction->notes('greylist');
-  # Decline if ALL recipients are whitelisted
-  if (($transaction->notes('whitelistrcpt')||0) == scalar($transaction->recipients)) {
-    $self->log(LOGWARN,"skip: all recipients whitelisted");
-    return DECLINED;
-  }
-  return DENYSOFT, $transaction->notes('greylist');
+    my ($self, $transaction) = @_;
+    return DECLINED unless $transaction->notes('greylist');
+
+    # Decline if ALL recipients are whitelisted
+    if (($transaction->notes('whitelistrcpt') || 0) ==
+        scalar($transaction->recipients))
+    {
+        $self->log(LOGWARN, "skip: all recipients whitelisted");
+        return DECLINED;
+    }
+    return DENYSOFT, $transaction->notes('greylist');
 }
 
 sub greylist {
     my ($self, $transaction, $sender, $rcpt, $config) = @_;
     $config ||= $self->{_args};
-    $self->log(LOGDEBUG, "config: " .
-        join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
+    $self->log(LOGDEBUG,
+               "config: "
+                 . join(',',
+                        map { $_ . '=' . $config->{$_} } sort keys %$config)
+              );
 
     return DECLINED if $self->is_immune();
-    return DECLINED if ! $self->is_p0f_match();
+    return DECLINED if !$self->is_p0f_match();
     return DECLINED if $self->geoip_match();
 
     my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return DECLINED;
-    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
-    my $key  = $self->get_db_key( $sender, $rcpt ) or return DECLINED;
+    my $lock = $self->get_db_lock($db) or return DECLINED;
+    my $tied = $self->get_db_tie($db, $lock) or return DECLINED;
+    my $key  = $self->get_db_key($sender, $rcpt) or return DECLINED;
 
-    my $fmt  = "%s:%d:%d:%d";
+    my $fmt = "%s:%d:%d:%d";
 
-# new IP or entry timed out - record new
-    if ( ! $tied->{$key} ) {
+    # new IP or entry timed out - record new
+    if (!$tied->{$key}) {
         $tied->{$key} = sprintf $fmt, time, 1, 0, 0;
         $self->log(LOGWARN, "fail: initial DENYSOFT, unknown");
-        return $self->cleanup_and_return( $tied, $lock );
-    };
+        return $self->cleanup_and_return($tied, $lock);
+    }
 
     my ($ts, $new, $black, $white) = split /:/, $tied->{$key};
     $self->log(LOGDEBUG, "ts: " . localtime($ts) . ", now: " . localtime);
 
-    if ( $white ) {
-# white IP - accept unless timed out
+    if ($white) {
+
+        # white IP - accept unless timed out
         if (time - $ts < $config->{white_timeout}) {
             $tied->{$key} = sprintf $fmt, time, $new, $black, ++$white;
             $self->log(LOGINFO, "pass: white, $white deliveries");
-            return $self->cleanup_and_return( $tied, $lock, DECLINED );
+            return $self->cleanup_and_return($tied, $lock, DECLINED);
         }
         else {
             $self->log(LOGINFO, "key $key has timed out (white)");
         }
-    };
-
-# Black IP - deny, but don't update timestamp
-    if (time - $ts < $config->{black_timeout}) {
-        $tied->{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
-        $self->log(LOGWARN, "fail: black DENYSOFT - $black deferred connections");
-        return $self->cleanup_and_return( $tied, $lock );
     }
 
-# Grey IP - accept unless timed out
+    # Black IP - deny, but don't update timestamp
+    if (time - $ts < $config->{black_timeout}) {
+        $tied->{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
+        $self->log(LOGWARN,
+                   "fail: black DENYSOFT - $black deferred connections");
+        return $self->cleanup_and_return($tied, $lock);
+    }
+
+    # Grey IP - accept unless timed out
     elsif (time - $ts < $config->{grey_timeout}) {
         $tied->{$key} = sprintf $fmt, time, $new, $black, 1;
         $self->log(LOGWARN, "pass: updated grey->white");
-        return $self->cleanup_and_return( $tied, $lock, DECLINED );
+        return $self->cleanup_and_return($tied, $lock, DECLINED);
     }
 
     $self->log(LOGWARN, "pass: timed out (grey)");
-    return $self->cleanup_and_return( $tied, $lock, DECLINED );
+    return $self->cleanup_and_return($tied, $lock, DECLINED);
 }
 
 sub cleanup_and_return {
-    my ($self, $tied, $lock, $return_val ) = @_;
+    my ($self, $tied, $lock, $return_val) = @_;
 
     untie $tied;
     close $lock;
-    return $return_val if defined $return_val;  # explicit override
-    return DECLINED if defined $self->{_args}{reject} && ! $self->{_args}{reject};
+    return $return_val if defined $return_val;    # explicit override
+    return DECLINED
+      if defined $self->{_args}{reject} && !$self->{_args}{reject};
     return (DENYSOFT, $DENYMSG);
-};
+}
 
 sub get_db_key {
-    my $self = shift;
+    my $self   = shift;
     my $sender = shift || $self->qp->transaction->sender;
-    my $rcpt = shift || ($self->qp->transaction->recipients)[0];
+    my $rcpt   = shift || ($self->qp->transaction->recipients)[0];
 
     my @key;
-    if ( $self->{_args}{remote_ip} ) {
-        my $nip = Net::IP->new( $self->qp->connection->remote_ip );
-        push @key, $nip->intip;             # convert IP to integer
-    };
+    if ($self->{_args}{remote_ip}) {
+        my $nip = Net::IP->new($self->qp->connection->remote_ip);
+        push @key, $nip->intip;    # convert IP to integer
+    }
 
     push @key, $sender->address || '' if $self->{_args}{sender};
-    push @key, $rcpt->address         if $rcpt && $self->{_args}{recipient};
-    if ( ! scalar @key ) {
+    push @key, $rcpt->address if $rcpt && $self->{_args}{recipient};
+    if (!scalar @key) {
         $self->log(LOGERROR, "enable one of remote_ip, sender, or recipient!");
         return;
-    };
+    }
     return join ':', @key;
-};
+}
 
 sub get_db_tie {
-    my ( $self, $db, $lock ) = @_;
+    my ($self, $db, $lock) = @_;
 
-    tie( my %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) or do {
+    tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, 0600) or do {
         $self->log(LOGCRIT, "tie to database $db failed: $!");
         close $lock;
         return;
     };
     return \%db;
-};
+}
 
 sub get_db_location {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
-    my $config = $self->{_args};
+    my $config      = $self->{_args};
 
     if ($config->{db_dir} && $config->{db_dir} =~ m{^([-a-zA-Z0-9./_]+)$}) {
         $config->{db_dir} = $1;
@@ -371,25 +390,28 @@ sub get_db_location {
 
     # Setup database location
     my $dbdir;
-    if ( $config->{per_recipient_db} ) {
+    if ($config->{per_recipient_db}) {
         $dbdir = $transaction->notes('per_rcpt_configdir');
-    };
+    }
 
-    my @candidate_dirs = ( $dbdir, $config->{db_dir},
-        "/var/lib/qpsmtpd/greylisting", "$QPHOME/var/db", "$QPHOME/config", '.' );
+    my @candidate_dirs = (
+                          $dbdir, $config->{db_dir},
+                          "/var/lib/qpsmtpd/greylisting",
+                          "$QPHOME/var/db", "$QPHOME/config", '.'
+                         );
 
-    for my $d ( @candidate_dirs ) {
-        next if ! $d || ! -d $d;   # impossible
+    for my $d (@candidate_dirs) {
+        next if !$d || !-d $d;    # impossible
         $dbdir = $d;
-        last;   # first match wins
+        last;                     # first match wins
     }
     my $db = "$dbdir/$DB";
-    if ( ! -f $db && -f "$dbdir/denysoft_greylist.dbm" ) {
-        $db = "$dbdir/denysoft_greylist.dbm";  # old DB name
+    if (!-f $db && -f "$dbdir/denysoft_greylist.dbm") {
+        $db = "$dbdir/denysoft_greylist.dbm";    # old DB name
     }
-    $self->log(LOGDEBUG,"using $db as greylisting database");
+    $self->log(LOGDEBUG, "using $db as greylisting database");
     return $db;
-};
+}
 
 sub get_db_lock {
     my ($self, $db) = @_;
@@ -397,12 +419,12 @@ sub get_db_lock {
     return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
 
     # Check denysoft db
-    open( my $lock, ">$db.lock" ) or do {
+    open(my $lock, ">$db.lock") or do {
         $self->log(LOGCRIT, "opening lockfile failed: $!");
         return;
     };
 
-    flock( $lock, LOCK_EX ) or do {
+    flock($lock, LOCK_EX) or do {
         $self->log(LOGCRIT, "flock of lockfile failed: $!");
         close $lock;
         return;
@@ -418,110 +440,111 @@ sub get_db_lock_nfs {
 
     ### set up a lock - lasts until object looses scope
     my $nfslock = new File::NFSLock {
-        file      => "$db.lock",
-        lock_type => LOCK_EX|LOCK_NB,
-        blocking_timeout   => 10,      # 10 sec
-        stale_lock_timeout => 30 * 60, # 30 min
-    } or do {
+                             file               => "$db.lock",
+                             lock_type          => LOCK_EX | LOCK_NB,
+                             blocking_timeout   => 10,                  # 10 sec
+                             stale_lock_timeout => 30 * 60,             # 30 min
+                                    }
+      or do {
         $self->log(LOGCRIT, "nfs lockfile failed: $!");
         return;
-    };
+      };
 
-    open( my $lock, "+<$db.lock") or do {
+    open(my $lock, "+<$db.lock") or do {
         $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
         return;
     };
 
     return $lock;
-};
+}
 
 sub convert_db {
     my $self = shift;
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return DECLINED;
-    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $db    = $self->get_db_location();
+    my $lock  = $self->get_db_lock($db) or return DECLINED;
+    my $tied  = $self->get_db_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
     my $converted = 0;
-    foreach my $key ( keys %$tied ) {
-        my ( @parts ) = split /:/, $key;
-        next if $parts[0] =~ /^[\d]+$/;      # already converted
+    foreach my $key (keys %$tied) {
+        my (@parts) = split /:/, $key;
+        next if $parts[0] =~ /^[\d]+$/;    # already converted
         $converted++;
-        my $nip = Net::IP->new( $parts[0] );
-        $parts[0] = $nip->intip;             # convert IP to integer
+        my $nip = Net::IP->new($parts[0]);
+        $parts[0] = $nip->intip;           # convert IP to integer
         my $new_key = join ':', @parts;
         $tied->{$new_key} = $tied->{$key};
         delete $tied->{$key};
-    };
+    }
     untie $tied;
     close $lock;
-    $self->log( LOGINFO, "converted $converted of $count DB entries" );
-    return $self->cleanup_and_return( $tied, $lock, DECLINED );
-};
+    $self->log(LOGINFO, "converted $converted of $count DB entries");
+    return $self->cleanup_and_return($tied, $lock, DECLINED);
+}
 
 sub prune_db {
     my $self = shift;
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return DECLINED;
-    my $tied = $self->get_db_tie( $db, $lock ) or return DECLINED;
+    my $db    = $self->get_db_location();
+    my $lock  = $self->get_db_lock($db) or return DECLINED;
+    my $tied  = $self->get_db_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
     my $pruned = 0;
-    foreach my $key ( keys %$tied ) {
+    foreach my $key (keys %$tied) {
         my ($ts, $new, $black, $white) = split /:/, $tied->{$key};
         my $age = time - $ts;
         next if $age < $self->{_args}{white_timeout};
         $pruned++;
         delete $tied->{$key};
-    };
+    }
     untie $tied;
     close $lock;
-    $self->log( LOGINFO, "pruned $pruned of $count DB entries" );
-    return $self->cleanup_and_return( $tied, $lock, DECLINED );
-};
+    $self->log(LOGINFO, "pruned $pruned of $count DB entries");
+    return $self->cleanup_and_return($tied, $lock, DECLINED);
+}
 
 sub p0f_match {
     my $self = shift;
 
-    return if ! $self->{_args}{p0f};
+    return if !$self->{_args}{p0f};
 
     my $p0f = $self->connection->notes('p0f');
-    if ( !$p0f || !ref $p0f ) {   # p0f fingerprint info not found
+    if (!$p0f || !ref $p0f) {    # p0f fingerprint info not found
         $self->LOGINFO(LOGERROR, "p0f info missing");
         return;
-    };
+    }
 
     my %valid_matches = map { $_ => 1 } qw( genre detail uptime link distance );
-    my %requested_matches = split(/\,/, $self->{_args}{p0f} );
+    my %requested_matches = split(/\,/, $self->{_args}{p0f});
 
     foreach my $key (keys %requested_matches) {
-        next if ! $key;
-        if ( ! defined $valid_matches{$key} ) {
-            $self->log(LOGERROR, "discarding invalid match key ($key)" );
+        next if !$key;
+        if (!defined $valid_matches{$key}) {
+            $self->log(LOGERROR, "discarding invalid match key ($key)");
             next;
-        };
+        }
         my $value = $requested_matches{$key};
-        next if ! defined $value;       # bad config setting?
-        next if ! defined $p0f->{$key}; # p0f didn't detect the value
+        next if !defined $value;          # bad config setting?
+        next if !defined $p0f->{$key};    # p0f didn't detect the value
 
-        if ( $key eq 'distance' && $p0f->{$key} > $value ) {
+        if ($key eq 'distance' && $p0f->{$key} > $value) {
             $self->log(LOGDEBUG, "p0f distance match ($value)");
             return 1;
-        };
-        if ( $key eq 'genre'    && $p0f->{$key} =~ /$value/i ) {
+        }
+        if ($key eq 'genre' && $p0f->{$key} =~ /$value/i) {
             $self->log(LOGDEBUG, "p0f genre match ($value)");
             return 1;
-        };
-        if ( $key eq 'uptime'   && $p0f->{$key} < $value ) {
+        }
+        if ($key eq 'uptime' && $p0f->{$key} < $value) {
             $self->log(LOGDEBUG, "p0f uptime match ($value)");
             return 1;
-        };
-        if ( $key eq 'link'     && $p0f->{$key} =~ /$value/i ) {
+        }
+        if ($key eq 'link' && $p0f->{$key} =~ /$value/i) {
             $self->log(LOGDEBUG, "p0f link match ($value)");
             return 1;
-        };
+        }
     }
     $self->log(LOGINFO, "skip: no p0f match");
     return;
@@ -530,21 +553,21 @@ sub p0f_match {
 sub geoip_match {
     my $self = shift;
 
-    return if ! $self->{_args}{geoip};
+    return if !$self->{_args}{geoip};
 
     my $country = $self->connection->notes('geoip_country');
-    my $c_name  = $self->connection->notes('geoip_country_name') || '';
+    my $c_name = $self->connection->notes('geoip_country_name') || '';
 
-    if ( !$country ) {
+    if (!$country) {
         $self->LOGINFO(LOGNOTICE, "skip: no geoip country");
         return;
-    };
+    }
 
     my @countries = split /,/, $self->{_args}{geoip};
-    foreach ( @countries ) {
+    foreach (@countries) {
         $self->LOGINFO(LOGINFO, "pass: geoip country match ($_, $c_name)");
         return 1 if lc $_ eq lc $country;
-    };
+    }
 
     $self->LOGINFO(LOGINFO, "skip: no geoip match ($c_name)");
     return;

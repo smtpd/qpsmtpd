@@ -86,9 +86,9 @@ sub register {
     foreach (keys %args) {
         $self->{_args}->{$_} = $args{$_};
     }
-    if ( ! defined $self->{_args}{reject} ) {
+    if (!defined $self->{_args}{reject}) {
         $self->{_args}{reject} = 1;
-    };
+    }
     $self->{_args}{reject_type} ||= 'soft';
 }
 
@@ -97,82 +97,86 @@ sub hook_mail {
 
     return DECLINED if $self->is_immune();
 
-    if ( $sender eq '<>' ) {
+    if ($sender eq '<>') {
         $transaction->notes('resolvable_fromhost', 'null');
         $self->log(LOGINFO, "pass, null sender");
         return DECLINED;
-    };
+    }
 
     $self->populate_invalid_networks();
     my $resolved = $self->check_dns($sender->host, $transaction);
 
-    return DECLINED if $resolved;  # success, no need to continue
-    #return DECLINED if $sender->host;  # reject later
+    return DECLINED if $resolved;    # success, no need to continue
+         #return DECLINED if $sender->host;  # reject later
 
     my $result = $transaction->notes('resolvable_fromhost') or do {
-        if ( $self->{_args}{reject} ) {;
-            $self->log(LOGINFO, 'fail, missing result' );
-            return Qpsmtpd::DSN->temp_resolver_failed( $self->get_reject_type(), '' );
-        };
-        $self->log(LOGINFO, 'fail, missing result, reject disabled' );
+        if ($self->{_args}{reject}) {
+            ;
+            $self->log(LOGINFO, 'fail, missing result');
+            return Qpsmtpd::DSN->temp_resolver_failed($self->get_reject_type(),
+                                                      '');
+        }
+        $self->log(LOGINFO, 'fail, missing result, reject disabled');
         return DECLINED;
     };
 
-    return DECLINED if $result =~ /^(?:a|ip|mx)$/;         # success
-    return DECLINED if $result =~ /^(?:whitelist|null|naughty)$/; # immunity
+    return DECLINED if $result =~ /^(?:a|ip|mx)$/;                   # success
+    return DECLINED if $result =~ /^(?:whitelist|null|naughty)$/;    # immunity
 
-    $self->adjust_karma( -1 );
+    $self->adjust_karma(-1);
 
-    if ( ! $self->{_args}{reject} ) {;
-        $self->log(LOGINFO, "fail, reject disabled, $result" );
+    if (!$self->{_args}{reject}) {
+        ;
+        $self->log(LOGINFO, "fail, reject disabled, $result");
         return DECLINED;
-    };
+    }
 
-    $self->log(LOGINFO, "fail, $result" ); # log error
-    return Qpsmtpd::DSN->addr_bad_from_system( $self->get_reject_type(),
-                            "FQDN required in the envelope sender");
+    $self->log(LOGINFO, "fail, $result");                            # log error
+    return
+      Qpsmtpd::DSN->addr_bad_from_system($self->get_reject_type(),
+                                        "FQDN required in the envelope sender");
 }
 
 sub check_dns {
     my ($self, $host, $transaction) = @_;
 
     # we can't even parse a hostname out of the address
-    if ( ! $host ) {
+    if (!$host) {
         $transaction->notes('resolvable_fromhost', 'unparsable host');
-        $self->adjust_karma( -1 );
+        $self->adjust_karma(-1);
         return;
-    };
+    }
 
     $transaction->notes('resolvable_fromhost_host', $host);
 
-    if ( $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/ ) {
+    if ($host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/) {
         $self->log(LOGINFO, "skip, $host is an IP");
         $transaction->notes('resolvable_fromhost', 'ip');
-        $self->adjust_karma( -1 );
+        $self->adjust_karma(-1);
         return 1;
-    };
+    }
 
     my $res = new Net::DNS::Resolver(dnsrch => 0);
     $res->tcp_timeout(30);
     $res->udp_timeout(30);
 
-    my $has_mx = $self->get_and_validate_mx( $res, $host, $transaction );
-    return 1 if $has_mx == 1;  # success, has MX!
-    return if $has_mx == -1;   # has invalid MX records
-    # at this point, no MX for fh is resolvable
+    my $has_mx = $self->get_and_validate_mx($res, $host, $transaction);
+    return 1 if $has_mx == 1;     # success, has MX!
+    return   if $has_mx == -1;    # has invalid MX records
+                                  # at this point, no MX for fh is resolvable
 
-    my @host_answers = $self->get_host_records( $res, $host, $transaction );
+    my @host_answers = $self->get_host_records($res, $host, $transaction);
     foreach my $rr (@host_answers) {
-        if ( $rr->type eq 'A' || $rr->type eq 'AAAA' ) {
+        if ($rr->type eq 'A' || $rr->type eq 'AAAA') {
             $self->log(LOGINFO, "pass, found A for $host");
             $transaction->notes('resolvable_fromhost', 'a');
             return $self->ip_is_valid($rr->address);
-        };
-        if ( $rr->type eq 'MX' ) {
+        }
+        if ($rr->type eq 'MX') {
             $self->log(LOGINFO, "pass, found MX for $host");
             $transaction->notes('resolvable_fromhost', 'mx');
             return $self->mx_address_resolves($rr->exchange, $host);
-        };
+        }
     }
     return;
 }
@@ -193,33 +197,34 @@ sub ip_is_valid {
 }
 
 sub get_and_validate_mx {
-    my ($self, $res, $host, $transaction ) = @_;
+    my ($self, $res, $host, $transaction) = @_;
 
     my @mx = mx($res, $host);
-    if ( ! scalar @mx ) {    # no mx records
-        $self->adjust_karma( -1 );
+    if (!scalar @mx) {    # no mx records
+        $self->adjust_karma(-1);
         $self->log(LOGINFO, "$host has no MX");
         return 0;
-    };
+    }
 
     foreach my $mx (@mx) {
+
         # if any MX is valid, then we consider the domain resolvable
-        if ( $self->mx_address_resolves($mx->exchange, $host) ) {
+        if ($self->mx_address_resolves($mx->exchange, $host)) {
             $self->log(LOGINFO, "pass, $host has MX at " . $mx->exchange);
             $transaction->notes('resolvable_fromhost', 'mx');
             return 1;
-        };
+        }
     }
 
     # if there are MX records, and we got here, none are valid
     #$self->log(LOGINFO, "fail, invalid MX for $host");
     $transaction->notes('resolvable_fromhost', "invalid MX for $host");
-    $self->adjust_karma( -1 );
+    $self->adjust_karma(-1);
     return -1;
-};
+}
 
 sub get_host_records {
-    my ($self, $res, $host, $transaction ) = @_;
+    my ($self, $res, $host, $transaction) = @_;
 
     my @answers;
     my $query = $res->search($host);
@@ -239,15 +244,15 @@ sub get_host_records {
         }
     }
 
-    if ( ! scalar @answers) {
-        if ( $res->errorstring ne 'NXDOMAIN' ) {
+    if (!scalar @answers) {
+        if ($res->errorstring ne 'NXDOMAIN') {
             $self->log(LOGWARN, "fail, query for $host, ", $res->errorstring);
-        };
+        }
         return;
-    };
+    }
 
     return @answers;
-};
+}
 
 sub mx_address_resolves {
     my ($self, $name, $fromhost) = @_;
@@ -271,15 +276,16 @@ sub mx_address_resolves {
             }
         }
     }
-    if (! @mx_answers) {
-        if ( $res->errorstring eq 'NXDOMAIN' ) {
-            $self->log(LOGWARN, "fail, query for $fromhost, ", $res->errorstring);
-        };
+    if (!@mx_answers) {
+        if ($res->errorstring eq 'NXDOMAIN') {
+            $self->log(LOGWARN, "fail, query for $fromhost, ",
+                       $res->errorstring);
+        }
         return;
     }
 
     foreach my $rr (@mx_answers) {
-        next if ( $rr->type ne 'A' && $rr->type ne 'AAAA' );
+        next if ($rr->type ne 'A' && $rr->type ne 'AAAA');
         return $self->ip_is_valid($rr->address);
     }
 
@@ -290,11 +296,11 @@ sub populate_invalid_networks {
     my $self = shift;
 
     foreach my $i ($self->qp->config("invalid_resolvable_fromhost")) {
-        $i =~ s/^\s*//;  # trim leading spaces
-        $i =~ s/\s*$//;  # trim trailing spaces
+        $i =~ s/^\s*//;    # trim leading spaces
+        $i =~ s/\s*$//;    # trim trailing spaces
         if ($i =~ m#^((\d{1,3}\.){3}\d{1,3})/(\d\d?)#) {
             $invalid{$1} = $3;
         }
     }
-};
+}
 
