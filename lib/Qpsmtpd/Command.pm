@@ -60,8 +60,8 @@ use vars qw(@ISA);
 @ISA = qw(Qpsmtpd::SMTP);
 
 sub parse {
-    my ($me,$cmd,$line,$sub) = @_;
-    return (OK) unless defined $line; # trivial case
+    my ($me, $cmd, $line, $sub) = @_;
+    return (OK) unless defined $line;    # trivial case
     my $self = {};
     bless $self, $me;
     $cmd = lc $cmd;
@@ -77,28 +77,29 @@ sub parse {
         ## }
         ## $self->log(LOGDEBUG, "parse($cmd) => [".join("], [", @log)."]");
         return @ret;
-    } 
+    }
     my $parse = "parse_$cmd";
     if ($self->can($parse)) {
+
         # print "CMD=$cmd,line=$line\n";
         my @out = eval { $self->$parse($cmd, $line); };
         if ($@) {
             $self->log(LOGERROR, "$parse($cmd,$line) failed: $@");
-            return(DENY, "Failed to parse line");
+            return (DENY, "Failed to parse line");
         }
         return @out;
     }
-    return(OK, split(/ +/, $line)); # default :)
+    return (OK, split(/ +/, $line));    # default :)
 }
 
 sub parse_rcpt {
-    my ($self,$cmd,$line) = @_;
+    my ($self, $cmd, $line) = @_;
     return (DENY, "Syntax error in command") unless $line =~ s/^to:\s*//i;
     return &_get_mail_params($cmd, $line);
 }
 
 sub parse_mail {
-    my ($self,$cmd,$line) = @_;
+    my ($self, $cmd, $line) = @_;
     return (DENY, "Syntax error in command") unless $line =~ s/^from:\s*//i;
     return &_get_mail_params($cmd, $line);
 }
@@ -121,7 +122,7 @@ sub parse_mail {
 ##   inner-esmtp-cmd  ::= ("MAIL FROM:" reverse-path)   /
 ##                        ("RCPT TO:" forward-path)
 sub _get_mail_params {
-    my ($cmd,$line) = @_;
+    my ($cmd, $line) = @_;
     my @params = ();
     $line =~ s/\s*$//;
 
@@ -130,36 +131,37 @@ sub _get_mail_params {
     }
     @params = reverse @params;
 
-    # the above will "fail" (i.e. all of the line in @params) on 
+    # the above will "fail" (i.e. all of the line in @params) on
     # some addresses without <> like
     #    MAIL FROM: user=name@example.net
     # or RCPT TO: postmaster
 
     # let's see if $line contains nothing and use the first value as address:
     if ($line) {
-        # parameter syntax error, i.e. not all of the arguments were 
+
+        # parameter syntax error, i.e. not all of the arguments were
         # stripped by the while() loop:
         return (DENY, "Syntax error in parameters")
-          if ($line =~ /\@.*\s/); 
+          if ($line =~ /\@.*\s/);
         return (OK, $line, @params);
     }
 
-    $line = shift @params; 
+    $line = shift @params;
     if ($cmd eq "mail") {
-        return (OK, "<>") unless $line; # 'MAIL FROM:' --> 'MAIL FROM:<>'
-        return (DENY, "Syntax error in parameters") 
-          if ($line =~ /\@.*\s/); # parameter syntax error
+        return (OK, "<>") unless $line;    # 'MAIL FROM:' --> 'MAIL FROM:<>'
+        return (DENY, "Syntax error in parameters")
+          if ($line =~ /\@.*\s/);          # parameter syntax error
     }
     else {
         if ($line =~ /\@/) {
-            return (DENY, "Syntax error in parameters") 
+            return (DENY, "Syntax error in parameters")
               if ($line =~ /\@.*\s/);
-        } 
+        }
         else {
             # XXX: what about 'abuse' in Qpsmtpd::Address?
             return (DENY, "Syntax error in parameters") if $line =~ /\s/;
-            return (DENY, "Syntax error in address") 
-              unless ($line =~ /^(postmaster|abuse)$/i); 
+            return (DENY, "Syntax error in address")
+              unless ($line =~ /^(postmaster|abuse)$/i);
         }
     }
     ## XXX:  No: let this do a plugin, so it's not up to us to decide
