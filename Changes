@@ -1,4 +1,32 @@
 
+0.92  Apr 20, 2013
+
+  new plugins: dmarc, fcrdns
+
+  new feature: DKIM message signing. See 'perldoc plugins/dkim' for details.
+        includes script for generating DKIM selectors, keys, and DNS records
+
+  tls: added ability to store SSL keys in config/ssl
+
+  log2sql: added UPDATE query support
+
+  removed FAQ to: https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/faq
+
+  helo: cease processing DNS records after first positive match
+
+  karma: sprinkled karma awards throughout other plugins
+     - limit poor karma hosts to 1 concurrent connection
+     - allow +3 conncurrent connections to hosts with good karma
+
+  Sanitize spamd_sock path for perl taint mode - Markus Ullmann
+
+  geo_ip: added too_far option (deduct karma from distant senders)
+
+  bogus_bounce: add Return-Path check, per RFC 3834
+
+  Fix for Net::DNS break -  Markus Ullmann
+
+
 0.91  Nov 20, 2012
 
   a handful of minor changes to log messages, similar to v0.90
