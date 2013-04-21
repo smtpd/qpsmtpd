@@ -195,7 +195,6 @@ sub discover_policy {
             return;
         }
         @matches = $self->fetch_dmarc_record($org_dom);
-
         if (0 == scalar @matches) {
             $self->log(LOGINFO, "skip, no policy for $from_host");
             return;
@@ -308,8 +307,8 @@ sub exists_in_dns {
 # I chose to query the name and match NS,MX,A,or AAAA records. Since it gets
 # repeated for the for the Organizational Name, if it fails, there's no
 # delegation from the TLD.
-    my $res = $self->init_resolver();
-    my $query = $res->send($domain) or do {
+    my $res = $self->init_resolver(8);
+    my $query = $res->query($domain, 'NS') or do {
         if ($res->errorstring eq 'NXDOMAIN') {
             $self->log(LOGDEBUG, "fail, non-existent domain: $domain");
             return;
@@ -317,15 +316,15 @@ sub exists_in_dns {
         $self->log(LOGINFO, "error, looking up $domain: " . $res->errorstring);
         return;
     };
-    my @matches;
+    my $matches = 0;
     for my $rr ($query->answer) {
         next if $rr->type !~ /(?:NS|MX|A|AAAA)/;
-        push @matches, $rr->nsdname;
+        $matches++;
     }
-    if (0 == scalar @matches) {
+    if (0 == $matches) {
         $self->log(LOGDEBUG, "fail, no records for $domain");
     }
-    return @matches;
+    return $matches;
 }
 
 sub fetch_dmarc_record {
@@ -344,6 +343,7 @@ sub fetch_dmarc_record {
         #   2.  Records that do not start with a "v=" tag that identifies the
         #       current version of DMARC are discarded.
         next if 'v=' ne substr($rr->txtdata, 0, 2);
+        next if 'v=spf' eq substr($rr->txtdata, 0, 5); # commonly found
         $self->log(LOGINFO, $rr->txtdata);
         push @matches, join('', $rr->txtdata);
     }
