@@ -38,17 +38,13 @@ See Section 10 of the draft: Domain Owner Actions
  rf=afrf;     (report format: afrf, iodef)
  ri=8400;     (report interval)
  pct=50;      (percent of messages to filter)
- 
 
-=head2 
 
 =head1 DRAFT
 
 http://www.dmarc.org/draft-dmarc-base-00-02.txt
 
 =head1 TODO
-
- 1. run dmarc before SPF, if DMARC policy is discovered, ignore SPF
 
  2. provide dmarc feedback to domains that request it
 
@@ -58,7 +54,7 @@ http://www.dmarc.org/draft-dmarc-base-00-02.txt
 
 =head1 IMPLEMENTATION
 
-1. Primary identifier is RFC5322.From field
+1. Primary identifier is RFC5322.From field (From: header)
 
 2. Senders can specify strict or relaxed mode
 
@@ -71,29 +67,6 @@ http://www.dmarc.org/draft-dmarc-base-00-02.txt
 6. Receivers should endeavour to reject or quarantine email if the
    RFC5322.From purports to be from a domain that appears to be
    either non-existent or incapable of receiving mail.
-
-=head2 Reports should include
-
-The report SHOULD include the following data:
-
-   o  Enough information for the report consumer to re-calculate DMARC
-      disposition based on the published policy, message dispositon, and
-      SPF, DKIM, and identifier alignment results. {R12}
-
-   o  Data for each sender subdomain separately from mail from the
-      sender's organizational domain, even if no subdomain policy is
-      applied. {R13}
-
-   o  Sending and receiving domains {R17}
-
-   o  The policy requested by the Domain Owner and the policy actually
-      applied (if different) {R18}
-
-   o  The number of successful authentications {R19}
-
-   o  The counts of messages based on all messages received even if
-      their delivery is ultimately blocked by other filtering agents
-      {R20}
 
 =cut
 
@@ -123,15 +96,13 @@ sub data_post_handler {
 
     # 11.1.  Extract Author Domain
 
-# TODO: check exists_in_dns result, and possibly reject here if domain non-exist
     my $from_host = $self->get_from_host($transaction) or return DECLINED;
-    if (!$self->exists_in_dns($from_host)) {
-        my $org_host = $self->get_organizational_domain($from_host);
-        if (!$self->exists_in_dns($org_host)) {
-            $self->log(LOGINFO, "fail, domain/org not in DNS");
+    my $org_host = $self->get_organizational_domain($from_host);
 
-            #return $self->get_reject();
-            return DECLINED;
+    if (!$self->exists_in_dns($from_host)) {
+        if (!$self->exists_in_dns($org_host)) {
+            $self->log(LOGINFO, "fail, $from_host not in DNS");
+            return $self->get_reject("RFC5322.From host does not exist");
         }
     }
 
@@ -140,17 +111,29 @@ sub data_post_handler {
       or return DECLINED;
 
     #   3.  Perform DKIM signature verification checks.  A single email may
-    #       contain multiple DKIM signatures.  The results of this step are
-    #       passed to the remainder of the algorithm and MUST include the
-    #       value of the "d=" tag from all DKIM signatures that successfully
-    #       validated.
-    my $dkim_sigs = $self->connection->notes('dkim_pass_domains') || [];
+    #       contain multiple DKIM signatures.  The results MUST include the
+    #       value of the "d=" tag from all DKIM signatures that validated.
+    #my $dkim_sigs = $self->connection->notes('dkim_pass_domains') || [];
 
-    #   4.  Perform SPF validation checks.  The results of this step are
-    #       passed to the remainder of the algorithm and MUST include the
-    #       domain name from the RFC5321.MailFrom if SPF evaluation returned
-    #       a "pass" result.
+    #   4.  Perform SPF validation checks.  The results of this step
+    #       MUST include the domain name from the RFC5321.MailFrom if SPF
+    #       evaluation returned a "pass" result.
     my $spf_dom = $transaction->notes('spf_pass_host');
+
+    #   5.  Conduct identifier alignment checks.
+    return DECLINED
+        if $self->is_aligned($from_host, $org_host, $policy, $spf_dom );
+
+    #   6.  Apply policy.  Emails that fail the DMARC mechanism check are
+    #       disposed of in accordance with the discovered DMARC policy of the
+    #       Domain Owner.  See Section 6.2 for details.
+    return DECLINED if lc $policy->{p} eq 'none';
+
+    return $self->get_reject("failed DMARC policy");
+}
+
+sub is_aligned {
+    my ($self, $from_host, $org_host, $policy, $spf_dom) = @_;
 
     #   5.  Conduct identifier alignment checks.  With authentication checks
     #       and policy discovery performed, the Mail Receiver checks if
@@ -160,34 +143,43 @@ sub data_post_handler {
     #       the DMARC mechanism check.  All other conditions (authentication
     #       failures, identifier mismatches) are considered to be DMARC
     #       mechanism check failures.
+
+    my $dkim_sigs = $self->connection->notes('dkim_pass_domains') || [];
     foreach (@$dkim_sigs) {
-        if ($_ eq $from_host) {    # strict alignment
-            $self->log(LOGINFO, "pass, DKIM alignment");
-            $self->adjust_karma(2);    # big karma boost
-            return DECLINED;
+        if ($_ eq $from_host) {        # strict alignment
+            $self->log(LOGINFO, "pass, DKIM aligned");
+            $self->adjust_karma(1);
+            return 1;
         }
+        next if $policy->{adkim} && lc $policy->{adkim} eq 's'; # strict pol.
+        # default policy is relaxed
+        if ( $_ eq $org_host ) {
+            $self->log(LOGINFO, "pass, DKIM aligned, relaxed");
+            $self->adjust_karma(1);
+            return 1;
+        };
     }
 
-    if ($spf_dom && $spf_dom eq $from_host) {
-        $self->adjust_karma(2);        # big karma boost
-        $self->log(LOGINFO, "pass, SPF alignment");
-        return DECLINED;
+    return 0 if ! $spf_dom;
+    if ($spf_dom eq $from_host) {
+        $self->adjust_karma(1);
+        $self->log(LOGINFO, "pass, SPF aligned");
+        return 1;
+    }
+    return 0 if ($policy->{aspf} && lc $policy->{aspf} eq 's' ); # strict pol
+    if ($spf_dom eq $org_host) {
+        $self->adjust_karma(1);
+        $self->log(LOGINFO, "pass, SPF aligned, relaxed");
+        return 1;
     }
 
-    #   6.  Apply policy.  Emails that fail the DMARC mechanism check are
-    #       disposed of in accordance with the discovered DMARC policy of the
-    #       Domain Owner.  See Section 6.2 for details.
-
-    $self->log(LOGINFO, "skip, NEED RELAXED alignment");
-    return DECLINED;
-}
+    return 0;
+};
 
 sub discover_policy {
     my ($self, $from_host) = @_;
 
-    # 1.  Mail Receivers MUST query the DNS for a DMARC TXT record at the
-    #     DNS domain matching the one found in the RFC5322.From domain in
-    #     the message. A possibly empty set of records is returned.
+    # 1.  Mail Receivers MUST query the DNS for a DMARC TXT record...
     my @matches = $self->fetch_dmarc_record($from_host);    # 2. within
     if (0 == scalar @matches) {
 
@@ -304,29 +296,45 @@ sub get_organizational_domain {
 
 sub exists_in_dns {
     my ($self, $domain) = @_;
+# the DMARC draft suggests rejecting messages whose From: domain does not
+# exist in DNS. That's as far as it goes. So I went back to the ADSP (from
+# where DMARC this originated, which in turn led me to the ietf-dkim email
+# list where a handful of 'experts' failed to agree on The Right Way to
+# perform this test. And thus no direction was given.
+# As they point out:
+#    MX records aren't mandatory.
+#    A or AAAA records as fallback aren't reliable either.
+
+# I chose to query the name and match NS,MX,A,or AAAA records. Since it gets
+# repeated for the for the Organizational Name, if it fails, there's no
+# delegation from the TLD.
     my $res = $self->init_resolver();
-    my $query = $res->send($domain, 'NS') or do {
+    my $query = $res->send($domain) or do {
         if ($res->errorstring eq 'NXDOMAIN') {
             $self->log(LOGDEBUG, "fail, non-existent domain: $domain");
             return;
         }
-        $self->log(LOGINFO,
-                   "error, looking up NS for $domain: " . $res->errorstring);
+        $self->log(LOGINFO, "error, looking up $domain: " . $res->errorstring);
         return;
     };
     my @matches;
     for my $rr ($query->answer) {
-        next if $rr->type ne 'NS';
+        next if $rr->type !~ /(?:NS|MX|A|AAAA)/;
         push @matches, $rr->nsdname;
     }
     if (0 == scalar @matches) {
-        $self->log(LOGDEBUG, "fail, zero NS for $domain");
+        $self->log(LOGDEBUG, "fail, no records for $domain");
     }
     return @matches;
 }
 
 sub fetch_dmarc_record {
     my ($self, $zone) = @_;
+
+    # 1.  Mail Receivers MUST query the DNS for a DMARC TXT record at the
+    #     DNS domain matching the one found in the RFC5322.From domain in
+    #     the message. A possibly empty set of records is returned.
+
     my $res = $self->init_resolver();
     my $query = $res->send('_dmarc.' . $zone, 'TXT');
     my @matches;
@@ -365,6 +373,34 @@ sub parse_policy {
     #warn Data::Dumper::Dumper(\%dmarc);
     return %dmarc;
 }
+
+sub external_report {
+
+=pod
+
+The report SHOULD include the following data:
+
+   o  Enough information for the report consumer to re-calculate DMARC
+      disposition based on the published policy, message dispositon, and
+      SPF, DKIM, and identifier alignment results. {R12}
+
+   o  Data for each sender subdomain separately from mail from the
+      sender's organizational domain, even if no subdomain policy is
+      applied. {R13}
+
+   o  Sending and receiving domains {R17}
+
+   o  The policy requested by the Domain Owner and the policy actually
+      applied (if different) {R18}
+
+   o  The number of successful authentications {R19}
+
+   o  The counts of messages based on all messages received even if
+      their delivery is ultimately blocked by other filtering agents {R20}
+
+=cut
+
+};
 
 sub verify_external_reporting {
 
