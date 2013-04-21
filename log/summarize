@@ -277,9 +277,10 @@ sub print_auto_format {
 sub show_symbol {
     my $mess = shift;
     return ' o' if $mess eq 'TLS setup returning';
-    return ' -' if $mess eq 'skip';
-    return ' -' if $mess =~ /^skip[,:\s]/i;
     return ' o' if $mess eq 'pass';
+    return ' -' if $mess eq 'skip';
+    return ' X' if $mess eq 'fail';
+    return ' -' if $mess =~ /^skip[,:\s]/i;
     return ' o' if $mess =~ /^pass[,:\s]/i;
     return ' X' if $mess =~ /^fail[,:\s]/i;
     return ' x' if $mess =~ /^negative[,:\s]/i;
