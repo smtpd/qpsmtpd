@@ -4,81 +4,88 @@
 # 
 #id	name						abb3	abb5		aliases
 #
-1	hosts_allow					alw		allow
-2	ident::geoip				geo		geoip
-3	ident::p0f					p0f		p0f
-5	karma						krm		karma
-6	dnsbl						dbl		dnsbl
-7	relay						rly		relay       check_relay,check_norelay,relay_only
-8   fcrdns						dns		fcrdn
-9	earlytalker					ear		early		check_earlytalker
-15	helo						hlo		helo		check_spamhelo
-16	tls							tls		tls
-20	dont_require_anglebrackets	rab		drabs
-21	unrecognized_commands		cmd		uncmd		count_unrecognized_commands
-22	noop						nop		noop		noop_counter
-23	random_error				rnd		rande
-24	milter						mlt		mlter
-25	content_log					log		colog
+201	hosts_allow					alw		allow
+202	ident::geoip				geo		geoip
+203	ident::p0f					p0f		p0f
+204	ident::p0f_3a0              p0f     p0f
+205	karma						krm		karma
+206	dnsbl						dbl		dnsbl
+207	relay						rly		relay       check_relay,check_norelay,relay_only
+208	fcrdns						dns		fcrdn
+
+300	earlytalker					ear		early		check_earlytalker
+301	helo						hlo		helo		check_spamhelo
+302	tls							tls		tls
+
+320	dont_require_anglebrackets	rab		drabs
+321	unrecognized_commands		cmd		uncmd		count_unrecognized_commands
+322	noop						nop		noop		noop_counter
+323	random_error				rnd		rande
+324	milter						mlt		mlter
+325	content_log					log		colog
 #
 # Authentication
 #
-30	auth::auth_vpopmail_sql		aut		vpsql
-31	auth::auth_vpopmaild		vpd		vpopd
-32	auth::auth_vpopmail			vpo		vpop
-33	auth::auth_checkpasswd		ckp		chkpw
-34	auth::auth_cvs_unix_local	cvs		cvsul
-35	auth::auth_flat_file		flt		aflat
-36	auth::auth_ldap_bind		ldp		aldap
-37	auth::authdeny	        	dny		adeny
+400	auth::auth_vpopmail_sql		aut		vpsql
+401	auth::auth_vpopmaild		vpd		vpopd
+402	auth::auth_vpopmail			vpo		vpop
+403	auth::auth_checkpasswd		ckp		chkpw
+404	auth::auth_cvs_unix_local	cvs		cvsul
+405	auth::auth_flat_file		flt		aflat
+406	auth::auth_ldap_bind		ldp		aldap
+407	auth::authdeny	        	dny		adeny
 #
-# Sender / From
+# Sender / Envelope From
 #
-40	badmailfrom					bmf		badmf		check_badmailfrom,check_badmailfrom_patterns
-41	badmailfromto				bmt		bfrto
-42	rhsbl						rbl		rhsbl
-44	resolvable_fromhost			rfh		rsvfh		require_resolvable_fromhost
-45	sender_permitted_from		spf		spf
+500	badmailfrom					bmf		badmf		check_badmailfrom,check_badmailfrom_patterns
+501	badmailfromto				bmt		bfrto
+502	rhsbl						rbl		rhsbl
+504	resolvable_fromhost			rfh		rsvfh		require_resolvable_fromhost
+505	sender_permitted_from		spf		spf
 #
-# Recipient
+# Recipient / Envelope To
 #
-50	badrcptto					bto		badto		check_badrcptto,check_badrcptto_patterns
-51	rcpt_map					rmp		rcmap
-52	rcpt_regex					rcx		rcrex
-53	qmail_deliverable			qmd		qmd
-55	rcpt_ok						rok		rcpok
-58	bogus_bounce				bog		bogus		check_bogus_bounce
-59	greylisting					gry		greyl
+600	badrcptto					bto		badto		check_badrcptto,check_badrcptto_patterns
+601	rcpt_map					rmp		rcmap
+602	rcpt_regex					rcx		rcrex
+603	qmail_deliverable			qmd		qmd
+605	rcpt_ok						rok		rcpok
+608	bogus_bounce				bog		bogus		check_bogus_bounce
+609	greylisting					gry		greyl
 #
 # Content Filters
 #
-60	headers						hdr		headr		check_basicheaders
-61	loop						lop		loop
-62	uribl						uri		uribl
-63	domainkeys					dky		dkey
-64	dkim						dkm		dkim
-65	spamassassin				spm		spama
-66	dspam						dsp		dspam
-67  dmarc                       dmc     dmarc
+700	headers						hdr		headr		check_basicheaders
+701	loop						lop		loop
+702	uribl						uri		uribl
+
+710	domainkeys					dky		dkey
+711	dkim						dkm		dkim
+712 dmarc 				        dmc     dmarc
+
+720	spamassassin				spm		spama
+721	dspam						dsp		dspam
 #
 # Anti-Virus Plugins
 #
-70	virus::aveclient			ave		avirs
-71	virus::bitdefender			bit		bitdf
-72	virus::clamav				cav		clamv
-73	virus::clamdscan			clm		clamd
-74	virus::hbedv				hbv		hbedv
-75	virus::kavscanner			kav		kavsc
-76	virus::klez_filter			klz		vklez
-77	virus::sophie				sop		sophe
-78	virus::uvscan				uvs		uvscn
+770	virus::aveclient			ave		avirs
+771	virus::bitdefender			bit		bitdf
+772	virus::clamav				cav		clamv
+773	virus::clamdscan			clm		clamd
+774	virus::hbedv				hbv		hbedv
+775	virus::kavscanner			kav		kavsc
+776	virus::klez_filter			klz		vklez
+777	virus::sophie				sop		sophe
+778	virus::uvscan				uvs		uvscn
 #
 # Queue Plugins
 #
-80	queue::qmail-queue			qqm		queue
-81	queue::maildir				qdr		qudir
-82	queue::postfix-queue		qpf		qupfx
-83	queue::smtp-forward			qfw		qufwd
-84	queue::exim-bsmtp			qxm		qexim
-98	quit_fortune				for		fortu
-99	connection_time				tim		time
+800	queue::qmail-queue			qqm		queue
+801	queue::maildir				qdr		qudir
+802	queue::postfix-queue		qpf		qupfx
+803	queue::smtp-forward			qfw		qufwd
+804	queue::exim-bsmtp			qxm		qexim
+
+900	quit_fortune				for		fortu
+
+999	connection_time				tim		time
