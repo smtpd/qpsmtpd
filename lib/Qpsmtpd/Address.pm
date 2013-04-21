@@ -25,9 +25,9 @@ for easy testing of values.
 =cut
 
 use overload (
-    '""'   => \&format,
-    'cmp'  => \&_addr_cmp,
-);
+              '""'  => \&format,
+              'cmp' => \&_addr_cmp,
+             );
 
 =head2 new()
 
@@ -59,13 +59,13 @@ test for equality (like in badmailfrom).
 sub new {
     my ($class, $user, $host) = @_;
     my $self = {};
-    if ($user =~ /^<(.*)>$/ ) {
-	($user, $host) = $class->canonify($user);
-	return undef unless defined $user;
+    if ($user =~ /^<(.*)>$/) {
+        ($user, $host) = $class->canonify($user);
+        return undef unless defined $user;
     }
-    elsif ( not defined $host ) {
-	my $address = $user;
-	($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
+    elsif (not defined $host) {
+        my $address = $user;
+        ($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
     }
     $self->{_user} = $user;
     $self->{_host} = $host;
@@ -84,35 +84,35 @@ sub new {
 #   At-domain = "@" domain
 #
 #   Mailbox = Local-part "@" Domain
-# 
+#
 #   Local-part = Dot-string / Quoted-string
 #       ; MAY be case-sensitive
-# 
+#
 #   Dot-string = Atom *("." Atom)
-# 
+#
 #   Atom = 1*atext
-# 
+#
 #   Quoted-string = DQUOTE *qcontent DQUOTE
-# 
+#
 #   Domain = (sub-domain 1*("." sub-domain)) / address-literal
 #   sub-domain = Let-dig [Ldh-str]
-# 
+#
 #   address-literal = "[" IPv4-address-literal /
 #                     IPv6-address-literal /
 #                     General-address-literal "]"
-# 
+#
 #   IPv4-address-literal = Snum 3("." Snum)
 #   IPv6-address-literal = "IPv6:" IPv6-addr
 #   General-address-literal = Standardized-tag ":" 1*dcontent
 #   Standardized-tag = Ldh-str
 #         ; MUST be specified in a standards-track RFC
 #         ; and registered with IANA
-# 
+#
 #   Snum = 1*3DIGIT  ; representing a decimal integer
 #         ; value in the range 0 through 255
 #   Let-dig = ALPHA / DIGIT
 #   Ldh-str = *( ALPHA / DIGIT / "-" ) Let-dig
-# 
+#
 #   IPv6-addr = IPv6-full / IPv6-comp / IPv6v4-full / IPv6v4-comp
 #   IPv6-hex  = 1*4HEXDIG
 #   IPv6-full = IPv6-hex 7(":" IPv6-hex)
@@ -127,12 +127,12 @@ sub new {
 #         ; The "::" represents at least 2 16-bit groups of zeros
 #         ; No more than 4 groups in addition to the "::" and
 #         ; IPv4-address-literal may be present
-# 
-# 
-# 
+#
+#
+#
 # atext and qcontent are not defined in RFC 2821.
 # From RFC 2822:
-# 
+#
 # atext           =       ALPHA / DIGIT / ; Any character except controls,
 #                         "!" / "#" /     ;  SP, and specials.
 #                         "$" / "%" /     ;  Used for atoms
@@ -145,21 +145,21 @@ sub new {
 #                         "|" / "}" /
 #                         "~"
 # qtext           =       NO-WS-CTL /     ; Non white space controls
-# 
+#
 #                         %d33 /          ; The rest of the US-ASCII
 #                         %d35-91 /       ;  characters not including "\"
 #                         %d93-126        ;  or the quote character
-# 
+#
 # qcontent        =       qtext / quoted-pair
-# 
+#
 # NO-WS-CTL       =       %d1-8 /         ; US-ASCII control characters
 #                         %d11 /          ;  that do not include the
 #                         %d12 /          ;  carriage return, line feed,
 #                         %d14-31 /       ;  and white space characters
 #                         %d127
-# 
+#
 # quoted-pair     =       ("\" text) / obs-qp
-# 
+#
 # text            =       %d1-9 /         ; Characters excluding CR and LF
 #                         %d11 /
 #                         %d12 /
@@ -196,8 +196,11 @@ sub canonify {
     return undef unless ($path =~ /^<(.*)>$/);
     $path = $1;
 
-    my $domain = $domain_expr ? $domain_expr
-                              : "$subdomain_expr(?:\.$subdomain_expr)*";
+    my $domain =
+        $domain_expr
+      ? $domain_expr
+      : "$subdomain_expr(?:\.$subdomain_expr)*";
+
     # it is possible for $address_literal_expr to be empty, if a site
     # doesn't want to allow them
     $domain = "(?:$address_literal_expr|$domain)"
@@ -216,14 +219,15 @@ sub canonify {
     return (undef) unless defined $localpart;
 
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
+
         # simple case, we are done
         return ($localpart, $domainpart);
-      }
+    }
     if ($localpart =~ /^"(($qtext_expr|\\$text_expr)*)"$/) {
         $localpart = $1;
         $localpart =~ s/\\($text_expr)/$1/g;
         return ($localpart, $domainpart);
-      }
+    }
     return (undef);
 }
 
@@ -234,7 +238,7 @@ to new() called with a single parameter.
 
 =cut
 
-sub parse { # retain for compatibility only
+sub parse {    # retain for compatibility only
     return shift->new(shift);
 }
 
@@ -252,14 +256,14 @@ L<format>.
 
 sub address {
     my ($self, $val) = @_;
-    if ( defined($val) ) {
-	$val = "<$val>" unless $val =~ /^<.+>$/;
-	my ($user, $host) = $self->canonify($val);
-	$self->{_user} = $user;
-	$self->{_host} = $host;
+    if (defined($val)) {
+        $val = "<$val>" unless $val =~ /^<.+>$/;
+        my ($user, $host) = $self->canonify($val);
+        $self->{_user} = $user;
+        $self->{_host} = $host;
     }
-    return ( defined $self->{_user} ?     $self->{_user} : '' )
-         . ( defined $self->{_host} ? '@'.$self->{_host} : '' );
+    return (defined $self->{_user} ? $self->{_user}       : '')
+      . (defined $self->{_host}    ? '@' . $self->{_host} : '');
 }
 
 =head2 format()
@@ -278,11 +282,12 @@ sub format {
     my ($self) = @_;
     my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
     return '<>' unless defined $self->{_user};
-    if ( ( my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
-        return qq(<"$user")
-	. ( defined $self->{_host} ? '@'.$self->{_host} : '' ). ">";
-      }
-    return "<".$self->address().">";
+    if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
+        return
+          qq(<"$user")
+          . (defined $self->{_host} ? '@' . $self->{_host} : '') . ">";
+    }
+    return "<" . $self->address() . ">";
 }
 
 =head2 user([$user])
@@ -326,10 +331,11 @@ use this to pass data between plugins.
 =cut
 
 sub notes {
-  my ($self,$key) = (shift,shift);
-  # Check for any additional arguments passed by the caller -- including undef
-  return $self->{_notes}->{$key} unless @_;
-  return $self->{_notes}->{$key} = shift;
+    my ($self, $key) = (shift, shift);
+
+    # Check for any additional arguments passed by the caller -- including undef
+    return $self->{_notes}->{$key} unless @_;
+    return $self->{_notes}->{$key} = shift;
 }
 
 sub _addr_cmp {
@@ -337,16 +343,16 @@ sub _addr_cmp {
     my ($left, $right, $swap) = @_;
     my $class = ref($left);
 
-    unless ( UNIVERSAL::isa($right, $class) ) {
-	$right = $class->new($right);
+    unless (UNIVERSAL::isa($right, $class)) {
+        $right = $class->new($right);
     }
 
-    #invert the address so we can sort by domain then user    
-    ($left  = join( '=', reverse( split(/@/, $left->format))) ) =~ tr/[<>]//d;
-    ($right = join( '=', reverse( split(/@/,$right->format))) ) =~ tr/[<>]//d;
+    #invert the address so we can sort by domain then user
+    ($left  = join('=', reverse(split(/@/, $left->format)))) =~ tr/[<>]//d;
+    ($right = join('=', reverse(split(/@/, $right->format)))) =~ tr/[<>]//d;
 
-    if ( $swap ) {
-	($right, $left) = ($left, $right);
+    if ($swap) {
+        ($right, $left) = ($left, $right);
     }
 
     return ($left cmp $right);

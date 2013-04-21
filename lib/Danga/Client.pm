@@ -3,26 +3,26 @@
 package Danga::Client;
 use base 'Danga::TimeoutSocket';
 use fields qw(
-    line
-    pause_count
-    read_bytes
-    data_bytes
-    callback
-    get_chunks
-    reader_object
-    );
+  line
+  pause_count
+  read_bytes
+  data_bytes
+  callback
+  get_chunks
+  reader_object
+  );
 use Time::HiRes ();
 
 use bytes;
 
 # 30 seconds max timeout!
-sub max_idle_time       { 30 }
-sub max_connect_time    { 1200 }
+sub max_idle_time    { 30 }
+sub max_connect_time { 1200 }
 
 sub new {
     my Danga::Client $self = shift;
     $self = fields::new($self) unless ref $self;
-    $self->SUPER::new( @_ );
+    $self->SUPER::new(@_);
 
     $self->reset_for_next_message;
     return $self;
@@ -30,13 +30,13 @@ sub new {
 
 sub reset_for_next_message {
     my Danga::Client $self = shift;
-    $self->{line} = '';
-    $self->{pause_count} = 0;
-    $self->{read_bytes} = 0;
-    $self->{callback} = undef;
+    $self->{line}          = '';
+    $self->{pause_count}   = 0;
+    $self->{read_bytes}    = 0;
+    $self->{callback}      = undef;
     $self->{reader_object} = undef;
-    $self->{data_bytes} = '';
-    $self->{get_chunks} = 0;
+    $self->{data_bytes}    = '';
+    $self->{get_chunks}    = 0;
     return $self;
 }
 
@@ -52,10 +52,12 @@ sub get_bytes {
     $self->{line} = '';
     if ($self->{read_bytes} <= 0) {
         if ($self->{read_bytes} < 0) {
-            $self->{line} = substr($self->{data_bytes},
-                                   $self->{read_bytes}, # negative offset
-                                   0 - $self->{read_bytes}, # to end of str
-                                   ""); # truncate that substr
+            $self->{line} = substr(
+                                   $self->{data_bytes},
+                                   $self->{read_bytes},        # negative offset
+                                   0 - $self->{read_bytes},    # to end of str
+                                   ""
+                                  );        # truncate that substr
         }
         $callback->($self->{data_bytes});
         return;
@@ -91,14 +93,14 @@ sub get_chunks {
     }
     $self->{read_bytes} = $bytes;
     $self->process_chunk($callback) if length($self->{line});
-    $self->{callback} = $callback;
+    $self->{callback}   = $callback;
     $self->{get_chunks} = 1;
 }
 
 sub end_get_chunks {
     my Danga::Client $self = shift;
     my $remaining = shift;
-    $self->{callback} = undef;
+    $self->{callback}   = undef;
     $self->{get_chunks} = 0;
     if (defined($remaining)) {
         $self->process_read_buf(\$remaining);
@@ -132,6 +134,7 @@ sub event_read {
             $self->{data_bytes} .= $$bref;
         }
         if ($self->{read_bytes} <= 0) {
+
             # print "Erk, read too much!\n" if $self->{read_bytes} < 0;
             my $cb = $self->{callback};
             $self->{callback} = undef;
@@ -150,21 +153,29 @@ sub process_read_buf {
     my $bref = shift;
     $self->{line} .= $$bref;
     return if $self->{pause_count} || $self->{closed};
-    
+
     if ($self->{line} =~ s/^(.*?\n)//) {
         my $line = $1;
         $self->{alive_time} = time;
         my $resp = $self->process_line($line);
-        if ($::DEBUG > 1 and $resp) { print "$$:".($self+0)."S: $_\n" for split(/\n/, $resp) }
+        if ($::DEBUG > 1 and $resp) {
+            print "$$:" . ($self + 0) . "S: $_\n" for split(/\n/, $resp);
+        }
         $self->write($resp) if $resp;
+
         # $self->watch_read(0) if $self->{pause_count};
         return if $self->{pause_count} || $self->{closed};
+
         # read more in a timer, to give other clients a look in
-        $self->AddTimer(0, sub {
-            if (length($self->{line}) && !$self->paused) {
-                $self->process_read_buf(\""); # " for bad syntax highlighters
+        $self->AddTimer(
+            0,
+            sub {
+                if (length($self->{line}) && !$self->paused) {
+                    $self->process_read_buf(\"")
+                      ;    # " for bad syntax highlighters
+                }
             }
-        });
+        );
     }
 }
 
@@ -188,6 +199,7 @@ sub paused {
 sub pause_read {
     my Danga::Client $self = shift;
     $self->{pause_count}++;
+
     # $self->watch_read(0);
 }
 
@@ -196,11 +208,15 @@ sub continue_read {
     $self->{pause_count}--;
     if ($self->{pause_count} <= 0) {
         $self->{pause_count} = 0;
-        $self->AddTimer(0, sub {
-            if (length($self->{line}) && !$self->paused) {
-                $self->process_read_buf(\""); # " for bad syntax highlighters
+        $self->AddTimer(
+            0,
+            sub {
+                if (length($self->{line}) && !$self->paused) {
+                    $self->process_read_buf(\"")
+                      ;    # " for bad syntax highlighters
+                }
             }
-        });
+        );
     }
 }
 
@@ -216,6 +232,10 @@ sub close {
 }
 
 sub event_err { my Danga::Client $self = shift; $self->close("Error") }
-sub event_hup { my Danga::Client $self = shift; $self->close("Disconnect (HUP)") }
+
+sub event_hup {
+    my Danga::Client $self = shift;
+    $self->close("Disconnect (HUP)");
+}
 
 1;

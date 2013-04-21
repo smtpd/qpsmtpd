@@ -48,95 +48,95 @@ than the RFC message.
 =cut
 
 my @rfc1893 = (
-    [ 
-        "Other or Undefined Status",                              # x.0.x
+    [
+     "Other or Undefined Status",    # x.0.x
     ],
     [
-        "Other address status.",                                  # x.1.0
-        "Bad destination mailbox address.",                       # x.1.1
-        "Bad destination system address.",                        # x.1.2
-        "Bad destination mailbox address syntax.",                # x.1.3
-        "Destination mailbox address ambiguous.",                 # x.1.4
-        "Destination address valid.",                             # x.1.5
-        "Destination mailbox has moved, No forwarding address.",  # x.1.6
-        "Bad sender's mailbox address syntax.",                   # x.1.7
-        "Bad sender's system address.",                           # x.1.8
+     "Other address status.",                                    # x.1.0
+     "Bad destination mailbox address.",                         # x.1.1
+     "Bad destination system address.",                          # x.1.2
+     "Bad destination mailbox address syntax.",                  # x.1.3
+     "Destination mailbox address ambiguous.",                   # x.1.4
+     "Destination address valid.",                               # x.1.5
+     "Destination mailbox has moved, No forwarding address.",    # x.1.6
+     "Bad sender's mailbox address syntax.",                     # x.1.7
+     "Bad sender's system address.",                             # x.1.8
     ],
     [
-        "Other or undefined mailbox status.",                     # x.2.0
-        "Mailbox disabled, not accepting messages.",              # x.2.1
-        "Mailbox full.",                                          # x.2.2
-        "Message length exceeds administrative limit.",           # x.2.3
-        "Mailing list expansion problem.",                        # x.2.4
+     "Other or undefined mailbox status.",                       # x.2.0
+     "Mailbox disabled, not accepting messages.",                # x.2.1
+     "Mailbox full.",                                            # x.2.2
+     "Message length exceeds administrative limit.",             # x.2.3
+     "Mailing list expansion problem.",                          # x.2.4
     ],
     [
-        "Other or undefined mail system status.",                 # x.3.0
-        "Mail system full.",                                      # x.3.1
-        "System not accepting network messages.",                 # x.3.2
-        "System not capable of selected features.",               # x.3.3
-        "Message too big for system.",                            # x.3.4
-        "System incorrectly configured.",                         # x.3.5
-    ],
-    [ 
-        "Other or undefined network or routing status.",          # x.4.0
-        "No answer from host.",                                   # x.4.1
-        "Bad connection.",                                        # x.4.2
-        "Directory server failure.",                              # x.4.3
-        "Unable to route.",                                       # x.4.4
-        "Mail system congestion.",                                # x.4.5
-        "Routing loop detected.",                                 # x.4.6
-        "Delivery time expired.",                                 # x.4.7
+     "Other or undefined mail system status.",                   # x.3.0
+     "Mail system full.",                                        # x.3.1
+     "System not accepting network messages.",                   # x.3.2
+     "System not capable of selected features.",                 # x.3.3
+     "Message too big for system.",                              # x.3.4
+     "System incorrectly configured.",                           # x.3.5
     ],
     [
-        "Other or undefined protocol status.",                    # x.5.0 
-        "Invalid command.",                                       # x.5.1 
-        "Syntax error.",                                          # x.5.2 
-        "Too many recipients.",                                   # x.5.3 
-        "Invalid command arguments.",                             # x.5.4 
-        "Wrong protocol version.",                                # x.5.5 
+     "Other or undefined network or routing status.",            # x.4.0
+     "No answer from host.",                                     # x.4.1
+     "Bad connection.",                                          # x.4.2
+     "Directory server failure.",                                # x.4.3
+     "Unable to route.",                                         # x.4.4
+     "Mail system congestion.",                                  # x.4.5
+     "Routing loop detected.",                                   # x.4.6
+     "Delivery time expired.",                                   # x.4.7
     ],
     [
-        "Other or undefined media error.",                        # x.6.0
-        "Media not supported.",                                   # x.6.1
-        "Conversion required and prohibited.",                    # x.6.2
-        "Conversion required but not supported.",                 # x.6.3
-        "Conversion with loss performed.",                        # x.6.4
-        "Conversion Failed.",                                     # x.6.5
+     "Other or undefined protocol status.",                      # x.5.0
+     "Invalid command.",                                         # x.5.1
+     "Syntax error.",                                            # x.5.2
+     "Too many recipients.",                                     # x.5.3
+     "Invalid command arguments.",                               # x.5.4
+     "Wrong protocol version.",                                  # x.5.5
     ],
     [
-        "Other or undefined security status.",                    # x.7.0
-        "Delivery not authorized, message refused.",              # x.7.1
-        "Mailing list expansion prohibited.",                     # x.7.2
-        "Security conversion required but not possible.",         # x.7.3
-        "Security features not supported.",                       # x.7.4
-        "Cryptographic failure.",                                 # x.7.5
-        "Cryptographic algorithm not supported.",                 # x.7.6
-        "Message integrity failure.",                             # x.7.7
+     "Other or undefined media error.",                          # x.6.0
+     "Media not supported.",                                     # x.6.1
+     "Conversion required and prohibited.",                      # x.6.2
+     "Conversion required but not supported.",                   # x.6.3
+     "Conversion with loss performed.",                          # x.6.4
+     "Conversion Failed.",                                       # x.6.5
+    ],
+    [
+     "Other or undefined security status.",                      # x.7.0
+     "Delivery not authorized, message refused.",                # x.7.1
+     "Mailing list expansion prohibited.",                       # x.7.2
+     "Security conversion required but not possible.",           # x.7.3
+     "Security features not supported.",                         # x.7.4
+     "Cryptographic failure.",                                   # x.7.5
+     "Cryptographic algorithm not supported.",                   # x.7.6
+     "Message integrity failure.",                               # x.7.7
     ],
 );
 
 sub _status {
     my $return = shift;
-    my $const = Qpsmtpd::Constants::return_code($return);
+    my $const  = Qpsmtpd::Constants::return_code($return);
     if ($const =~ /^DENYSOFT/) {
         return 4;
-    } 
+    }
     elsif ($const =~ /^DENY/) {
         return 5;
     }
     elsif ($const eq 'OK' or $const eq 'DONE') {
         return 2;
     }
-    else { # err .... no :)
-        return 4; # just 2,4,5 are allowed.. temp error by default
+    else {    # err .... no :)
+        return 4;    # just 2,4,5 are allowed.. temp error by default
     }
 }
 
 sub _dsn {
-    my ($self,$return,$reason,$default,$subject,$detail) = @_;
+    my ($self, $return, $reason, $default, $subject, $detail) = @_;
     if (!defined $return) {
         $return = $default;
-    } 
+    }
     elsif ($return !~ /^\d+$/) {
         $reason = $return;
         $return = $default;
@@ -157,7 +157,7 @@ sub _dsn {
     return ($return, "$msg (#$class.$subject.$detail)");
 }
 
-sub unspecified { shift->_dsn(shift,shift,DENYSOFT,0,0); }
+sub unspecified { shift->_dsn(shift, shift, DENYSOFT, 0, 0); }
 
 =head1 ADDRESS STATUS
 
@@ -170,7 +170,7 @@ default: DENYSOFT
 
 =cut
 
-sub addr_unspecified { shift->_dsn(shift,shift,DENYSOFT,1,0); }
+sub addr_unspecified { shift->_dsn(shift, shift, DENYSOFT, 1, 0); }
 
 =item no_such_user, addr_bad_dest_mbox
 
@@ -179,8 +179,8 @@ default: DENY
 
 =cut
 
-sub no_such_user         { shift->_dsn(shift,(shift||"No such user"),DENY,1,1); }
-sub addr_bad_dest_mbox   { shift->_dsn(shift,shift,DENY,1,1); }
+sub no_such_user { shift->_dsn(shift, (shift || "No such user"), DENY, 1, 1); }
+sub addr_bad_dest_mbox { shift->_dsn(shift, shift, DENY, 1, 1); }
 
 =item addr_bad_dest_system 
 
@@ -189,7 +189,7 @@ default: DENY
 
 =cut
 
-sub addr_bad_dest_system      { shift->_dsn(shift,shift,DENY,1,2); }
+sub addr_bad_dest_system { shift->_dsn(shift, shift, DENY, 1, 2); }
 
 =item addr_bad_dest_syntax
 
@@ -198,7 +198,7 @@ default: DENY
 
 =cut
 
-sub addr_bad_dest_syntax      { shift->_dsn(shift,shift,DENY,1,3); }
+sub addr_bad_dest_syntax { shift->_dsn(shift, shift, DENY, 1, 3); }
 
 =item addr_dest_ambigous
 
@@ -207,7 +207,7 @@ default: DENYSOFT
 
 =cut
 
-sub addr_dest_ambigous    { shift->_dsn(shift,shift,DENYSOFT,1,4); }
+sub addr_dest_ambigous { shift->_dsn(shift, shift, DENYSOFT, 1, 4); }
 
 =item addr_rcpt_ok
 
@@ -217,7 +217,7 @@ default: OK
 =cut
 
 # XXX: do we need this? Maybe in all address verifying plugins?
-sub addr_rcpt_ok  { shift->_dsn(shift,shift,OK,1,5); } 
+sub addr_rcpt_ok { shift->_dsn(shift, shift, OK, 1, 5); }
 
 =item addr_mbox_moved 
 
@@ -226,7 +226,7 @@ default: DENY
 
 =cut
 
-sub addr_mbox_moved           { shift->_dsn(shift,shift,DENY,1,6); }
+sub addr_mbox_moved { shift->_dsn(shift, shift, DENY, 1, 6); }
 
 =item addr_bad_from_syntax
 
@@ -235,7 +235,7 @@ default: DENY
 
 =cut 
 
-sub addr_bad_from_syntax      { shift->_dsn(shift,shift,DENY,1,7); }
+sub addr_bad_from_syntax { shift->_dsn(shift, shift, DENY, 1, 7); }
 
 =item addr_bad_from_system
 
@@ -246,7 +246,7 @@ default: DENY
 
 =cut
 
-sub addr_bad_from_system      { shift->_dsn(shift,shift,DENY,1,8); }
+sub addr_bad_from_system { shift->_dsn(shift, shift, DENY, 1, 8); }
 
 =head1 MAILBOX STATUS
 
@@ -259,7 +259,7 @@ default: DENYSOFT
 
 =cut
 
-sub mbox_unspecified  { shift->_dsn(shift,shift,DENYSOFT,2,0); }
+sub mbox_unspecified { shift->_dsn(shift, shift, DENYSOFT, 2, 0); }
 
 =item mbox_disabled
 
@@ -272,7 +272,7 @@ default: DENY ...but RFC says:
 
 =cut 
 
-sub mbox_disabled           { shift->_dsn(shift,shift,DENY,2,1); }
+sub mbox_disabled { shift->_dsn(shift, shift, DENY, 2, 1); }
 
 =item mbox_full
 
@@ -281,7 +281,7 @@ default: DENYSOFT
 
 =cut
 
-sub mbox_full               { shift->_dsn(shift,shift,DENYSOFT,2,2); }
+sub mbox_full { shift->_dsn(shift, shift, DENYSOFT, 2, 2); }
 
 =item mbox_msg_too_long 
 
@@ -290,7 +290,7 @@ default: DENY
 
 =cut
 
-sub mbox_msg_too_long            { shift->_dsn(shift,shift,DENY,2,3); }
+sub mbox_msg_too_long { shift->_dsn(shift, shift, DENY, 2, 3); }
 
 =item mbox_list_expansion_problem   
 
@@ -301,7 +301,7 @@ default: DENYSOFT
 
 =cut
 
-sub mbox_list_expansion_problem  { shift->_dsn(shift,shift,DENYSOFT,2,4); }
+sub mbox_list_expansion_problem { shift->_dsn(shift, shift, DENYSOFT, 2, 4); }
 
 =head1 MAIL SYSTEM STATUS
 
@@ -314,7 +314,7 @@ default: DENYSOFT
 
 =cut
 
-sub sys_unspecified        { shift->_dsn(shift,shift,DENYSOFT,3,0); }
+sub sys_unspecified { shift->_dsn(shift, shift, DENYSOFT, 3, 0); }
 
 =item sys_disk_full
 
@@ -323,7 +323,7 @@ default: DENYSOFT
 
 =cut
 
-sub sys_disk_full            { shift->_dsn(shift,shift,DENYSOFT,3,1); }
+sub sys_disk_full { shift->_dsn(shift, shift, DENYSOFT, 3, 1); }
 
 =item sys_not_accepting_mail
 
@@ -332,7 +332,7 @@ default: DENYSOFT
 
 =cut
 
-sub sys_not_accepting_mail   { shift->_dsn(shift,shift,DENYSOFT,3,2); }
+sub sys_not_accepting_mail { shift->_dsn(shift, shift, DENYSOFT, 3, 2); }
 
 =item sys_not_supported
 
@@ -345,7 +345,7 @@ default: DENYSOFT
 
 =cut
 
-sub sys_not_supported        { shift->_dsn(shift,shift,DENYSOFT,3,3); }
+sub sys_not_supported { shift->_dsn(shift, shift, DENYSOFT, 3, 3); }
 
 =item sys_msg_too_big           
 
@@ -356,7 +356,7 @@ default DENY
 
 =cut
 
-sub sys_msg_too_big          { shift->_dsn(shift,shift,DENY,3,4); }
+sub sys_msg_too_big { shift->_dsn(shift, shift, DENY, 3, 4); }
 
 =head1 NETWORK AND ROUTING STATUS
 
@@ -371,10 +371,10 @@ default: DENYSOFT
 
 =cut 
 
-sub net_unspecified                { shift->_dsn(shift,shift,DENYSOFT,4,0); } 
+sub net_unspecified { shift->_dsn(shift, shift, DENYSOFT, 4, 0); }
 
-# not useful # sub net_no_answer   { shift->_dsn(shift,shift,4,1); } 
-# not useful # sub net_bad_connection { shift->_dsn(shift,shift,4,2); } 
+# not useful # sub net_no_answer   { shift->_dsn(shift,shift,4,1); }
+# not useful # sub net_bad_connection { shift->_dsn(shift,shift,4,2); }
 
 =item net_directory_server_failed, temp_resolver_failed
 
@@ -383,12 +383,11 @@ default: DENYSOFT
 
 =cut
 
-sub temp_resolver_failed { 
-      shift->_dsn(shift,
-                 (shift || "Temporary address resolution failure"),
-                 DENYSOFT,4,3); 
+sub temp_resolver_failed {
+    shift->_dsn(shift, (shift || "Temporary address resolution failure"),
+                DENYSOFT, 4, 3);
 }
-sub net_directory_server_failed  { shift->_dsn(shift,shift,DENYSOFT,4,3); }
+sub net_directory_server_failed { shift->_dsn(shift, shift, DENYSOFT, 4, 3); }
 
 # not useful # sub net_unable_to_route { shift->_dsn(shift,shift,4,4); }
 
@@ -399,7 +398,7 @@ default: DENYSOFT
 
 =cut
 
-sub net_system_congested         { shift->_dsn(shift,shift,DENYSOFT,4,5); }
+sub net_system_congested { shift->_dsn(shift, shift, DENYSOFT, 4, 5); }
 
 =item net_routing_loop, too_many_hops
 
@@ -416,8 +415,11 @@ Why do we want to DENYSOFT something like this?
 
 =cut
 
-sub net_routing_loop   { shift->_dsn(shift,shift,DENY,4,6); }
-sub too_many_hops  { shift->_dsn(shift,(shift || "Too many hops"),DENY,4,6,); }
+sub net_routing_loop { shift->_dsn(shift, shift, DENY, 4, 6); }
+sub too_many_hops {
+    shift->_dsn(shift, (shift || "Too many hops"), DENY, 4, 6,);
+}
+
 # not useful # sub delivery_time_expired    { shift->_dsn(shift,shift,4,7); }
 
 =head1 MAIL DELIVERY PROTOCOL STATUS
@@ -431,7 +433,7 @@ default: DENYSOFT
 
 =cut
 
-sub proto_unspecified     { shift->_dsn(shift,shift,DENYSOFT,5,0); }
+sub proto_unspecified { shift->_dsn(shift, shift, DENYSOFT, 5, 0); }
 
 =item proto_invalid_command
 
@@ -440,7 +442,7 @@ default: DENY
 
 =cut
 
-sub proto_invalid_command        { shift->_dsn(shift,shift,DENY,5,1); }
+sub proto_invalid_command { shift->_dsn(shift, shift, DENY, 5, 1); }
 
 =item proto_syntax_error
 
@@ -449,7 +451,7 @@ default: DENY
 
 =cut
 
-sub proto_syntax_error           { shift->_dsn(shift,shift,DENY,5,2); }
+sub proto_syntax_error { shift->_dsn(shift, shift, DENY, 5, 2); }
 
 =item proto_rcpt_list_too_long, too_many_rcpts
 
@@ -458,8 +460,8 @@ default: DENYSOFT
 
 =cut
 
-sub proto_rcpt_list_too_long { shift->_dsn(shift,shift,DENYSOFT,5,3); }
-sub too_many_rcpts           { shift->_dsn(shift,shift,DENYSOFT,5,3); }
+sub proto_rcpt_list_too_long { shift->_dsn(shift, shift, DENYSOFT, 5, 3); }
+sub too_many_rcpts           { shift->_dsn(shift, shift, DENYSOFT, 5, 3); }
 
 =item proto_invalid_cmd_args 
 
@@ -468,7 +470,7 @@ default: DENY
 
 =cut
 
-sub proto_invalid_cmd_args       { shift->_dsn(shift,shift,DENY,5,4); }
+sub proto_invalid_cmd_args { shift->_dsn(shift, shift, DENY, 5, 4); }
 
 =item proto_wrong_version 
 
@@ -479,7 +481,7 @@ default: DENYSOFT
 
 =cut
 
-sub proto_wrong_version { shift->_dsn(shift,shift,DENYSOFT,5,5); }
+sub proto_wrong_version { shift->_dsn(shift, shift, DENYSOFT, 5, 5); }
 
 =head1 MESSAGE CONTENT OR MESSAGE MEDIA STATUS
 
@@ -492,7 +494,7 @@ default: DENYSOFT
 
 =cut
 
-sub media_unspecified      { shift->_dsn(shift,shift,DENYSOFT,6,0); }
+sub media_unspecified { shift->_dsn(shift, shift, DENYSOFT, 6, 0); }
 
 =item media_unsupported
 
@@ -501,7 +503,7 @@ default: DENY
 
 =cut
 
-sub media_unsupported      { shift->_dsn(shift,shift,DENY,6,1); }
+sub media_unsupported { shift->_dsn(shift, shift, DENY, 6, 1); }
 
 =item media_conv_prohibited
 
@@ -510,7 +512,7 @@ default: DENY
 
 =cut
 
-sub media_conv_prohibited        { shift->_dsn(shift,shift,DENY,6,2); }
+sub media_conv_prohibited { shift->_dsn(shift, shift, DENY, 6, 2); }
 
 =item media_conv_unsupported
 
@@ -519,7 +521,7 @@ default: DENYSOFT
 
 =cut
 
-sub media_conv_unsupported       { shift->_dsn(shift,shift,DENYSOFT,6,3); }
+sub media_conv_unsupported { shift->_dsn(shift, shift, DENYSOFT, 6, 3); }
 
 =item media_conv_lossy
 
@@ -530,7 +532,7 @@ default: DENYSOFT
 
 =cut
 
-sub media_conv_lossy             { shift->_dsn(shift,shift,DENYSOFT,6,4); }
+sub media_conv_lossy { shift->_dsn(shift, shift, DENYSOFT, 6, 4); }
 
 =head1 SECURITY OR POLICY STATUS
 
@@ -543,7 +545,7 @@ default: DENYSOFT
 
 =cut
 
-sub sec_unspecified                { shift->_dsn(shift,shift,DENYSOFT,7,0); }
+sub sec_unspecified { shift->_dsn(shift, shift, DENYSOFT, 7, 0); }
 
 =item sec_sender_unauthorized, bad_sender_ip, relaying_denied 
 
@@ -552,12 +554,14 @@ default: DENY
 
 =cut
 
-sub sec_sender_unauthorized      { shift->_dsn(shift,shift,DENY,7,1); }
-sub bad_sender_ip { 
-    shift->_dsn(shift,(shift || "Bad sender's IP"),DENY,7,1,); 
+sub sec_sender_unauthorized { shift->_dsn(shift, shift, DENY, 7, 1); }
+
+sub bad_sender_ip {
+    shift->_dsn(shift, (shift || "Bad sender's IP"), DENY, 7, 1,);
 }
-sub relaying_denied { 
-    shift->_dsn(shift,(shift || "Relaying denied"),DENY,7,1); 
+
+sub relaying_denied {
+    shift->_dsn(shift, (shift || "Relaying denied"), DENY, 7, 1);
 }
 
 =item sec_list_dest_prohibited
@@ -567,7 +571,7 @@ default: DENY
 
 =cut
 
-sub sec_list_dest_prohibited    { shift->_dsn(shift,shift,DENY,7,2); }
+sub sec_list_dest_prohibited { shift->_dsn(shift, shift, DENY, 7, 2); }
 
 =item sec_conv_failed 
 
@@ -576,7 +580,7 @@ default: DENY
 
 =cut
 
-sub sec_conv_failed              { shift->_dsn(shift,shift,DENY,7,3); }
+sub sec_conv_failed { shift->_dsn(shift, shift, DENY, 7, 3); }
 
 =item sec_feature_unsupported 
 
@@ -585,7 +589,7 @@ default: DENY
 
 =cut
 
-sub sec_feature_unsupported      { shift->_dsn(shift,shift,DENY,7,4); }
+sub sec_feature_unsupported { shift->_dsn(shift, shift, DENY, 7, 4); }
 
 =item sec_crypto_failure
 
@@ -594,7 +598,7 @@ default: DENY
 
 =cut
 
-sub sec_crypto_failure               { shift->_dsn(shift,shift,DENY,7,5); }
+sub sec_crypto_failure { shift->_dsn(shift, shift, DENY, 7, 5); }
 
 =item sec_crypto_algorithm_unsupported
 
@@ -603,7 +607,9 @@ default: DENYSOFT
 
 =cut
 
-sub sec_crypto_algorithm_unsupported { shift->_dsn(shift,shift,DENYSOFT,7,6); }
+sub sec_crypto_algorithm_unsupported {
+    shift->_dsn(shift, shift, DENYSOFT, 7, 6);
+}
 
 =item sec_msg_integrity_failure
 
@@ -614,7 +620,7 @@ default: DENY
 
 =cut
 
-sub sec_msg_integrity_failure         { shift->_dsn(shift,shift,DENY,7,7); }
+sub sec_msg_integrity_failure { shift->_dsn(shift, shift, DENY, 7, 7); }
 
 1;
 
