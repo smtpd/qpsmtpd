@@ -8,10 +8,8 @@ ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
 # fault method
 is(($smtpd->fault)->[0], 451, 'fault returns 451');
 is(($smtpd->fault("test message"))->[1],
-   "Internal error - try again later - test message",
-   'returns the input message'
-  );
-
+    "Internal error - try again later - test message",
+    'returns the input message');
 
 # vrfy command
 is(($smtpd->command('VRFY <foo@bar>'))[0], 252, 'VRFY command');

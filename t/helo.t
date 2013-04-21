@@ -1,4 +1,4 @@
-use Test::More tests => 12; 
+use Test::More tests => 12;
 use strict;
 use lib 't';
 use_ok('Test::Qpsmtpd');

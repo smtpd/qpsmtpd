@@ -7,11 +7,8 @@ my $qp = Test::Qpsmtpd->new();
 
 $qp->run_plugin_tests();
 
-foreach my $file ( 
-        "./t/config/greylist.dbm",
-        "./t/config/greylist.dbm.lock"
-        ) {
-    next if ! -f $file;
+foreach my $file ("./t/config/greylist.dbm", "./t/config/greylist.dbm.lock") {
+    next if !-f $file;
     unlink $file;
-};
+}
 
