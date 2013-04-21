@@ -111,10 +111,10 @@ sub hook_mail {
 
     my $result = $transaction->notes('resolvable_fromhost') or do {
         if ( $self->{_args}{reject} ) {;
-            $self->log(LOGINFO, 'error, missing result' );
+            $self->log(LOGINFO, 'fail, missing result' );
             return Qpsmtpd::DSN->temp_resolver_failed( $self->get_reject_type(), '' );
         };
-        $self->log(LOGINFO, 'error, missing result, reject disabled' );
+        $self->log(LOGINFO, 'fail, missing result, reject disabled' );
         return DECLINED;
     };
 
