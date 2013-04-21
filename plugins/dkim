@@ -353,7 +353,7 @@ sub handle_sig_pass {
     elsif ($prs->{neutral}) {
         $self->add_header($mess);
         $self->log(LOGINFO, "pass, valid signature, neutral policy");
-        $self->log(LOGINFO, $mess);
+        $self->log(LOGDEBUG, $mess);
         return DECLINED;
     }
     elsif ($prs->{reject}) {
@@ -364,7 +364,7 @@ sub handle_sig_pass {
                             "fail, valid sig, reject policy");
     }
 
-    # this should never happen
+    # this should never happen,
     $self->add_header($mess);
     $self->log(LOGERROR, "pass, valid sig, no policy results");
     $self->log(LOGINFO,  $mess);
@@ -449,14 +449,17 @@ sub get_keydir {
 sub save_signatures_to_note {
     my ($self, $dkim) = @_;
 
+    my %domains;
     foreach my $sig ($dkim->signatures) {
         next if $sig->result ne 'pass';
-        my $doms = $self->connection->notes('dkim_pass_domains') || [];
-        next if grep /$sig->domain/, @$doms;  # already in the list
-        push @$doms, $sig->domain;
-        $self->connection->notes('dkim_pass_domains', $doms);
-        $self->log(LOGINFO, "info, added " . $sig->domain);
+        $domains{$sig->domain} = 1;
     }
+    return if 0 == scalar keys %domains;
+
+    my $doms = $self->connection->notes('dkim_pass_domains') || [];
+    push @$doms, keys %domains;
+    $self->log(LOGDEBUG, "info, signed by: ". join(',', keys %domains) );
+    $self->connection->notes('dkim_pass_domains', $doms);
 }
 
 sub send_message_to_dkim {
