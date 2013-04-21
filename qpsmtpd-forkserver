@@ -21,19 +21,19 @@ $| = 1;
 my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
 # Configuration
-my $MAXCONN   = 15;                  # max simultaneous connections
-my @PORT;                            # port number(s)
-my @LOCALADDR;                       # ip address(es) to bind to
-my $MAXCONNIP = 5;                   # max simultaneous connections from one IP
-my $PID_FILE   = '';
-my $DETACH;                          # daemonize on startup
+my $MAXCONN = 15;    # max simultaneous connections
+my @PORT;            # port number(s)
+my @LOCALADDR;       # ip address(es) to bind to
+my $MAXCONNIP = 5;   # max simultaneous connections from one IP
+my $PID_FILE  = '';
+my $DETACH;          # daemonize on startup
 my $NORDNS;
 
-my $USER = (getpwuid $>)[0];         # user to suid to
+my $USER = (getpwuid $>)[0];    # user to suid to
 $USER = "smtpd" if $USER eq "root";
 
 sub usage {
-        print <<"EOT";
+    print <<"EOT";
 usage: qpsmtpd-forkserver [ options ]
  -l, --listen-address addr : listen on specific address(es); can be specified
                              multiple times for multiple bindings. IPv6 
@@ -49,51 +49,58 @@ usage: qpsmtpd-forkserver [ options ]
  -d, --detach              : detach from controlling terminal (daemonize)
  -H, --no-rdns             : don't perform reverse DNS lookups
 EOT
-        exit 0;
+    exit 0;
 }
 
-GetOptions('h|help' => \&usage,
-           'l|listen-address=s' => \@LOCALADDR,
+GetOptions(
+           'h|help'                => \&usage,
+           'l|listen-address=s'    => \@LOCALADDR,
            'c|limit-connections=i' => \$MAXCONN,
-           'm|max-from-ip=i' => \$MAXCONNIP,
-           'p|port=s' => \@PORT,
-           'u|user=s' => \$USER,
-           'pid-file=s' => \$PID_FILE,
-           'd|detach' => \$DETACH,
-	   'H|no-rdns' => \$NORDNS,
-          ) || &usage;
+           'm|max-from-ip=i'       => \$MAXCONNIP,
+           'p|port=s'              => \@PORT,
+           'u|user=s'              => \$USER,
+           'pid-file=s'            => \$PID_FILE,
+           'd|detach'              => \$DETACH,
+           'H|no-rdns'             => \$NORDNS,
+          )
+  || &usage;
 
 # detaint the commandline
 if ($has_ipv6) {
-  @LOCALADDR = ( '[::]' ) if !@LOCALADDR;
+    @LOCALADDR = ('[::]') if !@LOCALADDR;
 }
 else {
-  @LOCALADDR = ( '0.0.0.0' ) if !@LOCALADDR;
+    @LOCALADDR = ('0.0.0.0') if !@LOCALADDR;
 }
-@PORT = ( 2525 ) if !@PORT;
+@PORT = (2525) if !@PORT;
 
 my @LISTENADDR;
-for (0..$#LOCALADDR) {
-  if ($LOCALADDR[$_] =~ /^(\[.*\]|[\d\w\-.]+)(?::(\d+))?$/) {
-    if ( defined $2 ) {
-      push @LISTENADDR, { 'addr' => $1, 'port' => $2 };
-    } else {
-      my $addr = $1;
-      for (0..$#PORT) {
-        if ( $PORT[$_] =~ /^(\d+)$/ ) {
-          push @LISTENADDR, { 'addr' => $addr, 'port' => $1 };
-        } else {
-          &usage;
+for (0 .. $#LOCALADDR) {
+    if ($LOCALADDR[$_] =~ /^(\[.*\]|[\d\w\-.]+)(?::(\d+))?$/) {
+        if (defined $2) {
+            push @LISTENADDR, {'addr' => $1, 'port' => $2};
         }
-      }
+        else {
+            my $addr = $1;
+            for (0 .. $#PORT) {
+                if ($PORT[$_] =~ /^(\d+)$/) {
+                    push @LISTENADDR, {'addr' => $addr, 'port' => $1};
+                }
+                else {
+                    &usage;
+                }
+            }
+        }
     }
-  } else {
-    &usage;
-  }
+    else {
+        &usage;
+    }
 }
 
-if ($USER =~ /^([\w\-]+)$/) { $USER = $1 } else { &usage }
-if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 } else { &usage }
+if ($USER =~ /^([\w\-]+)$/) { $USER = $1 }
+else                        { &usage }
+if ($MAXCONN =~ /^(\d+)$/) { $MAXCONN = $1 }
+else                       { &usage }
 
 delete $ENV{ENV};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
@@ -101,23 +108,23 @@ $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 my %childstatus = ();
 
 sub REAPER {
-  while ( defined(my $chld = waitpid(-1, WNOHANG)) ){
-    last unless $chld > 0;
-    ::log(LOGINFO,"cleaning up after $chld");
-    delete $childstatus{$chld};
-  }
+    while (defined(my $chld = waitpid(-1, WNOHANG))) {
+        last unless $chld > 0;
+        ::log(LOGINFO, "cleaning up after $chld");
+        delete $childstatus{$chld};
+    }
 }
 
 sub HUNTSMAN {
-  $SIG{CHLD} = 'DEFAULT';
-  kill 'INT' => keys %childstatus;
-  if ($PID_FILE && -e $PID_FILE) {
-    unlink $PID_FILE or ::log(LOGERROR, "unlink: $PID_FILE: $!");
-  }
-  exit(0);
+    $SIG{CHLD} = 'DEFAULT';
+    kill 'INT' => keys %childstatus;
+    if ($PID_FILE && -e $PID_FILE) {
+        unlink $PID_FILE or ::log(LOGERROR, "unlink: $PID_FILE: $!");
+    }
+    exit(0);
 }
 
-$SIG{INT} = \&HUNTSMAN;
+$SIG{INT}  = \&HUNTSMAN;
 $SIG{TERM} = \&HUNTSMAN;
 
 my $select = new IO::Select;
@@ -125,89 +132,99 @@ my $server;
 
 # establish SERVER socket(s), bind and listen.
 for my $listen_addr (@LISTENADDR) {
-  my @Socket_opts = (LocalPort => $listen_addr->{'port'},
-                                     LocalAddr => $listen_addr->{'addr'},
-                                     Proto     => 'tcp',
-                                     Reuse     => 1,
-                                     Blocking  => 0,
-                                     Listen    => SOMAXCONN);
-  if ($has_ipv6) {
-    $server = IO::Socket::INET6->new(@Socket_opts)
-      or die "Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
-  }
-  else {
-    $server = IO::Socket::INET->new(@Socket_opts)
-      or die "Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
-  }
-  IO::Handle::blocking($server, 0);
-  $select->add($server);
+    my @Socket_opts = (
+                       LocalPort => $listen_addr->{'port'},
+                       LocalAddr => $listen_addr->{'addr'},
+                       Proto     => 'tcp',
+                       Reuse     => 1,
+                       Blocking  => 0,
+                       Listen    => SOMAXCONN
+                      );
+    if ($has_ipv6) {
+        $server = IO::Socket::INET6->new(@Socket_opts)
+          or die
+"Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
+    }
+    else {
+        $server = IO::Socket::INET->new(@Socket_opts)
+          or die
+"Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
+    }
+    IO::Handle::blocking($server, 0);
+    $select->add($server);
 }
 
 if ($PID_FILE) {
-  if ($PID_FILE =~ m#^(/[\w\d/\-.]+)$#) { $PID_FILE = $1 } else { &usage }
-  if (-e $PID_FILE) {
-    open PID, "+<$PID_FILE"
-      or die "open pid_file: $!\n";
-    my $running_pid = <PID> || ''; chomp $running_pid;
-    if ($running_pid =~ /(\d+)/) {
-      $running_pid = $1;
-      if (kill 0, $running_pid) {
-        die "Found an already running qpsmtpd with pid $running_pid.\n";
-      }
+    if ($PID_FILE =~ m#^(/[\w\d/\-.]+)$#) { $PID_FILE = $1 }
+    else                                  { &usage }
+    if (-e $PID_FILE) {
+        open PID, "+<$PID_FILE"
+          or die "open pid_file: $!\n";
+        my $running_pid = <PID> || '';
+        chomp $running_pid;
+        if ($running_pid =~ /(\d+)/) {
+            $running_pid = $1;
+            if (kill 0, $running_pid) {
+                die "Found an already running qpsmtpd with pid $running_pid.\n";
+            }
+        }
+        seek PID, 0, 0
+          or die "Could not seek back to beginning of $PID_FILE: $!\n";
+        truncate PID, 0
+          or die "Could not truncate $PID_FILE at 0: $!";
     }
-    seek PID, 0, 0
-      or die "Could not seek back to beginning of $PID_FILE: $!\n";
-    truncate PID, 0
-      or die "Could not truncate $PID_FILE at 0: $!";
-  } else {
-    open PID, ">$PID_FILE"
-      or die "open pid_file: $!\n";
-  }
+    else {
+        open PID, ">$PID_FILE"
+          or die "open pid_file: $!\n";
+    }
 }
 
 # Load plugins here
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
 
 # Drop privileges
-my (undef, undef, $quid, $qgid) = getpwnam $USER or
-      die "unable to determine uid/gid for $USER\n";
+my (undef, undef, $quid, $qgid) = getpwnam $USER
+  or die "unable to determine uid/gid for $USER\n";
 my $groups = "$qgid $qgid";
-while (my ($name,$passwd,$gid,$members) = getgrent()) {
+while (my ($name, $passwd, $gid, $members) = getgrent()) {
     my @m = split(/ /, $members);
-    if (grep {$_ eq $USER} @m) {
+    if (grep { $_ eq $USER } @m) {
         $groups .= " $gid";
     }
 }
 endgrent;
 $) = $groups;
-POSIX::setgid($qgid) or
-      die "unable to change gid: $!\n";
-POSIX::setuid($quid) or
-      die "unable to change uid: $!\n";
+POSIX::setgid($qgid)
+  or die "unable to change gid: $!\n";
+POSIX::setuid($quid)
+  or die "unable to change uid: $!\n";
 $> = $quid;
 
 $qpsmtpd->load_plugins;
 
-foreach my $listen_addr ( @LISTENADDR ) {
-    ::log(LOGINFO,"Listening on $listen_addr->{'addr'}:$listen_addr->{'port'}");
+foreach my $listen_addr (@LISTENADDR) {
+    ::log(LOGINFO,
+          "Listening on $listen_addr->{'addr'}:$listen_addr->{'port'}");
 }
-::log(LOGINFO, 'Running as user '.
-        (getpwuid($>) || $>) .
-        ', group '.
-        (getgrgid($)) || $)));
+::log(LOGINFO,
+          'Running as user '
+        . (getpwuid($>) || $>)
+        . ', group '
+        . (getgrgid($)) || $))
+     );
 
 if ($DETACH) {
-  open STDIN, '/dev/null' or die "/dev/null: $!";
-  open STDOUT, '>/dev/null' or die "/dev/null: $!";
-  open STDERR, '>&STDOUT' or die "open(stderr): $!";
-  defined (my $pid = fork) or die "fork: $!";
-  exit 0 if $pid;
-  POSIX::setsid or die "setsid: $!";
+    open STDIN,  '/dev/null'  or die "/dev/null: $!";
+    open STDOUT, '>/dev/null' or die "/dev/null: $!";
+    open STDERR, '>&STDOUT'   or die "open(stderr): $!";
+    defined(my $pid = fork) or die "fork: $!";
+    exit 0 if $pid;
+    POSIX::setsid or die "setsid: $!";
 }
 
 if ($PID_FILE) {
-  print PID $$,"\n";
-  close PID;
+    print PID $$, "\n";
+    close PID;
 }
 
 # Populate class cached variables
@@ -222,137 +239,149 @@ $SIG{HUP} = sub {
 };
 
 while (1) {
-  REAPER();
-  my $running = scalar keys %childstatus;
-  if ($running >= $MAXCONN) {
-    ::log(LOGINFO,"Too many connections: $running >= $MAXCONN.  Waiting one second.");
-    sleep(1);
-    next;
-  }
-  my @ready = $select->can_read(1);
-  next if !@ready;
-  while (my $server = shift @ready) {
-    my ($client, $hisaddr) = $server->accept;
-  
-    if (!$hisaddr) {
-      # possible something condition...
-      next;
+    REAPER();
+    my $running = scalar keys %childstatus;
+    if ($running >= $MAXCONN) {
+        ::log(LOGINFO,
+              "Too many connections: $running >= $MAXCONN.  Waiting one second."
+             );
+        sleep(1);
+        next;
     }
-    IO::Handle::blocking($client, 1);
-    # get local/remote hostname, port and ip address
-    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) = Qpsmtpd::TcpServer::lrpip($server, $client, $hisaddr);
+    my @ready = $select->can_read(1);
+    next if !@ready;
+    while (my $server = shift @ready) {
+        my ($client, $hisaddr) = $server->accept;
 
-    my ($rc, @msg) = $qpsmtpd->run_hooks("pre-connection",
-                                         remote_ip    => $nto_iaddr,
-                                         remote_port  => $port,
-                                         local_ip     => $nto_laddr,
-                                         local_port   => $lport,
-                                         max_conn_ip  => $MAXCONNIP,
-                                         child_addrs  => [values %childstatus],
-                                        );
-    if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
-      unless ($msg[0]) {
-        @msg = ("Sorry, try again later");
-      }
-      &respond_client($client, 451, @msg);
-      close $client;
-      next;
-    } 
-    elsif ($rc == DENY || $rc == DENY_DISCONNECT) {
-      unless ($msg[0]) {
-        @msg = ("Sorry, service not available for you");
-      }
-      &respond_client($client, 550, @msg);
-      close $client;
-      next;
+        if (!$hisaddr) {
+
+            # possible something condition...
+            next;
+        }
+        IO::Handle::blocking($client, 1);
+
+        # get local/remote hostname, port and ip address
+        my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) =
+          Qpsmtpd::TcpServer::lrpip($server, $client, $hisaddr);
+
+        my ($rc, @msg) =
+          $qpsmtpd->run_hooks(
+                              "pre-connection",
+                              remote_ip   => $nto_iaddr,
+                              remote_port => $port,
+                              local_ip    => $nto_laddr,
+                              local_port  => $lport,
+                              max_conn_ip => $MAXCONNIP,
+                              child_addrs => [values %childstatus],
+                             );
+        if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
+            unless ($msg[0]) {
+                @msg = ("Sorry, try again later");
+            }
+            &respond_client($client, 451, @msg);
+            close $client;
+            next;
+        }
+        elsif ($rc == DENY || $rc == DENY_DISCONNECT) {
+            unless ($msg[0]) {
+                @msg = ("Sorry, service not available for you");
+            }
+            &respond_client($client, 550, @msg);
+            close $client;
+            next;
+        }
+
+        my $pid = safe_fork();
+        if ($pid) {
+
+            # parent
+            $childstatus{$pid} = $iaddr;    # add to table
+                 # $childstatus{$pid} = 1;        # add to table
+            $running++;
+            close($client);
+            next;
+        }
+
+        # otherwise child
+
+        close $_ for $select->handles;
+
+        $SIG{$_} = 'DEFAULT' for keys %SIG;
+        $SIG{ALRM} = sub {
+            print $client "421 Connection Timed Out\n";
+            ::log(LOGINFO, "Connection Timed Out");
+            exit;
+        };
+
+        # set enviroment variables
+        ($ENV{TCPLOCALIP}, $ENV{TCPREMOTEIP}, $ENV{TCPREMOTEHOST}) =
+          Qpsmtpd::TcpServer::tcpenv($nto_laddr, $nto_iaddr);
+
+        # don't do this!
+        #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
+
+        ::log(LOGINFO,
+"Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}"
+        );
+
+        # dup to STDIN/STDOUT
+        POSIX::dup2(fileno($client), 0);
+        POSIX::dup2(fileno($client), 1);
+
+        $qpsmtpd->start_connection(
+                                   local_ip    => $ENV{TCPLOCALIP},
+                                   local_port  => $lport,
+                                   remote_ip   => $ENV{TCPREMOTEIP},
+                                   remote_port => $port,
+                                  );
+        $qpsmtpd->run($client);
+
+        $qpsmtpd->run_hooks("post-connection");
+        $qpsmtpd->connection->reset;
+        close $client;
+        exit;    # child leaves
     }
-
-    my $pid = safe_fork();
-    if ($pid) {
-      # parent
-      $childstatus{$pid} = $iaddr;        # add to table
-      # $childstatus{$pid} = 1;        # add to table
-      $running++;
-      close($client);
-      next;
-    }
-    # otherwise child
-
-    close $_ for $select->handles;
-  
-    $SIG{$_} = 'DEFAULT' for keys %SIG;
-    $SIG{ALRM} = sub { 
-       print $client "421 Connection Timed Out\n";
-       ::log(LOGINFO, "Connection Timed Out"); 
-       exit; };
-  
-    # set enviroment variables
-    ($ENV{TCPLOCALIP}, $ENV{TCPREMOTEIP}, $ENV{TCPREMOTEHOST}) = Qpsmtpd::TcpServer::tcpenv($nto_laddr, $nto_iaddr);
-    
-    # don't do this!
-    #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
-  
-    ::log(LOGINFO, "Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}");
-    
-    # dup to STDIN/STDOUT
-    POSIX::dup2(fileno($client), 0);
-    POSIX::dup2(fileno($client), 1);
-    
-    $qpsmtpd->start_connection
-      (
-       local_ip    => $ENV{TCPLOCALIP},
-       local_port  => $lport,
-       remote_ip   => $ENV{TCPREMOTEIP},
-       remote_port => $port,
-      );
-    $qpsmtpd->run($client);
-    
-    $qpsmtpd->run_hooks("post-connection");
-    $qpsmtpd->connection->reset;
-    close $client;
-    exit;                                   # child leaves
-  }
 }
 
 sub log {
-  my ($level,$message) = @_;
-  $qpsmtpd->log($level,$message);
+    my ($level, $message) = @_;
+    $qpsmtpd->log($level, $message);
 }
 
 sub respond_client {
-  my ($client, $code, @message) = @_;
-  $client->autoflush(1);
-  while (my $msg = shift @message) {
-    my $line = $code . (@message?"-":" ").$msg;
-    ::log(LOGDEBUG, $line);
-    print $client "$line\r\n" 
-      or (::log(LOGERROR, "Could not print [$line]: $!"), return 0);
-  }
-  return 1;
+    my ($client, $code, @message) = @_;
+    $client->autoflush(1);
+    while (my $msg = shift @message) {
+        my $line = $code . (@message ? "-" : " ") . $msg;
+        ::log(LOGDEBUG, $line);
+        print $client "$line\r\n"
+          or (::log(LOGERROR, "Could not print [$line]: $!"), return 0);
+    }
+    return 1;
 }
 
 ### routine to protect process during fork
 sub safe_fork {
-  
-  ### block signal for fork
-  my $sigset = POSIX::SigSet->new(SIGINT);
-  POSIX::sigprocmask(SIG_BLOCK, $sigset)
-    or die "Can't block SIGINT for fork: [$!]\n";
-  
-  ### fork off a child
-  my $pid = fork;
-  unless( defined $pid ){
-    die "Couldn't fork: [$!]\n";
-  }
 
-  ### make SIGINT kill us as it did before
-  $SIG{INT} = 'DEFAULT';
+    ### block signal for fork
+    my $sigset = POSIX::SigSet->new(SIGINT);
+    POSIX::sigprocmask(SIG_BLOCK, $sigset)
+      or die "Can't block SIGINT for fork: [$!]\n";
 
-  ### put back to normal
-  POSIX::sigprocmask(SIG_UNBLOCK, $sigset)
-    or die "Can't unblock SIGINT for fork: [$!]\n";
+    ### fork off a child
+    my $pid = fork;
+    unless (defined $pid) {
+        die "Couldn't fork: [$!]\n";
+    }
 
-  return $pid;
+    ### make SIGINT kill us as it did before
+    $SIG{INT} = 'DEFAULT';
+
+    ### put back to normal
+    POSIX::sigprocmask(SIG_UNBLOCK, $sigset)
+      or die "Can't unblock SIGINT for fork: [$!]\n";
+
+    return $pid;
 }
 
 __END__
