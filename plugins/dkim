@@ -418,7 +418,8 @@ sub get_keydir {
             shift @labels;                   # remove the first label (ie: www)
             my $zone = join '.', @labels;    # reassemble the labels
             if (-e "config/dkim/$zone") {    # if the directory exists
-                $dir = "config/dkim/$zone";    # use the parent domain's key
+                $domain = $zone;             # the DKIM signing domain
+                $dir = "config/dkim/$zone";  # use the parent domain's key
                 $self->log(LOGINFO, "info, using $zone key for $domain");
             }
         }
@@ -451,6 +452,7 @@ sub save_signatures_to_note {
     foreach my $sig ($dkim->signatures) {
         next if $sig->result ne 'pass';
         my $doms = $self->connection->notes('dkim_pass_domains') || [];
+        next if grep /$sig->domain/, @$doms;  # already in the list
         push @$doms, $sig->domain;
         $self->connection->notes('dkim_pass_domains', $doms);
         $self->log(LOGINFO, "info, added " . $sig->domain);
@@ -515,7 +517,7 @@ sub get_selector {
     my $selector = <$SFH>;
     chomp $selector;
     close $SFH;
-    $self->log(LOGINFO, "info, selector: $selector");
+    $self->log(LOGDEBUG, "info, selector: $selector");
     return $selector;
 }
 
