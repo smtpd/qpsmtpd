@@ -102,8 +102,6 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-#use Socket qw(:DEFAULT :crlf);
-
 sub init {
     my ($self, $qp) = (shift, shift);
     $self->{_args} = { @_ };
