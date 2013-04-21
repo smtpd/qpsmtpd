@@ -40,23 +40,22 @@ Deny with a soft error code.
 
 =cut
 
-
 sub register {
     my ($self, $qp) = (shift, shift);
 
-    if ( @_ % 2 ) {
+    if (@_ % 2) {
         $self->{_args}{action} = shift;
     }
     else {
-        $self->{_args} = { @_ };
-    };
+        $self->{_args} = {@_};
+    }
 
-    if ( ! defined $self->{_args}{reject} ) {
-        $self->{_args}{reject} = 0;     # legacy default
-    };
+    if (!defined $self->{_args}{reject}) {
+        $self->{_args}{reject} = 0;    # legacy default
+    }
 
     # we only need to check for deferral, default is DENY
-    if ( $self->{_args}{action} && $self->{_args}{action} =~ /soft/i ) {
+    if ($self->{_args}{action} && $self->{_args}{action} =~ /soft/i) {
         $self->{_args}{reject_type} = 'temp';
     }
 }
@@ -68,10 +67,10 @@ sub hook_data_post {
     # Find the sender, quit processing if this isn't a bounce.
     #
     my $sender = $transaction->sender->address || undef;
-    if ( $sender && $sender ne '<>') {
+    if ($sender && $sender ne '<>') {
         $self->log(LOGINFO, "pass, not a null sender");
         return DECLINED;
-    };
+    }
 
     #  at this point we know it is a bounce, via the null-envelope.
     #
@@ -80,16 +79,19 @@ sub hook_data_post {
     my @to = $transaction->recipients || ();
     if (scalar @to != 1) {
         $self->log(LOGINFO, "fail, bogus bounce to: " . join(',', @to));
-        return $self->get_reject( "fail, this bounce message does not have 1 recipient" );
-    };
+        return $self->get_reject(
+                         "fail, this bounce message does not have 1 recipient");
+    }
 
     # validate that Return-Path is empty, RFC 3834
 
     my $rp = $transaction->header->get('Return-Path');
-    if ( $rp && $rp ne '<>' ) {
-        $self->log(LOGINFO, "fail, bounce messages must not have a Return-Path");
-        return $self->get_reject( "a bounce return path must be empty (RFC 3834)" );
-    };
+    if ($rp && $rp ne '<>') {
+        $self->log(LOGINFO,
+                   "fail, bounce messages must not have a Return-Path");
+        return $self->get_reject(
+                               "a bounce return path must be empty (RFC 3834)");
+    }
 
     $self->log(LOGINFO, "pass, single recipient, empty Return-Path");
     return DECLINED;

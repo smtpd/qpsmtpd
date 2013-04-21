@@ -172,8 +172,8 @@ use Socket qw(:DEFAULT :crlf);
 
 sub init {
     my ($self, $qp) = (shift, shift);
-    $self->{_args} = { @_ };
-    $self->{_args}{reject} = 1 if ! defined $self->{_args}{reject};
+    $self->{_args} = {@_};
+    $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
 }
 
@@ -181,52 +181,55 @@ sub register {
     my $self = shift;
 
     #  Mail::DKIM::TextWrap - nice idea, clients get mangled headers though
-    foreach my $mod ( qw/ Mail::DKIM::Verifier Mail::DKIM::Signer / ) {
+    foreach my $mod (qw/ Mail::DKIM::Verifier Mail::DKIM::Signer /) {
         eval "use $mod";
-        if ( $@ ) {
+        if ($@) {
             warn "error, plugin disabled, could not load $mod\n";
-            $self->log(LOGERROR, "skip, plugin disabled, is Mail::DKIM installed?");
+            $self->log(LOGERROR,
+                       "skip, plugin disabled, is Mail::DKIM installed?");
             return;
-        };
-    };
+        }
+    }
 
     $self->register_hook('data_post', 'data_post_handler');
-};
+}
 
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    if ( $self->qp->connection->relay_client() ) {
+    if ($self->qp->connection->relay_client()) {
+
         # this is an authenticated user sending a message.
-        return $self->sign_it( $transaction );
-    };
+        return $self->sign_it($transaction);
+    }
 
     return DECLINED if $self->is_immune();
 
-    return $self->validate_it( $transaction );
-};
+    return $self->validate_it($transaction);
+}
 
 sub validate_it {
     my ($self, $transaction) = @_;
 
     # Incoming message, perform DKIM validation
     my $dkim = Mail::DKIM::Verifier->new() or do {
-        $self->log(LOGERROR, "error, could not instantiate a new Mail::DKIM::Verifier");
+        $self->log(LOGERROR,
+                   "error, could not instantiate a new Mail::DKIM::Verifier");
         return DECLINED;
     };
 
-    $self->send_message_to_dkim( $dkim, $transaction );
+    $self->send_message_to_dkim($dkim, $transaction);
     my $result = $dkim->result;
-    my $mess   = $self->get_details( $dkim );
+    my $mess   = $self->get_details($dkim);
 
-    foreach my $t ( qw/ pass fail invalid temperror none / ) {
+    foreach my $t (qw/ pass fail invalid temperror none /) {
         next if $t ne $result;
         my $handler = 'handle_sig_' . $t;
         $self->log(LOGDEBUG, "dispatching $result to $handler");
-        return $self->$handler( $dkim, $mess );
-    };
+        return $self->$handler($dkim, $mess);
+    }
 
-    $self->log( LOGERROR, "error, unknown result: $result, $mess" );
+    $self->log(LOGERROR, "error, unknown result: $result, $mess");
     return DECLINED;
 }
 
@@ -237,277 +240,276 @@ sub sign_it {
     my $selector = $self->get_selector($keydir);
 
     my $dkim = Mail::DKIM::Signer->new(
-            Algorithm => "rsa-sha256",
-            Method    => "relaxed",
-            Domain    => $domain,
-            Selector  => $selector,
-            KeyFile   => "$keydir/private",
-            );
+                                       Algorithm => "rsa-sha256",
+                                       Method    => "relaxed",
+                                       Domain    => $domain,
+                                       Selector  => $selector,
+                                       KeyFile   => "$keydir/private",
+                                      );
 
-    $self->send_message_to_dkim( $dkim, $transaction );
+    $self->send_message_to_dkim($dkim, $transaction);
 
-    my $signature = $dkim->signature;  # what is the signature result?
-    $self->qp->transaction->header->add(
-        'DKIM-Signature', $signature->as_string, 0 );
+    my $signature = $dkim->signature;    # what is the signature result?
+    $self->qp->transaction->header->add('DKIM-Signature',
+                                        $signature->as_string, 0);
 
-    $self->log(LOGINFO, "pass, we signed the message" );
+    $self->log(LOGINFO, "pass, we signed the message");
     return DECLINED;
-};
+}
 
 sub get_details {
-    my ($self, $dkim ) = @_;
+    my ($self, $dkim) = @_;
 
     my @data;
     my $string;
-    push @data, "domain: "   . $dkim->signature->domain   if $dkim->signature;
+    push @data, "domain: " . $dkim->signature->domain     if $dkim->signature;
     push @data, "selector: " . $dkim->signature->selector if $dkim->signature;
-    push @data, "result: "   . $dkim->result_detail       if $dkim->result_detail;
+    push @data, "result: " . $dkim->result_detail if $dkim->result_detail;
 
-    foreach my $policy ( $dkim->policies ) {
-        next if ! $policy;
+    foreach my $policy ($dkim->policies) {
+        next if !$policy;
         push @data, "policy: " . $policy->as_string;
-        push @data, "name: "   . $policy->name;
-        push @data, "policy_location: " . $policy->location if $policy->location;
+        push @data, "name: " . $policy->name;
+        push @data, "policy_location: " . $policy->location
+          if $policy->location;
 
         my $policy_result;
         $policy_result = $policy->apply($dkim);
         $policy_result or next;
         push @data, "policy_result: " . $policy_result if $policy_result;
-    };
+    }
 
     return join(', ', @data);
-};
+}
 
 sub handle_sig_fail {
-    my ( $self, $dkim, $mess ) = @_;
+    my ($self, $dkim, $mess) = @_;
 
-    $self->adjust_karma( -1 );
-    return $self->get_reject( "DKIM signature invalid: " . $dkim->result_detail, $mess );
-};
+    $self->adjust_karma(-1);
+    return
+      $self->get_reject("DKIM signature invalid: " . $dkim->result_detail,
+                        $mess);
+}
 
 sub handle_sig_temperror {
-    my ( $self, $dkim, $mess ) = @_;
+    my ($self, $dkim, $mess) = @_;
 
-    $self->log(LOGINFO, "error, $mess" );
-    return ( DENYSOFT, "Please try again later - $dkim->result_detail" );
-};
+    $self->log(LOGINFO, "error, $mess");
+    return (DENYSOFT, "Please try again later - $dkim->result_detail");
+}
 
 sub handle_sig_invalid {
-    my ( $self, $dkim, $mess ) = @_;
+    my ($self, $dkim, $mess) = @_;
 
-    my ( $prs, $policies) = $self->get_policy_results( $dkim );
+    my ($prs, $policies) = $self->get_policy_results($dkim);
 
-    foreach my $policy ( @$policies ) {
-        if ( $policy->signall && ! $policy->is_implied_default_policy ) {
-            $self->log(LOGINFO, $mess );
-            return $self->get_reject(
-                "invalid DKIM signature with sign-all policy",
-                "invalid signature, sign-all policy"
-            );
+    foreach my $policy (@$policies) {
+        if ($policy->signall && !$policy->is_implied_default_policy) {
+            $self->log(LOGINFO, $mess);
+            return
+              $self->get_reject("invalid DKIM signature with sign-all policy",
+                                "invalid signature, sign-all policy");
         }
-    };
+    }
 
-    $self->adjust_karma( -1 );
-    $self->log(LOGINFO, $mess );
+    $self->adjust_karma(-1);
+    $self->log(LOGINFO, $mess);
 
-    if ( $prs->{accept} ) {
-        $self->add_header( $mess );
-        $self->log( LOGERROR, "error, invalid signature but accept policy!?" );
+    if ($prs->{accept}) {
+        $self->add_header($mess);
+        $self->log(LOGERROR, "error, invalid signature but accept policy!?");
         return DECLINED;
     }
-    elsif ( $prs->{neutral} ) {
-        $self->add_header( $mess );
-        $self->log( LOGERROR, "error, invalid signature but neutral policy?!" );
+    elsif ($prs->{neutral}) {
+        $self->add_header($mess);
+        $self->log(LOGERROR, "error, invalid signature but neutral policy?!");
         return DECLINED;
     }
-    elsif ( $prs->{reject} ) {
-        return $self->get_reject(
-                "invalid DKIM signature: " . $dkim->result_detail,
-                "fail, invalid signature, reject policy"
-            );
+    elsif ($prs->{reject}) {
+        return
+          $self->get_reject("invalid DKIM signature: " . $dkim->result_detail,
+                            "fail, invalid signature, reject policy");
     }
 
     # this should never happen
-    $self->log( LOGINFO, "error, invalid signature, unhandled" );
-    $self->add_header( $mess );
+    $self->log(LOGINFO, "error, invalid signature, unhandled");
+    $self->add_header($mess);
     return DECLINED;
-};
+}
 
 sub handle_sig_pass {
-    my ( $self, $dkim, $mess ) = @_;
+    my ($self, $dkim, $mess) = @_;
 
-    $self->save_signatures_to_note( $dkim );
+    $self->save_signatures_to_note($dkim);
 
-    my ($prs) = $self->get_policy_results( $dkim );
+    my ($prs) = $self->get_policy_results($dkim);
 
-    if ( $prs->{accept} ) {
-        $self->add_header( $mess );
+    if ($prs->{accept}) {
+        $self->add_header($mess);
         $self->log(LOGINFO, "pass, valid signature, accept policy");
-        $self->adjust_karma( 1 );
+        $self->adjust_karma(1);
         return DECLINED;
     }
-    elsif ( $prs->{neutral} ) {
-        $self->add_header( $mess );
+    elsif ($prs->{neutral}) {
+        $self->add_header($mess);
         $self->log(LOGINFO, "pass, valid signature, neutral policy");
-        $self->log(LOGINFO, $mess );
+        $self->log(LOGINFO, $mess);
         return DECLINED;
     }
-    elsif ( $prs->{reject} ) {
-        $self->log(LOGINFO, $mess );
-        $self->adjust_karma( -1 );
-        return $self->get_reject(
-                "DKIM signature valid but fails policy, $mess",
-                "fail, valid sig, reject policy"
-            );
-    };
+    elsif ($prs->{reject}) {
+        $self->log(LOGINFO, $mess);
+        $self->adjust_karma(-1);
+        return
+          $self->get_reject("DKIM signature valid but fails policy, $mess",
+                            "fail, valid sig, reject policy");
+    }
 
     # this should never happen
-    $self->add_header( $mess );
-    $self->log(LOGERROR, "pass, valid sig, no policy results" );
-    $self->log(LOGINFO, $mess );
+    $self->add_header($mess);
+    $self->log(LOGERROR, "pass, valid sig, no policy results");
+    $self->log(LOGINFO,  $mess);
     return DECLINED;
-};
+}
 
 sub handle_sig_none {
-    my ( $self, $dkim, $mess ) = @_;
+    my ($self, $dkim, $mess) = @_;
 
-    my ( $prs, $policies) = $self->get_policy_results( $dkim );
+    my ($prs, $policies) = $self->get_policy_results($dkim);
 
-    foreach my $policy ( @$policies ) {
-        if ( $policy->signall && ! $policy->is_implied_default_policy ) {
-            $self->log(LOGINFO, $mess );
-            return $self->get_reject(
-                "no DKIM signature with sign-all policy",
-                "no signature, sign-all policy"
-            );
+    foreach my $policy (@$policies) {
+        if ($policy->signall && !$policy->is_implied_default_policy) {
+            $self->log(LOGINFO, $mess);
+            return
+              $self->get_reject("no DKIM signature with sign-all policy",
+                                "no signature, sign-all policy");
         }
-    };
+    }
 
-    if ( $prs->{accept} ) {
-        $self->log( LOGINFO, "pass, no signature, accept policy" );
+    if ($prs->{accept}) {
+        $self->log(LOGINFO, "pass, no signature, accept policy");
         return DECLINED;
     }
-    elsif ( $prs->{neutral} ) {
-        $self->log( LOGINFO, "pass, no signature, neutral policy" );
+    elsif ($prs->{neutral}) {
+        $self->log(LOGINFO, "pass, no signature, neutral policy");
         return DECLINED;
     }
-    elsif ( $prs->{reject} ) {
-        $self->log(LOGINFO, $mess );
+    elsif ($prs->{reject}) {
+        $self->log(LOGINFO, $mess);
         $self->get_reject(
-            "no DKIM signature, policy says reject: " . $dkim->result_detail,
-            "no signature, reject policy"
-        );
-    };
+               "no DKIM signature, policy says reject: " . $dkim->result_detail,
+               "no signature, reject policy");
+    }
 
     # should never happen
-    $self->log( LOGINFO, "error, no signature, no policy" );
-    $self->log(LOGINFO, $mess );
+    $self->log(LOGINFO, "error, no signature, no policy");
+    $self->log(LOGINFO, $mess);
     return DECLINED;
-};
+}
 
 sub get_keydir {
     my ($self, $transaction) = @_;
 
     my $domain = $transaction->sender->host;
-    my $dir = "config/dkim/$domain";
+    my $dir    = "config/dkim/$domain";
 
-    if ( ! -e $dir ) {                      # the dkim key dir doesn't exist
-        my @labels = split /\./, $domain;   # split the domain into labels
-        while ( @labels > 1 ) {
-            shift @labels;                  # remove the first label (ie: www)
-            my $zone = join '.', @labels;   # reassemble the labels
-            if ( -e "config/dkim/$zone" ) { # if the directory exists
-                $dir = "config/dkim/$zone"; # use the parent domain's key
+    if (!-e $dir) {    # the dkim key dir doesn't exist
+        my @labels = split /\./, $domain;    # split the domain into labels
+        while (@labels > 1) {
+            shift @labels;                   # remove the first label (ie: www)
+            my $zone = join '.', @labels;    # reassemble the labels
+            if (-e "config/dkim/$zone") {    # if the directory exists
+                $dir = "config/dkim/$zone";    # use the parent domain's key
                 $self->log(LOGINFO, "info, using $zone key for $domain");
-            };
-        };
-    };
+            }
+        }
+    }
 
-    if ( -l $dir ) {
+    if (-l $dir) {
         $dir = readlink($dir);
-        $dir = "config/dkim/$dir" if $dir !~ /\//;  # no /, relative path
+        $dir = "config/dkim/$dir" if $dir !~ /\//;    # no /, relative path
         ($domain) = (split /\//, $dir)[-1];
-    };
+    }
 
-    if ( ! -d $dir ) {
+    if (!-d $dir) {
         $self->log(LOGINFO, "skip, DKIM not configured for $domain");
         return;
-    };
-    if ( ! -r $dir ) {
+    }
+    if (!-r $dir) {
         $self->log(LOGINFO, "error, unable to read key from $dir");
         return;
-    };
-    if ( ! -r "$dir/private" ) {
+    }
+    if (!-r "$dir/private") {
         $self->log(LOGINFO, "error, unable to read dkim key from $dir/private");
         return;
-    };
+    }
     return ($domain, $dir);
-};
+}
 
 sub save_signatures_to_note {
-    my ( $self, $dkim ) = @_;
+    my ($self, $dkim) = @_;
 
-    foreach my $sig ( $dkim->signatures ) {
+    foreach my $sig ($dkim->signatures) {
         next if $sig->result ne 'pass';
         my $doms = $self->connection->notes('dkim_pass_domains') || [];
         push @$doms, $sig->domain;
         $self->connection->notes('dkim_pass_domains', $doms);
-        $self->log(LOGINFO, "info, added " . $sig->domain );
-    };
-};
+        $self->log(LOGINFO, "info, added " . $sig->domain);
+    }
+}
 
 sub send_message_to_dkim {
     my ($self, $dkim, $transaction) = @_;
 
-    foreach ( split ( /\n/s, $transaction->header->as_string ) ) {
+    foreach (split(/\n/s, $transaction->header->as_string)) {
         $_ =~ s/\r?$//s;
-        eval { $dkim->PRINT ( $_ . CRLF ); };
-        $self->log(LOGERROR, $@ ) if $@;
+        eval { $dkim->PRINT($_ . CRLF); };
+        $self->log(LOGERROR, $@) if $@;
     }
 
     $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) {
         chomp $line;
         $line =~ s/\015$//;
-        eval { $dkim->PRINT($line . CRLF ); };
-        $self->log(LOGERROR, $@ ) if $@;
-    };
+        eval { $dkim->PRINT($line . CRLF); };
+        $self->log(LOGERROR, $@) if $@;
+    }
 
     $dkim->CLOSE;
-};
+}
 
 sub get_policies {
     my ($self, $dkim) = @_;
 
     my @policies;
     eval { @policies = $dkim->policies };
-    $self->log(LOGERROR, $@ ) if $@;
+    $self->log(LOGERROR, $@) if $@;
     return @policies;
-};
+}
 
 sub get_policy_results {
-    my ( $self, $dkim ) = @_;
+    my ($self, $dkim) = @_;
 
     my %prs;
-    my @policies = $self->get_policies( $dkim );
+    my @policies = $self->get_policies($dkim);
 
-    foreach my $policy ( @policies ) {
+    foreach my $policy (@policies) {
         my $policy_result;
         eval { $policy_result = $policy->apply($dkim); }; # accept, reject, neutral
-        if ( $@ ) {
-            $self->log(LOGERROR, $@ );
-        };
+        if ($@) {
+            $self->log(LOGERROR, $@);
+        }
         $prs{$policy_result}++ if $policy_result;
-    };
+    }
 
     return \%prs, \@policies;
-};
+}
 
 sub get_selector {
     my ($self, $keydir) = @_;
 
     open my $SFH, '<', "$keydir/selector" or do {
-        $self->log(LOGINFO, "error, unable to read selector from $keydir/selector");
+        $self->log(LOGINFO,
+                   "error, unable to read selector from $keydir/selector");
         return DECLINED;
     };
     my $selector = <$SFH>;
@@ -515,13 +517,13 @@ sub get_selector {
     close $SFH;
     $self->log(LOGINFO, "info, selector: $selector");
     return $selector;
-};
+}
 
 sub add_header {
     my $self = shift;
     my $header = shift or return;
 
-# consider adding Authentication-Results header, (RFC 5451)
-    $self->qp->transaction->header->add( 'X-DKIM-Authentication', $header, 0 );
+    # consider adding Authentication-Results header, (RFC 5451)
+    $self->qp->transaction->header->add('X-DKIM-Authentication', $header, 0);
 }
 

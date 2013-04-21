@@ -1,4 +1,5 @@
 #!perl -w
+
 =head1 NAME
 
 exim-bsmtp
@@ -69,8 +70,10 @@ sub register {
     $self->{_exim_path} = $args{exim_path} || '/usr/sbin/rsmtp';
     $self->{_exim_path} = $1 if $self->{_exim_path} =~ /(.*)/;
     unless (-x $self->{_exim_path}) {
-        $self->log(LOGERROR, "Could not find exim at $self->{_exim_path};".
-                             " please set exim_path in config/plugins");
+        $self->log(LOGERROR,
+                       "Could not find exim at $self->{_exim_path};"
+                     . " please set exim_path in config/plugins"
+                  );
         return undef;
     }
 }
@@ -91,14 +94,14 @@ sub hook_queue {
     }
 
     print $tmp "HELO ", hostname(), "\n",
-               "MAIL FROM:<", ($transaction->sender->address || ''), ">\n";
+      "MAIL FROM:<", ($transaction->sender->address || ''), ">\n";
     print $tmp "RCPT TO:<", ($_->address || ''), ">\n"
       for $transaction->recipients;
     print $tmp "DATA\n", $transaction->header->as_string;
     $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) {
-      $line =~ s/^\./../;
-      print $tmp $line;
+        $line =~ s/^\./../;
+        print $tmp $line;
     }
     print $tmp ".\nQUIT\n";
     close $tmp;
@@ -111,6 +114,7 @@ sub hook_queue {
         unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
         return (DECLINED, "Internal error enqueuing mail");
     }
+
     # Normally exim produces no output in BSMTP mode; anything that
     # does come out is an error worth logging.
     my $start = time;
@@ -122,20 +126,23 @@ sub hook_queue {
             ($bsmtp_error, $bsmtp_msg) = ($1, $2);
         }
     }
-    $self->log(LOGDEBUG, "BSMTP finished (".(time - $start)." sec)");
+    $self->log(LOGDEBUG, "BSMTP finished (" . (time - $start) . " sec)");
     $exim->close;
     my $exit = $?;
     unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
 
     $self->log(LOGDEBUG, "Exitcode from exim: $exit");
     if ($bsmtp_error && $bsmtp_error >= 400 && $bsmtp_error < 600) {
-        $self->log(LOGERROR, "BSMTP enqueue failed; response $bsmtp_error".
-                             " ($bsmtp_msg)");
+        $self->log(LOGERROR,
+               "BSMTP enqueue failed; response $bsmtp_error" . " ($bsmtp_msg)");
         return ($bsmtp_error < 400 ? DECLINED : DENY, $bsmtp_msg);
     }
     elsif (($exit >> 8) != 0 || $bsmtp_error) {
-        $self->log(LOGERROR, 'BSMTP enqueue failed; exitcode '.($exit >> 8).
-                             " from $self->{_exim_path} -bS");
+        $self->log(LOGERROR,
+                       'BSMTP enqueue failed; exitcode '
+                     . ($exit >> 8)
+                     . " from $self->{_exim_path} -bS"
+                  );
         return (DECLINED, 'Internal error enqueuing mail');
     }
 

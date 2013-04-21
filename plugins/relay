@@ -105,14 +105,14 @@ use Qpsmtpd::Constants;
 use Net::IP qw(:PROC);
 
 sub register {
-    my ($self, $qp) = ( shift, shift );
+    my ($self, $qp) = (shift, shift);
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
-    $self->{_args} = { @_ };
+    $self->{_args} = {@_};
 
-    if ( $self->{_args}{only} ) {
+    if ($self->{_args}{only}) {
         $self->register_hook('rcpt', 'relay_only');
-    };
-};
+    }
+}
 
 sub is_in_norelayclients {
     my $self = shift;
@@ -121,30 +121,30 @@ sub is_in_norelayclients {
 
     my $ip = $self->qp->connection->remote_ip;
 
-    while ( $ip ) {
-        if ( exists $no_relay_clients{$ip} ) {
+    while ($ip) {
+        if (exists $no_relay_clients{$ip}) {
             $self->log(LOGINFO, "$ip in norelayclients");
             return 1;
         }
-        $ip =~ s/(\d|\w)+(:|\.)?$// or last; # strip off another octet
-    };
+        $ip =~ s/(\d|\w)+(:|\.)?$// or last;    # strip off another octet
+    }
 
     $self->log(LOGDEBUG, "no match in norelayclients");
     return;
-};
+}
 
 sub populate_relayclients {
     my $self = shift;
 
-    foreach ( $self->qp->config('relayclients') ) {
+    foreach ($self->qp->config('relayclients')) {
         my ($network, $netmask) = ip_splitprefix($_);
-        if ( $netmask ) {
-            push @{ $self->{_cidr_blocks} }, $_;
+        if ($netmask) {
+            push @{$self->{_cidr_blocks}}, $_;
             next;
         }
-        $self->{_octets}{$_} = 1;   # no prefix, split
+        $self->{_octets}{$_} = 1;    # no prefix, split
     }
-};
+}
 
 sub is_in_cidr_block {
     my $self = shift;
@@ -154,20 +154,20 @@ sub is_in_cidr_block {
         return;
     };
     my $cversion = ip_get_version($ip);
-    for ( @{ $self->{_cidr_blocks} } ) {
-        my ($network, $mask) = ip_splitprefix($_); # split IP & CIDR range
-        my $rversion = ip_get_version($network);   # get IP version (4 vs 6)
-        my ($begin, $end) = ip_normalize($_, $rversion); # get pool start/end
+    for (@{$self->{_cidr_blocks}}) {
+        my ($network, $mask) = ip_splitprefix($_);    # split IP & CIDR range
+        my $rversion = ip_get_version($network);      # get IP version (4 vs 6)
+        my ($begin, $end) = ip_normalize($_, $rversion);    # get pool start/end
 
-# expand the client address (zero pad it) before converting to binary
+        # expand the client address (zero pad it) before converting to binary
         my $bin_ip = ip_iptobin(ip_expand_address($ip, $cversion), $cversion)
-            or next;
+          or next;
 
-        next if ! $begin || ! $end;  # probably not a netmask entry
+        next if !$begin || !$end;    # probably not a netmask entry
 
-        if (    ip_bincomp($bin_ip, 'gt', ip_iptobin($begin, $rversion))
-             && ip_bincomp($bin_ip, 'lt', ip_iptobin($end,   $rversion))
-           ) {
+        if (   ip_bincomp($bin_ip, 'gt', ip_iptobin($begin, $rversion))
+            && ip_bincomp($bin_ip, 'lt', ip_iptobin($end, $rversion)))
+        {
             $self->log(LOGINFO, "pass, cidr match ($ip)");
             return 1;
         }
@@ -175,75 +175,75 @@ sub is_in_cidr_block {
 
     $self->log(LOGDEBUG, "no cidr match");
     return;
-};
+}
 
 sub is_octet_match {
     my $self = shift;
 
     my $ip = $self->qp->connection->remote_ip;
 
-    if ( $ip eq '::1' ) {
+    if ($ip eq '::1') {
         $self->log(LOGINFO, "pass, octet matched localhost ($ip)");
         return 1;
-    };
+    }
 
     my $more_relay_clients = $self->qp->config('morerelayclients', 'map');
 
     my $ipv6 = $ip =~ /:/ ? 1 : 0;
 
-    if ( $ipv6 && $ip =~ /::/ ) {  # IPv6 compressed notation
-        $ip = Net::IP::ip_expand_address($ip,6);
-    };
+    if ($ipv6 && $ip =~ /::/) {    # IPv6 compressed notation
+        $ip = Net::IP::ip_expand_address($ip, 6);
+    }
 
     while ($ip) {
-        if ( exists $self->{_octets}{$ip} ) {
+        if (exists $self->{_octets}{$ip}) {
             $self->log(LOGINFO, "pass, octet match in relayclients ($ip)");
             return 1;
-        };
+        }
 
-        if ( exists $more_relay_clients->{$ip} ) {
+        if (exists $more_relay_clients->{$ip}) {
             $self->log(LOGINFO, "pass, octet match in morerelayclients ($ip)");
             return 1;
-        };
+        }
 
         # added IPv6 support (Michael Holzt - 2012-11-14)
-        if ( $ipv6 ) {
-            $ip =~ s/[0-9a-f]:?$//;       # strip off another nibble
+        if ($ipv6) {
+            $ip =~ s/[0-9a-f]:?$//;    # strip off another nibble
             chop $ip if ':' eq substr($ip, -1, 1);
         }
         else {
-            $ip =~ s/\d+\.?$// or last;   # strip off another 8 bits
+            $ip =~ s/\d+\.?$// or last;    # strip off another 8 bits
         }
     }
 
-    $self->log(LOGDEBUG, "no octet match" );
+    $self->log(LOGDEBUG, "no octet match");
     return;
 }
 
 sub hook_connect {
     my ($self, $transaction) = @_;
 
-    if ( $self->is_in_norelayclients() ) {
+    if ($self->is_in_norelayclients()) {
         $self->qp->connection->relay_client(0);
         delete $ENV{RELAYCLIENT};
         $self->log(LOGINFO, "fail, disabled by norelayclients");
         return (DECLINED);
     }
 
-    if ( $ENV{RELAYCLIENT} ) {
+    if ($ENV{RELAYCLIENT}) {
         $self->qp->connection->relay_client(1);
         $self->log(LOGINFO, "pass, enabled by env");
         return (DECLINED);
-    };
+    }
 
     $self->populate_relayclients();
 
-# 95586 (connect) relay: pass, octet match in relayclients (127.0.0.)
+    # 95586 (connect) relay: pass, octet match in relayclients (127.0.0.)
 
-    if ( $self->is_in_cidr_block() || $self->is_octet_match() ) {
+    if ($self->is_in_cidr_block() || $self->is_octet_match()) {
         $self->qp->connection->relay_client(1);
         return (DECLINED);
-    };
+    }
 
     $self->log(LOGINFO, "skip, no match");
     return (DECLINED);
@@ -251,9 +251,9 @@ sub hook_connect {
 
 sub relay_only {
     my $self = shift;
-    if ( $self->qp->connection->relay_client ) {
+    if ($self->qp->connection->relay_client) {
         return (OK);
-    };
+    }
     return (DENY);
 }
 

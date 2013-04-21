@@ -136,7 +136,7 @@ sub authldap {
     unless ($ldbase) {
         $self->log(LOGERROR, "skip: please configure ldap_base");
         return (DECLINED, "authldap - temporary auth error");
-    };
+    }
     $ldwait  = $self->{"ldconf"}->{'ldap_timeout'};
     $ldmattr = $self->{"ldconf"}->{'ldap_auth_filter_attr'};
 
@@ -149,20 +149,23 @@ sub authldap {
     };
 
     # find the user's DN
-    $mesg = $ldh->search(   base      => $ldbase,
-                            scope     => 'sub',
-                            filter    => "$ldmattr=$pw_name",
-                            attrs     => ['uid'],
-                            timeout   => $ldwait,
-                            sizelimit => '1'
-                        ) or do {
+    $mesg = $ldh->search(
+                         base      => $ldbase,
+                         scope     => 'sub',
+                         filter    => "$ldmattr=$pw_name",
+                         attrs     => ['uid'],
+                         timeout   => $ldwait,
+                         sizelimit => '1'
+                        )
+      or do {
         $self->log(LOGALERT, "skip: err in search for user");
         return (DECLINED, "authldap - temporary auth error");
-    };
+      };
 
     # deal with errors if they exist
     if ($mesg->code) {
-        $self->log(LOGALERT, "skip: err " . $mesg->code . " in search for user");
+        $self->log(LOGALERT,
+                   "skip: err " . $mesg->code . " in search for user");
         return (DECLINED, "authldap - temporary auth error");
     }
 
@@ -170,10 +173,10 @@ sub authldap {
     $ldh->unbind if $ldh;
 
     # bind against directory as user with password supplied
-    if ( ! $mesg->count || $lduserdn = $mesg->entry->dn ) {
+    if (!$mesg->count || $lduserdn = $mesg->entry->dn) {
         $self->log(LOGALERT, "fail: user not found");
         return (DECLINED, "authldap - wrong username or password");
-    };
+    }
 
     $ldh = Net::LDAP->new($ldhost, port => $ldport, timeout => $ldwait) or do {
         $self->log(LOGALERT, "skip: err in user conn");

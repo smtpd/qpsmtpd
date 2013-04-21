@@ -54,123 +54,139 @@ B<to_virusadmin> option.
 
 use File::Temp qw(tempfile);
 use Mail::Address;
- 
+
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  if (@args % 2) {
-    $self->log(LOGWARN, "kavscanner: Wrong number of arguments");
-    $self->{_kavscanner_bin} = "/opt/AVP/kavscanner";
-  } else {
-    my %args = @args;
-    foreach my $key (keys %args) {
-      my $arg = $key;
-      $key =~ s/^/_/;
-      $self->{$key} = $args{$arg};
+    if (@args % 2) {
+        $self->log(LOGWARN, "kavscanner: Wrong number of arguments");
+        $self->{_kavscanner_bin} = "/opt/AVP/kavscanner";
     }
-    # Untaint scanner location
-    if (exists $self->{_kavscanner_bin} && 
-        $self->{_kavscanner_bin} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
-      $self->{_kavscanner_bin} = $1;
-    } else {
-      $self->log(LOGALERT, "FATAL ERROR: Unexpected characters in kavscanner argument");
-      exit 3;
+    else {
+        my %args = @args;
+        foreach my $key (keys %args) {
+            my $arg = $key;
+            $key =~ s/^/_/;
+            $self->{$key} = $args{$arg};
+        }
+
+        # Untaint scanner location
+        if (exists $self->{_kavscanner_bin}
+            && $self->{_kavscanner_bin} =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/)
+        {
+            $self->{_kavscanner_bin} = $1;
+        }
+        else {
+            $self->log(LOGALERT,
+                   "FATAL ERROR: Unexpected characters in kavscanner argument");
+            exit 3;
+        }
     }
-  } 
 }
- 
+
 sub hook_data_post {
-  my ($self, $transaction) = @_;
- 
-  my ($temp_fh, $filename) = tempfile();
-  print $temp_fh $transaction->header->as_string;
-  print $temp_fh "\n";
-  $transaction->body_resetpos;
-  while (my $line = $transaction->body_getline) {
-    print $temp_fh $line;
-  }
-  seek($temp_fh, 0, 0);
- 
-  # Now do the actual scanning!
-  my $cmd = $self->{_kavscanner_bin}." -Y -P -B -MP -MD -* $filename 2>&1";
-  $self->log(LOGNOTICE, "Running: $cmd");
-  my @output = `$cmd`;
-  chomp(@output);
- 
-  my $result = ($? >> 8);
-  my $signal = ($? & 127);
- 
-  unlink($filename);
-  close $temp_fh;
+    my ($self, $transaction) = @_;
 
-  if ($signal) {
-    $self->log(LOGWARN, "kavscanner exited with signal: $signal");
-    return (DECLINED);
-  }
-
-  my $description = 'clean';
-  my @infected    = ();
-  my @suspicious  = ();
-  if ($result > 0) {
-    if ($result =~ /^(2|3|4|8)$/) {
-      foreach (@output) {
-        if (/^.* infected: (.*)$/) {
-          # This covers the specific
-          push @infected, $1;
-        } elsif (/^\s*.* suspicion: (.*)$/) {
-          # This covers the potential viruses
-          push @suspicious, $1;
-        }
-      }
-      $description = "infected by: ".join(", ",@infected)."; "
-                    ."suspicions: ".join(", ", @suspicious);
-      # else we may get a veeeery long X-Virus-Details: line or log entry
-      $description = substr($description,0,60); 
-      $self->log(LOGWARN, "There be a virus! ($description)");
-      ### Untested by now, need volunteers ;-)
-      #if ($self->qp->config("kav_deny")) {
-      #  foreach my $d (keys %{$self->qp->config("kav_deny", "map")}) {
-      #    foreach my $v (@infected) {
-      #      return(DENY, "Virus found: $description")
-      #        if ($v =~ /^$d$/i); 
-      #    }
-      #    foreach my $s (@suspicious) {
-      #      return(DENY, "Virus found: $description")
-      #        if ($s =~ /^$d$/i); 
-      #    }
-      #  }
-      #}
-      $transaction->header->add('X-Virus-Found', 'Yes');
-      $transaction->header->add('X-Virus-Details', $description);
-      ### maybe the spamassassin plugin can skip this mail if a virus
-      ### was found (and $transaction->notes('virus_flag') exists :))
-      ### ...ok, works with our spamassassin plugin version 
-      ###   -- hah
-      $transaction->notes('virus', $description);
-      $transaction->notes('virus_flag', 'Yes');
-
-      #### requires modification of Qpsmtpd/Transaction.pm:
-      # if ($self->{_to_virusadmin}) {
-      #   my @addrs = ();
-      #   foreach (@{$transaction->recipients}) {
-      #     push @addr, $_->address;
-      #   }
-      #   $transaction->header->add('X-Virus-Orig-RcptTo', join(", ", @addrs));
-      #   $transaction->set_recipients(@{ Mail::Address->parse($self->{_to_virusadmin}) });
-      # } elsif ($self->{_bcc_virusadmin}) {
-      if ($self->{_bcc_virusadmin}) {
-        foreach ( @{ Mail::Address->parse($self->{_bcc_virusadmin}) } ) {
-          $transaction->add_recipient($_);
-        }
-      }
-    } else {
-      $self->log(LOGEMERG, "corrupt or unknown Kaspersky scanner/resource problems - exit status $result");
+    my ($temp_fh, $filename) = tempfile();
+    print $temp_fh $transaction->header->as_string;
+    print $temp_fh "\n";
+    $transaction->body_resetpos;
+    while (my $line = $transaction->body_getline) {
+        print $temp_fh $line;
     }
-  }
-  
-  $self->log(LOGINFO, "kavscanner results: $description");
- 
-  $transaction->header->add('X-Virus-Checked', 'Checked by '.$self->qp->config("me"));
-  return (DECLINED);
-} 
+    seek($temp_fh, 0, 0);
+
+    # Now do the actual scanning!
+    my $cmd = $self->{_kavscanner_bin} . " -Y -P -B -MP -MD -* $filename 2>&1";
+    $self->log(LOGNOTICE, "Running: $cmd");
+    my @output = `$cmd`;
+    chomp(@output);
+
+    my $result = ($? >> 8);
+    my $signal = ($? & 127);
+
+    unlink($filename);
+    close $temp_fh;
+
+    if ($signal) {
+        $self->log(LOGWARN, "kavscanner exited with signal: $signal");
+        return (DECLINED);
+    }
+
+    my $description = 'clean';
+    my @infected    = ();
+    my @suspicious  = ();
+    if ($result > 0) {
+        if ($result =~ /^(2|3|4|8)$/) {
+            foreach (@output) {
+                if (/^.* infected: (.*)$/) {
+
+                    # This covers the specific
+                    push @infected, $1;
+                }
+                elsif (/^\s*.* suspicion: (.*)$/) {
+
+                    # This covers the potential viruses
+                    push @suspicious, $1;
+                }
+            }
+            $description =
+                "infected by: "
+              . join(", ", @infected) . "; "
+              . "suspicions: "
+              . join(", ", @suspicious);
+
+            # else we may get a veeeery long X-Virus-Details: line or log entry
+            $description = substr($description, 0, 60);
+            $self->log(LOGWARN, "There be a virus! ($description)");
+            ### Untested by now, need volunteers ;-)
+            #if ($self->qp->config("kav_deny")) {
+            #  foreach my $d (keys %{$self->qp->config("kav_deny", "map")}) {
+            #    foreach my $v (@infected) {
+            #      return(DENY, "Virus found: $description")
+            #        if ($v =~ /^$d$/i);
+            #    }
+            #    foreach my $s (@suspicious) {
+            #      return(DENY, "Virus found: $description")
+            #        if ($s =~ /^$d$/i);
+            #    }
+            #  }
+            #}
+            $transaction->header->add('X-Virus-Found',   'Yes');
+            $transaction->header->add('X-Virus-Details', $description);
+            ### maybe the spamassassin plugin can skip this mail if a virus
+            ### was found (and $transaction->notes('virus_flag') exists :))
+            ### ...ok, works with our spamassassin plugin version
+            ###   -- hah
+            $transaction->notes('virus',      $description);
+            $transaction->notes('virus_flag', 'Yes');
+
+            #### requires modification of Qpsmtpd/Transaction.pm:
+# if ($self->{_to_virusadmin}) {
+#   my @addrs = ();
+#   foreach (@{$transaction->recipients}) {
+#     push @addr, $_->address;
+#   }
+#   $transaction->header->add('X-Virus-Orig-RcptTo', join(", ", @addrs));
+#   $transaction->set_recipients(@{ Mail::Address->parse($self->{_to_virusadmin}) });
+# } elsif ($self->{_bcc_virusadmin}) {
+            if ($self->{_bcc_virusadmin}) {
+                foreach (@{Mail::Address->parse($self->{_bcc_virusadmin})}) {
+                    $transaction->add_recipient($_);
+                }
+            }
+        }
+        else {
+            $self->log(LOGEMERG,
+"corrupt or unknown Kaspersky scanner/resource problems - exit status $result"
+            );
+        }
+    }
+
+    $self->log(LOGINFO, "kavscanner results: $description");
+
+    $transaction->header->add('X-Virus-Checked',
+                              'Checked by ' . $self->qp->config("me"));
+    return (DECLINED);
+}
 

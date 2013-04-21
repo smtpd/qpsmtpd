@@ -68,19 +68,19 @@ use Qpsmtpd::Constants;
 sub register {
     my ($self, $qp, %args) = @_;
     eval 'use Mail::SPF';
-    if ( $@ ) {
+    if ($@) {
         warn "skip: plugin disabled, is Mail::SPF installed?\n";
         $self->log(LOGERROR, "skip: plugin disabled, is Mail::SPF installed?");
         return;
-    };
-    $self->{_args} = { %args };
-    if ( $self->{_args}{spf_deny} ) {
+    }
+    $self->{_args} = {%args};
+    if ($self->{_args}{spf_deny}) {
         $self->{_args}{reject} = 3 if $self->{_args}{spf_deny} == 1;
         $self->{_args}{reject} = 4 if $self->{_args}{spf_deny} == 2;
-    };
-    if ( ! $self->{_args}{reject} && $self->qp->config('spfbehavior') ) {
+    }
+    if (!$self->{_args}{reject} && $self->qp->config('spfbehavior')) {
         $self->{_args}{reject} = $self->qp->config('spfbehavior');
-    };
+    }
     $self->register_hook('mail',      'mail_handler');
     $self->register_hook('data_post', 'data_post_handler');
 }
@@ -91,28 +91,29 @@ sub mail_handler {
     return (DECLINED) if $self->is_immune();
 
     my $format = $sender->format;
-    if ( $format eq '<>' || ! $sender->host || ! $sender->user ) {
-        $self->log( LOGINFO, "skip, null sender" );
+    if ($format eq '<>' || !$sender->host || !$sender->user) {
+        $self->log(LOGINFO, "skip, null sender");
         return (DECLINED, "SPF - null sender");
-    };
+    }
 
-    if ( $self->qp->connection->relay_client ) {
-        $self->log( LOGINFO, "skip, relay_client" );
+    if ($self->qp->connection->relay_client) {
+        $self->log(LOGINFO, "skip, relay_client");
         return (DECLINED, "SPF - relaying permitted");
-    };
+    }
 
-    if ( ! $self->{_args}{reject} ) {
-        $self->log( LOGINFO, "skip, reject disabled" );
+    if (!$self->{_args}{reject}) {
+        $self->log(LOGINFO, "skip, reject disabled");
         return (DECLINED);
-    };
+    }
 
-    my $client_ip  = $self->qp->connection->remote_ip;
-    my $from       = $sender->user . '@' . lc($sender->host);
-    my $helo       = $self->qp->connection->hello_host;
-    my $scope      = $from ? 'mfrom' : 'helo';
-    my %req_params = ( versions   => [1, 2],        # optional
-                       scope      => $scope,
-                       ip_address => $client_ip,
+    my $client_ip = $self->qp->connection->remote_ip;
+    my $from      = $sender->user . '@' . lc($sender->host);
+    my $helo      = $self->qp->connection->hello_host;
+    my $scope     = $from ? 'mfrom' : 'helo';
+    my %req_params = (
+        versions => [1, 2],    # optional
+        scope => $scope,
+        ip_address => $client_ip,
                      );
 
     if ($scope =~ /^mfrom|pra$/) {
@@ -127,7 +128,7 @@ sub mail_handler {
     my $spf_server = Mail::SPF::Server->new();
     my $request    = Mail::SPF::Request->new(%req_params);
     my $result     = $spf_server->process($request) or do {
-        $self->log( LOGINFO, "fail, no result" );
+        $self->log(LOGINFO, "fail, no result");
         return DECLINED;
     };
 
@@ -137,49 +138,49 @@ sub mail_handler {
     my $why    = $result->local_explanation;
     my $reject = $self->{_args}{reject};
 
-    if ( ! $code ) {
-        $self->log( LOGINFO, "fail, no response" );
+    if (!$code) {
+        $self->log(LOGINFO, "fail, no response");
         return (DENYSOFT, "SPF - no response") if $reject >= 2;
         return (DECLINED, "SPF - no response");
-    };
+    }
 
-    if ( ! $reject ) {
-        $self->log( LOGINFO, "fail, no reject policy ($code: $why)" );
-        return (DECLINED, "SPF - $code: $why")
-    };
+    if (!$reject) {
+        $self->log(LOGINFO, "fail, no reject policy ($code: $why)");
+        return (DECLINED, "SPF - $code: $why");
+    }
 
-# SPF result codes: pass fail softfail neutral none error permerror temperror
+   # SPF result codes: pass fail softfail neutral none error permerror temperror
     return $self->handle_code_none($reject, $why) if $code eq 'none';
-    if ( $code eq 'fail' ) {
-        $self->adjust_karma( -1 );
+    if ($code eq 'fail') {
+        $self->adjust_karma(-1);
         return $self->handle_code_fail($reject, $why);
     }
-    elsif ( $code eq 'softfail' ) {
-        $self->adjust_karma( -1 );
+    elsif ($code eq 'softfail') {
+        $self->adjust_karma(-1);
         return $self->handle_code_softfail($reject, $why);
     }
-    elsif ( $code eq 'pass' ) {
-        $self->adjust_karma( 1 );
+    elsif ($code eq 'pass') {
+        $self->adjust_karma(1);
         $transaction->notes('spf_pass_host', lc $sender->host);
-        $self->log(LOGINFO, "pass, $code: $why" );
+        $self->log(LOGINFO, "pass, $code: $why");
         return (DECLINED);
     }
-    elsif ( $code eq 'neutral' ) {
-        $self->log(LOGINFO, "fail, $code, $why" );
+    elsif ($code eq 'neutral') {
+        $self->log(LOGINFO, "fail, $code, $why");
         return (DENY, "SPF - $code: $why") if $reject >= 5;
     }
-    elsif ( $code eq 'error' ) {
-        $self->log(LOGINFO, "fail, $code, $why" );
-        return (DENY, "SPF - $code: $why") if $reject >= 6;
+    elsif ($code eq 'error') {
+        $self->log(LOGINFO, "fail, $code, $why");
+        return (DENY,     "SPF - $code: $why") if $reject >= 6;
         return (DENYSOFT, "SPF - $code: $why") if $reject > 3;
     }
-    elsif ( $code eq 'permerror' ) {
-        $self->log(LOGINFO, "fail, $code, $why" );
-        return (DENY, "SPF - $code: $why") if $reject >= 6;
+    elsif ($code eq 'permerror') {
+        $self->log(LOGINFO, "fail, $code, $why");
+        return (DENY,     "SPF - $code: $why") if $reject >= 6;
         return (DENYSOFT, "SPF - $code: $why") if $reject > 3;
     }
-    elsif ( $code eq 'temperror' ) {
-        $self->log(LOGINFO, "fail, $code, $why" );
+    elsif ($code eq 'temperror') {
+        $self->log(LOGINFO, "fail, $code, $why");
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
     }
 
@@ -188,60 +189,61 @@ sub mail_handler {
 }
 
 sub handle_code_none {
-    my ($self, $reject, $why ) = @_;
+    my ($self, $reject, $why) = @_;
 
-    if ( $reject >= 6 ) {
-        $self->log(LOGINFO, "fail, none, $why" );
+    if ($reject >= 6) {
+        $self->log(LOGINFO, "fail, none, $why");
         return (DENY, "SPF - none: $why");
-    };
+    }
 
-    $self->log(LOGINFO, "pass, none, $why" );
+    $self->log(LOGINFO, "pass, none, $why");
     return DECLINED;
-};
+}
 
 sub handle_code_fail {
-    my ($self, $reject, $why ) = @_;
+    my ($self, $reject, $why) = @_;
 
-    if ( $reject >= 2 ) {
-        $self->log(LOGINFO, "fail, $why" );
+    if ($reject >= 2) {
+        $self->log(LOGINFO, "fail, $why");
         return (DENY, "SPF - forgery: $why") if $reject >= 3;
-        return (DENYSOFT, "SPF - fail: $why")
-    };
+        return (DENYSOFT, "SPF - fail: $why");
+    }
 
-    $self->log(LOGINFO, "pass, fail tolerated, $why" );
+    $self->log(LOGINFO, "pass, fail tolerated, $why");
     return DECLINED;
-};
+}
 
 sub handle_code_softfail {
-    my ($self, $reject, $why ) = @_;
+    my ($self, $reject, $why) = @_;
 
-    if ( $reject >= 3 ) {
-        $self->log(LOGINFO, "fail, soft, $why" );
-        return (DENY, "SPF - fail: $why") if $reject >= 4;
+    if ($reject >= 3) {
+        $self->log(LOGINFO, "fail, soft, $why");
+        return (DENY,     "SPF - fail: $why") if $reject >= 4;
         return (DENYSOFT, "SPF - fail: $why") if $reject >= 3;
-    };
+    }
 
-    $self->log(LOGINFO, "pass, softfail tolerated, $why" );
+    $self->log(LOGINFO, "pass, softfail tolerated, $why");
     return DECLINED;
-};
+}
 
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
     my $result = $transaction->notes('spfquery') or return DECLINED;
 
-# if we skipped processing in mail_handler, we should skip here too
+    # if we skipped processing in mail_handler, we should skip here too
     return (DECLINED) if $self->is_immune();
 
     $self->log(LOGDEBUG, "result was $result->code");
 
-    if ( ! $transaction->header ) {
+    if (!$transaction->header) {
         $self->log(LOGERROR, "missing headers!");
         return DECLINED;
-    };
+    }
 
     $transaction->header->add('Received-SPF', $result->received_spf_header, 0);
-# consider also adding SPF status to Authentication-Results header
+
+    # consider also adding SPF status to Authentication-Results header
 
     return DECLINED;
 }
@@ -249,20 +251,20 @@ sub data_post_handler {
 sub is_special_recipient {
     my ($self, $rcpt) = @_;
 
-    if ( ! $rcpt ) {
+    if (!$rcpt) {
         $self->log(LOGINFO, "skip: missing recipient");
         return 1;
-    };
-    if ( ! $rcpt->user ) {
+    }
+    if (!$rcpt->user) {
         $self->log(LOGINFO, "skip: missing user");
         return 1;
-    };
+    }
 
     # special addresses don't get SPF-tested.
-    if ( $rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i ) {
-        $self->log(LOGINFO, "skip: special user (".$rcpt->user.")");
+    if ($rcpt->user =~ /^(?:postmaster|abuse|mailer-daemon|root)$/i) {
+        $self->log(LOGINFO, "skip: special user (" . $rcpt->user . ")");
         return 1;
-    };
+    }
 
     return;
-};
+}

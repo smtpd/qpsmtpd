@@ -1,5 +1,5 @@
 #!perl -w
- 
+
 =head1 NAME
 
 dont_require_anglebrackets 
@@ -22,19 +22,19 @@ MAIL FROM:user@example.com
 =cut
 
 sub hook_mail_pre {
-    my ($self,$transaction, $addr) = @_;
+    my ($self, $transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {
         $self->log(LOGINFO, "added MAIL angle brackets");
-        $addr = '<'.$addr.'>';
+        $addr = '<' . $addr . '>';
     }
     return (OK, $addr);
 }
 
 sub hook_rcpt_pre {
-    my ($self,$transaction, $addr) = @_;
+    my ($self, $transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {
         $self->log(LOGINFO, "added RCPT angle brackets");
-        $addr = '<'.$addr.'>';
+        $addr = '<' . $addr . '>';
     }
     return (OK, $addr);
 }

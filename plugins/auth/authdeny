@@ -13,11 +13,11 @@ the Qpsmtpd::Auth module.  Don't run this in production!!!
 =cut
 
 sub hook_auth {
-    my ( $self, $transaction, $method, $user, $passClear, $passHash, $ticket ) =
+    my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
       @_;
 
-    $self->log( LOGWARN, "fail: cannot authenticate" );
+    $self->log(LOGWARN, "fail: cannot authenticate");
 
-    return ( DECLINED, "$user is not free to abuse my relay" );
+    return (DECLINED, "$user is not free to abuse my relay");
 }
 

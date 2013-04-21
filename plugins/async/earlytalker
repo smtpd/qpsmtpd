@@ -62,73 +62,80 @@ Note that defer-reject has no meaning if check-at is I<data>.
 my $MSG = 'Connecting host started transmitting before SMTP greeting';
 
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  if (@args % 2) {
-	$self->log(LOGERROR, "Unrecognized/mismatched arguments");
-	return undef;
-  }
-  $self->{_args} = {
-  	'wait' => 1,
-	'action' => 'denysoft',
-	'defer-reject' => 0,
-	'check-at' => 'connect',
-	@args,
-  };
-  print STDERR "Check at: ", $self->{_args}{'check-at'}, "\n";
-  $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_poll');
-  $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_post');
-  if ($self->{_args}{'check-at'} eq 'connect') {
-    $self->register_hook('mail', 'hook_mail')
-      if $self->{_args}->{'defer-reject'};
-  }
-  1;
+    if (@args % 2) {
+        $self->log(LOGERROR, "Unrecognized/mismatched arguments");
+        return undef;
+    }
+    $self->{_args} = {
+                      'wait'         => 1,
+                      'action'       => 'denysoft',
+                      'defer-reject' => 0,
+                      'check-at'     => 'connect',
+                      @args,
+                     };
+    print STDERR "Check at: ", $self->{_args}{'check-at'}, "\n";
+    $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_poll');
+    $self->register_hook($self->{_args}->{'check-at'}, 'check_talker_post');
+    if ($self->{_args}{'check-at'} eq 'connect') {
+        $self->register_hook('mail', 'hook_mail')
+          if $self->{_args}->{'defer-reject'};
+    }
+    1;
 }
 
 sub check_talker_poll {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  my $qp = $self->qp;
-  my $conn = $qp->connection;
-  my $check_until = time + $self->{_args}{'wait'};
-  $qp->AddTimer(1, sub { read_now($qp, $conn, $check_until, $self->{_args}{'check-at'}) });
-  return YIELD;
+    my $qp          = $self->qp;
+    my $conn        = $qp->connection;
+    my $check_until = time + $self->{_args}{'wait'};
+    $qp->AddTimer(
+        1,
+        sub {
+            read_now($qp, $conn, $check_until, $self->{_args}{'check-at'});
+        }
+    );
+    return YIELD;
 }
 
 sub read_now {
-  my ($qp, $conn, $until, $phase) = @_;
+    my ($qp, $conn, $until, $phase) = @_;
 
-  if ($qp->has_data) {
-    $qp->log(LOGNOTICE, 'remote host started talking after $phase before we responded');
-    $qp->clear_data if $phase eq 'data';
-    $conn->notes('earlytalker', 1);
-    $qp->run_continuation;
-  }
-  elsif (time >= $until) {
-    # no early talking
-    $qp->run_continuation;
-  }
-  else {
-    $qp->AddTimer(1, sub { read_now($qp, $conn, $until, $phase) });
-  }
+    if ($qp->has_data) {
+        $qp->log(LOGNOTICE,
+                'remote host started talking after $phase before we responded');
+        $qp->clear_data if $phase eq 'data';
+        $conn->notes('earlytalker', 1);
+        $qp->run_continuation;
+    }
+    elsif (time >= $until) {
+
+        # no early talking
+        $qp->run_continuation;
+    }
+    else {
+        $qp->AddTimer(1, sub { read_now($qp, $conn, $until, $phase) });
+    }
 }
 
 sub check_talker_post {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  return DECLINED unless $self->connection->notes('earlytalker');
-  return DECLINED if $self->{'defer-reject'};
-  return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
-  return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
-  return DECLINED; # assume action eq 'log'
+    return DECLINED unless $self->connection->notes('earlytalker');
+    return DECLINED if $self->{'defer-reject'};
+    return (DENY,     $MSG) if $self->{_args}->{'action'} eq 'deny';
+    return (DENYSOFT, $MSG) if $self->{_args}->{'action'} eq 'denysoft';
+    return DECLINED;    # assume action eq 'log'
 }
 
 sub hook_mail {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  return DECLINED unless $self->connection->notes('earlytalker');
-  return (DENY,$MSG) if $self->{_args}->{'action'} eq 'deny';
-  return (DENYSOFT,$MSG) if $self->{_args}->{'action'} eq 'denysoft';
-  return DECLINED;
+    return DECLINED unless $self->connection->notes('earlytalker');
+    return (DENY,     $MSG) if $self->{_args}->{'action'} eq 'deny';
+    return (DENYSOFT, $MSG) if $self->{_args}->{'action'} eq 'denysoft';
+    return DECLINED;
 }
 

@@ -57,7 +57,7 @@ use Qpsmtpd::Constants;
 use Socket;
 
 sub hook_pre_connection {
-    my ($self,$transaction,%args) = @_;
+    my ($self, $transaction, %args) = @_;
 
     # remote_ip    => inet_ntoa($iaddr),
     # remote_port  => $port,
@@ -70,62 +70,62 @@ sub hook_pre_connection {
     my $max    = $args{max_conn_ip};
     my $karma  = $self->connection->notes('karma_history');
 
-    if ( $max ) {
-        my $num_conn = 1; # seed with current value
+    if ($max) {
+        my $num_conn = 1;                    # seed with current value
         my $raddr    = inet_aton($remote);
         foreach my $rip (@{$args{child_addrs}}) {
             ++$num_conn if (defined $rip && $rip eq $raddr);
         }
-        $max = $self->karma_bump( $karma, $max ) if defined $karma;
-        if ($num_conn > $max ) {
+        $max = $self->karma_bump($karma, $max) if defined $karma;
+        if ($num_conn > $max) {
             my $err_mess = "too many connections from $remote";
             $self->log(LOGINFO, "fail: $err_mess ($num_conn > $max)");
             return (DENYSOFT, "$err_mess, try again later");
         }
     }
 
-    my @r = $self->in_hosts_allow( $remote );
+    my @r = $self->in_hosts_allow($remote);
     return @r if scalar @r;
 
-    $self->log(LOGDEBUG, "pass" );
+    $self->log(LOGDEBUG, "pass");
     return (DECLINED);
 }
 
 sub in_hosts_allow {
-    my $self = shift;
+    my $self   = shift;
     my $remote = shift;
 
-    foreach ( $self->qp->config('hosts_allow') ) {
+    foreach ($self->qp->config('hosts_allow')) {
         s/^\s*//;    # trim leading whitespace
         my ($ipmask, $const, $message) = split /\s+/, $_, 3;
         next unless defined $const;
 
-        my ($net,$mask) = split /\//, $ipmask, 2;
-        $mask = 32 if ! defined $mask;
-        $mask = pack "B32", "1"x($mask)."0"x(32-$mask);
+        my ($net, $mask) = split /\//, $ipmask, 2;
+        $mask = 32 if !defined $mask;
+        $mask = pack "B32", "1" x ($mask) . "0" x (32 - $mask);
         if (join('.', unpack('C4', inet_aton($remote) & $mask)) eq $net) {
             $const = Qpsmtpd::Constants::return_code($const) || DECLINED;
-            if ( $const =~ /deny/i ) {
-                $self->log( LOGINFO, "fail, $message" );
-            };
-            $self->log( LOGDEBUG, "pass, $const, $message" );
-            return($const, $message);
+            if ($const =~ /deny/i) {
+                $self->log(LOGINFO, "fail, $message");
+            }
+            $self->log(LOGDEBUG, "pass, $const, $message");
+            return ($const, $message);
         }
     }
 
     return;
-};
+}
 
 sub karma_bump {
     my ($self, $karma, $max) = @_;
 
-    if ( $karma  > 5 ) {
+    if ($karma > 5) {
         $self->log(LOGDEBUG, "connect limit +3 for positive karma");
         return $max + 3;
-    };
-    if ( $karma <= 0 ) {
+    }
+    if ($karma <= 0) {
         $self->log(LOGINFO, "connect limit 1, karma $karma");
         return 1;
-    };
+    }
     return $max;
-};
+}

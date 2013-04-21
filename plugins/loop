@@ -29,28 +29,30 @@ Released to the public domain, 17 June 2005.
 use Qpsmtpd::DSN;
 
 sub init {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  $self->{_max_hops} = $args[0] || 100;
+    $self->{_max_hops} = $args[0] || 100;
 
-  if ( $self->{_max_hops} !~ /^\d+$/ ) {
-    $self->log(LOGWARN, "Invalid max_hops value -- using default");
-    $self->{_max_hops} = 100;
-  }
-  $self->log(LOGWARN, "Ignoring additional arguments") if @args > 1;
+    if ($self->{_max_hops} !~ /^\d+$/) {
+        $self->log(LOGWARN, "Invalid max_hops value -- using default");
+        $self->{_max_hops} = 100;
+    }
+    $self->log(LOGWARN, "Ignoring additional arguments") if @args > 1;
 }
 
 sub hook_data_post {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  my $hops = 0;
-  $hops++ for $transaction->header->get('Received'),
-    $transaction->header->get('Delivered-To');
+    my $hops = 0;
+    $hops++
+      for $transaction->header->get('Received'),
+      $transaction->header->get('Delivered-To');
 
-  if ( $hops >= $self->{_max_hops} ) {
-    # default of too_many_hops is DENY, see comment in POD of Qpsmtpd::DSN
-    return Qpsmtpd::DSN->too_many_hops();
-  }
+    if ($hops >= $self->{_max_hops}) {
 
-  return DECLINED;
+        # default of too_many_hops is DENY, see comment in POD of Qpsmtpd::DSN
+        return Qpsmtpd::DSN->too_many_hops();
+    }
+
+    return DECLINED;
 }

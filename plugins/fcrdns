@@ -102,20 +102,20 @@ use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp) = (shift, shift);
-    $self->{_args} = { @_ };
+    $self->{_args} = {@_};
     $self->{_args}{reject_type} = 'temp';
     $self->{_args}{timeout} ||= 5;
     $self->{_args}{ptr_hosts} = {};
 
-    if ( ! defined $self->{_args}{reject} ) {
+    if (!defined $self->{_args}{reject}) {
         $self->{_args}{reject} = 0;
-    };
+    }
 
     $self->init_resolver() or return;
 
     $self->register_hook('connect',   'connect_handler');
     $self->register_hook('data_post', 'data_post_handler');
-};
+}
 
 sub connect_handler {
     my ($self) = @_;
@@ -123,9 +123,9 @@ sub connect_handler {
     return DECLINED if $self->is_immune();
 
     # run a couple cheap tests before the more expensive DNS tests
-    foreach my $test ( qw/ invalid_localhost is_not_fqdn / ) {
+    foreach my $test (qw/ invalid_localhost is_not_fqdn /) {
         $self->$test() or return DECLINED;
-    };
+    }
 
     $self->has_reverse_dns() or return DECLINED;
     $self->has_forward_dns() or return DECLINED;
@@ -138,91 +138,93 @@ sub data_post_handler {
     my ($self, $transaction) = @_;
 
     my $match = $self->connection->notes('fcrdns_match') || 0;
-    $transaction->header->add('X-Fcrdns', $match ? 'Yes' : 'No', 0 );
+    $transaction->header->add('X-Fcrdns', $match ? 'Yes' : 'No', 0);
     return (DECLINED);
-};
+}
 
 sub invalid_localhost {
-    my ( $self ) = @_;
+    my ($self) = @_;
     return 1 if lc $self->qp->connection->remote_host ne 'localhost';
     if (   $self->qp->connection->remote_ip ne '127.0.0.1'
-        && $self->qp->connection->remote_ip ne '::1' ) {
-        $self->adjust_karma( -1 );
-        $self->log( LOGINFO, "fail, not localhost" );
+        && $self->qp->connection->remote_ip ne '::1')
+    {
+        $self->adjust_karma(-1);
+        $self->log(LOGINFO, "fail, not localhost");
         return;
-    };
-    $self->adjust_karma( 1 );
-    $self->log( LOGDEBUG, "pass, is localhost" );
+    }
+    $self->adjust_karma(1);
+    $self->log(LOGDEBUG, "pass, is localhost");
     return 1;
-};
+}
 
 sub is_not_fqdn {
     my ($self) = @_;
     my $host = $self->qp->connection->remote_host or return 1;
-    return 1 if $host eq 'Unknown'; # QP assigns this to a "no DNS result"
+    return 1 if $host eq 'Unknown';    # QP assigns this to a "no DNS result"
 
     # Since QP looked it up, perform some quick validation
-    if ( $host !~ /\./ ) { # has no dots
-        $self->adjust_karma( -1 );
+    if ($host !~ /\./) {               # has no dots
+        $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, not FQDN");
         return;
-    };
-    if ( $host =~ /[^a-zA-Z0-9\-\.]/ ) {
-        $self->adjust_karma( -1 );
+    }
+    if ($host =~ /[^a-zA-Z0-9\-\.]/) {
+        $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, invalid FQDN chars");
         return;
-    };
+    }
     return 1;
-};
+}
 
 sub has_reverse_dns {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
     my $res = $self->init_resolver();
     my $ip  = $self->qp->connection->remote_ip;
 
-    my $query = $res->query( $ip ) or do {
-        if ( $res->errorstring eq 'NXDOMAIN' ) {
-            $self->adjust_karma( -1 );
-            $self->log( LOGINFO, "fail, no rDNS: ".$res->errorstring );
+    my $query = $res->query($ip) or do {
+        if ($res->errorstring eq 'NXDOMAIN') {
+            $self->adjust_karma(-1);
+            $self->log(LOGINFO, "fail, no rDNS: " . $res->errorstring);
             return;
-        };
-        $self->log( LOGINFO, "fail, error getting rDNS: ".$res->errorstring );
+        }
+        $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
         return;
     };
 
     my $hits = 0;
-    $self->{_args}{ptr_hosts} = {};  # reset hash
+    $self->{_args}{ptr_hosts} = {};    # reset hash
     for my $rr ($query->answer) {
         next if $rr->type ne 'PTR';
         $hits++;
-        $self->{_args}{ptr_hosts}{ $rr->ptrdname } = 1;
-        $self->log(LOGDEBUG, "PTR: " . $rr->ptrdname );
-    };
-    if ( ! $hits ) {
-        $self->adjust_karma( -1 );
-        $self->log( LOGINFO, "fail, no PTR records");
+        $self->{_args}{ptr_hosts}{$rr->ptrdname} = 1;
+        $self->log(LOGDEBUG, "PTR: " . $rr->ptrdname);
+    }
+    if (!$hits) {
+        $self->adjust_karma(-1);
+        $self->log(LOGINFO, "fail, no PTR records");
         return;
-    };
+    }
 
     $self->log(LOGDEBUG, "has rDNS");
     return 1;
-};
+}
 
 sub has_forward_dns {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
     my $res = $self->init_resolver();
 
-    foreach my $host ( keys %{ $self->{_args}{ptr_hosts} } ) {
+    foreach my $host (keys %{$self->{_args}{ptr_hosts}}) {
 
-        $host .= '.' if '.' ne substr( $host, -1, 1); # fully qualify name
+        $host .= '.' if '.' ne substr($host, -1, 1);    # fully qualify name
         my $query = $res->search($host) or do {
-            if ( $res->errorstring eq 'NXDOMAIN' ) {
-                $self->log(LOGDEBUG, "host $host does not exist" );
+            if ($res->errorstring eq 'NXDOMAIN') {
+                $self->log(LOGDEBUG, "host $host does not exist");
                 next;
             }
-            $self->log(LOGDEBUG, "query for $host failed (", $res->errorstring, ")" );
+            $self->log(LOGDEBUG, "query for $host failed (",
+                       $res->errorstring, ")");
             next;
         };
 
@@ -230,38 +232,39 @@ sub has_forward_dns {
         foreach my $rr ($query->answer) {
             next unless $rr->type =~ /^(?:A|AAAA)$/;
             $hits++;
-            $self->check_ip_match( $rr->address ) and return 1;
+            $self->check_ip_match($rr->address) and return 1;
         }
-        if ( $hits ) {
+        if ($hits) {
             $self->log(LOGDEBUG, "PTR host has forward DNS") if $hits;
             return 1;
-        };
-    };
-    $self->adjust_karma( -1 );
+        }
+    }
+    $self->adjust_karma(-1);
     $self->log(LOGINFO, "fail, no PTR hosts have forward DNS");
     return;
-};
+}
 
 sub check_ip_match {
     my $self = shift;
     my $ip = shift or return;
 
-    if ( $ip eq $self->qp->connection->remote_ip ) {
-        $self->log( LOGDEBUG, "forward ip match" );
+    if ($ip eq $self->qp->connection->remote_ip) {
+        $self->log(LOGDEBUG, "forward ip match");
         $self->connection->notes('fcrdns_match', 1);
-        $self->adjust_karma( 1 );
+        $self->adjust_karma(1);
         return 1;
-    };
+    }
 
-# TODO: make this IPv6 compatible
-    my $dns_net = join('.', (split(/\./, $ip))[0,1,2] );
-    my $rem_net = join('.', (split(/\./, $self->qp->connection->remote_ip))[0,1,2] );
+    # TODO: make this IPv6 compatible
+    my $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
+    my $rem_net =
+      join('.', (split(/\./, $self->qp->connection->remote_ip))[0, 1, 2]);
 
-    if ( $dns_net eq $rem_net ) {
-        $self->log( LOGNOTICE, "forward network match" );
+    if ($dns_net eq $rem_net) {
+        $self->log(LOGNOTICE, "forward network match");
         $self->connection->notes('fcrdns_match', 1);
         return 1;
-    };
+    }
     return;
-};
+}
 
