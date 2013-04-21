@@ -1,16 +1,30 @@
 
-New Name Suggestions
-====================
-ignite
-flare(mta)
-quench
-pez (or pezmail)
+Qpsmtpd-dev is a fork of Qpsmtpd. Qpsmtpd is a very good SMTP daemon for
+developers and hackers (admittedly, its focus). It is difficult to install
+and administer for the typical sysadmin/user.
+
+The primary focus of the -dev branch is improving the consistency and
+behavior of the plugins. After using one plugin, the knowledge gained
+should carry over to other plugins.
+
+Secondary goals are reducing code duplication and complexity. Anything
+covered in Perl Best Practices is also fair game.
+
+So far, the main changes between the release and dev branches have focused
+on these goals:
+
+  - plugins emit a single entry summarizing their disposition
+  - plugin logs prefixed with keywords: pass, fail, skip, error
+  - plugins use 'reject' and 'reject_type' settings.
+  - plugins support deferred rejection via 'naughty' plugin
+  - plugins get a resolver via $self->init_resolver
+
 
 
 Roadmap
 =======
 
- - http://code.google.com/p/smtpd/issues
+ - https://github.com/qpsmtpd-dev/qpsmtpd-dev/issues
 
  - Bugfixes - qpsmtpd is extremely stable (in production since 2001), but
    there are always more things to fix.
@@ -24,16 +38,8 @@ Roadmap
 Issues
 ======
 
-See http://code.google.com/p/smtpd/issues/list
-
 ------ The rest of the list here might be outdated. ------
 ------ Patches to remove things are welcome.        ------
-
-
-add whitelist support to the dnsbl plugin (and maybe to the rhsbl
-plugin too).  Preferably both supporting DNS based whitelists and
-filebased (CDB) ones.
-
 
 plugin support;
 
