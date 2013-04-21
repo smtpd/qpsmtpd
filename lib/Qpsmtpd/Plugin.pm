@@ -273,10 +273,10 @@ sub store_deferred_reject {
 
 sub init_resolver {
     my $self = shift;
+    my $timeout = $self->{_args}{dns_timeout} || shift || 5;
     return $self->{_resolver} if $self->{_resolver};
     $self->log(LOGDEBUG, "initializing Net::DNS::Resolver");
     $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    my $timeout = $self->{_args}{dns_timeout} || 5;
     $self->{_resolver}->tcp_timeout($timeout);
     $self->{_resolver}->udp_timeout($timeout);
     return $self->{_resolver};
