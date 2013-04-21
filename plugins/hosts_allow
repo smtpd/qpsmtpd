@@ -120,11 +120,11 @@ sub karma_bump {
     my ($self, $karma, $max) = @_;
 
     if ( $karma  > 5 ) {
-        $self->log(LOGDEBUG, "increasing max connects for positive karma");
+        $self->log(LOGDEBUG, "connect limit +3 for positive karma");
         return $max + 3;
     };
     if ( $karma <= 0 ) {
-        $self->log(LOGINFO, "limiting max connects to 1 (karma $karma)");
+        $self->log(LOGINFO, "connect limit 1, karma $karma");
         return 1;
     };
     return $max;
