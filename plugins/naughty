@@ -4,67 +4,47 @@
 
 naughty - dispose of naughty connections
 
+=head1 SYNOPSIS
+
+Rather than immediately terminating naughty connections, plugins can flag the connection and dispose of it later. Examples are B<dnsbl>, B<karma>, B<greylisting>, B<resolvable_fromhost>, B<SPF>, and B<DKIM>.
+
 =head1 BACKGROUND
 
-Rather than immediately terminating naughty connections, plugins often mark
-the connections and dispose of them later. Examples are B<dnsbl>, B<karma>,
-B<greylisting>, B<resolvable_fromhost> and B<SPF>.
+Historically, deferred rejection was based on the belief that malware will retry less if we disconnect after RCPT. Observations in 2012 suggest it makes no measurable difference when we disconnect.
 
-This practice is based on RFC standards and the belief that malware will retry
-less if we disconnect after RCPT. This may have been true, and may still be,
-but my observations in 2012 suggest it makes no measurable difference whether
-I disconnect during connect or rcpt.
+Disconnecting early will block connections from your users who are roaming, or whose IP space is voluntarily listed by their ISP. Deferring rejection until after the remote has had the ability to authenticate allows RBLs to be safely used on port 25 and 587.
 
-Disconnecting later is inefficient because other plugins continue to do their
-work, oblivious to the fact that a connection is destined for the bit bucket.
+Some (much older) RFCs suggest deferring later.
+
+For these and other reasons, a few plugins implemented deferred rejection on their own. By having naughty, other plugins can be much simpler.
 
 =head1 DESCRIPTION
 
 Naughty provides the following:
 
+=head2 consistency
+
+With one change to the config of naughty, all plugins can reject their messages at the preferred time. I use this feature for spam filter training. When setting up a new server, I use 'naughty reject data_post' until after dspam is trained. Once the bayesian filters are trained, I change to 'naughty reject data', and avoid processing the message bodies.
+
 =head2 efficiency
 
-Naughty provides plugins with an efficient way to offer late disconnects. It
-does this by allowing other plugins to detect that a connection is naughty.
-For efficiency, other plugins should skip processing naughty connections.
-Plugins like SpamAssassin and DSPAM can benefit from using naughty connections
-to train their filters.
+After a connection is marked as naughty, subsequent plugins can detect that and skip processing. Plugins like SpamAssassin and DSPAM can benefit from using naughty connections to train their filters.
 
-Since many connections are from blacklisted IPs, naughty significantly
-reduces the resources required to dispose of them. Over 80% of my
-connections are disposed of after after a few DNS queries (B<dnsbl> or one DB
-query (B<karma>) and 0.01s of compute time.
-
-=head2 naughty cleanup
-
-Instead of each plugin handling cleanup, B<naughty> does it. Set I<reject> to
-the hook you prefer to reject in and B<naughty> will reject the naughty
-connections, regardless of who identified them, exactly when you choose.
-
-For training spam filters, I<reject data_post> is best.
+Since many connections are from blacklisted IPs, naughty significantly reduces the resources required to dispose of them. Over 80% of my connections are disposed of after after a few DNS queries (B<dnsbl> or one DB query (B<karma>) and 0.01s of compute time.
 
 =head2 simplicity
 
-Rather than having plugins split processing across hooks, they can run to
-completion when they have the information they need, issue a
-I<reject naughty> if warranted, and be done.
+Rather than having plugins split processing across hooks, plugins can run to completion when they have the information they need, issue a I<reject naughty> if warranted, and be done.
 
-This may help reduce the code divergence between the sync and async
-deployment models.
+This may help reduce the code divergence between the sync and async deployment models.
 
 =head2 authentication
 
-When a user authenticates, the naughty flag on their connection is cleared.
-This is to allow users to send email from IPs that fail connection tests such
-as B<dnsbl>. Note that if I<reject connect> is set, connections will
-not get the chance to authenticate. To allow clients a chance to authenticate,
-I<reject mail> works well.
+When a user authenticates, the naughty flag on their connection is cleared. This allows users to send email from IPs that fail connection tests such as B<dnsbl>. Note that if I<reject connect> is set, connections will not get the chance to authenticate. To allow clients a chance to authenticate, I<reject mail> works well.
 
-=head2 naughty
+=head1 HOW TO USE
 
-<naughty> provides a a consistent way for plugins to mark connections as
-naughty. Set the connection note I<naughty> to the message you wish to send
-the naughty sender during rejection.
+Set the connection note I<naughty> to the message you wish to send the naughty sender during rejection.
 
    $self->connection->notes('naughty', $message);
 
