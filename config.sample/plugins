@@ -6,6 +6,10 @@
 # plugins/http_config for details.
 #   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
 
+# tls should load before count_unrecognized_commands
+# to support legacy port 465, tls must load before connection plugins
+#tls
+
 # hosts_allow does not work with the tcpserver deployment model!
 #   perldoc plugins/hosts_allow for an alternative.
 #
@@ -23,8 +27,6 @@ ident/geoip
 fcrdns
 
 quit_fortune
-# tls should load before count_unrecognized_commands
-#tls
 earlytalker
 count_unrecognized_commands 4
 
