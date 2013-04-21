@@ -24,9 +24,9 @@ custom connection policies such as these two examples:
 
 =over 4 
 
-Hi there, well behaved sender. Please help yourself to greater concurrency, multiple recipients, no delays, and other privileges.
+Hi there, well known and well behaved sender. Please help yourself to greater concurrency (hosts_allow), multiple recipients (karma), and no delays (early_sender).
 
-Hi there, naughty sender. You get a max concurrency of 1, and SMTP delays.
+Hi there, naughty sender. You get a max concurrency of 1, max recipients of 2, and SMTP delays.
 
 =back 
 
@@ -245,6 +245,7 @@ sub register {
     $self->register_hook('connect',           'connect_handler');
     $self->register_hook('data',              'data_handler'   );
     $self->register_hook('disconnect',        'disconnect_handler');
+    $self->register_hook('received_line',     'rcpt_handler');
 }
 
 sub hook_pre_connection {
@@ -316,6 +317,19 @@ sub connect_handler {
 
     return $self->get_reject( $mess, $karma );
 }
+
+sub rcpt_handler {
+    my ($self, $transaction, $recipient, %args) = @_;
+
+    my $recipients = scalar $self->transaction->recipients;
+    return DECLINED if $recipients < 2;   # only one recipient
+
+    my $karma = $self->connection->notes('karma_history');
+    return DECLINED if $karma > 0;    # good karma, no limit
+
+#  limit # of recipients if host has negative or unknown karma
+    return $self->get_reject( "too many recipients");
+};
 
 sub data_handler {
     my ($self, $transaction) = @_;
