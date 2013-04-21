@@ -1,24 +1,35 @@
 
 Qpsmtpd-dev is a fork of Qpsmtpd. Qpsmtpd is a very good SMTP daemon for
-developers and hackers (admittedly, its focus). It is difficult to install
-and administer for the typical sysadmin/user.
+developers and hackers (admittedly, its focus). The plugin system is great
+but the plugin organization, documentation, and consistency left much
+to be desired.
 
 The primary focus of the -dev branch is improving the consistency and
 behavior of the plugins. After using one plugin, the knowledge gained
 should carry over to other plugins.
 
-Secondary goals are reducing code duplication and complexity. Anything
-covered in Perl Best Practices is also fair game.
+Secondary goals are making it easier to install, reducing code duplication,
+reducing complexity, and cooperation between plugins. Anything covered
+in Perl Best Practices is also fair game.
 
 So far, the main changes between the release and dev branches have focused
 on these goals:
 
-  - plugins emit a single entry summarizing their disposition
+  - plugins log a single entry summarizing their disposition
   - plugin logs prefixed with keywords: pass, fail, skip, error
-  - plugins use 'reject' and 'reject_type' settings.
+  - plugins use 'reject' and 'reject_type' settings
   - plugins support deferred rejection via 'naughty' plugin
   - plugins get a resolver via $self->init_resolver
+  - new plugins: fcrdns, dmarc, naughty, karma
 
+An example of plugin cooperation is karma. Karma is a scorekeeper that aggregates bits of information from many plugins. Those bits alone are insufficient for acting on.  Examples of such data are:
+
+  FcRDNS - whether or not hostname has Forward confirmed reverse DNS
+  GeoIP distance - how many km away the sender is
+  p0f    - senders Operating System
+  helo   - helo hostname validity
+
+For most sites, even DNSBL, SPF, DKIM, and SpamAssassin tests alone are insufficient rejection criteria. But when these bits are combined, they can create an extremely reliable means to block spam.
 
 
 Roadmap
