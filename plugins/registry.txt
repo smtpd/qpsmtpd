@@ -1,13 +1,16 @@
 # This file contains a list of every plugin used on this server. If you have
 # additional plugins running, add them here.
 # Fields are whitespace delimited. Columns are ordered by numeric plugin ID.
+#
+#   the order of plugins in this file determines the order they appear in
+#   summary output
 # 
 #id	name						abb3	abb5		aliases
 #
 201	hosts_allow					alw		allow
 202	ident::geoip				geo		geoip
-203	ident::p0f					p0f		p0f
-204	ident::p0f_3a0              p0f     p0f
+203	ident::p0f					p0f		p0f			ident::p0f_3a0,ident::p0f_3a1
+
 205	karma						krm		karma
 206	dnsbl						dbl		dnsbl
 207	relay						rly		relay       check_relay,check_norelay,relay_only
@@ -26,13 +29,13 @@
 #
 # Authentication
 #
-400	auth::auth_vpopmail_sql		aut		vpsql
-401	auth::auth_vpopmaild		vpd		vpopd
-402	auth::auth_vpopmail			vpo		vpop
-403	auth::auth_checkpasswd		ckp		chkpw
-404	auth::auth_cvs_unix_local	cvs		cvsul
-405	auth::auth_flat_file		flt		aflat
-406	auth::auth_ldap_bind		ldp		aldap
+400	auth::auth_vpopmail_sql		avq		avsql
+401	auth::auth_vpopmaild		avd		vpopd
+402	auth::auth_vpopmail			avp		vpop
+403	auth::auth_checkpassword	ack		chkpw
+404	auth::auth_cvs_unix_local	acv		cvsul
+405	auth::auth_flat_file		aff		aflat
+406	auth::auth_ldap_bind		ald		aldap
 407	auth::authdeny	        	dny		adeny
 #
 # Sender / Envelope From
@@ -80,11 +83,11 @@
 #
 # Queue Plugins
 #
-800	queue::qmail-queue			qqm		queue
+800	queue::qmail-queue			qqm		queue	queue::qmail_2dqueue
 801	queue::maildir				qdr		qudir
-802	queue::postfix-queue		qpf		qupfx
-803	queue::smtp-forward			qfw		qufwd
-804	queue::exim-bsmtp			qxm		qexim
+802	queue::postfix-queue		qpf		qupfx	queue::postfix_2dqueue
+803	queue::smtp-forward			qfw		qufwd	queue::smtp_2dqueue
+804	queue::exim-bsmtp			qxm		qexim	queue::exim_2dbsmtp
 
 900	quit_fortune				for		fortu
 
