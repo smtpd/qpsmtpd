@@ -328,8 +328,11 @@ sub rcpt_handler {
     my $recipients = scalar $self->transaction->recipients;
     return DECLINED if $recipients < 2;    # only one recipient
 
-    my $karma = $self->connection->notes('karma_history');
-    return DECLINED if $karma > 0;         # good karma, no limit
+    my $history = $self->connection->notes('karma_history');
+    return DECLINED if $history > 0;       # good history, no limit
+
+    my $karma = $self->connection->notes('karma');
+    return DECLINED if $karma > 0;      # good connection, no limit
 
     #  limit # of recipients if host has negative or unknown karma
     return $self->get_reject("too many recipients");
@@ -337,9 +340,16 @@ sub rcpt_handler {
 
 sub data_handler {
     my ($self, $transaction) = @_;
-    return DECLINED if !$self->qp->connection->relay_client;
 
-    $self->adjust_karma(5);    # big karma boost for authenticated user/IP
+    if ( $self->qp->connection->relay_client ) {
+        $self->adjust_karma(5);    # big karma boost for authenticated user/IP
+    };
+
+    my $karma = $self->connection->notes('karma');
+    if ( $karma < -3 ) {     # bad karma
+        return $self->get_reject("very bad karma: $karma");
+    };
+
     return DECLINED;
 }
 
