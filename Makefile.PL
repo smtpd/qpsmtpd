@@ -4,21 +4,25 @@ use strict;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME           => 'qpsmtpd',
-    VERSION_FROM   => 'lib/Qpsmtpd.pm',
-    PREREQ_PM      => {
-        'Mail::Header' => 0,
-        'MIME::Base64' => 0,
-        'Net::DNS'     => 0.39,
-        'Data::Dumper' => 0,
-        'File::Temp'   => 0,
-        'Time::HiRes'  => 0,
-        'Net::IP'      => 0,
-        'Date::Parse'  => 0,
-    },
-    ABSTRACT       => 'Flexible smtpd daemon written in Perl',
-    AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',
-    EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver qpsmtpd-prefork qpsmtpd-async)],
+    NAME         => 'qpsmtpd',
+    VERSION_FROM => 'lib/Qpsmtpd.pm',
+    PREREQ_PM    => {
+                  'Mail::Header' => 0,
+                  'MIME::Base64' => 0,
+                  'Net::DNS'     => 0.39,
+                  'Data::Dumper' => 0,
+                  'File::Temp'   => 0,
+                  'Time::HiRes'  => 0,
+                  'Net::IP'      => 0,
+                  'Date::Parse'  => 0,
+                 },
+    ABSTRACT  => 'Flexible smtpd daemon written in Perl',
+    AUTHOR    => 'Ask Bjoern Hansen <ask@develooper.com>',
+    EXE_FILES => [qw(qpsmtpd qpsmtpd-forkserver qpsmtpd-prefork qpsmtpd-async)],
+    dist      => {COMPRESS => 'gzip -9f',},
+    clean     => {
+              FILES => ['t/config/greylist.dbm*',],
+             },
 );
 
 sub MY::libscan {
@@ -28,11 +32,11 @@ sub MY::libscan {
 }
 
 sub MY::postamble {
-  qq[
+    qq[
 testcover :
 \t cover -delete && \\
-   HARNESS_PERL_SWITCHES=-MDevel::Cover \$(MAKE) test && \\
-   cover
+	HARNESS_PERL_SWITCHES=-MDevel::Cover \$(MAKE) test && \\
+	cover
 ]
 
 }
