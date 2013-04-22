@@ -201,8 +201,10 @@ sub rcpt_handler {
     $self->log(LOGINFO, "pass, bouncesaying with program"), $k++ if $rv == 0x13;
     if ($rv == 0x14) {
         my $s = $transaction->sender->address;
-        return (DENY, "mailing lists do not accept null senders")
-          if (!$s || $s eq '<>');
+        if (!$s || $s eq '<>') {
+            $self->adjust_karma(-1);
+            return (DENY, "mailing lists do not accept null senders");
+        };
         $self->log(LOGINFO, "pass, ezmlm list");
         $k++;
     }
