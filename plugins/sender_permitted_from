@@ -96,28 +96,17 @@ sub mail_handler {
         return (DECLINED, "SPF - null sender");
     }
 
-    if ($self->qp->connection->relay_client) {
-        $self->log(LOGINFO, "skip, relay_client");
-        return (DECLINED, "SPF - relaying permitted");
-    }
-
-    if (!$self->{_args}{reject}) {
-        $self->log(LOGINFO, "skip, reject disabled");
-        return (DECLINED);
-    }
-
-    my $client_ip = $self->qp->connection->remote_ip;
     my $from      = $sender->user . '@' . lc($sender->host);
     my $helo      = $self->qp->connection->hello_host;
     my $scope     = $from ? 'mfrom' : 'helo';
     my %req_params = (
         versions => [1, 2],    # optional
         scope => $scope,
-        ip_address => $client_ip,
+        ip_address => $self->qp->connection->remote_ip,
                      );
 
     if ($scope =~ /^mfrom|pra$/) {
-        $req_params{identity} = $from;
+        $req_params{identity}      = $from;
         $req_params{helo_identity} = $helo if $helo;
     }
     elsif ($scope eq 'helo') {
@@ -144,28 +133,24 @@ sub mail_handler {
         return (DECLINED, "SPF - no response");
     }
 
-    if (!$reject) {
-        $self->log(LOGINFO, "fail, no reject policy ($code: $why)");
-        return (DECLINED, "SPF - $code: $why");
-    }
-
-   # SPF result codes: pass fail softfail neutral none error permerror temperror
-    return $self->handle_code_none($reject, $why) if $code eq 'none';
-    if ($code eq 'fail') {
-        $self->adjust_karma(-1);
-        return $self->handle_code_fail($reject, $why);
-    }
-    elsif ($code eq 'softfail') {
-        $self->adjust_karma(-1);
-        return $self->handle_code_softfail($reject, $why);
-    }
-    elsif ($code eq 'pass') {
+    if ($code eq 'pass') {
         $self->adjust_karma(1);
         $transaction->notes('spf_pass_host', lc $sender->host);
         $self->log(LOGINFO, "pass, $code: $why");
         return (DECLINED);
     }
-    elsif ($code eq 'neutral') {
+
+    if (!$reject) {
+        $self->log(LOGINFO, "skip, tolerated ($code: $why)");
+        return (DECLINED, "SPF - $code: $why");
+    }
+
+   # SPF result codes: pass fail softfail neutral none error permerror temperror
+    return $self->handle_code_none($reject, $why) if $code eq 'none';
+    return $self->handle_code_fail($reject, $why) if $code eq 'fail';
+    return $self->handle_code_softfail($reject, $why) if $code eq 'softfail';
+
+    if ($code eq 'neutral') {
         $self->log(LOGINFO, "fail, $code, $why");
         return (DENY, "SPF - $code: $why") if $reject >= 5;
     }
@@ -196,12 +181,14 @@ sub handle_code_none {
         return (DENY, "SPF - none: $why");
     }
 
-    $self->log(LOGINFO, "pass, none, $why");
+    $self->log(LOGINFO, "skip, tolerated, none, $why");
     return DECLINED;
 }
 
 sub handle_code_fail {
     my ($self, $reject, $why) = @_;
+
+    $self->adjust_karma(-1);
 
     if ($reject >= 2) {
         $self->log(LOGINFO, "fail, $why");
@@ -209,12 +196,14 @@ sub handle_code_fail {
         return (DENYSOFT, "SPF - fail: $why");
     }
 
-    $self->log(LOGINFO, "pass, fail tolerated, $why");
+    $self->log(LOGINFO, "fail, tolerated, $why");
     return DECLINED;
 }
 
 sub handle_code_softfail {
     my ($self, $reject, $why) = @_;
+
+    $self->adjust_karma(-1);
 
     if ($reject >= 3) {
         $self->log(LOGINFO, "fail, soft, $why");
@@ -222,7 +211,7 @@ sub handle_code_softfail {
         return (DENYSOFT, "SPF - fail: $why") if $reject >= 3;
     }
 
-    $self->log(LOGINFO, "pass, softfail tolerated, $why");
+    $self->log(LOGINFO, "fail, soft, tolerated, $why");
     return DECLINED;
 }
 
