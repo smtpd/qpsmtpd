@@ -6,6 +6,10 @@ Domain-based Message Authentication, Reporting and Conformance
 
 =head1 SYNOPSIS
 
+DMARC is an extremely reliable means to authenticate email.
+
+=head1 DESCRIPTION
+
 From the DMARC Draft: "DMARC operates as a policy layer atop DKIM and SPF. These technologies are the building blocks of DMARC as each is widely deployed, supported by mature tools, and is readily available to both senders and receivers. They are complementary, as each is resilient to many of the failure modes of the other."
 
 DMARC provides a way to exchange authentication information and policies among mail servers.
@@ -14,9 +18,9 @@ DMARC benefits domain owners by preventing others from impersonating them. A dom
 
 DMARC benefits mail server operators by providing them with an extremely reliable (as opposed to DKIM or SPF, which both have reliability issues when used independently) means to block forged emails. Is that message really from PayPal, Chase, Gmail, or Facebook? Since those organizations, and many more, publish DMARC policies, operators have a definitive means to know.
 
-=head1 HOW IT WORKS
-
 =head1 HOWTO
+
+=head2 Protect a domain with DMARC
 
 See Section 10 of the draft: Domain Owner Actions
 
@@ -25,32 +29,46 @@ See Section 10 of the draft: Domain Owner Actions
 3. Publish a "monitor" record, ask for data reports
 4. Roll policies from monitor to reject
 
-=head2 Publish a DMARC policy
+=head3 Publish a DMARC policy
+
+_dmarc  IN TXT "v=DMARC1; p=reject; pct=100; rua=mailto:dmarc-feedback@example.com;"
 
  v=DMARC1;    (version)
  p=none;      (disposition policy : reject, quarantine, none (monitor))
  sp=reject;   (subdomain policy: default, same as p)
- rua
  adkim=s;     (dkim alignment: s=strict, r=relaxed)
  aspf=r;      (spf  alignment: s=strict, r=relaxed)
- rua=mailto: dmarc-feedback\@$zone;  (aggregate reports)
- ruf=mailto: dmarc-feedback\@$zone.com; (forensic reports)
+ rua=mailto: dmarc-feedback@example.com; (aggregate reports)
+ ruf=mailto: dmarc-feedback@example.com; (forensic reports)
  rf=afrf;     (report format: afrf, iodef)
  ri=8400;     (report interval)
  pct=50;      (percent of messages to filter)
 
+=head2 Validate messages with DMARC
 
-=head1 DRAFT
+1. install this plugin
+
+2. install a public suffix list in config/public_suffix_list. See http://publicsuffix.org/list/
+
+3. activate this plugin (add to config/plugins)
+
+Be sure to run the DMARC after the SPF & DKIM plugins, and you should also have I<reject 0> set for both SPF and DKIM.
+
+=head2 Parse dmarc feedback reports into a database
+
+See http://www.taugh.com/rddmarc/
+
+=head1 MORE INFORMATION
 
 http://www.dmarc.org/draft-dmarc-base-00-02.txt
+
+https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/DMARC-FAQ
 
 =head1 TODO
 
  2. provide dmarc feedback to domains that request it
 
  3. If a message has multiple 'From' recipients, reject it
-
- 4. Rejections with a 550 (perm) or 450 (temp)
 
 =head1 IMPLEMENTATION
 
@@ -99,11 +117,10 @@ sub data_post_handler {
     my $from_host = $self->get_from_host($transaction) or return DECLINED;
     my $org_host = $self->get_organizational_domain($from_host);
 
-    if (!$self->exists_in_dns($from_host)) {
-        if (!$self->exists_in_dns($org_host)) {
-            $self->log(LOGINFO, "fail, $from_host not in DNS");
-            return $self->get_reject("RFC5322.From host does not exist");
-        }
+    # 6. Receivers should reject email if the domain appears to not exist
+    if (!$self->exists_in_dns($from_host) && !$self->exists_in_dns($org_host)) {
+        $self->log(LOGINFO, "fail, $from_host not in DNS");
+        return $self->get_reject("RFC5322.From host appears non-existent");
     }
 
     # 11.2.  Determine Handling Policy
@@ -295,18 +312,20 @@ sub get_organizational_domain {
 
 sub exists_in_dns {
     my ($self, $domain) = @_;
-# the DMARC draft suggests rejecting messages whose From: domain does not
-# exist in DNS. That's as far as it goes. So I went back to the ADSP (from
-# where DMARC this originated, which in turn led me to the ietf-dkim email
-# list where a handful of 'experts' failed to agree on The Right Way to
-# perform this test. And thus no direction was given.
-# As they point out:
-#    MX records aren't mandatory.
-#    A or AAAA records as fallback aren't reliable either.
+# 6. Receivers should endeavour to reject or quarantine email if the
+#    RFC5322.From purports to be from a domain that appears to be
+#    either non-existent or incapable of receiving mail.
 
-# I chose to query the name and match NS,MX,A,or AAAA records. Since it gets
-# repeated for the for the Organizational Name, if it fails, there's no
-# delegation from the TLD.
+# I went back to the ADSP (from where DMARC this originated, which in turn
+# led me to the ietf-dkim email list where a handful of 'experts' failed to
+# agree on The Right Way to test domain validity. No direction was given.
+# They point out:
+#    MX records aren't mandatory.
+#    A or AAAA records as fallback aren't reliable.
+
+# I chose to query the From: domain name and match NS,MX,A,or AAAA records.
+# Since this search gets repeated for the Organizational Name, if it
+# fails for the O.N., there's no delegation from the TLD.
     my $res = $self->init_resolver(8);
     my $query = $res->query($domain, 'NS') or do {
         if ($res->errorstring eq 'NXDOMAIN') {
