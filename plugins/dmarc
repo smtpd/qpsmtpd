@@ -52,7 +52,7 @@ _dmarc  IN TXT "v=DMARC1; p=reject; pct=100; rua=mailto:dmarc-feedback@example.c
 
 3. activate this plugin (add to config/plugins)
 
-Be sure to run the DMARC after the SPF & DKIM plugins, and you should also have I<reject 0> set for both SPF and DKIM.
+Be sure to run the DMARC plugin after the SPF & DKIM plugins. Configure the SPF and DKIM messages to not reject mail.
 
 =head2 Parse dmarc feedback reports into a database
 
@@ -145,6 +145,12 @@ sub data_post_handler {
     #       disposed of in accordance with the discovered DMARC policy of the
     #       Domain Owner.  See Section 6.2 for details.
     return DECLINED if lc $policy->{p} eq 'none';
+
+    my $pct = $policy->{pct} || 100;
+    if ( $pct != 100 && int(rand(100)) >= $pct ) {
+        $self->log("fail, tolerated, policy, sampled out");
+        return DECLINED;
+    };
 
     return $self->get_reject("failed DMARC policy");
 }
@@ -348,6 +354,7 @@ sub host_has_rr {
             $self->log(LOGDEBUG, "fail, non-existent domain: $domain");
             return;
         }
+        return if $res->errorstring eq 'NOERROR';
         $self->log(LOGINFO, "error, looking up $domain: " . $res->errorstring);
         return;
     };
