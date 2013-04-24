@@ -314,6 +314,7 @@ sub show_symbol {
     return ' o' if $mess eq 'TLS setup returning';
     return ' o' if $mess eq 'pass';
     return ' -' if $mess eq 'skip';
+    return ' x' if 'fail, tolerated' eq substr($mess, 0, 15);
     return ' X' if $mess eq 'fail';
     return ' -' if $mess =~ /^skip[,:\s]/i;
     return ' o' if $mess =~ /^pass[,:\s]/i;

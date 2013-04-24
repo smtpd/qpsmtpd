@@ -116,7 +116,7 @@ sub hook_mail {
             return Qpsmtpd::DSN->temp_resolver_failed($self->get_reject_type(),
                                                       '');
         }
-        $self->log(LOGINFO, 'fail, missing result, reject disabled');
+        $self->log(LOGINFO, 'fail, tolerated, missing result');
         return DECLINED;
     };
 
@@ -127,7 +127,7 @@ sub hook_mail {
 
     if (!$self->{_args}{reject}) {
         ;
-        $self->log(LOGINFO, "fail, reject disabled, $result");
+        $self->log(LOGINFO, "fail, tolerated, $result");
         return DECLINED;
     }
 

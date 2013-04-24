@@ -178,7 +178,7 @@ sub data_post_handler {
 
     if ($transaction->data_size > 500_000) {
         $self->log(LOGINFO,
-                   "skip: too large (" . $transaction->data_size . ")");
+                   "skip, too large (" . $transaction->data_size . ")");
         return (DECLINED);
     }
 
@@ -424,7 +424,7 @@ sub reject {
 
     if ($score < $reject) {
         if ($ham_or_spam eq 'Spam') {
-            $self->log(LOGINFO, "fail, $status < $reject, $learn");
+            $self->log(LOGINFO, "fail, tolerated, $status < $reject, $learn");
             return DECLINED;
         }
         else {
