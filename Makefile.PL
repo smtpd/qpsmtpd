@@ -4,25 +4,29 @@ use strict;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME         => 'qpsmtpd',
-    VERSION_FROM => 'lib/Qpsmtpd.pm',
-    PREREQ_PM    => {
-                  'Mail::Header' => 0,
-                  'MIME::Base64' => 0,
-                  'Net::DNS'     => 0.39,
-                  'Data::Dumper' => 0,
-                  'File::Temp'   => 0,
-                  'Time::HiRes'  => 0,
-                  'Net::IP'      => 0,
-                  'Date::Parse'  => 0,
-                 },
-    ABSTRACT  => 'Flexible smtpd daemon written in Perl',
-    AUTHOR    => 'Ask Bjoern Hansen <ask@develooper.com>',
-    EXE_FILES => [qw(qpsmtpd qpsmtpd-forkserver qpsmtpd-prefork qpsmtpd-async)],
-    dist      => {COMPRESS => 'gzip -9f',},
-    clean     => {
-              FILES => ['t/config/greylist.dbm*',],
-             },
+    NAME           => 'qpsmtpd',
+    VERSION_FROM   => 'lib/Qpsmtpd.pm',
+    PREREQ_PM      => {
+        'Data::Dumper' => 0,
+        'Date::Parse'  => 0,
+        'File::Temp'   => 0,
+        'Mail::Header' => 0,
+        'MIME::Base64' => 0,
+        'Net::DNS'     => 0.39,
+        'Net::IP'      => 0,
+        'Time::HiRes'  => 0,
+        'IO::Socket::SSL'=>0,
+# modules for specific features
+        'Geo::IP'            => 0,
+        'Mail::DKIM'         => 0,
+        'Mail::SpamAssassin' => 0,
+        'Mail::SPF'          => 0,
+        'File::Tail'         => 0,
+        'Time::TAI64'        => 0,
+    },
+    ABSTRACT       => 'Flexible smtpd daemon written in Perl',
+    AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',
+    EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver qpsmtpd-prefork qpsmtpd-async)],
 );
 
 sub MY::libscan {
