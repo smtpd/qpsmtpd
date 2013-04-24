@@ -151,22 +151,25 @@ sub mail_handler {
     return $self->handle_code_softfail($reject, $why) if $code eq 'softfail';
 
     if ($code eq 'neutral') {
-        $self->log(LOGINFO, "fail, $code, $why");
-        return (DENY, "SPF - $code: $why") if $reject >= 5;
+        if ($reject >= 5 ) {
+            $self->log(LOGINFO, "fail, $code, $why");
+            return (DENY, "SPF - $code: $why");
+        };
+        $self->log(LOGINFO, "fail, tolerated, $code, $why");
+        return (DECLINED);
     }
-    elsif ($code eq 'error') {
-        $self->log(LOGINFO, "fail, $code, $why");
+    if ($code =~ /(?:permerror|error)/ ) {
+        $self->log(LOGINFO, "fail, $code, $why") if $reject > 3;
         return (DENY,     "SPF - $code: $why") if $reject >= 6;
         return (DENYSOFT, "SPF - $code: $why") if $reject > 3;
+        $self->log(LOGINFO, "fail, tolerated, $code, $why");
+        return (DECLINED);
     }
-    elsif ($code eq 'permerror') {
-        $self->log(LOGINFO, "fail, $code, $why");
-        return (DENY,     "SPF - $code: $why") if $reject >= 6;
-        return (DENYSOFT, "SPF - $code: $why") if $reject > 3;
-    }
-    elsif ($code eq 'temperror') {
+    if ($code eq 'temperror') {
         $self->log(LOGINFO, "fail, $code, $why");
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
+        $self->log(LOGINFO, "fail, tolerated, $code, $why");
+        return (DECLINED);
     }
 
     $self->log(LOGINFO, "SPF from $from was $code: $why");
@@ -211,7 +214,7 @@ sub handle_code_softfail {
         return (DENYSOFT, "SPF - fail: $why") if $reject >= 3;
     }
 
-    $self->log(LOGINFO, "fail, soft, tolerated, $why");
+    $self->log(LOGINFO, "fail, tolerated, soft, $why");
     return DECLINED;
 }
 
