@@ -86,7 +86,7 @@ loglevel settings from the plugins/config entry $self->{_args}{loglevel}. A
 simple and recommended example is as follows:
 
  sub register {
-   my ( $self, $qp ) = shift, shift;
+   my ( $self, $qp ) = (shift, shift);
    $self->log(LOGERROR, "Bad arguments") if @_ % 2;
    $self->{_args} = { @_ };
  }
