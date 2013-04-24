@@ -12,7 +12,7 @@ my $test_email = 'matt@tnpi.net';
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_organizational_domain', 2);
+    $self->register_test('test_get_organizational_domain', 3);
     $self->register_test("test_fetch_dmarc_record", 3);
     $self->register_test("test_discover_policy", 1);
 }
@@ -55,7 +55,8 @@ sub test_get_organizational_domain {
     my $transaction = $self->qp->transaction;
 
     cmp_ok( $self->get_organizational_domain('test.www.tnpi.net'), 'eq', 'tnpi.net' );
-    cmp_ok( $self->get_organizational_domain('www.example.co.uk'), 'eq', 'example.co.uk' )
+    cmp_ok( $self->get_organizational_domain('www.example.co.uk'), 'eq', 'example.co.uk' );
+    cmp_ok( $self->get_organizational_domain('plus.google.com'),   'eq', 'google.com' );
 };
 
 sub test_discover_policy {
