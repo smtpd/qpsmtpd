@@ -127,6 +127,40 @@ plugins in plugins/logging, specifically the L<plugins/logging/warn> and
 L<plugins/logging/adaptive> files for examples of how to write your own
 logging plugins.
 
+=head1 plugin authors
+
+While plugins can log anything they like, a few logging conventions in use:
+
+=over 4
+
+=item * at LOGINFO, log a single entry summarizing their disposition
+
+=item * log messages are prefixed with keywords: pass, fail, skip, error
+
+=over 4
+
+=item pass: tests were run and the message passed
+
+=item fail: tests were run and the message failed
+
+=item fail, tolerated: tests run, msg failed, reject disabled
+
+=item skip: tests were not run
+
+=item error: tried to run tests but failure(s) encountered
+
+=item info: additional info, not to be used for plugin summary
+
+=back
+
+=item * when tests fail and reject is disabled, use the 'fail, tolerated' prefix
+
+=back
+
+When these conventions are adhered to, the logs/summarize tool outputs each
+message as a single row, with a small x showing failed tests and a large X
+for failed tests that caused message rejection.
+
 =head1 Internal support for pluggable logging
 
 Any code in the core can call C<$self->log()> and those log lines will be
