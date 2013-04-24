@@ -224,7 +224,7 @@ sub get_reject {
 
     my $reject = $self->{_args}{reject};
     if (defined $reject && !$reject) {
-        $self->log(LOGINFO, "fail, reject disabled" . $log_mess);
+        $self->log(LOGINFO, "fail, tolerated" . $log_mess);
         return DECLINED;
     }
 
