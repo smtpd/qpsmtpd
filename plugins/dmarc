@@ -296,9 +296,16 @@ sub get_organizational_domain {
 
         # $self->log( LOGINFO, "i: $i, $tld" );
         #warn "i: $i -  tld: $tld\n";
-        if (grep /$tld/, $self->qp->config('public_suffix_list')) {
+        if (grep /^$tld/, $self->qp->config('public_suffix_list')) {
             $greatest = $i + 1;
+            next;
         }
+
+        # check for wildcards (ex: *.uk should match co.uk)
+        $tld = join '.', '\*', reverse((@labels)[0 .. $i-1]);
+        if (grep /^$tld/, $self->qp->config('public_suffix_list')) {
+            $greatest = $i + 1;
+        };
     }
 
     return $from_host if $greatest == scalar @labels;    # same
@@ -327,7 +334,16 @@ sub exists_in_dns {
 # Since this search gets repeated for the Organizational Name, if it
 # fails for the O.N., there's no delegation from the TLD.
     my $res = $self->init_resolver(8);
-    my $query = $res->query($domain, 'NS') or do {
+    return 1 if $self->host_has_rr('NS', $res, $domain);
+    return 1 if $self->host_has_rr('MX', $res, $domain);
+    return 1 if $self->host_has_rr('A',  $res, $domain);
+    return 1 if $self->host_has_rr('AAAA', $res, $domain);
+}
+
+sub host_has_rr {
+    my ($self, $type, $res, $domain) = @_;
+
+    my $query = $res->query($domain, $type) or do {
         if ($res->errorstring eq 'NXDOMAIN') {
             $self->log(LOGDEBUG, "fail, non-existent domain: $domain");
             return;
@@ -337,14 +353,14 @@ sub exists_in_dns {
     };
     my $matches = 0;
     for my $rr ($query->answer) {
-        next if $rr->type !~ /(?:NS|MX|A|AAAA)/;
+        next if $rr->type ne $type;
         $matches++;
     }
     if (0 == $matches) {
-        $self->log(LOGDEBUG, "fail, no records for $domain");
+        $self->log(LOGDEBUG, "no $type records for $domain");
     }
     return $matches;
-}
+};
 
 sub fetch_dmarc_record {
     my ($self, $zone) = @_;
