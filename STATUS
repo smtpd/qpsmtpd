@@ -15,6 +15,7 @@ in Perl Best Practices is also fair game.
 So far, the main changes between the release and dev branches have focused
 on these goals:
 
+  - plugins use is_immune and is_naughty instead of a local methods
   - plugins log a single entry summarizing their disposition
   - plugin logs prefixed with keywords: pass, fail, skip, error
   - plugins use 'reject' and 'reject_type' settings

@@ -36,11 +36,11 @@ sub MY::libscan {
 }
 
 sub MY::postamble {
-  qq[
+    qq[
 testcover :
 \t cover -delete && \\
-   HARNESS_PERL_SWITCHES=-MDevel::Cover \$(MAKE) test && \\
-   cover
+	HARNESS_PERL_SWITCHES=-MDevel::Cover \$(MAKE) test && \\
+	cover
 ]
 
 }

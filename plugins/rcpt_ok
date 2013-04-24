@@ -6,18 +6,18 @@ rcpt_ok
 
 =head1 SYNOPSIS
 
-this plugin checks the standard rcpthosts config
+Validate that we accept mail for a recipient using a qmail rcpthosts file
 
 =head1 DESCRIPTION
 
-Check the recipient hostname and determine if we accept mail to that host.
+Check the envelope recipient hostname and determine if we accept mail to that host.
 
 This is functionally identical to qmail's rcpthosts implementation, consulting
 both rcpthosts and morercpthosts.cdb.
 
 =head1 CONFIGURATION
 
-It should be configured to be run _LAST_!
+It should be configured as the _LAST_ recipient plugin!
 
 =cut
 
@@ -30,6 +30,8 @@ use Qpsmtpd::DSN;
 sub hook_rcpt {
     my ($self, $transaction, $recipient, %param) = @_;
 
+    return (OK) if $self->is_immune();     # relay_client or whitelist
+
     # Allow 'no @' addresses for 'postmaster' and 'abuse'
     # qmail-smtpd will do this for all users without a domain, but we'll
     # be a bit more picky.  Maybe that's a bad idea.
@@ -37,7 +39,6 @@ sub hook_rcpt {
 
     return (OK) if $self->is_in_rcpthosts($host);
     return (OK) if $self->is_in_morercpthosts($host);
-    return (OK) if $self->qp->connection->relay_client;    # failsafe
 
     # default of relaying_denied is obviously DENY,
     # we use the default "Relaying denied" message...

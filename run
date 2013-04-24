@@ -2,8 +2,8 @@
 #
 # You might want/need to to edit these settings
 QPUSER=smtpd
-# limit qpsmtpd to 150MB memory, should be several times what is needed.
-MAXRAM=150000000
+# limit qpsmtpd to 300MB memory
+MAXRAM=300000000
 BIN=/usr/local/bin
 PERL=/usr/bin/perl
 

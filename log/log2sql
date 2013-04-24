@@ -6,14 +6,11 @@ use warnings;
 use Cwd;
 use Data::Dumper;
 use DBIx::Simple;
+use IO::File;
 use File::stat;
 use Time::TAI64 qw/ tai2unix /;
 
 $Data::Dumper::Sortkeys = 1;
-
-my $dsn  = 'DBI:mysql:database=qpsmtpd;host=db;port=3306';
-my $user = 'qplog';
-my $pass = 't0ps3cret';
 
 my $logdir   = get_log_dir();
 my @logfiles = get_logfiles($logdir);
@@ -21,6 +18,7 @@ my @logfiles = get_logfiles($logdir);
 my (%plugins, %os, %message_ids);
 my $has_cleanup;
 my $db = get_db();
+check_plugins_table();
 
 foreach my $file (@logfiles) {
     my ($fid, $offset) = check_logfile($file);
@@ -208,6 +206,7 @@ sub parse_logfile {
         #warn "type: $type\n";
         if ($type eq 'plugin') {
             next if $plugin eq 'naughty';             # housekeeping only
+            next if $plugin eq 'karma' && 'karma adjust' eq substr($message,0,12);
             insert_plugin($msg_id, $plugin, $message);
         }
         elsif ($type eq 'queue') {
@@ -529,11 +528,69 @@ sub get_score {
 
 sub get_db {
 
-    my $db = DBIx::Simple->connect($dsn, $user, $pass)
+    my %dbv = get_config('log2sql');
+
+    $dbv{dsn}  ||= 'DBI:mysql:database=qpsmtpd;host=db;port=3306';
+    $dbv{user} ||= 'qplog';
+    $dbv{pass} ||= 't0ps3cret';
+
+    print Dumper(\%dbv);
+    my $db = DBIx::Simple->connect($dbv{dsn}, $dbv{user}, $dbv{pass})
       or die DBIx::Simple->error;
 
     return $db;
 }
+
+sub get_config {
+    my $file = shift or die "missing file name\n";
+    my %values;
+    foreach my $line ( get_config_contents( $file ) ) {
+        next if $line =~ /^#/;
+        chomp $line;
+        my ($key,$val) = split /\s*=\s*/, $line, 2;
+        $values{$key} = $val;
+    };
+    return %values;
+};
+
+sub get_config_contents {
+    my $name = shift;
+
+    my @config_dirs = qw[ config ../config log plugins ];
+    foreach my $dir ( @config_dirs ) {
+        next if ! -f "$dir/$name";
+
+        my $fh = IO::File->new();
+        if ( ! $fh->open( "$dir/$name", '<' ) ) {
+            warn "unable to open config file $dir/$name\n";
+            next;
+        };
+        my @contents = <$fh>;
+        return @contents;
+    };
+};
+
+sub check_plugins_table {
+    my $rows = exec_query( 'SELECT COUNT(*) FROM plugin');
+    return if scalar @$rows != 0;
+    my @lines = get_config_contents('registry.txt');
+    foreach my $line ( @lines ) {
+        next if $line =~ /^\s*#/;  # ignore comments
+        chomp $line;
+        next if ! $line;
+        my ($id, $name, $abb3, $abb5, $aliases) = split /\s+/, $line, 5;
+        my $q = "REPLACE INTO plugin (id,name,abb3,abb5) VALUES (??)";
+        print "query: $q, $id, $name, $abb3, $abb5\n";
+        exec_query($q, [$id, $name, $abb3, $abb5 ]);
+        next if ! $aliases;
+        foreach my $alias ( split /\s*,\s*/, $aliases ) {
+            next if ! $alias;
+            my $aq = "REPLACE INTO plugin_aliases (plugin_id,name) VALUES (??)";
+            print "aqury: $aq, $id, $alias\n";
+            exec_query($aq, [$id, $alias]);
+        };
+    };
+};
 
 sub exec_query {
     my $query  = shift;
@@ -550,10 +607,11 @@ sub exec_query {
     }
 
     #warn "err: $err\n";
-    if ($query =~ /INSERT INTO/) {
-        my ($table) = $query =~ /INSERT INTO (\w+)\s/;
+    if ($query =~ /(?:REPLACE|INSERT) INTO/) {
+        my ($table) = $query =~ /(?:REPLACE|INSERT) INTO (\w+)\s/;
         $db->query($query, @params);
-        die "$db->error\n$err" if $db->error ne 'DBI error: ';
+        warn "$db->error\n$err" if $db->error ne 'DBI error: ';
+        return if $query =~ /^REPLACE/;
         my $id = $db->last_insert_id(undef, undef, $table, undef) or die $err;
         return $id;
     }

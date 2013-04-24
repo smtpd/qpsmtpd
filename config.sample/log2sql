@@ -1,0 +1,4 @@
+# comments are allowed
+dsn  = DBI:mysql:database=qpsmtpd;host=db;port=3306
+user = qplog
+pass = can mysql have 6 spaces in a passphrase?

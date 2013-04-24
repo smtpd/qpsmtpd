@@ -6,8 +6,12 @@ use warnings;
 use Cwd;
 use Data::Dumper;
 use File::Tail;
+use Getopt::Std;
 
 $Data::Dumper::Sortkeys = 1;
+
+our $opt_l = 0;
+getopts('l');
 
 my (%plugins, %plugin_aliases, %seen_plugins, %pids);
 my %hide_plugins = map { $_ => 1 } qw/ hostname /;
@@ -32,7 +36,7 @@ my %formats = (
                ip                          => "%-15.15s",
                hostname                    => "%-20.20s",
                distance                    => "%5.5s",
-               'ident::geoip'              => "%-20.20s",
+               'ident::geoip'              => $opt_l ? "%-20.20s" : "%-6.6s",
                'ident::p0f'                => "%-10.10s",
                count_unrecognized_commands => "%-5.5s",
                unrecognized_commands       => "%-5.5s",
@@ -269,18 +273,20 @@ sub print_auto_format {
             next;
         }
 
+        my $wide = $opt_l ? 20 : 8;
+
         if (defined $pids{$pid}{helo_host} && $plugin =~ /helo/) {
-            $format .= " %-18.18s";
-            push @values, substr(delete $pids{$pid}{helo_host}, -18, 18);
+            $format .= " %-$wide.${wide}s";
+            push @values, substr(delete $pids{$pid}{helo_host}, -$wide, $wide);
             push @headers, 'HELO';
         }
         elsif (defined $pids{$pid}{from} && $plugin =~ /from/) {
-            $format .= " %-20.20s";
-            push @values, substr(delete $pids{$pid}{from}, -20, 20);
+            $format .= " %-$wide.${wide}s";
+            push @values, substr(delete $pids{$pid}{from}, -$wide, $wide);
             push @headers, 'MAIL FROM';
         }
         elsif (defined $pids{$pid}{to} && $plugin =~ /to|rcpt|recipient/) {
-            $format .= " %-20.20s";
+            $format .= " %-$wide.${wide}s";
             push @values,  delete $pids{$pid}{to};
             push @headers, 'RCPT TO';
         }
@@ -299,7 +305,7 @@ sub print_auto_format {
     $format .= "\n";
     printf("\n$format", @headers) if (!$printed || $printed % 20 == 0);
     printf($format, @values);
-    print Data::Dumper::Dumper($pids{$pid}) if keys %{$pids{$pid}};
+    #print Data::Dumper::Dumper($pids{$pid}) if keys %{$pids{$pid}};
     $printed++;
 }
 
@@ -308,6 +314,7 @@ sub show_symbol {
     return ' o' if $mess eq 'TLS setup returning';
     return ' o' if $mess eq 'pass';
     return ' -' if $mess eq 'skip';
+    return ' x' if 'fail, tolerated' eq substr($mess, 0, 15);
     return ' X' if $mess eq 'fail';
     return ' -' if $mess =~ /^skip[,:\s]/i;
     return ' o' if $mess =~ /^pass[,:\s]/i;
@@ -347,6 +354,8 @@ sub populate_plugins_from_registry {
     open my $F, '<', $file;
     while (defined(my $line = <$F>)) {
         next if $line =~ /^#/;    # discard comments
+        chomp $line;
+        next if ! $line;
         my ($id, $name, $abb3, $abb5, $aliases) = split /\s+/, $line;
         next if !defined $name;
         $plugins{$name} = {id => $id, abb3 => $abb3, abb5 => $abb5};

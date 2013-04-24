@@ -20,22 +20,22 @@ Karma provides other plugins with a karma value they can use to be more
 lenient, strict, or skip processing entirely.
 
 Karma is small, fast, and ruthlessly efficient. Karma can be used to craft
-custom connection policies such as these two examples: 
+custom connection policies such as these two examples:
 
-=over 4 
+=over 4
 
 Hi there, well known and well behaved sender. Please help yourself to greater concurrency (hosts_allow), multiple recipients (karma), and no delays (early_sender).
 
 Hi there, naughty sender. You get a max concurrency of 1, max recipients of 2, and SMTP delays.
 
-=back 
+=back
 
 =head1 CONFIG
 
 =head2 negative <integer>
 
 How negative a senders karma can get before we penalize them for sending a
-naughty message. Karma is the number of nice - naughty connections. 
+naughty message. Karma is the number of nice - naughty connections.
 
 Default: 1
 
@@ -67,7 +67,7 @@ I<0> will not reject any connections.
 
 I<1> will reject naughty senders.
 
-I<connect> is the most efficient setting. 
+I<connect> is the most efficient setting.
 
 To reject at any other connection hook, use the I<naughty> setting and the
 B<naughty> plugin.
@@ -104,7 +104,7 @@ sending a virus, early talking, or sending messages with a very high spam
 score.
 
 This plugin does not penalize connections with transaction notes I<relayclient>
-or I<whitelisthost> set. These notes would have been set by the B<relay>, 
+or I<whitelisthost> set. These notes would have been set by the B<relay>,
 B<whitelist>, and B<dns_whitelist_soft> plugins. Obviously, those plugins must
 run before B<karma> for that to work.
 
@@ -244,9 +244,10 @@ sub register {
 
     #$self->prune_db();    # keep the DB compact
     $self->register_hook('connect',       'connect_handler');
+    $self->register_hook('rcpt_pre',      'rcpt_handler');
     $self->register_hook('data',          'data_handler');
+    $self->register_hook('data_post',     'data_handler');
     $self->register_hook('disconnect',    'disconnect_handler');
-    $self->register_hook('received_line', 'rcpt_handler');
 }
 
 sub hook_pre_connection {
@@ -255,8 +256,6 @@ sub hook_pre_connection {
     $self->connection->notes('karma_history', 0);
 
     my $remote_ip = $args{remote_ip};
-
-    #my $max_conn = $args{max_conn_ip};
 
     my $db   = $self->get_db_location();
     my $lock = $self->get_db_lock($db) or return DECLINED;
@@ -323,23 +322,43 @@ sub connect_handler {
 }
 
 sub rcpt_handler {
-    my ($self, $transaction, $recipient, %args) = @_;
+    my ($self, $transaction, $addr) = @_;
 
-    my $recipients = scalar $self->transaction->recipients;
-    return DECLINED if $recipients < 2;    # only one recipient
+    return DECLINED if $self->is_immune();
 
-    my $karma = $self->connection->notes('karma_history');
-    return DECLINED if $karma > 0;         # good karma, no limit
+    my $recipients = scalar $self->transaction->recipients or do {
+        $self->log(LOGDEBUG, "info, no recipient count");
+        return DECLINED;
+    };
+
+    my $history = $self->connection->notes('karma_history');
+    if ( $history > 0 ) {
+        $self->log(LOGDEBUG, "info, good history");
+        return DECLINED;
+    };
+
+    my $karma = $self->connection->notes('karma');
+    if ( $karma > 0 ) {
+        $self->log(LOGDEBUG, "info, good connection");
+        return DECLINED;
+    };
 
     #  limit # of recipients if host has negative or unknown karma
-    return $self->get_reject("too many recipients");
+    return (DENY, "too many recipients for karma $karma (h: $history)");
 }
 
 sub data_handler {
     my ($self, $transaction) = @_;
-    return DECLINED if !$self->qp->connection->relay_client;
 
-    $self->adjust_karma(5);    # big karma boost for authenticated user/IP
+    return DECLINED if $self->is_immune();
+    return DECLINED if $self->is_naughty();   # let naughty do it
+
+# cutting off a naughty sender at DATA prevents having to receive the message
+    my $karma = $self->connection->notes('karma');
+    if ( $karma < -3 ) {     # bad karma
+        return $self->get_reject("very bad karma: $karma");
+    };
+
     return DECLINED;
 }
 

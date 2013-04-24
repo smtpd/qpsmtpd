@@ -246,7 +246,7 @@ sub helo_handler {
     my ($self, $transaction, $host) = @_;
 
     if (!$host) {
-        $self->log(LOGINFO, "fail, no helo host");
+        $self->log(LOGINFO, "fail, tolerated, no helo host");
         return DECLINED;
     }
 
