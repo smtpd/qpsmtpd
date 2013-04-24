@@ -17,6 +17,7 @@
   karma: sprinkled karma awards throughout other plugins
      - limit poor karma hosts to 1 concurrent connection
      - allow +3 conncurrent connections to hosts with good karma
+     - limit recipients to 1 for senders with negative karma
 
   Sanitize spamd_sock path for perl taint mode - Markus Ullmann
 
