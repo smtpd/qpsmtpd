@@ -303,6 +303,12 @@ sub is_immune {
         $self->log(LOGINFO, "skip, whitelisted sender");
         return 1;
     }
+    return;
+}
+
+sub is_naughty {
+    my $self = shift;
+
     if ($self->connection->notes('naughty')) {
 
         # see plugins/naughty
@@ -323,7 +329,7 @@ sub adjust_karma {
 
     my $karma = $self->connection->notes('karma') || 0;
     $karma += $value;
-    $self->log(LOGDEBUG, "karma adjust: $value ($karma)");
+    $self->log(LOGDEBUG, "karma $value ($karma)");
     $self->connection->notes('karma', $karma);
     return $value;
 }
