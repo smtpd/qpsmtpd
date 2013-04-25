@@ -27,13 +27,8 @@ use CPAN;
 use English qw( -no_match_vars );
 
 my $apps = [
-    { app => 'expat'         , info => { port => 'expat2',         dport=>'expat2' } },
-    { app => 'gettext'       , info => { port => 'gettext',        dport=>'gettext'} },
-    { app => 'gmake'         , info => { port => 'gmake',          dport=>'gmake'  } },
-    { app => 'mysql-server-5', info => { port => 'mysql50-server', dport=>'mysql5',  yum =>'mysql-server'} },
-    { app => 'apache22'      , info => { port => 'apache22',       dport=>'',     yum => 'httpd' } },
-    { app => 'mod_perl2'     , info => { port => 'mod_perl2',      dport=>'',     yum => 'mod_perl' } },
-    { app => 'rsync'         , info => { }, },
+#   { app => 'mysql-server-5', info => { port => 'mysql50-server', dport=>'mysql5',  yum =>'mysql-server'} },
+#   { app => 'apache22'      , info => { port => 'apache22',       dport=>'',     yum => 'httpd' } },
 ];
 
 $EUID == 0 or die "You will have better luck if you run me as root.\n";
@@ -95,8 +90,9 @@ sub get_perl_modules_from_Makefile_PL {
         };
         next if ! $in;
         last if $line =~ /}/;
+        next if $line !~ /=/;  # no = char means not a module
         my ($mod,$ver) = split /\s*=\s*/, $line;
-        $mod =~ s/[\s'"]*//g;   # remove whitespace and quotes
+        $mod =~ s/[\s'"\#]*//g;   # remove whitespace and quotes
         next if ! $mod;
         push @modules, name_overrides($mod);
 #print "module: .$mod.\n";
