@@ -377,58 +377,46 @@ sub _load_plugin {
     my $self = shift;
     my ($plugin_line, @plugin_dirs) = @_;
 
-    my ($plugin, @args) = split /\s+/, $plugin_line;
-
-    my $package;
+    # untaint the config data before passing it to plugins
+    my ($safe_line) = $plugin_line =~ /^([ -~]+)$/  # all ascii printable
+        or die "unsafe characters in config line: $plugin_line\n";
+    my ($plugin, @args) = split /\s+/, $safe_line;
 
     if ($plugin =~ m/::/) {
+        return $self->_load_package_plugin($plugin, $safe_line, \@args);
+    };
 
-        # "full" package plugin (My::Plugin)
-        $package = $plugin;
-        $package =~ s/[^_a-z0-9:]+//gi;
-        my $eval = qq[require $package;\n]
-          . qq[sub ${plugin}::plugin_name { '$plugin' }];
-        $eval =~ m/(.*)/s;
-        $eval = $1;
-        eval $eval;
-        die "Failed loading $package - eval $@" if $@;
-        $self->log(LOGDEBUG, "Loading $package ($plugin_line)")
-          unless $plugin_line =~ /logging/;
-    }
-    else {
-        # regular plugins/$plugin plugin
-        my $plugin_name = $plugin;
-        $plugin =~ s/:\d+$//;    # after this point, only used for filename
+    # regular plugins/$plugin plugin
+    my $plugin_name = $plugin;
+    $plugin =~ s/:\d+$//;    # after this point, only used for filename
 
-        # Escape everything into valid perl identifiers
-        $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
+    # Escape everything into valid perl identifiers
+    $plugin_name =~ s/([^A-Za-z0-9_\/])/sprintf("_%2x",unpack("C",$1))/eg;
 
-        # second pass cares for slashes and words starting with a digit
-        $plugin_name =~ s{
-        (/+)       # directory
-        (\d?)      # package's first character
-       }[
-         "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
-        ]egx;
+    # second pass cares for slashes and words starting with a digit
+    $plugin_name =~ s{
+    (/+)       # directory
+    (\d?)      # package's first character
+    }[
+        "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
+    ]egx;
 
-        $package = "Qpsmtpd::Plugin::$plugin_name";
+    my $package = "Qpsmtpd::Plugin::$plugin_name";
 
-        # don't reload plugins if they are already loaded
-        unless (defined &{"${package}::plugin_name"}) {
-          PLUGIN_DIR: for my $dir (@plugin_dirs) {
-                if (-e "$dir/$plugin") {
-                    Qpsmtpd::Plugin->compile($plugin_name, $package,
-                                  "$dir/$plugin", $self->{_test_mode}, $plugin);
-                    $self->log(LOGDEBUG,
-                               "Loading $plugin_line from $dir/$plugin")
-                      unless $plugin_line =~ /logging/;
-                    last PLUGIN_DIR;
-                }
+    # don't reload plugins if they are already loaded
+    unless (defined &{"${package}::plugin_name"}) {
+        PLUGIN_DIR: for my $dir (@plugin_dirs) {
+            if (-e "$dir/$plugin") {
+                Qpsmtpd::Plugin->compile($plugin_name, $package,
+                                "$dir/$plugin", $self->{_test_mode}, $plugin);
+                $self->log(LOGDEBUG, "Loading $safe_line from $dir/$plugin")
+                    unless $safe_line =~ /logging/;
+                last PLUGIN_DIR;
             }
-            die "Plugin $plugin_name not found in our plugin dirs (",
-              join(", ", @plugin_dirs), ")"
-              unless defined &{"${package}::plugin_name"};
         }
+        die "Plugin $plugin_name not found in our plugin dirs (",
+            join(", ", @plugin_dirs), ")"
+            unless defined &{"${package}::plugin_name"};
     }
 
     my $plug = $package->new();
@@ -436,6 +424,26 @@ sub _load_plugin {
 
     return $plug;
 }
+
+sub _load_package_plugin {
+    my ($self, $plugin, $plugin_line, $args) = @_;
+    # "full" package plugin (My::Plugin)
+    my $package = $plugin;
+    $package =~ s/[^_a-z0-9:]+//gi;
+    my $eval = qq[require $package;\n]
+        . qq[sub ${plugin}::plugin_name { '$plugin' }];
+    $eval =~ m/(.*)/s;
+    $eval = $1;
+    eval $eval;
+    die "Failed loading $package - eval $@" if $@;
+    $self->log(LOGDEBUG, "Loading $package ($plugin_line)")
+        unless $plugin_line =~ /logging/;
+
+    my $plug = $package->new();
+    $plug->_register($self, @$args);
+
+    return $plug;
+};
 
 sub transaction { return {}; }    # base class implements empty transaction
 
