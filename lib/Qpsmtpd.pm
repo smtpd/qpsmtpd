@@ -7,7 +7,7 @@ use Qpsmtpd::Constants;
 
 #use DashProfiler;
 
-$VERSION = "0.91";
+$VERSION = "0.92";
 
 my $git;
 
@@ -377,7 +377,7 @@ sub _load_plugin {
     my $self = shift;
     my ($plugin_line, @plugin_dirs) = @_;
 
-    my ($plugin, @args) = split / /, $plugin_line;
+    my ($plugin, @args) = split /\s+/, $plugin_line;
 
     my $package;
 
