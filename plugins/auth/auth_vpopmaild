@@ -6,7 +6,7 @@ use warnings;
 use Qpsmtpd::Constants;
 use IO::Socket;
 use version;
-my $VERSION = qv('1.0.3');
+my $VERSION = qv('1.0.4');
 
 sub register {
     my ($self, $qp, %args) = @_;
@@ -29,8 +29,65 @@ sub auth_vpopmaild {
         return DECLINED;
     }
 
+    my $socket = $self->get_socket() or return DECLINED;
+
+    $self->log(LOGDEBUG, "attempting $method");
+
+    # Get server greeting (+OK)
+    my $response = $self->get_response( $socket, '' )
+        or return DECLINED;
+
+    if ($response !~ /^\+OK/) {
+        $self->log(LOGERROR, "skip, bad connection response: $response");
+        close $socket;
+        return DECLINED;
+    }
+
+    print $socket "login $user $passClear\n\r";  # send login details
+    $response = $self->get_response( $socket, "login $user $passClear\n\r" )
+        or return DECLINED;
+
+    close $socket;
+
+    # check for successful login (single line (+OK) or multiline (+OK+))
+    if ($response =~ /^\+OK/) {
+        $self->log(LOGINFO, "pass, clear");
+        return (OK, 'auth_vpopmaild');
+    }
+
+    chomp $response;
+    $self->log(LOGNOTICE, "fail, $response");
+    return DECLINED;
+}
+
+sub get_response {
+    my ($self, $socket, $send) = @_;
+
+    print $socket $send if $send;     # send request
+    my $response = <$socket>;         # get response
+    chomp $response;
+
+    if ( ! defined $response ) {
+        $self->log(LOGERROR, "error, no connection response");
+        close $socket;
+        return;
+    }
+
+    if ($response =~ /^([ -~\n\r]+)$/) { # match ascii printable
+        $response = $1;                  # $response now untainted
+    }
+    else {
+        $self->log(LOGERROR, "error, response unsafe.");
+    };
+
+    return $response;
+};
+
+sub get_socket {
+    my ($self) = @_;
+
     # create socket
-    my $vpopmaild_socket =
+    my $socket =
       IO::Socket::INET->new(
                             PeerAddr => $self->{_vpopmaild_host},
                             PeerPort => $self->{_vpopmaild_port},
@@ -38,46 +95,11 @@ sub auth_vpopmaild {
                             Type     => SOCK_STREAM
                            )
       or do {
-        $self->log(LOGERROR, "skip: socket connection to vpopmaild failed");
-        return DECLINED;
+        $self->log(LOGERROR, "skip, socket connection to vpopmaild failed");
+        return;
       };
-
-    $self->log(LOGDEBUG, "attempting $method");
-
-    # Get server greeting (+OK)
-    my $connect_response = <$vpopmaild_socket>;
-    if (!$connect_response) {
-        $self->log(LOGERROR, "skip: no connection response");
-        close($vpopmaild_socket);
-        return DECLINED;
-    }
-
-    if ($connect_response !~ /^\+OK/) {
-        $self->log(LOGERROR,
-                   "skip: bad connection response: $connect_response");
-        close($vpopmaild_socket);
-        return DECLINED;
-    }
-
-    print $vpopmaild_socket "login $user $passClear\n\r";   # send login details
-    my $login_response = <$vpopmaild_socket>;    # get response from server
-    close($vpopmaild_socket);
-
-    if (!$login_response) {
-        $self->log(LOGERROR, "skip: no login response");
-        return DECLINED;
-    }
-
-    # check for successful login (single line (+OK) or multiline (+OK+))
-    if ($login_response =~ /^\+OK/) {
-        $self->log(LOGINFO, "pass: clear");
-        return (OK, 'auth_vpopmaild');
-    }
-
-    chomp $login_response;
-    $self->log(LOGNOTICE, "fail: $login_response");
-    return DECLINED;
-}
+    return $socket;
+};
 
 __END__
 
@@ -113,7 +135,9 @@ please read the VPOPMAIL section in doc/authentication.pod
 
 Robin Bowes <robin.bowes@yo61.com>
 
-Matt Simerson (updated response parsing, added logging)
+2012 Matt Simerson (updated response parsing, added logging)
+
+2013 Matt Simerson - split get_response and get_socket into new methods, added taint checking to responses
 
 =head1 COPYRIGHT AND LICENSE
 
