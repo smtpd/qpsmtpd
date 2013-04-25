@@ -17,11 +17,11 @@ WriteMakefile(
         'Time::HiRes'  => 0,
         'IO::Socket::SSL'=>0,
 # modules for specific features
-        'Geo::IP'            => 0,
         'Mail::DKIM'         => 0,
         'Mail::SpamAssassin' => 0,
-        'Mail::SPF'          => 0,
         'File::Tail'         => 0,
+#        'Geo::IP'            => 0,
+#        'Mail::SPF'          => 0,
 #        'Time::TAI64'        => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
