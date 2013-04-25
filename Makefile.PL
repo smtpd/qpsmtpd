@@ -15,14 +15,15 @@ WriteMakefile(
         'Net::DNS'     => 0.39,
         'Net::IP'      => 0,
         'Time::HiRes'  => 0,
-        'IO::Socket::SSL'=>0,
+        'IO::Socket::SSL' => 0,
 # modules for specific features
         'Mail::DKIM'         => 0,
         'File::Tail'         => 0,
+        'Time::TAI64'        => 0,
+# modules that cause Travis build tests to fail
 #       'Mail::SpamAssassin' => 0,
 #       'Geo::IP'            => 0,
 #       'Mail::SPF'          => 0,
-#       'Time::TAI64'        => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',
