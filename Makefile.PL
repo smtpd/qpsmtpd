@@ -20,7 +20,7 @@ WriteMakefile(
         'Geo::IP'            => 0,
         'Mail::DKIM'         => 0,
         'Mail::SpamAssassin' => 0,
-        'Mail::SPF'          => 0,
+#        'Mail::SPF'          => 0,
         'File::Tail'         => 0,
         'Time::TAI64'        => 0,
     },
