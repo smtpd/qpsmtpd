@@ -1,5 +1,6 @@
 .gitignore
 .travis.yml
+bin/install_deps.pl
 Changes
 config.sample/badhelo
 config.sample/badmailfrom
@@ -10,6 +11,7 @@ config.sample/dnsbl_zones
 config.sample/flat_auth_pw
 config.sample/invalid_resolvable_fromhost
 config.sample/IP
+config.sample/log2sql
 config.sample/logging
 config.sample/loglevel
 config.sample/norelayclients
