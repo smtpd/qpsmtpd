@@ -4,7 +4,12 @@
   new plugins: dmarc, fcrdns
 
   new feature: DKIM message signing. See 'perldoc plugins/dkim' for details.
-        includes script for generating DKIM selectors, keys, and DNS records
+        includes script for generating DKIM selectors, keys, and DNS records.
+        RAM bumped up to 300MB, to avoid memory exhaustion errors.
+
+  Qpsmtpd.pm: untaint config options before passing them to plugins.
+
+  auth_vpopmaild: untaint responses obtained from network. Combined with the taint fix for config options, enables auth_vpopmaild to work when setting the host config and port
 
   tls: added ability to store SSL keys in config/ssl
 
@@ -27,6 +32,9 @@
 
   Fix for Net::DNS break -  Markus Ullmann
 
+  SPF: arrange logic to so improve reliability of spf pass reporting (helpful to DMARC plugin)
+
+  is_naughty removed from is_immune feature. Allows more granular handling by plugins.
 
 0.91  Nov 20, 2012
 
