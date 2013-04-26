@@ -824,7 +824,7 @@ sub received_line {
           . " (HELO "
           . $self->connection->hello_host . ") ("
           . $self->connection->remote_ip
-          . ")\n  $authheader  by "
+          . ")\n by "
           . $self->config('me')
           . " (qpsmtpd/"
           . $self->version

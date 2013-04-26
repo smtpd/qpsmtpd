@@ -1,0 +1,33 @@
+---
+abstract: 'Flexible smtpd daemon written in Perl'
+author:
+  - 'Ask Bjoern Hansen <ask@develooper.com>'
+build_requires:
+  ExtUtils::MakeMaker: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 0
+generated_by: 'ExtUtils::MakeMaker version 6.64, CPAN::Meta::Converter version 2.120921'
+license: unknown
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: qpsmtpd
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  Data::Dumper: 0
+  Date::Parse: 0
+  File::Tail: 0
+  File::Temp: 0
+  IO::Socket::SSL: 0
+  MIME::Base64: 0
+  Mail::DKIM: 0
+  Mail::Header: 0
+  Net::DNS: 0.39
+  Net::IP: 0
+  Time::HiRes: 0
+  Time::TAI64: 0
+version: 0.91
