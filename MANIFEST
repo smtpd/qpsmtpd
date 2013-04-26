@@ -157,7 +157,8 @@ qpsmtpd-forkserver
 qpsmtpd-prefork
 README
 README.plugins
-run
+run.forkserver
+run.tcpserver
 STATUS
 t/addresses.t
 t/auth.t
