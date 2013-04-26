@@ -20,6 +20,9 @@ WriteMakefile(
         'Mail::DKIM'         => 0,
         'File::Tail'         => 0,
         'Time::TAI64'        => 0,
+#       'DBI'                => 0,   # auth_vpopmail_sql and
+#       'DBD::mysql'         => 0,   # log2sql
+#       'DBIx::Simple'       => 0,
 # modules that cause Travis build tests to fail
 #       'Mail::SpamAssassin' => 0,
 #       'Geo::IP'            => 0,
