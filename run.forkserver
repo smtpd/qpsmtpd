@@ -13,7 +13,7 @@ LANG=C
 exec 2>&1 \
 sh -c "
   exec $BIN/softlimit -m $MAXRAM   \
-    $PERL -T ./bin/qpsmtpd-forkserver  \
+    $PERL -T ./qpsmtpd-forkserver  \
       --listen-address $IP         \
       --port 25                    \
       --port 587                   \
