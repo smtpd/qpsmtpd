@@ -19,6 +19,6 @@ NOFILESGID=`id -g $QPUSER`
 exec $BIN/softlimit -m $MAXRAM  \
   $BIN/tcpserver -c 10 -v -R -p \
   -u $QMAILDUID -g $NOFILESGID $IP $PORT  \
-  ./bin/qpsmtpd 2>&1
+  ./qpsmtpd 2>&1
 # <end tcpserver>
 
