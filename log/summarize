@@ -8,6 +8,7 @@ use Data::Dumper;
 use File::Tail;
 use Getopt::Std;
 
+$|++;
 $Data::Dumper::Sortkeys = 1;
 
 our $opt_l = 0;
@@ -32,54 +33,11 @@ my $fh = File::Tail->new(
 my $printed = 0;
 my $has_cleanup;
 
-my %formats = (
-               ip                          => "%-15.15s",
-               hostname                    => "%-20.20s",
-               distance                    => "%5.5s",
-               'ident::geoip'              => $opt_l ? "%-20.20s" : "%-6.6s",
-               'ident::p0f'                => "%-10.10s",
-               count_unrecognized_commands => "%-5.5s",
-               unrecognized_commands       => "%-5.5s",
-               dnsbl                       => "%-3.3s",
-               rhsbl                       => "%-3.3s",
-               relay                       => "%-3.3s",
-               karma                       => "%-3.3s",
-               fcrdns                      => "%-3.3s",
-               earlytalker                 => "%-3.3s",
-               check_earlytalker           => "%-3.3s",
-               helo                        => "%-3.3s",
-               tls                         => "%-3.3s",
-               'auth::auth_vpopmail'       => "%-3.3s",
-               'auth::auth_vpopmaild'      => "%-3.3s",
-               'auth::auth_vpopmail_sql'   => "%-3.3s",
-               'auth::auth_checkpassword'  => "%-3.3s",
-               badmailfrom                 => "%-3.3s",
-               check_badmailfrom           => "%-3.3s",
-               sender_permitted_from       => "%-3.3s",
-               resolvable_fromhost         => "%-3.3s",
-               dont_require_anglebrackets  => "%-3.3s",
-               'queue::qmail-queue'        => "%-3.3s",
-               connection_time             => "%-4.4s",
-              );
-
-my %formats3 = (
-                %formats,
-                badrcptto          => "%-3.3s",
-                check_badrcptto    => "%-3.3s",
-                qmail_deliverable  => "%-3.3s",
-                rcpt_ok            => "%-3.3s",
-                check_basicheaders => "%-3.3s",
-                headers            => "%-3.3s",
-                uribl              => "%-3.3s",
-                bogus_bounce       => "%-3.3s",
-                check_bogus_bounce => "%-3.3s",
-                domainkeys         => "%-3.3s",
-                dkim               => "%-3.3s",
-                dmarc              => "%-3.3s",
-                spamassassin       => "%-3.3s",
-                dspam              => "%-3.3s",
-                'virus::clamdscan' => "%-3.3s",
-               );
+my %formats  = get_default_field_widths();
+my %formats3 = ( %formats, map { $_ => "%-3.3s" } qw/ badrcptto check_badrcptto
+        qmail_deliverable rcpt_ok check_basicheaders headers uribl bogus_bounce
+        check_bogus_bounce domainkeys dkim dmarc spamassassin dspam
+        virus::clamdscan / );
 
 while (defined(my $line = $fh->read)) {
     chomp $line;
@@ -87,7 +45,7 @@ while (defined(my $line = $fh->read)) {
     next if !$line;
     my ($type, $pid, $hook, $plugin, $message) = parse_line($line);
     next if !$type;
-    next if $type =~ /^(info|unknown|response|tcpserver)$/;
+    next if $type =~ /^(?:info|unknown|response|tcpserver)$/;
     next if $type eq 'init';    # doesn't occur in all deployment models
 
     if (!$pids{$pid}) {         # haven't seen this pid
@@ -95,7 +53,7 @@ while (defined(my $line = $fh->read)) {
         my ($host, $ip) = split /\s/, $message;
         $ip = substr $ip, 1, -1;
         foreach (keys %seen_plugins, qw/ helo_host from to /) {
-            $pids{$pid}{$_} = '';
+            $pids{$pid}{$_} = '';    # define them
         }
         $pids{$pid}{ip} = $ip;
         $pids{$pid}{hostname} = $host if $host ne 'Unknown';
@@ -111,60 +69,91 @@ while (defined(my $line = $fh->read)) {
         delete $pids{$pid};
     }
     elsif ($type eq 'plugin') {
-        next if $plugin eq 'naughty';    # housekeeping only
-        if (!$pids{$pid}{$plugin}) {     # first entry for this plugin
-            $pids{$pid}{$plugin} = $message;
-        }
-        else {                           # subsequent log entry for this plugin
-            if ($pids{$pid}{$plugin} !~ /^(?:pass|fail|skip)/i) {
-                $pids{$pid}{$plugin} = $message;    # overwrite 1st
-            }
-            else {
-                #print "ignoring subsequent hit on $plugin: $message\n";
-            }
-        }
-
-        if ($plugin eq 'ident::geoip') {
-            if (length $message < 3) {
-                $formats{'ident::geoip'}  = "%-3.3s";
-                $formats3{'ident::geoip'} = "%-3.3s";
-            }
-            else {
-                my ($gip, $distance) = $message =~ /(.*?),\s+([\d]+)\skm/;
-                if ($distance) {
-                    $pids{$pid}{$plugin} = $gip;
-                    $pids{$pid}{distance} = $distance;
-                }
-            }
-        }
+        handle_plugin($message,$plugin,$pid,$line);
     }
     elsif ($type eq 'reject')  { }
     elsif ($type eq 'connect') { }
     elsif ($type eq 'dispatch') {
-        if ($message =~ /^dispatching MAIL FROM/i) {
-            my ($from) = $message =~ /<(.*?)>/;
-            $pids{$pid}{from} = $from;
-        }
-        elsif ($message =~ /^dispatching RCPT TO/i) {
-            my ($to) = $message =~ /<(.*?)>/;
-            $pids{$pid}{to} = $to;
-        }
-        elsif ($message =~ m/dispatching (EHLO|HELO) (.*)/) {
-            $pids{$pid}{helo_host} = $2;
-        }
-        elsif ($message eq 'dispatching DATA')     { }
-        elsif ($message eq 'dispatching QUIT')     { }
-        elsif ($message eq 'dispatching STARTTLS') { }
-        elsif ($message eq 'dispatching RSET') {
-            print_auto_format($pid, $line);
-        }
-        else {
-            # anything here is likely an unrecognized command
-            #print "$message\n";
-        }
+        handle_dispatch($message,$pid,$line);
     }
     else {
         print "$type $pid $hook $plugin $message\n";
+    }
+}
+
+sub get_default_field_widths {
+    my %widths = (
+        ip                          => "%-15.15s",
+        hostname                    => "%-20.20s",
+        'ident::geoip'              => $opt_l ? "%-20.20s" : "%-6.6s",
+        'ident::p0f'                => "%-10.10s",
+        distance                    => "%5.5s",
+        count_unrecognized_commands => "%-5.5s",
+        unrecognized_commands       => "%-5.5s",
+        connection_time             => "%-4.4s",
+    ),
+    map { $_ => "%-3.3s" }
+    qw/ dnsbl rhsbl relay karma fcrdns earlytalker check_earlytalker helo
+        tls auth::auth_vpopmail auth::auth_vpopmaild auth::auth_vpopmail_sql
+        auth::auth_checkpassword badmailfrom check_badmailfrom
+        sender_permitted_from resolvable_fromhost dont_require_anglebrackets
+        queue::qmail-queue queue::smtp-forward /;
+
+    return %widths;
+};
+
+sub handle_plugin {
+    my ($message, $plugin, $pid, $line) = @_;
+    return if $plugin eq 'naughty';   # housekeeping only
+    if (!$pids{$pid}{$plugin}) {     # first entry for this plugin
+        $pids{$pid}{$plugin} = $message;
+    }
+    else {                           # subsequent log entry for this plugin
+        if ($pids{$pid}{$plugin} !~ /^(?:pass|fail|skip)/i) {
+            $pids{$pid}{$plugin} = $message;    # overwrite 1st
+        }
+        else {
+            #print "ignoring subsequent hit on $plugin: $message\n";
+        }
+    }
+
+    if ($plugin eq 'ident::geoip') {
+        if (length $message < 3) {
+            $formats{'ident::geoip'}  = "%-3.3s";
+            $formats3{'ident::geoip'} = "%-3.3s";
+        }
+        else {
+            my ($gip, $distance) = $message =~ /(.*?),\s+([\d]+)\skm/;
+            if ($distance) {
+                $pids{$pid}{$plugin} = $gip;
+                $pids{$pid}{distance} = $distance;
+            }
+        }
+    }
+}
+
+sub handle_dispatch {
+    my ($message, $pid, $line) = @_;
+    if ($message =~ /^dispatching MAIL FROM/i) {
+        my ($from) = $message =~ /<(.*?)>/;
+        $pids{$pid}{from} = $from;
+    }
+    elsif ($message =~ /^dispatching RCPT TO/i) {
+        my ($to) = $message =~ /<(.*?)>/;
+        $pids{$pid}{to} = $to;
+    }
+    elsif ($message =~ m/dispatching (EHLO|HELO) (.*)/) {
+        $pids{$pid}{helo_host} = $2;
+    }
+    elsif ($message eq 'dispatching DATA')     { }
+    elsif ($message eq 'dispatching QUIT')     { }
+    elsif ($message eq 'dispatching STARTTLS') { }
+    elsif ($message eq 'dispatching RSET') {
+        print_auto_format($pid, $line);
+    }
+    else {
+        # anything here is likely an unrecognized command
+        #print "$message\n";
     }
 }
 
@@ -370,4 +359,78 @@ sub populate_plugins_from_registry {
         }
     }
 }
+
+__END__
+
+=head1 NAME
+
+Summarize
+
+=head2 SYNOPSIS
+
+Parse the qpsmtpd logs and display a one line summary of each connection
+
+=head2 EXAMPLES
+
+ ip              dista geo    p0f        krm dbl rly dns ear HELO     hlo tls MAIL FRO bmf rbl rfh spf RCPT TO  bto qmd rok tim
+ 192.48.85.146    2705 NA, US FreeBSD 9.  o   o   -   o   -  tnpi.net  o   o                                                0.55
+ 190.194.22.35    7925 SA, AR Windows 7   X   X   -   X   o  a.net.ar  x      ogle.com  o   o   o   x  *o*g@sim  o   o   o  2.72
+ 192.48.85.146    2705 NA, US  -          o   o   -   o   -  tnpi.net  o                                                    0.41
+ 181.164.160.98   8493 SA, AR Windows 7   X   X   -   X   o  l.com.ar  x      ogle.com  o   o   o   x  trapped@  o   o   o  2.61
+ 188.79.146.22    8381 EU, ES Windows 7   o   X   -   o   o  zztel.es  o      ogle.com  o   o   o   x  *o**an@s  o   o   o  3.02
+ 188.79.146.22    8381 EU, ES Windows 7   o   X   -   o   o  zztel.es  o      ogle.com  o   o   o   x  *o**an@s  o   o   o  2.58
+ 188.79.146.22    8381 EU, ES Windows 7   o   X   -   o   o  zztel.es  o      ogle.com  o   o   o   x  *o**an@s  o   o   o  2.70
+ 190.194.22.35    7925 SA, AR Windows 7   X   X   -   X   o  a.net.ar  x      ogle.com  o   o   o   x  do*g@s*m  o   o   o  2.60
+
+ ip              dista geo    p0f        krm dbl rly dns ear HELO     hlo tls MAIL FRO bmf rbl rfh spf RCPT TO  bto qmd rok bog hdr dky dkm dmc spm dsp clm qqm tim
+ 192.48.85.146    2705 NA, US FreeBSD 9.  o   o   -   o   -  tnpi.net  o   o                                                                                    1.36
+ 192.48.85.146    2705 NA, US  -          o   o   -   o   -  tnpi.net  o                                                                                        0.36
+ 66.175.56.179    2313 NA, US Linux 2.6.  o   o   -   o   -  zone.com  o   o  chem.com  o   o   o   -  d**n@the  o   o   o   o   o   -   o   -   -   -   -   o  2.86
+ 190.237.55.32    5411 SA, PE Windows 7   o   X   -   X   o  gtsgnvnu  x      ryrk.net  o   o   x   -  *an@s*rl  o   o   o                                      3.54
+ 192.48.85.146    2705 NA, US  -          o   o   -   o   -  tnpi.net  o                                                                                        0.20
+ 207.171.174.77   2700 NA, US             o   o   -   o   -  azon.com  o      azon.com  o   o   o   o  *a*e@s*r  o   o   o   o   o   -   o   o   o   o   o   o  7.27
+ 201.141.78.4     1487 NA, MX Windows XP  o   X   -   X   o  fmhufhjo  x      fdvx.net  o   o   x   -  d**@si*e  o   o   o                                      2.95
+ 201.141.78.4     1487 NA, MX Windows XP  X   X   -   X   o  fmhufhjo  x      fdvx.net  o   o   x   -  d**@s*rl  o   o   o                                      2.42
+
+The display autosizes to display disposition results for as many plugins as are emitting logs. The 3 char abbreviations are listed with their full plugin names in plugins/registry.txt. The GeoIP, p0f, HELO, FROM, and RCPT fields are compressed to fit on a typical display. If you have a wider display, use the -l option to display longer lines and more detail.
+
+Starting from left to right, in the first block, the results are interpreted as follows:
+
+ geo - We see 2 connections from N. America, 3 from S. America, and 3 from Europe.
+ p0f - One system is running FreeBSD and the rest are running Windows 7.
+ krm - 3 of the connections will be rejected because of bad karma (sender history)
+ dbl - 7 are from IPs on DNS blacklists, an offense worth rejecting for.
+ rly - None of the IPs have relay permission.
+ dns - Only three senders have Forward Confirmed Reverse DNS
+ ear - two connections skipped testing (good karma), and the rest passed
+ hlo - three of the senders failed to present valid HELO hostnames
+ tls - one sender negotiated TLS
+ bmf - none of the senders presented a from address in our badmailfrom list
+ rbl - none of the sender domains are in a RHS blocking list
+ rfh - resolvable_from_host: all the sender domains resolve
+ spf - all but two connections fail SPF, meaning they are forging the envelope sender identity
+ bto - badmailto: none of the recipients are in our badmailto list
+ qmd - qmail_deliverable: the recipients are valid addresses on our system
+ rok - the recipient domain is on our system
+ tim - the number of seconds the connection was active
+
+In the second block, we have two messages that were ultimately delivered.
+
+ bog - no messages were bogus bounces
+ hdr - the messages had valid headers
+ dky - the messages were not DomainKeys signed
+ dkm - two messages were DKIM signed and passed validation
+ dmc - the message from amazon.com passed DMARC validation
+ spm - spamassassin, one skipped processing, one passed
+ dsp - dspam, one skipped, one passed
+ clm - clamav, one skipped, one passed
+ qqm - qmail queue, two messages were delivered
+
+In the first block of entries, not a single connection made it past the DATA phase of the SMTP conversation, where the content tests kick in. Other interesting observations are that many connections purport to be from Google. Ah, you say, but does Google have Windows mail servers in Estonia? If we look over to the SPF column, the lower case x is telling us that it failed SPF tests, meaning Google has explicitely told us that IP is not theirs. Instead of rejecting immediately, the SPF plugin deferred the rejection to B<naughty> to disconnect later.
+
+=head1 AUTHOR
+
+Matt Simerson <msimerson@cpan.org>
+
+=cut
 
