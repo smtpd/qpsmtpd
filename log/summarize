@@ -57,6 +57,7 @@ my %formats = (
                check_badmailfrom           => "%-3.3s",
                sender_permitted_from       => "%-3.3s",
                resolvable_fromhost         => "%-3.3s",
+               dont_require_anglebrackets  => "%-3.3s",
                'queue::qmail-queue'        => "%-3.3s",
                connection_time             => "%-4.4s",
               );
@@ -82,6 +83,7 @@ my %formats3 = (
 
 while (defined(my $line = $fh->read)) {
     chomp $line;
+    $line =~ s/[^[ -~]]//g;   # strip out binary/unprintable
     next if !$line;
     my ($type, $pid, $hook, $plugin, $message) = parse_line($line);
     next if !$type;
