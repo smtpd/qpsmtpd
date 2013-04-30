@@ -92,8 +92,8 @@ adjusted for ClamAV::Client by Devin Carraway <qpsmtpd/@/devin.com>.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2005 John Peacock,
-Copyright (c) 2007 Devin Carraway
+ Copyright (c) 2005 John Peacock,
+ Copyright (c) 2007 Devin Carraway
 
 Based heavily on the clamav plugin
 
@@ -167,7 +167,7 @@ sub data_post_handler {
     if ($found) {
         $self->log(LOGNOTICE, "fail, found virus $found");
 
-        $self->connection->notes('naughty', 1);    # see plugins/naughty
+        $self->is_naughty(1);       # see plugins/naughty
         $self->adjust_karma(-1);
 
         if ($self->{_args}{deny_viruses}) {
