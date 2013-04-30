@@ -27,7 +27,10 @@ use CPAN;
 use English qw( -no_match_vars );
 
 my $apps = [
-#   { app => 'mysql-server-5', info => { port => 'mysql50-server', dport=>'mysql5',  yum =>'mysql-server'} },
+   { app => 'daemontools', info => { } },
+   { app => 'ucspi-tcp',   info => { } },
+#   { app => 'dspam',       info => { } },
+#   { app => 'mysql-server-55', info => { port => 'mysql55-server', dport=>'mysql5',  yum =>'mysql-server'} },
 #   { app => 'apache22'      , info => { port => 'apache22',       dport=>'',     yum => 'httpd' } },
 ];
 
@@ -388,7 +391,8 @@ sub name_overrides {
 # MacPorts ($dport), yum, and apt.
     my @modules = (
         { module=>'LWP::UserAgent', info => { cat=>'www', port=>'p5-libwww', dport=>'p5-libwww-perl' }, },
-        { module=>'Mail::Send'    , info => { port => 'Mail::Tools', }  },
+        { module=>'Mail::Send'         , info => { port => 'Mail::Tools', }  },
+        { module=>'Mail::SpamAssassin' , info => { cat => 'mail', }  },
     );
     my ($match) = grep { $_->{module} eq $mod } @modules;
     return $match if $match;
