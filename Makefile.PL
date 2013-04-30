@@ -26,6 +26,7 @@ WriteMakefile(
 # modules that cause Travis build tests to fail
 #       'Mail::SpamAssassin' => 0,
 #       'Geo::IP'            => 0,
+#       'Math::Complex'      => 0,   # geodesic distance in Geo::IP
 #       'Mail::SPF'          => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
