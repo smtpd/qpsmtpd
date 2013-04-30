@@ -91,13 +91,13 @@ sub get_default_field_widths {
         count_unrecognized_commands => "%-5.5s",
         unrecognized_commands       => "%-5.5s",
         connection_time             => "%-4.4s",
-    ),
     map { $_ => "%-3.3s" }
     qw/ dnsbl rhsbl relay karma fcrdns earlytalker check_earlytalker helo
         tls auth::auth_vpopmail auth::auth_vpopmaild auth::auth_vpopmail_sql
         auth::auth_checkpassword badmailfrom check_badmailfrom
         sender_permitted_from resolvable_fromhost dont_require_anglebrackets
-        queue::qmail-queue queue::smtp-forward /;
+        queue::qmail-queue queue::smtp-forward /
+    );
 
     return %widths;
 };
