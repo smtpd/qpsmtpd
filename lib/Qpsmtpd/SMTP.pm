@@ -354,6 +354,7 @@ sub mail {
     }
 
     $self->log(LOGDEBUG, "full from_parameter: $line");
+    $self->connection->notes('envelope_from', $line);
     $self->run_hooks("mail_parse", $line);
 }
 
@@ -442,6 +443,7 @@ sub mail_respond {
 
 sub rcpt {
     my ($self, $line) = @_;
+    $self->connection->notes('envelope_rcpt', $line);
     $self->run_hooks("rcpt_parse", $line);
 }
 
@@ -466,7 +468,7 @@ sub rcpt_parse_respond {
     # (... or anything else parseable by Qpsmtpd::Address ;-))
     # this means, a plugin can decide to (pre-)accept
     # addresses like <user@example.com.> or <user@example.com >
-    # by removing the trailing "."/" " from this example...
+    # by removing the trailing dot or space from this example.
     $self->run_hooks("rcpt_pre", $rcpt, \%param);
 }
 
