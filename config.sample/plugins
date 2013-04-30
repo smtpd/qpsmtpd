@@ -59,7 +59,7 @@ dont_require_anglebrackets
 badmailfrom reject naughty
 #badmailfromto
 resolvable_fromhost reject 0
-# sender_permitted_from reject 2
+sender_permitted_from reject 1
 
 # RCPT TO plugins
 badrcptto
@@ -104,6 +104,9 @@ naughty reject data
 
 # queue the mail with qmail-queue
 # queue/qmail-queue
+
+# forward to another mail server
+# queue/smtp-forward 10.2.2.2 9025
 
 
 # If you need to run the same plugin multiple times, you can do
