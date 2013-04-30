@@ -138,7 +138,7 @@ sub hook_data_post {
 
     return DECLINED if $self->is_immune();
 
-    my $errors  = $self->has_required_headers( $header );
+    my $errors  = $self->has_required_headers( $header ) || 0;
        $errors += $self->has_singular_headers( $header );
 
     my $err_msg = $self->invalid_date_range();
@@ -158,7 +158,7 @@ sub hook_data_post {
 sub has_required_headers {
     my ($self, $header) = @_;
 
-    my $errors;
+    my $errors = 0;
     foreach my $h (@required_headers) {
         next if $header->get($h);
         $errors++;
@@ -173,7 +173,7 @@ sub has_required_headers {
 sub has_singular_headers {
     my ($self, $header) = @_;
 
-    my $errors;
+    my $errors = 0;
     foreach my $h (@singular_headers) {
         next if !$header->get($h);    # doesn't exist
         my @qty = $header->get($h);
