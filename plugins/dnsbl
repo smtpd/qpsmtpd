@@ -294,7 +294,7 @@ sub hook_rcpt {
                    "skip, don't blacklist special account: " . $rcpt->user);
 
         # clear the naughty connection note here, if desired.
-        $self->connection->notes('naughty', 0);
+        $self->is_naughty(0);
     }
 
     return DECLINED;

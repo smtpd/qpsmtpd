@@ -307,7 +307,12 @@ sub is_immune {
 }
 
 sub is_naughty {
-    my $self = shift;
+    my ($self, $setit) = @_;
+
+    if ( defined $setit ) {
+        $self->connection->notes('naughty', $setit);
+        $self->connection->notes('rejected', $setit);
+    };
 
     if ($self->connection->notes('naughty')) {
 

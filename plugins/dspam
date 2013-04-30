@@ -661,9 +661,7 @@ sub autolearn_naughty {
         return;
     }
 
-    if (   $self->connection->notes('naughty')
-        && $response->{result} eq 'Innocent')
-    {
+    if ( $self->is_naughty() && $response->{result} eq 'Innocent') {
         $self->log(LOGINFO, "training naughty FN message as spam");
         $self->train_error_as_spam($transaction);
         return 1;
@@ -707,7 +705,7 @@ sub autolearn_spamassassin {
 
     my $sa = $transaction->notes('spamassassin');
     if (!$sa || !$sa->{is_spam}) {
-        if (!$self->connection->notes('naughty')) {
+        if (!$self->is_naughty()) {
             $self->log(LOGERROR, "SA results missing");    # SA skips naughty
         }
         return;
