@@ -26,6 +26,7 @@ sub hook_mail_pre {
     unless ($addr =~ /^<.*>$/) {
         $self->log(LOGINFO, "added MAIL angle brackets");
         $addr = '<' . $addr . '>';
+        $self->adjust_karma(-1);
     }
     return (OK, $addr);
 }
@@ -35,6 +36,7 @@ sub hook_rcpt_pre {
     unless ($addr =~ /^<.*>$/) {
         $self->log(LOGINFO, "added RCPT angle brackets");
         $addr = '<' . $addr . '>';
+        $self->adjust_karma(-1);
     }
     return (OK, $addr);
 }

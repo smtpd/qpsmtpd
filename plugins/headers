@@ -77,6 +77,12 @@ Default: perm
 
 Adjust the quantity of logging for this plugin. See docs/logging.pod
 
+=head1 TODO
+
+=head1 SEE ALSO
+
+https://tools.ietf.org/html/rfc5322
+
 =head1 AUTHOR
 
 2012 - Matt Simerson
@@ -130,35 +136,58 @@ sub hook_data_post {
         return $self->get_reject("Headers are missing", "missing headers");
     };
 
-    return (DECLINED, "immune") if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
-    foreach my $h (@required_headers) {
-        next if $header->get($h);
-        $self->adjust_karma(-1);
-        return $self->get_reject("We require a valid $h header",
-                                 "no $h header");
-    }
-
-    foreach my $h (@singular_headers) {
-        next if !$header->get($h);    # doesn't exist
-        my @qty = $header->get($h);
-        next if @qty == 1;            # only 1 header
-        $self->adjust_karma(-1);
-        return
-          $self->get_reject(
-                        "Only one $h header allowed. See RFC 5322, Section 3.6",
-                        "too many $h headers",);
-    }
+    my $errors  = $self->has_required_headers( $header );
+       $errors += $self->has_singular_headers( $header );
 
     my $err_msg = $self->invalid_date_range();
     if ($err_msg) {
-        $self->adjust_karma(-1);
         return $self->get_reject($err_msg, $err_msg);
     }
+
+    if ( $errors ) {
+        return $self->get_reject($self->get_reject_type(),
+                "RFC 5322 validation errors" );
+    };
 
     $self->log(LOGINFO, 'pass');
     return (DECLINED);
 }
+
+sub has_required_headers {
+    my ($self, $header) = @_;
+
+    my $errors;
+    foreach my $h (@required_headers) {
+        next if $header->get($h);
+        $errors++;
+        $self->adjust_karma(-1);
+        $self->is_naughty(1) if $self->{args}{reject};
+        $self->store_deferred_reject("We require a valid $h header");
+        $self->log(LOGINFO, "fail, no $h header" );
+    }
+    return $errors;
+};
+
+sub has_singular_headers {
+    my ($self, $header) = @_;
+
+    my $errors;
+    foreach my $h (@singular_headers) {
+        next if !$header->get($h);    # doesn't exist
+        my @qty = $header->get($h);
+        next if @qty == 1;            # only 1 header
+        $errors++;
+        $self->adjust_karma(-1);
+        $self->is_naughty(1) if $self->{args}{reject};
+        $self->store_deferred_reject(
+                "Only one $h header allowed. See RFC 5322, Section 3.6",
+                );
+        $self->log(LOGINFO, "fail, too many $h headers" );
+    }
+    return $errors;
+};
 
 sub invalid_date_range {
     my $self = shift;
@@ -175,12 +204,14 @@ sub invalid_date_range {
     my $past = $self->{_args}{past};
     if ($past && $ts < time - ($past * 24 * 3600)) {
         $self->log(LOGINFO, "fail, date too old ($date)");
+        $self->adjust_karma(-1);
         return "The Date header is too far in the past";
     }
 
     my $future = $self->{_args}{future};
     if ($future && $ts > time + ($future * 24 * 3600)) {
         $self->log(LOGINFO, "fail, date in future ($date)");
+        $self->adjust_karma(-1);
         return "The Date header is too far in the future";
     }
 

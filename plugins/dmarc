@@ -64,7 +64,9 @@ https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/DMARC-FAQ
 
 =head1 TODO
 
- 2. provide dmarc feedback to domains that request it
+ provide dmarc feedback to domains that request it
+
+ reject messages with multiple From: headers
 
 =head1 AUTHORS
 

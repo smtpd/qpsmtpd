@@ -244,6 +244,7 @@ sub register {
 
     #$self->prune_db();    # keep the DB compact
     $self->register_hook('connect',       'connect_handler');
+    $self->register_hook('mail_pre',      'from_handler');
     $self->register_hook('rcpt_pre',      'rcpt_handler');
     $self->register_hook('data',          'data_handler');
     $self->register_hook('data_post',     'data_handler');
@@ -271,7 +272,7 @@ sub hook_pre_connection {
     }
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
-      $self->parse_value($tied->{$key});
+      $self->parse_db_record($tied->{$key});
     $self->calc_karma($naughty, $nice);
     return $self->cleanup_and_return($tied, $lock);
 }
@@ -297,7 +298,7 @@ sub connect_handler {
     }
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
-      $self->parse_value($tied->{$key});
+      $self->parse_db_record($tied->{$key});
     my $summary = "$naughty naughty, $nice nice, $connects connects";
     my $karma = $self->calc_karma($naughty, $nice);
 
@@ -321,8 +322,29 @@ sub connect_handler {
     return $self->get_reject($mess, $karma);
 }
 
+sub from_handler {
+    my ($self, $transaction, $addr) = @_;
+
+# test if sender has placed an illegal (RFC (2)821) space in envelope from
+    my $full_from = $self->connection->notes('envelope_from');
+    $self->illegal_envelope_format( $full_from );
+
+    return DECLINED;
+};
+
 sub rcpt_handler {
     my ($self, $transaction, $addr) = @_;
+
+    $self->illegal_envelope_format( 
+        $self->connection->notes('envelope_rcpt'),
+        );
+
+    my $count = $self->connection->notes('recipient_count') || 0;
+    $count++;
+    if ( $count > 1 ) {
+        $self->log(LOGINFO, "recipients c: $count ($addr)");
+        $self->connection->notes('recipient_count', $count);
+    };
 
     return DECLINED if $self->is_immune();
 
@@ -330,16 +352,17 @@ sub rcpt_handler {
         $self->log(LOGDEBUG, "info, no recipient count");
         return DECLINED;
     };
+    $self->log(LOGINFO, "recipients t: $recipients ($addr)");
 
     my $history = $self->connection->notes('karma_history');
     if ( $history > 0 ) {
-        $self->log(LOGDEBUG, "info, good history");
+        $self->log(LOGINFO, "info, good history");
         return DECLINED;
     };
 
     my $karma = $self->connection->notes('karma');
     if ( $karma > 0 ) {
-        $self->log(LOGDEBUG, "info, good connection");
+        $self->log(LOGINFO, "info, good connection");
         return DECLINED;
     };
 
@@ -376,7 +399,7 @@ sub disconnect_handler {
     my $key  = $self->get_db_key();
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
-      $self->parse_value($tied->{$key});
+      $self->parse_db_record($tied->{$key});
     my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
@@ -410,7 +433,17 @@ sub disconnect_handler {
     return $self->cleanup_and_return($tied, $lock);
 }
 
-sub parse_value {
+sub illegal_envelope_format {
+    my ($self, $addr) = @_;
+
+# test if envelope address has an illegal (RFC (2)821) space
+    if ( uc substr($addr,0,6) ne 'FROM:<' && uc substr($addr,0,4) ne 'TO:<' ) {
+        $self->log(LOGINFO, "illegal envelope address format: $addr" );
+        $self->adjust_karma(-1);
+    };
+};
+
+sub parse_db_record {
     my ($self, $value) = @_;
 
     my $penalty_start_ts = my $naughty = my $nice = my $connects = 0;
