@@ -123,8 +123,8 @@ sub register {
 
     # Set some sensible defaults
     $self->{'_args'}{'deny_viruses'} ||= 'yes';
-    $self->{'_args'}{'max_size'}     ||= 128;
-    $self->{'_args'}{'scan_all'}     ||= 0;
+    $self->{'_args'}{'max_size'}     ||= 1024;
+    $self->{'_args'}{'scan_all'}     ||= 1;
     for my $setting ('deny_viruses', 'defer_on_error') {
         next unless $self->{'_args'}{$setting};
         if (lc $self->{'_args'}{$setting} eq 'no') {

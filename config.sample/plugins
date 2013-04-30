@@ -91,9 +91,9 @@ spamassassin reject 12
 # dspam must run after spamassassin for the learn_from_sa feature to work
 dspam autolearn spamassassin reject 0.95
 
-# run the clamav virus checking plugin
+# run the clamav virus checking plugin (max size in Kb)
 # virus/clamav
-# virus/clamdscan deny_viruses yes scan_all 1
+# virus/clamdscan deny_viruses yes max_size 1024
 
 naughty reject data
 

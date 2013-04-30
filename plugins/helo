@@ -203,6 +203,12 @@ this prohibition applies to the matching of the parameter to its IP
 address only; see Section 7.9 for a more extensive discussion of
 rejecting incoming connections or mail messages.
 
+=head1 TODO
+
+is_forged_literal, if the forged IP is an internal IP, it's likely one
+of our clients that should have authenticated. Perhaps when we check back
+later in data_post, if they have added relay_client, then give back the
+karma.
 
 =head1 AUTHOR
 
