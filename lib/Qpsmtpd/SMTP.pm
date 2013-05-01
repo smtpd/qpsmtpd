@@ -770,6 +770,7 @@ sub data_respond {
     my $esmtp      = substr($smtp, 0, 1) eq "E";
     my $authheader = '';
     my $sslheader  = '';
+    my $auth_result = 'none';
 
     if (defined $self->connection->notes('tls_enabled')
         and $self->connection->notes('tls_enabled'))
@@ -780,14 +781,27 @@ sub data_respond {
           . " encrypted) ";
     }
 
-    if (defined $self->{_auth} and $self->{_auth} == OK) {
-        $smtp .= "A" if $esmtp;    # RFC3848
-        $authheader =
-"(smtp-auth username $self->{_auth_user}, mechanism $self->{_auth_mechanism})\n";
+    if (defined $self->{_auth} ) {
+        my $mech = $self->{_auth_mechanism};
+        my $user = $self->{_auth_user};
+        $auth_result = "auth=";
+        if ( $self->{_auth} == OK) {
+            $smtp .= "A" if $esmtp;    # RFC3848
+            $authheader = "(smtp-auth username $user, mechanism $mech)\n";
+            $auth_result .= 'pass';
+        }
+        else {
+            $auth_result .= 'fail';
+        };
+        $auth_result .= " ($mech) smtp.auth=$user";
     }
 
-    $header->add("Received",
+    $header->add('Received',
                  $self->received_line($smtp, $authheader, $sslheader), 0);
+
+    # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
+    $header->add('Authentication-Results',
+                join('; ', $self->config('me'), $auth_result ) );
 
     # if we get here without seeing a terminator, the connection is
     # probably dead.

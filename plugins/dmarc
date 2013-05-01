@@ -122,24 +122,31 @@ sub data_post_handler {
     #       evaluation returned a "pass" result.
     my $spf_dom = $transaction->notes('spf_pass_host');
 
+    my $effective_policy = ( $self->{_args}{is_subdomain} && defined $policy->{sp} )
+        ? $policy->{sp} : $policy->{p};
+
     #   5.  Conduct identifier alignment checks.
-    return DECLINED
-        if $self->is_aligned($from_dom, $org_dom, $policy, $spf_dom );
+    if ( $self->is_aligned($from_dom, $org_dom, $policy, $spf_dom ) ) {
+        $self->store_auth_results("dmarc=pass (p=$effective_policy) d=$from_dom");
+        return DECLINED;
+    };
 
     #   6.  Apply policy.  Emails that fail the DMARC mechanism check are
     #       disposed of in accordance with the discovered DMARC policy of the
     #       Domain Owner.  See Section 6.2 for details.
-    if ( $self->{_args}{is_subdomain} && defined $policy->{sp} ) {
-        return DECLINED if lc $policy->{sp} eq 'none';
+    if ( lc $effective_policy eq 'none' ) {
+        $self->store_auth_results("dmarc=fail (p=none) d=$from_dom");
+        return DECLINED;
     };
-    return DECLINED if lc $policy->{p} eq 'none';
 
     my $pct = $policy->{pct} || 100;
     if ( $pct != 100 && int(rand(100)) >= $pct ) {
         $self->log("fail, tolerated, policy, sampled out");
+        $self->store_auth_results("dmarc=sampled_out (p=$effective_policy) d=$from_dom");
         return DECLINED;
     };
 
+    $self->store_auth_results("dmarc=fail (p=$effective_policy) d=$from_dom");
     return $self->get_reject("failed DMARC policy");
 }
 

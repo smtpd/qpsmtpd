@@ -6,7 +6,7 @@ Forward Confirmed RDNS - http://en.wikipedia.org/wiki/FCrDNS
 
 =head1 DESCRIPTION
 
-Determine if the SMTP sender has matching forward and reverse DNS. 
+Determine if the SMTP sender has matching forward and reverse DNS.
 
 Sets the connection note fcrdns.
 
@@ -88,6 +88,38 @@ From Wikipedia summary:
 
 3. Any A or AAAA record returned by the second query is then compared against the original IP address (check_ip_match), and if there is a match, then the FCrDNS check passes.
 
+=head1 iprev
+
+# https://www.ietf.org/rfc/rfc5451.txt
+
+2.4.3.  "iprev" Results
+
+The result values are used by the "iprev" method, defined in
+Section 3, are as follows:
+
+pass:  The DNS evaluation succeeded, i.e., the "reverse" and
+"forward" lookup results were returned and were in agreement.
+
+fail:  The DNS evaluation failed.  In particular, the "reverse" and
+"forward" lookups each produced results but they were not in
+agreement, or the "forward" query completed but produced no
+result, e.g., a DNS RCODE of 3, commonly known as NXDOMAIN, or an
+RCODE of 0 (NOERROR) in a reply containing no answers, was
+returned.
+
+temperror:  The DNS evaluation could not be completed due to some
+error that is likely transient in nature, such as a temporary DNS
+error, e.g., a DNS RCODE of 2, commonly known as SERVFAIL, or
+other error condition resulted.  A later attempt may produce a
+final result.
+
+permerror:  The DNS evaluation could not be completed because no PTR
+data are published for the connecting IP address, e.g., a DNS
+RCODE of 3, commonly known as NXDOMAIN, or an RCODE of 0 (NOERROR)
+in a reply containing no answers, was returned.  This prevented
+completion of the evaluation.
+
+=cut
 
 =head1 AUTHOR
 
@@ -136,9 +168,8 @@ sub connect_handler {
 
 sub data_post_handler {
     my ($self, $transaction) = @_;
-
-    my $match = $self->connection->notes('fcrdns_match') || 0;
-    $transaction->header->add('X-Fcrdns', $match ? 'Yes' : 'No', 0);
+    my $match = $self->connection->notes('fcrdns_match') || 'error';
+    $self->store_auth_results("iprev=$match");
     return (DECLINED);
 }
 
@@ -182,13 +213,25 @@ sub has_reverse_dns {
     my $res = $self->init_resolver();
     my $ip  = $self->qp->connection->remote_ip;
 
-    my $query = $res->query($ip) or do {
+    my $query = $res->query($ip, 'PTR') or do {
         if ($res->errorstring eq 'NXDOMAIN') {
             $self->adjust_karma(-1);
+            $self->connection->notes('fcrdns_match', 'permerror');
             $self->log(LOGINFO, "fail, no rDNS: " . $res->errorstring);
             return;
         }
-        $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
+        if ( $res->errorstring eq 'SERVFAIL' ) {
+            $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
+            $self->connection->notes('fcrdns_match', 'temperror');
+        }
+        elsif ( $res->errorstring eq 'NOERROR' ) {
+            $self->log(LOGINFO, "fail, no PTR (NOERROR)" );
+            $self->connection->notes('fcrdns_match', 'permerror');
+        }
+        else {
+            $self->connection->notes('fcrdns_match', 'fail');
+            $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
+        };
         return;
     };
 
@@ -203,6 +246,7 @@ sub has_reverse_dns {
     if (!$hits) {
         $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, no PTR records");
+        $self->connection->notes('fcrdns_match', 'permerror');
         return;
     }
 
@@ -218,11 +262,13 @@ sub has_forward_dns {
     foreach my $host (keys %{$self->{_args}{ptr_hosts}}) {
 
         $host .= '.' if '.' ne substr($host, -1, 1);    # fully qualify name
-        my $query = $res->search($host) or do {
+        my $query = $res->query($host) or do {
             if ($res->errorstring eq 'NXDOMAIN') {
+                $self->connection->notes('fcrdns_match', 'permerror');
                 $self->log(LOGDEBUG, "host $host does not exist");
                 next;
             }
+            $self->connection->notes('fcrdns_match', 'fail');
             $self->log(LOGDEBUG, "query for $host failed (",
                        $res->errorstring, ")");
             next;
@@ -235,11 +281,13 @@ sub has_forward_dns {
             $self->check_ip_match($rr->address) and return 1;
         }
         if ($hits) {
+            $self->connection->notes('fcrdns_match', 'fail');
             $self->log(LOGDEBUG, "PTR host has forward DNS") if $hits;
             return 1;
         }
     }
     $self->adjust_karma(-1);
+    $self->connection->notes('fcrdns_match', 'fail');
     $self->log(LOGINFO, "fail, no PTR hosts have forward DNS");
     return;
 }
@@ -250,7 +298,7 @@ sub check_ip_match {
 
     if ($ip eq $self->qp->connection->remote_ip) {
         $self->log(LOGDEBUG, "forward ip match");
-        $self->connection->notes('fcrdns_match', 1);
+        $self->connection->notes('fcrdns_match', 'pass');
         $self->adjust_karma(1);
         return 1;
     }
@@ -262,7 +310,7 @@ sub check_ip_match {
 
     if ($dns_net eq $rem_net) {
         $self->log(LOGNOTICE, "forward network match");
-        $self->connection->notes('fcrdns_match', 1);
+        $self->connection->notes('fcrdns_match', 'pass');
         return 1;
     }
     return;

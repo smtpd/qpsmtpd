@@ -222,6 +222,9 @@ sub validate_it {
     my $result = $dkim->result;
     my $mess   = $self->get_details($dkim);
 
+    $self->store_auth_results("dkim=" .$dkim->result_detail . " header.i=@".$dkim->signature->domain);
+    #$self->add_header($mess);
+
     foreach my $t (qw/ pass fail invalid temperror none /) {
         next if $t ne $result;
         my $handler = 'handle_sig_' . $t;
@@ -286,8 +289,7 @@ sub handle_sig_fail {
     my ($self, $dkim, $mess) = @_;
 
     $self->adjust_karma(-1);
-    return
-      $self->get_reject("DKIM signature invalid: " . $dkim->result_detail,
+    return $self->get_reject("signature invalid: " . $dkim->result_detail,
                         $mess);
 }
 
@@ -316,12 +318,10 @@ sub handle_sig_invalid {
     $self->log(LOGINFO, $mess);
 
     if ($prs->{accept}) {
-        $self->add_header($mess);
         $self->log(LOGERROR, "error, invalid signature but accept policy!?");
         return DECLINED;
     }
     elsif ($prs->{neutral}) {
-        $self->add_header($mess);
         $self->log(LOGERROR, "error, invalid signature but neutral policy?!");
         return DECLINED;
     }
@@ -333,7 +333,6 @@ sub handle_sig_invalid {
 
     # this should never happen
     $self->log(LOGINFO, "error, invalid signature, unhandled");
-    $self->add_header($mess);
     return DECLINED;
 }
 
@@ -527,8 +526,6 @@ sub get_selector {
 sub add_header {
     my $self = shift;
     my $header = shift or return;
-
-    # consider adding Authentication-Results header, (RFC 5451)
     $self->qp->transaction->header->add('X-DKIM-Authentication', $header, 0);
 }
 
