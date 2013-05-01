@@ -133,10 +133,12 @@ sub mail_handler {
         return (DECLINED, "SPF - no response");
     }
 
+    $self->store_auth_results("spf=$code smtp.mailfrom=".$sender->host);
+
     if ($code eq 'pass') {
         $self->adjust_karma(1);
         $transaction->notes('spf_pass_host', lc $sender->host);
-        $self->log(LOGINFO, "pass, $code: $why");
+        $self->log(LOGINFO, "pass, $why");
         return (DECLINED);
     }
 
@@ -234,8 +236,6 @@ sub data_post_handler {
     }
 
     $transaction->header->add('Received-SPF', $result->received_spf_header, 0);
-
-    # consider also adding SPF status to Authentication-Results header
 
     return DECLINED;
 }
