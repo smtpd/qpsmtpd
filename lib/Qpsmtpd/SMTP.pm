@@ -812,7 +812,7 @@ sub authentication_results {
     };
 
     $self->log(LOGDEBUG, "adding auth results header" );
-    $self->transaction->header->add('Authentication-Results', join('; ', @auth_list) );
+    $self->transaction->header->add('Authentication-Results', join('; ', @auth_list), 0);
 };
 
 sub clean_authentication_results {
