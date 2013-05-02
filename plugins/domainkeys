@@ -43,7 +43,9 @@ the same terms as Perl itself.
 
 =head1 AUTHORS
 
- Matt Simerson    - 2012
+ Matt Simerson    - 2013 - safe results to Authentication-Results header
+                           instead of DomainKey-Status
+ Matt Simerson    - 2012 - refactored, added tests, safe loading
  John Peacock     - 2005-2006
  Anthony D. Urso. - 2004
 
@@ -113,7 +115,8 @@ sub data_post_handler {
     my $status = $self->get_message_status($message);
 
     if (defined $status) {
-        $transaction->header->add("DomainKey-Status", $status, 0);
+#$transaction->header->add("DomainKey-Status", $status, 0);
+        $self->store_auth_results('domainkey=' . $status);
         $self->log(LOGINFO, "pass, $status");
         return DECLINED;
     }

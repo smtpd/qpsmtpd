@@ -7,7 +7,7 @@ use Qpsmtpd::Constants;
 
 #use DashProfiler;
 
-$VERSION = "0.92";
+$VERSION = "0.93";
 
 my $git;
 

@@ -272,31 +272,14 @@ sub store_deferred_reject {
 }
 
 sub store_auth_results {
-    my ($self, $value) = @_;
-
-    my @headers = $self->transaction->header->get('Authentication-Results');
-    chomp @headers;
-    my @deleteme;
-    for ( my $i = 0; $i < scalar @headers; $i++ ) {
-        my @values = split /;/, $headers[$i];
-        if ( $self->config->('me') ne $values[0] ) {  # some other MTA
-# we generally want to remove Authentication-Results headers added by other
-# MTAs (so our downstream can trust the A-R header we insert), but we also
-# don't want to invalidate DKIM signatures.
-# TODO: parse the DKIM signature(s) to see if A-R header is signed
-            if ( ! $self->transaction->header->get('DKIM-Signature') ) {
-                $self->log(LOGINFO, "deleted auth-results from $_");
-                push @deleteme, $i;
-            };
-            next;
+    my ($self, $result) = @_;
+    my $auths = $self->qp->connection->notes('authentication_results') or do {
+        $self->qp->connection->notes('authentication_results', $result);
+        return;
         };
-        push @values, $value;
-        $self->log(LOGINFO, "appended to auth-results: $value");
-        $self->transaction->header->replace('Authentication->Results', join('; ', @values ), $i);
-    }
-    foreach ( @deleteme ) {
-        $self->transaction->header->delete('Authentication-Results', $_);
-    };
+    my $ar = join('; ', $auths, $result);
+    $self->log(LOGDEBUG, "auth-results: $ar");
+    $self->qp->connection->notes('authentication_results', $ar );
 };
 
 sub init_resolver {
