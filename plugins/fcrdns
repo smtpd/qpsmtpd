@@ -119,8 +119,6 @@ RCODE of 3, commonly known as NXDOMAIN, or an RCODE of 0 (NOERROR)
 in a reply containing no answers, was returned.  This prevented
 completion of the evaluation.
 
-=cut
-
 =head1 AUTHOR
 
 2013 - Matt Simerson
@@ -146,7 +144,6 @@ sub register {
     $self->init_resolver() or return;
 
     $self->register_hook('connect',   'connect_handler');
-    $self->register_hook('data_post', 'data_post_handler');
 }
 
 sub connect_handler {
@@ -164,13 +161,6 @@ sub connect_handler {
 
     $self->log(LOGINFO, "pass");
     return DECLINED;
-}
-
-sub data_post_handler {
-    my ($self, $transaction) = @_;
-    my $match = $self->connection->notes('fcrdns_match') || 'error';
-    $self->store_auth_results("iprev=$match");
-    return (DECLINED);
 }
 
 sub invalid_localhost {
@@ -216,20 +206,20 @@ sub has_reverse_dns {
     my $query = $res->query($ip, 'PTR') or do {
         if ($res->errorstring eq 'NXDOMAIN') {
             $self->adjust_karma(-1);
-            $self->connection->notes('fcrdns_match', 'permerror');
+            $self->store_auth_results("iprev=permerror");
             $self->log(LOGINFO, "fail, no rDNS: " . $res->errorstring);
             return;
         }
         if ( $res->errorstring eq 'SERVFAIL' ) {
             $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
-            $self->connection->notes('fcrdns_match', 'temperror');
+            $self->store_auth_results("iprev=temperror");
         }
         elsif ( $res->errorstring eq 'NOERROR' ) {
             $self->log(LOGINFO, "fail, no PTR (NOERROR)" );
-            $self->connection->notes('fcrdns_match', 'permerror');
+            $self->store_auth_results("iprev=permerror");
         }
         else {
-            $self->connection->notes('fcrdns_match', 'fail');
+            $self->store_auth_results("iprev=fail");
             $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
         };
         return;
@@ -246,7 +236,7 @@ sub has_reverse_dns {
     if (!$hits) {
         $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, no PTR records");
-        $self->connection->notes('fcrdns_match', 'permerror');
+        $self->store_auth_results("iprev=permerror");
         return;
     }
 
@@ -264,11 +254,11 @@ sub has_forward_dns {
         $host .= '.' if '.' ne substr($host, -1, 1);    # fully qualify name
         my $query = $res->query($host) or do {
             if ($res->errorstring eq 'NXDOMAIN') {
-                $self->connection->notes('fcrdns_match', 'permerror');
+                $self->store_auth_results("iprev=permerror");
                 $self->log(LOGDEBUG, "host $host does not exist");
                 next;
             }
-            $self->connection->notes('fcrdns_match', 'fail');
+            $self->store_auth_results("iprev=fail");
             $self->log(LOGDEBUG, "query for $host failed (",
                        $res->errorstring, ")");
             next;
@@ -281,13 +271,13 @@ sub has_forward_dns {
             $self->check_ip_match($rr->address) and return 1;
         }
         if ($hits) {
-            $self->connection->notes('fcrdns_match', 'fail');
+            $self->store_auth_results("iprev=fail");
             $self->log(LOGDEBUG, "PTR host has forward DNS") if $hits;
             return 1;
         }
     }
     $self->adjust_karma(-1);
-    $self->connection->notes('fcrdns_match', 'fail');
+    $self->store_auth_results("iprev=fail");
     $self->log(LOGINFO, "fail, no PTR hosts have forward DNS");
     return;
 }
@@ -298,7 +288,7 @@ sub check_ip_match {
 
     if ($ip eq $self->qp->connection->remote_ip) {
         $self->log(LOGDEBUG, "forward ip match");
-        $self->connection->notes('fcrdns_match', 'pass');
+        $self->store_auth_results("iprev=pass");
         $self->adjust_karma(1);
         return 1;
     }
@@ -310,7 +300,7 @@ sub check_ip_match {
 
     if ($dns_net eq $rem_net) {
         $self->log(LOGNOTICE, "forward network match");
-        $self->connection->notes('fcrdns_match', 'pass');
+        $self->store_auth_results("iprev=pass");
         return 1;
     }
     return;

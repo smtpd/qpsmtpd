@@ -766,43 +766,6 @@ sub data_respond {
 
     $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
 
-    my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
-    my $esmtp      = substr($smtp, 0, 1) eq "E";
-    my $authheader = '';
-    my $sslheader  = '';
-    my $auth_result = 'none';
-
-    if (defined $self->connection->notes('tls_enabled')
-        and $self->connection->notes('tls_enabled'))
-    {
-        $smtp .= "S" if $esmtp;    # RFC3848
-        $sslheader = "("
-          . $self->connection->notes('tls_socket')->get_cipher()
-          . " encrypted) ";
-    }
-
-    if (defined $self->{_auth} ) {
-        my $mech = $self->{_auth_mechanism};
-        my $user = $self->{_auth_user};
-        $auth_result = "auth=";
-        if ( $self->{_auth} == OK) {
-            $smtp .= "A" if $esmtp;    # RFC3848
-            $authheader = "(smtp-auth username $user, mechanism $mech)\n";
-            $auth_result .= 'pass';
-        }
-        else {
-            $auth_result .= 'fail';
-        };
-        $auth_result .= " ($mech) smtp.auth=$user";
-    }
-
-    $header->add('Received',
-                 $self->received_line($smtp, $authheader, $sslheader), 0);
-
-    # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
-    $header->add('Authentication-Results',
-                join('; ', $self->config('me'), $auth_result ) );
-
     # if we get here without seeing a terminator, the connection is
     # probably dead.
     unless ($complete) {
@@ -823,8 +786,75 @@ sub data_respond {
     $self->run_hooks("data_post");
 }
 
+sub authentication_results {
+    my ($self) = @_;
+
+    my @auth_list = $self->config('me');
+#   $self->clean_authentication_results();
+
+    if ( ! defined $self->{_auth} ) {
+        push @auth_list, 'auth=none';
+    }
+    else {
+        my $mechanism = "(" . $self->{_auth_mechanism} . ")";
+        my $user = "smtp.auth=" . $self->{_auth_user};
+        if ( $self->{_auth} == OK) {
+            push @auth_list, "auth=pass $mechanism $user";
+        }
+        else {
+            push @auth_list, "auth=fail $mechanism $user";
+        };
+    };
+
+    # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
+    if ( $self->connection->notes('authentication_results') ) {
+        push @auth_list, $self->connection->notes('authentication_results');
+    };
+
+    $self->log(LOGDEBUG, "adding auth results header" );
+    $self->transaction->header->add('Authentication-Results', join('; ', @auth_list) );
+};
+
+sub clean_authentication_results {
+    my $self = shift;
+
+# On messages received from the internet, we may want to remove
+# the Authentication-Results headers added by other MTAs, so our downstream
+# can trust the new A-R header we insert.
+# We do not want to invalidate DKIM signatures.
+# TODO: parse the DKIM signature(s) to see if A-R header is signed
+    return if $self->transaction->header->get('DKIM-Signature');
+
+    my @headers = $self->transaction->header->get('Authentication-Results');
+    for ( my $i = 0; $i < scalar @headers; $i++ ) {
+        $self->transaction->header->delete('Authentication-Results', $i);
+    }
+};
+
 sub received_line {
-    my ($self, $smtp, $authheader, $sslheader) = @_;
+    my ($self) = @_;
+
+    my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
+    my $esmtp      = substr($smtp, 0, 1) eq "E";
+    my $authheader = '';
+    my $sslheader  = '';
+
+    if (defined $self->connection->notes('tls_enabled')
+        and $self->connection->notes('tls_enabled'))
+    {
+        $smtp .= "S" if $esmtp;    # RFC3848
+        $sslheader = "("
+          . $self->connection->notes('tls_socket')->get_cipher()
+          . " encrypted) ";
+    }
+    if (defined $self->{_auth} && $self->{_auth} == OK) {
+        my $mech = $self->{_auth_mechanism};
+        my $user = $self->{_auth_user};
+        $smtp .= "A" if $esmtp;    # RFC3848
+        $authheader = "(smtp-auth username $user, mechanism $mech)\n";
+    }
+
+    my $header_str;
     my ($rc, @received) =
       $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
     if ($rc == YIELD) {
@@ -834,7 +864,7 @@ sub received_line {
         return join("\n", @received);
     }
     else {    # assume $rc == DECLINED
-        return
+        $header_str = 
             "from "
           . $self->connection->remote_info
           . " (HELO "
@@ -847,6 +877,7 @@ sub received_line {
           . ") with $sslheader$smtp; "
           . (strftime('%a, %d %b %Y %H:%M:%S %z', localtime));
     }
+    $self->transaction->header->add('Received', $header_str, 0 );
 }
 
 sub data_post_respond {
@@ -881,6 +912,8 @@ sub data_post_respond {
         return 1;
     }
     else {
+        $self->authentication_results();
+        $self->received_line();
         $self->queue($self->transaction);
     }
 }

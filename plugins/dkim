@@ -222,7 +222,11 @@ sub validate_it {
     my $result = $dkim->result;
     my $mess   = $self->get_details($dkim);
 
-    $self->store_auth_results("dkim=" .$dkim->result_detail . " header.i=@".$dkim->signature->domain);
+    my $auth_str = "dkim=" .$dkim->result_detail;
+    if ( $dkim->signature && $dkim->signature->domain ) {
+        $auth_str .= " header.i=@" . $dkim->signature->domain;
+    };
+    $self->store_auth_results( $auth_str );
     #$self->add_header($mess);
 
     foreach my $t (qw/ pass fail invalid temperror none /) {
