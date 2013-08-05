@@ -35,7 +35,7 @@ I would be surprised if a valid message ever had a date header older than a week
 
 Determine if the connection is denied. Use the I<reject 0> option when first enabling the plugin, and then watch your logs to see what would have been rejected. When you are no longer concerned that valid messages will be rejected, enable with I<reject 1>.
 
-  check_basicheaders [ reject 0 | 1 ]
+  check_basicheaders reject [ 0 | 1 ]
 
 Default policy is to reject.
 
@@ -116,7 +116,7 @@ sub hook_data_post {
 
     if ( ! $header->get('From') ) {
         $self->log(LOGINFO, "fail: no from");
-        return ($deny, "We require a valid From header")
+        return ($deny, "We require a valid From header");
     };
 
     my $date = $header->get('Date') or do {

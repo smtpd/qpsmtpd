@@ -210,6 +210,37 @@ sub compile {
     die "eval $@" if $@;
 }
 
+sub is_immune {
+    my $self = shift;
+
+    if ( $self->qp->connection->relay_client() ) {
+        # set by plugins/relay, or Qpsmtpd::Auth
+        $self->log(LOGINFO, "skip, relay client");
+        return 1;
+    };
+    if ( $self->qp->connection->notes('whitelisthost') ) {
+        # set by plugins/dns_whitelist_soft or plugins/whitelist
+        $self->log(LOGINFO, "skip, whitelisted host");
+        return 1;
+    };
+    if ( $self->qp->transaction->notes('whitelistsender') ) {
+        # set by plugins/whitelist
+        $self->log(LOGINFO, "skip, whitelisted sender");
+        return 1;
+    };
+    if ( $self->connection->notes('naughty') ) {
+        # see plugins/naughty
+        $self->log(LOGINFO, "skip, naughty");
+        return 1;
+    };
+    if ( $self->connection->notes('rejected') ) {
+        # http://www.steve.org.uk/Software/ms-lite/
+        $self->log(LOGINFO, "skip, already rejected");
+        return 1;
+    };
+    return;
+};
+
 sub _register_standard_hooks {
   my ($plugin, $qp) = @_;
 

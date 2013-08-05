@@ -1,6 +1,5 @@
-# used by plugins/relay
 # Format is IP, or IP part with trailing dot
 # e.g. "127.0.0.1", or "192.168."
 127.0.0.1 
 # leading/trailing whitespace is ignored
- 192.0. 
+ 192.168. 
