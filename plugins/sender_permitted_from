@@ -167,7 +167,7 @@ sub hook_rcpt {
     }
     elsif ( $code eq 'permerror' ) {
         return (DENY, "SPF - $code: $why") if $reject >= 6;
-        return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
+        return (DENYSOFT, "SPF - $code: $why") if $reject >= 3;
     }
     elsif ( $code eq 'temperror' ) {
         return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;

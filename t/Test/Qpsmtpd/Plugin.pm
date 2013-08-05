@@ -5,8 +5,10 @@ package Test::Qpsmtpd::Plugin;
 package Qpsmtpd::Plugin;
 
 use strict;
-use Test::More;
+use warnings;
+
 use Qpsmtpd::Constants;
+use Test::More;
 
 sub register_tests {
     # Virtual base method - implement in plugin
