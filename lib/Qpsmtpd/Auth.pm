@@ -1,5 +1,5 @@
 package Qpsmtpd::Auth;
-# See the documentation in 'perldoc README.authentication' 
+# See the documentation in 'perldoc docs/authentication.pod' 
 
 use strict;
 use warnings;
