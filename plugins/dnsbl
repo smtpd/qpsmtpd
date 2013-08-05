@@ -136,6 +136,7 @@ sub hook_connect {
 
     # perform RBLSMTPD checks to mimic Dan Bernstein's rblsmtpd
     return DECLINED if $self->is_set_rblsmtpd();
+    return DECLINED if $self->is_immune();
     return DECLINED if $self->ip_whitelisted();
 
   my %dnsbl_zones = map { (split /:/, $_, 2)[0,1] } $self->qp->config('dnsbl_zones');
@@ -196,24 +197,13 @@ sub is_set_rblsmtpd {
 };
 
 sub ip_whitelisted {
-    my ($self) = @_;
+    my $self = shift;
 
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $white = $self->connection->notes('whitelisthost');
-    if ( $white ) {
-        $self->log(LOGDEBUG, "skip: whitelist overrode blacklist: $white");
-        return 1;
-    };
+    my $remote_ip = shift || $self->qp->connection->remote_ip;
 
-    if ( $self->qp->connection->relay_client() ) {
-        $self->log(LOGWARN, "skip: don't blacklist relay/auth clients");
-        return 1;
-    };
-
-    return grep { s/\.?$/./;
-            $_ eq substr($remote_ip . '.', 0, length $_)
-        }
-        $self->qp->config('dnsbl_allow');
+    return
+        grep { s/\.?$/./; $_ eq substr($remote_ip . '.', 0, length $_) }
+            $self->qp->config('dnsbl_allow');
 };
 
 sub process_sockets {
@@ -306,6 +296,8 @@ sub process_sockets {
 sub hook_rcpt {
   my ($self, $transaction, $rcpt, %param) = @_;
 
+    return DECLINED if $self->is_immune();
+
   # RBLSMTPD being non-empty means it contains the failure message to return
   if (defined $ENV{'RBLSMTPD'} && $ENV{'RBLSMTPD'} ne '') {
     my $result = $ENV{'RBLSMTPD'};
@@ -346,6 +338,6 @@ sub get_reject_type {
 
     return   $self->{_args}{reject_type} eq 'temp'       ? DENYSOFT
            : $self->{_args}{reject_type} eq 'disconnect' ? DENY_DISCONNECT
-           : DENY;
+           : $default;
 };
 

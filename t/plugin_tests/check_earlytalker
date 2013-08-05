@@ -1,0 +1,147 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('test_reject_type', 3);
+    $self->register_test('test_log_and_pass', 1);
+    $self->register_test('test_log_and_deny', 3);
+    $self->register_test('test_data_handler', 3);
+    $self->register_test('test_connect_handler', 3);
+    $self->register_test('test_apr_data_handler', 3);
+    $self->register_test('test_apr_connect_handler', 3);
+    $self->register_test('test_mail_handler', 4);
+}
+
+sub test_apr_connect_handler {
+    my $self = shift;
+
+    $self->{_args}{'check-at'} = undef;
+    my ($code, $mess) = $self->apr_connect_handler();
+    cmp_ok( $code, '==', DECLINED, "no check-at set");
+
+    $self->{_args}{'check-at'}{'DATA'} = 1;
+    $self->qp->connection->notes('whitelisthost', 1);
+    ($code, $mess) = $self->apr_connect_handler();
+    cmp_ok( $code, '==', DECLINED, "whitelisted host");
+
+    $self->qp->connection->notes('whitelisthost', 0);
+    ($code, $mess) = $self->apr_connect_handler();
+    cmp_ok( $code, '==', DECLINED, "not sure");
+};
+
+sub test_apr_data_handler {
+    my $self = shift;
+
+    $self->{_args}{'check-at'} = undef;
+    my ($code, $mess) = $self->apr_data_handler();
+    cmp_ok( $code, '==', DECLINED, "no check-at set");
+
+    $self->{_args}{'check-at'}{'DATA'} = 1;
+    $self->qp->connection->notes('whitelisthost', 1);
+    ($code, $mess) = $self->apr_data_handler();
+    cmp_ok( $code, '==', DECLINED, "whitelisted host");
+
+    $self->qp->connection->notes('whitelisthost', 0);
+    ($code, $mess) = $self->apr_data_handler();
+    cmp_ok( $code, '==', DECLINED, "not sure");
+};
+
+sub test_connect_handler {
+    my $self = shift;
+
+    $self->{_args}{'check-at'} = undef;
+    my ($code, $mess) = $self->connect_handler();
+    cmp_ok( $code, '==', DECLINED, "no check-at set");
+
+    $self->{_args}{'check-at'}{'CONNECT'} = 1;
+    $self->qp->connection->notes('whitelisthost', 1);
+    ($code, $mess) = $self->connect_handler();
+    cmp_ok( $code, '==', DECLINED, "whitelisted host");
+
+    $self->qp->connection->notes('whitelisthost', 0);
+    ($code, $mess) = $self->connect_handler();
+    cmp_ok( $code, '==', DECLINED, "not sure");
+};
+
+sub test_data_handler {
+    my $self = shift;
+
+    $self->{_args}{'check-at'} = undef;
+    my ($code, $mess) = $self->data_handler();
+    cmp_ok( $code, '==', DECLINED, "no check-at set");
+
+    $self->{_args}{'check-at'}{'DATA'} = 1;
+    $self->qp->connection->notes('whitelisthost', 1);
+    ($code, $mess) = $self->data_handler();
+    cmp_ok( $code, '==', DECLINED, "whitelisted host");
+
+    $self->qp->connection->notes('whitelisthost', 0);
+    ($code, $mess) = $self->data_handler();
+    cmp_ok( $code, '==', DECLINED, "not sure");
+};
+
+sub test_log_and_pass {
+    my $self = shift;
+
+    my ($code, $mess) = $self->log_and_pass();
+    cmp_ok( $code, '==', DECLINED, "default");
+};
+
+sub test_log_and_deny {
+    my $self = shift;
+
+    $self->{_args}{reject_type} = undef;
+
+    my ($code, $mess) = $self->log_and_deny();
+    cmp_ok( $code, '==', DENY, "default");
+
+    $self->{_args}{reject_type} = 'temp';
+    ($code, $mess) = $self->log_and_deny();
+    cmp_ok( $code, '==', DENYSOFT, "bad, temp");
+
+    $self->{_args}{reject_type} = 'disconnect';
+    ($code, $mess) = $self->log_and_deny();
+    cmp_ok( $code, '==', DENY_DISCONNECT, "bad, disconnect");
+};
+
+sub test_mail_handler {
+    my $self = shift;
+
+    $self->{_args}{reject_type} = undef;
+    $self->qp->connection->notes('earlytalker', 0);
+
+    my ($code, $mess) = $self->mail_handler();
+    cmp_ok( $code, '==', DECLINED, "good");
+
+    $self->qp->connection->notes('earlytalker', 1);
+    ($code, $mess) = $self->mail_handler();
+    cmp_ok( $code, '==', DENY, "bad");
+
+    $self->{_args}{reject_type} = 'temp';
+    ($code, $mess) = $self->mail_handler();
+    cmp_ok( $code, '==', DENYSOFT, "bad, temp");
+
+    $self->{_args}{reject_type} = 'disconnect';
+    ($code, $mess) = $self->mail_handler();
+    cmp_ok( $code, '==', DENY_DISCONNECT, "bad, disconnect");
+};
+
+sub test_reject_type {
+    my $self = shift;
+
+    $self->{_args}{reject_type} = undef;
+    cmp_ok( $self->get_reject_type(), '==', DENY, "default");
+
+    $self->{_args}{reject_type} = 'temp';
+    cmp_ok( $self->get_reject_type(), '==', DENYSOFT, "defer");
+
+    $self->{_args}{reject_type} = 'disconnect';
+    cmp_ok( $self->get_reject_type(), '==', DENY_DISCONNECT, "disconnect");
+};
+
