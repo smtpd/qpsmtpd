@@ -22,8 +22,8 @@ sub new {
 }
 
 # overload these in a subclass
-sub max_idle_time       { 0 }
-sub max_connect_time    { 0 }
+sub max_idle_time    { 0 }
+sub max_connect_time { 0 }
 
 sub Reset {
     Danga::Socket->Reset;
@@ -32,21 +32,21 @@ sub Reset {
 
 sub _do_cleanup {
     my $now = time;
-    
+
     Danga::Socket->AddTimer(15, \&_do_cleanup);
-    
+
     my $sf = __PACKAGE__->get_sock_ref;
 
-    my %max_age;  # classname -> max age (0 means forever)
-    my %max_connect; # classname -> max connect time
+    my %max_age;        # classname -> max age (0 means forever)
+    my %max_connect;    # classname -> max connect time
     my @to_close;
     while (my $k = each %$sf) {
         my Danga::TimeoutSocket $v = $sf->{$k};
         my $ref = ref $v;
         next unless $v->isa('Danga::TimeoutSocket');
         unless (defined $max_age{$ref}) {
-            $max_age{$ref}      = $ref->max_idle_time || 0;
-            $max_connect{$ref}  = $ref->max_connect_time || 0;
+            $max_age{$ref}     = $ref->max_idle_time    || 0;
+            $max_connect{$ref} = $ref->max_connect_time || 0;
         }
         if (my $t = $max_connect{$ref}) {
             if ($v->{create_time} < $now - $t) {

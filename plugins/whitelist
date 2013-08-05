@@ -1,0 +1,232 @@
+#!perl -w
+
+=head1 NAME
+
+whitelist - whitelist override for other qpsmtpd plugins
+
+
+=head1 DESCRIPTION
+
+The B<whitelist> plugin allows selected hosts or senders or recipients 
+to be whitelisted as exceptions to later plugin processing. It is a more
+conservative variant of Devin Carraway's 'whitelist' plugin.
+
+
+=head1 CONFIGURATION
+
+To enable the plugin, add it to the qpsmtpd/config/plugins file as usual.
+It should precede any plugins you might wish to whitelist for.
+
+Several configuration files are supported, corresponding to different
+parts of the SMTP conversation:
+
+=over 4
+
+=item whitelisthosts
+
+Any IP address (or start-anchored fragment thereof) listed in the
+whitelisthosts file is exempted from any further validation during 
+'connect', and can be selectively exempted at other stages by 
+plugins testing for a 'whitelisthost' connection note.
+
+Similarly, if the environment variable $WHITELISTCLIENT is set
+(which can be done by tcpserver), the connection will be exempt from
+further 'connect' validation, and the host can be selectively 
+exempted by other plugins testing for a 'whitelistclient' connection 
+note.
+
+=item whitelisthelo
+
+Any host that issues a HELO matching an entry in whitelisthelo will
+be exempted from further validation at the 'helo' stage. Subsequent
+plugins can test for a 'whitelisthelo' connection note. Note that 
+this does not actually amount to an authentication in any meaningful 
+sense.
+
+=item whitelistsenders
+
+If the envelope sender of a mail (that which is sent as the MAIL FROM)
+matches an entry in whitelistsenders, or if the hostname component 
+matches, the mail will be exempted from any further validation within
+the 'mail' stage. Subsequent plugins can test for this exemption as a 
+'whitelistsender' transaction note.
+
+=item whitelistrcpt
+
+If any recipient of a mail (that sent as the RCPT TO) matches an
+entry from whitelistrcpt, or if the hostname component matches, no 
+further validation will be required for this recipient. Subsequent 
+plugins can test for this exemption using a 'whitelistrcpt' 
+transaction note, which holds the count of whitelisted recipients.
+
+=back
+
+whitelist_soft also supports per-recipient whitelisting when using
+the per_user_config plugin. To enable the per-recipient behaviour 
+(delaying all whitelisting until the rcpt part of the smtp 
+conversation, and using per-recipient whitelist configs, if 
+available), pass a true 'per_recipient' argument in the
+config/plugins invocation i.e.
+
+  whitelist_soft per_recipient 1
+
+By default global and per-recipient whitelists are merged; to turn off
+the merge behaviour pass a false 'merge' argument in the config/plugins
+invocation i.e.
+
+  whitelist_soft per_recipient 1 merge 0
+
+
+=head1 BUGS
+
+Whitelist lookups are all O(n) linear scans of configuration files, even
+though they're all associative lookups.  Something should be done about
+this when CDB/DB/GDBM configs are supported.
+
+
+=head1 AUTHOR
+
+Based on the 'whitelist' plugin by Devin Carraway <qpsmtpd@devin.com>.
+
+Modified by Gavin Carr <gavin@openfusion.com.au> to not inherit 
+whitelisting across hooks, but use per-hook whitelist notes instead.
+This is a more conservative approach e.g. whitelisting an IP will not
+automatically allow relaying from that IP.
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+my $VERSION = 0.02;
+
+# Default is to merge whitelists in per_recipient mode
+my %MERGE = (merge => 1);
+
+sub register {
+    my ($self, $qp, %arg) = @_;
+
+    $self->{_per_recipient} = 1 if $arg{per_recipient};
+    $MERGE{merge} = $arg{merge} if defined $arg{merge};
+
+    # Normal mode - whitelist per hook
+    unless ($arg{per_recipient}) {
+        $self->register_hook("connect", "check_host");
+        $self->register_hook("helo",    "check_helo");
+        $self->register_hook("ehlo",    "check_helo");
+        $self->register_hook("mail",    "check_sender");
+        $self->register_hook("rcpt",    "check_rcpt");
+    }
+
+    # Per recipient mode - defer all whitelisting to rcpt hook
+    else {
+        $self->register_hook("rcpt", "check_host");
+        $self->register_hook("helo", "helo_helper");
+        $self->register_hook("ehlo", "helo_helper");
+        $self->register_hook("rcpt", "check_helo");
+        $self->register_hook("rcpt", "check_sender");
+        $self->register_hook("rcpt", "check_rcpt");
+    }
+}
+
+sub check_host {
+    my ($self, $transaction, $rcpt) = @_;
+    my $ip = $self->qp->connection->remote_ip || return (DECLINED);
+
+    # From tcpserver
+    if (exists $ENV{WHITELISTCLIENT}) {
+        $self->qp->connection->notes('whitelistclient', 1);
+        $self->log(2, "pass, is whitelisted client");
+        $self->adjust_karma(5);
+        return OK;
+    }
+
+    my $config_arg = $self->{_per_recipient} ? {rcpt => $rcpt, %MERGE} : {};
+    for my $h ($self->qp->config('whitelisthosts', $config_arg)) {
+        if ($h eq $ip or $ip =~ /^\Q$h\E/) {
+            $self->qp->connection->notes('whitelisthost', 1);
+            $self->log(2, "pass, is a whitelisted host");
+            $self->adjust_karma(5);
+            return OK;
+        }
+    }
+    $self->log(LOGDEBUG, "skip: $ip is not whitelisted");
+    return DECLINED;
+}
+
+sub helo_helper {
+    my ($self, $transaction, $helo) = @_;
+    $self->{_whitelist_soft_helo} = $helo;
+    return DECLINED;
+}
+
+sub check_helo {
+    my ($self, $transaction, $helo) = @_;
+
+    # If per_recipient will be rcpt hook, and helo actually rcpt
+    my $config_arg = {};
+    if ($self->{_per_recipient}) {
+        $config_arg = {rcpt => $helo, %MERGE};
+        $helo = $self->{_whitelist_soft_helo};
+    }
+
+    for my $h ($self->qp->config('whitelisthelo', $config_arg)) {
+        if ($helo and lc $h eq lc $helo) {
+            $self->qp->connection->notes('whitelisthelo', 1);
+            $self->log(2, "helo host $helo in whitelisthelo");
+            return OK;
+        }
+    }
+    return DECLINED;
+}
+
+sub check_sender {
+    my ($self, $transaction, $sender) = @_;
+
+    # If per_recipient will be rcpt hook, and sender actually rcpt
+    my $config_arg = {};
+    if ($self->{_per_recipient}) {
+        $config_arg = {rcpt => $sender, %MERGE};
+        $sender = $transaction->sender;
+    }
+
+    return DECLINED if $sender->format eq '<>';
+    my $addr = lc $sender->address or return DECLINED;
+    my $host = lc $sender->host    or return DECLINED;
+
+    for my $h ($self->qp->config('whitelistsenders', $config_arg)) {
+        next unless $h;
+        $h = lc $h;
+
+        if ($addr eq $h or $host eq $h) {
+            $transaction->notes('whitelistsender', 1);
+            $self->log(2, "envelope sender $addr in whitelistsenders");
+            return OK;
+        }
+    }
+    return DECLINED;
+}
+
+sub check_rcpt {
+    my ($self, $transaction, $rcpt) = @_;
+
+    my $addr = lc $rcpt->address or return DECLINED;
+    my $host = lc $rcpt->host    or return DECLINED;
+
+    my $config_arg = $self->{_per_recipient} ? {rcpt => $rcpt, %MERGE} : {};
+    for my $h ($self->qp->config('whitelistrcpt', $config_arg)) {
+        next unless $h;
+        $h = lc $h;
+
+        if ($addr eq $h or $host eq $h) {
+            my $note = $transaction->notes('whitelistrcpt');
+            $transaction->notes('whitelistrcpt', ++$note);
+            $self->log(2, "recipient $addr in whitelistrcpt");
+            return OK;
+        }
+    }
+    return DECLINED;
+}
+

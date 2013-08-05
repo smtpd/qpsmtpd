@@ -1,123 +1,124 @@
 package Qpsmtpd::Connection;
 use strict;
 
-# All of these parameters depend only on the physical connection, 
+# All of these parameters depend only on the physical connection,
 # i.e. not on anything sent from the remote machine.  Hence, they
 # are an appropriate set to use for either start() or clone().  Do
 # not add parameters here unless they also meet that criteria.
 my @parameters = qw(
-        remote_host
-        remote_ip 
-        remote_info 
-        remote_port
-        local_ip
-        local_port
-        relay_client
-);
-
+  remote_host
+  remote_ip
+  remote_info
+  remote_port
+  local_ip
+  local_port
+  relay_client
+  );
 
 sub new {
-  my $proto = shift;
-  my $class = ref($proto) || $proto;
-  my $self = {};
-  bless ($self, $class);
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my $self  = {};
+    bless($self, $class);
 }
 
 sub start {
-  my $self = shift;
-  $self = $self->new(@_) unless ref $self;
+    my $self = shift;
+    $self = $self->new(@_) unless ref $self;
 
-  my %args = @_;
+    my %args = @_;
 
-  foreach my $f ( @parameters ) {
-    $self->$f($args{$f}) if $args{$f};
-  }
+    foreach my $f (@parameters) {
+        $self->$f($args{$f}) if $args{$f};
+    }
 
-  return $self;
+    return $self;
 }
 
 sub clone {
-  my $self = shift;
-  my %args = @_;
-  my $new = $self->new();
-  foreach my $f ( @parameters ) {
-    $new->$f($self->$f()) if $self->$f();
-  }
-  $new->{_notes} = $self->{_notes} if defined $self->{_notes};
-  # reset the old connection object like it's done at the end of a connection
-  # to prevent leaks (like prefork/tls problem with the old SSL file handle 
-  # still around)
-  $self->reset unless $args{no_reset}; 
-  # should we generate a new id here?
-  return $new;
+    my $self = shift;
+    my %args = @_;
+    my $new  = $self->new();
+    foreach my $f (@parameters) {
+        $new->$f($self->$f()) if $self->$f();
+    }
+    $new->{_notes} = $self->{_notes} if defined $self->{_notes};
+
+    # reset the old connection object like it's done at the end of a connection
+    # to prevent leaks (like prefork/tls problem with the old SSL file handle
+    # still around)
+    $self->reset unless $args{no_reset};
+
+    # should we generate a new id here?
+    return $new;
 }
 
 sub remote_host {
-  my $self = shift;
-  @_ and $self->{_remote_host} = shift;
-  $self->{_remote_host};
+    my $self = shift;
+    @_ and $self->{_remote_host} = shift;
+    $self->{_remote_host};
 }
 
 sub remote_ip {
-  my $self = shift;
-  @_ and $self->{_remote_ip} = shift;
-  $self->{_remote_ip};
+    my $self = shift;
+    @_ and $self->{_remote_ip} = shift;
+    $self->{_remote_ip};
 }
 
 sub remote_port {
-  my $self = shift;
-  @_ and $self->{_remote_port} = shift;
-  $self->{_remote_port};
+    my $self = shift;
+    @_ and $self->{_remote_port} = shift;
+    $self->{_remote_port};
 }
 
 sub local_ip {
-  my $self = shift;
-  @_ and $self->{_local_ip} = shift;
-  $self->{_local_ip};
+    my $self = shift;
+    @_ and $self->{_local_ip} = shift;
+    $self->{_local_ip};
 }
 
 sub local_port {
-  my $self = shift;
-  @_ and $self->{_local_port} = shift;
-  $self->{_local_port};
+    my $self = shift;
+    @_ and $self->{_local_port} = shift;
+    $self->{_local_port};
 }
 
-
 sub remote_info {
-  my $self = shift;
-  @_ and $self->{_remote_info} = shift;
-  $self->{_remote_info};
+    my $self = shift;
+    @_ and $self->{_remote_info} = shift;
+    $self->{_remote_info};
 }
 
 sub relay_client {
-  my $self = shift;
-  @_ and $self->{_relay_client} = shift;
-  $self->{_relay_client};
+    my $self = shift;
+    @_ and $self->{_relay_client} = shift;
+    $self->{_relay_client};
 }
 
 sub hello {
-  my $self = shift;
-  @_ and $self->{_hello} = shift;
-  $self->{_hello};
+    my $self = shift;
+    @_ and $self->{_hello} = shift;
+    $self->{_hello};
 }
 
 sub hello_host {
-  my $self = shift;
-  @_ and $self->{_hello_host} = shift;
-  $self->{_hello_host};
+    my $self = shift;
+    @_ and $self->{_hello_host} = shift;
+    $self->{_hello_host};
 }
 
 sub notes {
-  my ($self,$key) = (shift,shift);
-  # Check for any additional arguments passed by the caller -- including undef
-  return $self->{_notes}->{$key} unless @_;
-  return $self->{_notes}->{$key} = shift;
+    my ($self, $key) = (shift, shift);
+
+    # Check for any additional arguments passed by the caller -- including undef
+    return $self->{_notes}->{$key} unless @_;
+    return $self->{_notes}->{$key} = shift;
 }
 
 sub reset {
-   my $self = shift;
-   $self->{_notes} = undef;
-   $self = $self->new;
+    my $self = shift;
+    $self->{_notes} = undef;
+    $self = $self->new;
 }
 
 1;

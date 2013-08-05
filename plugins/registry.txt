@@ -1,0 +1,94 @@
+# This file contains a list of every plugin used on this server. If you have
+# additional plugins running, add them here.
+# Fields are whitespace delimited. Columns are ordered by numeric plugin ID.
+#
+#   the order of plugins in this file determines the order they appear in
+#   summary output
+# 
+#id	name						abb3	abb5		aliases
+#
+201	hosts_allow					alw		allow
+202	ident::geoip				geo		geoip
+203	ident::p0f					p0f		p0f			ident::p0f_3a0,ident::p0f_3a1
+
+205	karma						krm		karma
+206	dnsbl						dbl		dnsbl
+207	relay						rly		relay       check_relay,check_norelay,relay_only
+208	fcrdns						dns		fcrdn
+
+300	earlytalker					ear		early		check_earlytalker
+301	helo						hlo		helo		check_spamhelo
+302	tls							tls		tls
+
+320	dont_require_anglebrackets	rab		drabs
+321	unrecognized_commands		cmd		uncmd		count_unrecognized_commands
+322	noop						nop		noop		noop_counter
+323	random_error				rnd		rande
+324	milter						mlt		mlter
+325	content_log					log		colog
+#
+# Authentication
+#
+400	auth::auth_vpopmail_sql		avq		avsql
+401	auth::auth_vpopmaild		avd		vpopd
+402	auth::auth_vpopmail			avp		vpop
+403	auth::auth_checkpassword	ack		chkpw
+404	auth::auth_cvs_unix_local	acv		cvsul
+405	auth::auth_flat_file		aff		aflat
+406	auth::auth_ldap_bind		ald		aldap
+407	auth::authdeny	        	dny		adeny
+#
+# Sender / Envelope From
+#
+500	badmailfrom					bmf		badmf		check_badmailfrom,check_badmailfrom_patterns
+501	badmailfromto				bmt		bfrto
+502	rhsbl						rbl		rhsbl
+504	resolvable_fromhost			rfh		rsvfh		require_resolvable_fromhost
+505	sender_permitted_from		spf		spf
+#
+# Recipient / Envelope To
+#
+600	badrcptto					bto		badto		check_badrcptto,check_badrcptto_patterns
+601	rcpt_map					rmp		rcmap
+602	rcpt_regex					rcx		rcrex
+603	qmail_deliverable			qmd		qmd
+605	rcpt_ok						rok		rcpok
+608	bogus_bounce				bog		bogus		check_bogus_bounce
+609	greylisting					gry		greyl
+#
+# Content Filters
+#
+700	headers						hdr		headr		check_basicheaders
+701	loop						lop		loop
+702	uribl						uri		uribl
+
+710	domainkeys					dky		dkey
+711	dkim						dkm		dkim
+712 dmarc 				        dmc     dmarc
+
+720	spamassassin				spm		spama
+721	dspam						dsp		dspam
+#
+# Anti-Virus Plugins
+#
+770	virus::aveclient			ave		avirs
+771	virus::bitdefender			bit		bitdf
+772	virus::clamav				cav		clamv
+773	virus::clamdscan			clm		clamd
+774	virus::hbedv				hbv		hbedv
+775	virus::kavscanner			kav		kavsc
+776	virus::klez_filter			klz		vklez
+777	virus::sophie				sop		sophe
+778	virus::uvscan				uvs		uvscn
+#
+# Queue Plugins
+#
+800	queue::qmail-queue			qqm		queue	queue::qmail_2dqueue
+801	queue::maildir				qdr		qudir
+802	queue::postfix-queue		qpf		qupfx	queue::postfix_2dqueue
+803	queue::smtp-forward			qfw		qufwd	queue::smtp_2dqueue
+804	queue::exim-bsmtp			qxm		qexim	queue::exim_2dbsmtp
+
+900	quit_fortune				for		fortu
+
+999	connection_time				tim		time

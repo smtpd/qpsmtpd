@@ -5,40 +5,46 @@
 # as how to ignore log entries from itself
 
 sub register {
-  my ($self, $qp, $loglevel) = @_;
-  die "The transaction ID feature is currently unsupported";
+    my ($self, $qp, $loglevel) = @_;
+    die "The transaction ID feature is currently unsupported";
 
-  $self->{_level} = LOGWARN;
-  if ( defined($loglevel) ) {
-      if ($loglevel =~ /^\d+$/) {
-	  $self->{_level} = $loglevel;
-      }
-      else {
-	  $self->{_level} = log_level($loglevel);
-      }
-  }
+    $self->{_level} = LOGWARN;
+    if (defined($loglevel)) {
+        if ($loglevel =~ /^\d+$/) {
+            $self->{_level} = $loglevel;
+        }
+        else {
+            $self->{_level} = log_level($loglevel);
+        }
+    }
 
-  # If you want to capture this log entry with this plugin, you need to
-  # wait until after you register the plugin
-  $self->log(LOGINFO,'Initializing logging::transaction_id plugin');
+    # If you want to capture this log entry with this plugin, you need to
+    # wait until after you register the plugin
+    $self->log(LOGINFO, 'Initializing logging::transaction_id plugin');
 }
 
 sub hook_logging {
-  my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
+    my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
-  # Don't log your own log entries!  If this is the only logging plugin
-  # then these lines will not be logged at all.  You can safely comment
-  # out this line and it will not cause an infinite loop.
-  return DECLINED if defined $plugin and $plugin eq $self->plugin_name; 
+    # Don't log your own log entries!  If this is the only logging plugin
+    # then these lines will not be logged at all.  You can safely comment
+    # out this line and it will not cause an infinite loop.
+    return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
 
-  warn 
-    join(" ", ($transaction ? $transaction->id : "???") .
-         (defined $plugin ? " $plugin plugin:" :
-          defined $hook   ? " running plugin ($hook):"  : ""),
-         @log), "\n"
-    if ($trace <= $self->{_level});
+    warn join(
+              " ",
+              ($transaction ? $transaction->id : "???")
+                . (
+                     defined $plugin ? " $plugin plugin:"
+                   : defined $hook   ? " running plugin ($hook):"
+                   :                   ""
+                  ),
+              @log
+             ),
+      "\n"
+      if ($trace <= $self->{_level});
 
-  return DECLINED;
+    return DECLINED;
 }
 
 =head1 NAME

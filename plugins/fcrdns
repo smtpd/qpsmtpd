@@ -1,0 +1,308 @@
+#!perl -w
+
+=head1 NAME
+
+Forward Confirmed RDNS - http://en.wikipedia.org/wiki/FCrDNS
+
+=head1 DESCRIPTION
+
+Determine if the SMTP sender has matching forward and reverse DNS.
+
+Sets the connection note fcrdns.
+
+=head1 WHY IT WORKS
+
+The reverse DNS of zombie PCs is out of the spam operators control. Their
+only way to pass this test is to limit themselves to hosts with matching
+forward and reverse DNS. At present, this presents a significant hurdle.
+
+=head1 VALIDATION TESTS
+
+=over 4
+
+=item has_reverse_dns
+
+Determine if the senders IP address resolves to a hostname.
+
+=item has_forward_dns
+
+If the remote IP has a PTR hostname(s), see if that host has an A or AAAA. If
+so, see if any of the host IPs (A or AAAA records) match the remote IP.
+
+Since the dawn of SMTP, having matching DNS has been a standard expected and
+oft required of mail servers. While requiring matching DNS is prudent,
+requiring an exact match will reject valid email. This often hinders the
+use of FcRDNS. While testing this plugin, I noticed that mx0.slc.paypal.com
+sends mail from an IP that reverses to mx1.slc.paypal.com. While that's
+technically an error, so too would rejecting that connection.
+
+To avoid false positives, matches are extended to the first 3 octets of the
+IP and the last two labels of the FQDN. The following are considered a match:
+
+  192.0.1.2, 192.0.1.3
+
+  foo.example.com, bar.example.com
+
+This allows FcRDNS to be used without rejecting mail from orgs with
+pools of servers where the HELO name and IP don't exactly match. This list
+includes Yahoo, Gmail, PayPal, cheaptickets.com, exchange.microsoft.com, etc.
+
+=back
+
+=head1 CONFIGURATION
+
+=head2 timeout [seconds]
+
+Default: 5
+
+The number of seconds before DNS queries timeout.
+
+=head2 reject [ 0 | 1 | naughty ]
+
+Default: 1
+
+0: do not reject
+
+1: reject
+
+naughty: naughty plugin handles rejection
+
+=head2 reject_type [ temp | perm | disconnect ]
+
+Default: disconnect
+
+What type of rejection should be sent? See docs/config.pod
+
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
+
+
+=head1 RFC 1912, RFC 5451
+
+From Wikipedia summary:
+
+1. First a reverse DNS lookup (PTR query) is performed on the IP address, which returns a list of zero or more PTR records. (has_reverse_dns)
+
+2. For each domain name returned in the PTR query results, a regular 'forward' DNS lookup (type A or AAAA query) is then performed on that domain name. (has_forward_dns)
+
+3. Any A or AAAA record returned by the second query is then compared against the original IP address (check_ip_match), and if there is a match, then the FCrDNS check passes.
+
+=head1 iprev
+
+# https://www.ietf.org/rfc/rfc5451.txt
+
+2.4.3.  "iprev" Results
+
+The result values are used by the "iprev" method, defined in
+Section 3, are as follows:
+
+pass:  The DNS evaluation succeeded, i.e., the "reverse" and
+"forward" lookup results were returned and were in agreement.
+
+fail:  The DNS evaluation failed.  In particular, the "reverse" and
+"forward" lookups each produced results but they were not in
+agreement, or the "forward" query completed but produced no
+result, e.g., a DNS RCODE of 3, commonly known as NXDOMAIN, or an
+RCODE of 0 (NOERROR) in a reply containing no answers, was
+returned.
+
+temperror:  The DNS evaluation could not be completed due to some
+error that is likely transient in nature, such as a temporary DNS
+error, e.g., a DNS RCODE of 2, commonly known as SERVFAIL, or
+other error condition resulted.  A later attempt may produce a
+final result.
+
+permerror:  The DNS evaluation could not be completed because no PTR
+data are published for the connecting IP address, e.g., a DNS
+RCODE of 3, commonly known as NXDOMAIN, or an RCODE of 0 (NOERROR)
+in a reply containing no answers, was returned.  This prevented
+completion of the evaluation.
+
+=head1 AUTHOR
+
+2013 - Matt Simerson
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register {
+    my ($self, $qp) = (shift, shift);
+    $self->{_args} = {@_};
+    $self->{_args}{reject_type} = 'temp';
+    $self->{_args}{timeout} ||= 5;
+    $self->{_args}{ptr_hosts} = {};
+
+    if (!defined $self->{_args}{reject}) {
+        $self->{_args}{reject} = 0;
+    }
+
+    $self->init_resolver() or return;
+
+    $self->register_hook('connect',   'connect_handler');
+}
+
+sub connect_handler {
+    my ($self) = @_;
+
+    return DECLINED if $self->is_immune();
+
+    # run a couple cheap tests before the more expensive DNS tests
+    foreach my $test (qw/ invalid_localhost is_not_fqdn /) {
+        $self->$test() or return DECLINED;
+    }
+
+    $self->has_reverse_dns() or return DECLINED;
+    $self->has_forward_dns() or return DECLINED;
+
+    $self->log(LOGINFO, "pass");
+    return DECLINED;
+}
+
+sub invalid_localhost {
+    my ($self) = @_;
+    return 1 if lc $self->qp->connection->remote_host ne 'localhost';
+    if (   $self->qp->connection->remote_ip ne '127.0.0.1'
+        && $self->qp->connection->remote_ip ne '::1')
+    {
+        $self->adjust_karma(-1);
+        $self->log(LOGINFO, "fail, not localhost");
+        return;
+    }
+    $self->adjust_karma(1);
+    $self->log(LOGDEBUG, "pass, is localhost");
+    return 1;
+}
+
+sub is_not_fqdn {
+    my ($self) = @_;
+    my $host = $self->qp->connection->remote_host or return 1;
+    return 1 if $host eq 'Unknown';    # QP assigns this to a "no DNS result"
+
+    # Since QP looked it up, perform some quick validation
+    if ($host !~ /\./) {               # has no dots
+        $self->adjust_karma(-1);
+        $self->log(LOGINFO, "fail, not FQDN");
+        return;
+    }
+    if ($host =~ /[^a-zA-Z0-9\-\.]/) {
+        $self->adjust_karma(-1);
+        $self->log(LOGINFO, "fail, invalid FQDN chars");
+        return;
+    }
+    return 1;
+}
+
+sub has_reverse_dns {
+    my ($self) = @_;
+
+    my $res = $self->init_resolver();
+    my $ip  = $self->qp->connection->remote_ip;
+
+    my $query = $res->query($ip, 'PTR') or do {
+        if ($res->errorstring eq 'NXDOMAIN') {
+            $self->adjust_karma(-1);
+            $self->store_auth_results("iprev=permerror");
+            $self->log(LOGINFO, "fail, no rDNS: " . $res->errorstring);
+            return;
+        }
+        if ( $res->errorstring eq 'SERVFAIL' ) {
+            $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
+            $self->store_auth_results("iprev=temperror");
+        }
+        elsif ( $res->errorstring eq 'NOERROR' ) {
+            $self->log(LOGINFO, "fail, no PTR (NOERROR)" );
+            $self->store_auth_results("iprev=permerror");
+        }
+        else {
+            $self->store_auth_results("iprev=fail");
+            $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
+        };
+        return;
+    };
+
+    my $hits = 0;
+    $self->{_args}{ptr_hosts} = {};    # reset hash
+    for my $rr ($query->answer) {
+        next if $rr->type ne 'PTR';
+        $hits++;
+        $self->{_args}{ptr_hosts}{$rr->ptrdname} = 1;
+        $self->log(LOGDEBUG, "PTR: " . $rr->ptrdname);
+    }
+    if (!$hits) {
+        $self->adjust_karma(-1);
+        $self->log(LOGINFO, "fail, no PTR records");
+        $self->store_auth_results("iprev=permerror");
+        return;
+    }
+
+    $self->log(LOGDEBUG, "has rDNS");
+    return 1;
+}
+
+sub has_forward_dns {
+    my ($self) = @_;
+
+    my $res = $self->init_resolver();
+
+    foreach my $host (keys %{$self->{_args}{ptr_hosts}}) {
+
+        $host .= '.' if '.' ne substr($host, -1, 1);    # fully qualify name
+        my $query = $res->query($host) or do {
+            if ($res->errorstring eq 'NXDOMAIN') {
+                $self->store_auth_results("iprev=permerror");
+                $self->log(LOGDEBUG, "host $host does not exist");
+                next;
+            }
+            $self->store_auth_results("iprev=fail");
+            $self->log(LOGDEBUG, "query for $host failed (",
+                       $res->errorstring, ")");
+            next;
+        };
+
+        my $hits = 0;
+        foreach my $rr ($query->answer) {
+            next unless $rr->type =~ /^(?:A|AAAA)$/;
+            $hits++;
+            $self->check_ip_match($rr->address) and return 1;
+        }
+        if ($hits) {
+            $self->store_auth_results("iprev=fail");
+            $self->log(LOGDEBUG, "PTR host has forward DNS") if $hits;
+            return 1;
+        }
+    }
+    $self->adjust_karma(-1);
+    $self->store_auth_results("iprev=fail");
+    $self->log(LOGINFO, "fail, no PTR hosts have forward DNS");
+    return;
+}
+
+sub check_ip_match {
+    my $self = shift;
+    my $ip = shift or return;
+
+    if ($ip eq $self->qp->connection->remote_ip) {
+        $self->log(LOGDEBUG, "forward ip match");
+        $self->store_auth_results("iprev=pass");
+        $self->adjust_karma(1);
+        return 1;
+    }
+
+    # TODO: make this IPv6 compatible
+    my $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
+    my $rem_net =
+      join('.', (split(/\./, $self->qp->connection->remote_ip))[0, 1, 2]);
+
+    if ($dns_net eq $rem_net) {
+        $self->log(LOGNOTICE, "forward network match");
+        $self->store_auth_results("iprev=pass");
+        return 1;
+    }
+    return;
+}
+

@@ -235,8 +235,8 @@ Arguments for this hook are
   # $sender: an Qpsmtpd::Address object for 
   # sender of the message
 
-Example plugins for the C<hook_mail> are F<require_resolvable_fromhost>
-and F<check_badmailfrom>.
+Example plugins for the C<hook_mail> are F<resolvable_fromhost>
+and F<badmailfrom>.
 
 =head2 hook_rcpt_pre
 
@@ -293,7 +293,7 @@ was sent, this hook is called.
 
 B<NOTE:> This hook, like B<EHLO>, B<VRFY>, B<QUIT>, B<NOOP>, is an 
 endpoint of a pipelined command group (see RFC 1854) and may be used to 
-detect ``early talkers''. Since svn revision 758 the F<check_earlytalker>
+detect ``early talkers''. Since svn revision 758 the F<earlytalker>
 plugin may be configured to check at this hook for ``early talkers''.
 
 Allowed return codes are

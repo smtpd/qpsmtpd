@@ -2,9 +2,9 @@
 use IO::Socket;
 
 sub register {
-    my ( $self, $qp, @args ) = @_;
+    my ($self, $qp, @args) = @_;
 
-    %{ $self->{"_sophie"} } = @args;
+    %{$self->{"_sophie"}} = @args;
 
     # Set some sensible defaults
     $self->{"_sophie"}->{"sophie_socket"} ||= "/var/run/sophie";
@@ -13,68 +13,66 @@ sub register {
 }
 
 sub hook_data_post {
-    my ( $self, $transaction ) = @_;
+    my ($self, $transaction) = @_;
     $DB::single = 1;
 
-    if ( $transaction->data_size > $self->{"_sophie"}->{"max_size"} * 1024 ) {
-        $self->log( LOGNOTICE, "Declining due to data_size" );
+    if ($transaction->data_size > $self->{"_sophie"}->{"max_size"} * 1024) {
+        $self->log(LOGNOTICE, "Declining due to data_size");
         return (DECLINED);
     }
 
     # Ignore non-multipart emails
     my $content_type = $transaction->header->get('Content-Type');
     $content_type =~ s/\s/ /g if defined $content_type;
-    unless ( $content_type
-        && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i )
+    unless (   $content_type
+            && $content_type =~ m!\bmultipart/.*\bboundary="?([^"]+)!i)
     {
-        $self->log( LOGWARN, "non-multipart mail - skipping" );
+        $self->log(LOGWARN, "non-multipart mail - skipping");
         return DECLINED;
     }
 
     my $filename = $transaction->body_filename;
     unless ($filename) {
-        $self->log( LOGWARN, "Cannot process due to lack of filename" );
+        $self->log(LOGWARN, "Cannot process due to lack of filename");
         return (DECLINED);    # unless $filename;
     }
 
-    my $mode = ( stat( $self->spool_dir() ) )[2];
-    if ( $mode & 07077 ) {   # must be sharing spool directory with external app
-        $self->log( LOGWARN,
-            "Changing permissions on file to permit scanner access" );
+    my $mode = (stat($self->spool_dir()))[2];
+    if ($mode & 07077) {    # must be sharing spool directory with external app
+        $self->log(LOGWARN,
+                   "Changing permissions on file to permit scanner access");
         chmod $mode, $filename;
     }
 
     my ($SOPHIE, $response);
     socket(\*SOPHIE, AF_UNIX, SOCK_STREAM, 0)
-    	|| die "Couldn't create socket ($!)\n";
+      || die "Couldn't create socket ($!)\n";
 
     connect(\*SOPHIE, pack_sockaddr_un $self->{"_sophie"}->{"sophie_socket"})
-	|| die "Couldn't connect() to the socket ($!)\n";
+      || die "Couldn't connect() to the socket ($!)\n";
 
-    syswrite(\*SOPHIE, $filename."\n", length($filename)+1);
-    sysread(\*SOPHIE, $response, 256);    
-    close (\*SOPHIE);
+    syswrite(\*SOPHIE, $filename . "\n", length($filename) + 1);
+    sysread(\*SOPHIE, $response, 256);
+    close(\*SOPHIE);
 
     my $virus;
 
-    if ( ($virus) = ( $response =~ m/^1:?(.*)?$/ ) ) {
-        $self->log( LOGERROR, "One or more virus(es) found: $virus" );
+    if (($virus) = ($response =~ m/^1:?(.*)?$/)) {
+        $self->log(LOGERROR, "One or more virus(es) found: $virus");
 
-        if ( lc( $self->{"_sophie"}->{"deny_viruses"} ) eq "yes" ) {
-            return ( DENY,
-                    "Virus"
-                  . ( $virus =~ /,/ ? "es " : " " )
-                  . "Found: $virus" );
+        if (lc($self->{"_sophie"}->{"deny_viruses"}) eq "yes") {
+            return (DENY,
+                    "Virus" . ($virus =~ /,/ ? "es " : " ") . "Found: $virus");
         }
         else {
-            $transaction->header->add( 'X-Virus-Found',   'Yes' );
-            $transaction->header->add( 'X-Virus-Details', $virus );
+            $transaction->header->add('X-Virus-Found',   'Yes');
+            $transaction->header->add('X-Virus-Details', $virus);
             return (DECLINED);
         }
     }
 
-    $transaction->header->add( 'X-Virus-Checked',
-        "Checked by SOPHIE on " . $self->qp->config("me") );
+    $transaction->header->add('X-Virus-Checked',
+                             "Checked by SOPHIE on " . $self->qp->config("me"));
 
     return (DECLINED);
 }

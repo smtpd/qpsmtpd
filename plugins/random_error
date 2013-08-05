@@ -1,4 +1,10 @@
 #!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
 =head1 NAME
 
 random_error
@@ -12,7 +18,7 @@ This plugin randomly disconnects and issues DENYSOFTs.
 one parameter is allowed, which is how often to error, as a percentage
 of messages.  The default is 1. Use a negative number to disable.
 
-2/5 of failures are DENYSOFT_DISOCNNECT, 3/5 simply DENYSOFT.
+2/5 of failures are DENYSOFT_DISCONNECT, 3/5 simply DENYSOFT.
 
 For use with other plugins, scribble the revised failure rate to
 
@@ -21,17 +27,17 @@ For use with other plugins, scribble the revised failure rate to
 =cut
 
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  die "Invalid args: '@args'" unless @args < 2;
-  ($self->{__PACKAGE__.'_how'}) = $args[0] || 1;
-  
+    die "Invalid args: '@args'" unless @args < 2;
+    ($self->{__PACKAGE__ . '_how'}) = $args[0] || 1;
+
 }
 
 sub NEXT() { DECLINED }
 
 sub random_fail {
-        my $fpct = $_[0]->connection->notes('random_fail_%');
+    my $fpct = $_[0]->connection->notes('random_fail_%');
 
 =head1 calculating the probability of failure
 
@@ -46,40 +52,41 @@ or
        x = 1 - ( (1 - input_number ) ** (1/6) )
 
 =cut
-        my $successp = 1 - ($fpct / 100);
-        $_[0]->log(LOGINFO, "to fail, rand(1) must be more than ". ($successp ** (1 / 6)) );
-	rand(1) < ($successp ** (1 / 6)) and return NEXT;
-	rand(5) < 2 and return (DENYSOFT_DISCONNECT, "random failure");
-	return (DENYSOFT, "random failure");
+
+    my $successp = 1 - ($fpct / 100);
+    $_[0]->log(LOGINFO,
+               "to fail, rand(1) must be more than " . ($successp**(1 / 6)));
+    rand(1) < ($successp**(1 / 6)) and return NEXT;
+    rand(5) < 2 and return (DENYSOFT_DISCONNECT, "random failure");
+    return (DENYSOFT, "random failure");
 }
 
-
 sub hook_connect {
-    $_[0]->connection->notes('random_fail_%', $_[0]->{__PACKAGE__.'_how'});
-    goto &random_fail
+    $_[0]->connection->notes('random_fail_%', $_[0]->{__PACKAGE__ . '_how'});
+    goto &random_fail;
 }
 
 sub hook_helo {
-    goto &random_fail
+    goto &random_fail;
 }
 
 sub hook_ehlo {
-    goto &random_fail
+    goto &random_fail;
 }
 
 sub hook_mail {
-    goto &random_fail
+    goto &random_fail;
 }
 
 sub hook_rcpt {
-    goto &random_fail
+    goto &random_fail;
 }
 
 sub hook_data {
-    goto &random_fail
+    goto &random_fail;
 }
 
 sub hook_data_post {
-    goto &random_fail
+    goto &random_fail;
 }
 

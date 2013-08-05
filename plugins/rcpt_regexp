@@ -1,4 +1,5 @@
 #!perl -w
+
 =head1 NAME
 
 rcpt_regexp - check recipients against a list of regular expressions

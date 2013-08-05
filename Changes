@@ -1,5 +1,114 @@
 
-Next Version
+0.92  Apr 20, 2013
+
+  new plugins: dmarc, fcrdns
+
+  new feature: DKIM message signing. See 'perldoc plugins/dkim' for details.
+        includes script for generating DKIM selectors, keys, and DNS records.
+        RAM bumped up to 300MB, to avoid memory exhaustion errors.
+
+  Qpsmtpd.pm: untaint config options before passing them to plugins.
+
+  auth_vpopmaild: untaint responses obtained from network. Combined with the taint fix for config options, enables auth_vpopmaild to work when setting the host config and port
+
+  tls: added ability to store SSL keys in config/ssl
+
+  log2sql: added UPDATE query support
+
+  removed FAQ to: https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/faq
+
+  helo: cease processing DNS records after first positive match
+
+  karma: sprinkled karma awards throughout other plugins
+     - limit poor karma hosts to 1 concurrent connection
+     - allow +3 conncurrent connections to hosts with good karma
+     - limit recipients to 1 for senders with negative karma
+
+  Sanitize spamd_sock path for perl taint mode - Markus Ullmann
+
+  geo_ip: added too_far option (deduct karma from distant senders)
+
+  bogus_bounce: add Return-Path check, per RFC 3834
+
+  Fix for Net::DNS break -  Markus Ullmann
+
+  SPF: arrange logic to so improve reliability of spf pass reporting (helpful to DMARC plugin)
+
+  is_naughty removed from is_immune feature. Allows more granular handling by plugins.
+
+0.91  Nov 20, 2012
+
+  a handful of minor changes to log messages, similar to v0.90
+
+  replace all instances of split '' with split // (required for 5.1?+)
+
+  clamdscan: skip processing of naughty messages
+
+  TcpServer: improved IPv6 support (Michael Holzt)
+
+  SPF: improved support for IPv6, removed is_in_relayclient in favor
+    of checking if relayclient() note is set.
+
+  spamassassin: added 'headers none' option
+
+  qmail_deliverable: added vpopmail extension support, reject null
+    senders to ezmlm mailing lists.
+
+  dnsbl rejections handled by naughty plugin
+
+  changed default loglevel from 9 to 6
+
+  allow messages with no body: (Robin's patch)
+
+  ordered config.sample/plugins roughly in SMTP phase order
+
+  added Plugins::adjust_karma, reduces code requirements in other plugins
+
+  added whitelist plugin
+
+  helo: added is_plain_ip to lenient checks
+
+  dspam improvements
+
+  added log2sql, log/watch.pl, log/summarize.pl, and plugins/registry.txt
+
+  new dkim plugin added (deprecates domainkeys plugin).
+
+0.90  Jun 27, 2012
+
+  Many logging adjustments for plugins, to achieve the goal of emitting
+     a single message per plugin that provides a summary of that plugins
+     action(s) and/or outcome(s).
+
+  qmail_deliverable plugin added (depends on Qmail::Deliverable).
+
+  karma plugin added.
+
+  naughty plugin added.
+
+  count_unrecognized_commands: corrected variable assignment error
+
+  connection_time: added tcpserver deployment compatibility
+
+  loop: max_hops was sometimes unset
+
+  dnsbl,rhsbl: process DNS queries syncronously to improve overall efficiency
+
+  insert headers at top of message (consistent SMTP behavior) in uribl
+     domainkeys, spamassassin plugins.
+
+  spamassassin: consolidated two data_post methods (more linear, simpler)
+
+  rewrote check_basicheaders  -> headers
+
+  renamed check_loop          -> loop
+  renamed check_badrcptto     -> badrcptto
+  renamed check_badmailfromto -> badmailfromto
+  renamed check_badmailfrom   -> badmailfrom
+
+  check_badmailfrom_patterns, merged functionality into check_badmailfrom
+
+  check_badrcptto_patterns, merged functionality into check_badrcptto
 
   check_basicheaders. New arguments available: past, future, reject, reject_type
 
@@ -9,7 +118,7 @@ Next Version
 
   p0f version 3 supported and new default. see UPGRADING (Matt Simerson)
 
-  require_resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
+  resolvable_fromhost ignores DNS search path (i.e. it expects fully resolved domains)  (Robert Spier, Charlie Brady)
 
   new plugin auth_vpopmaild (Robin Bowes)
 
@@ -19,7 +128,7 @@ Next Version
 
   new plugin check_bogus_bounce (Steve Kemp)
 
-  clamav: added ClamAV version to the X-Virus-Checked header, 
+  clamav: added ClamAV version to the X-Virus-Checked header,
   as well as noting "no virus found".  (Matt Simerson)
 
   assorted documentation cleanups (Steve Kemp, Robert Spier)
@@ -36,12 +145,12 @@ Next Version
 
   AUTH PLAIN bug with Alpine (Rick Richard)
 
-  require_resolvable_fromhost: Moved DENYSOFT for temp_resolver_failed
+  resolvable_fromhost: Moved DENYSOFT for temp_resolver_failed
   to the RCPT TO hook. (Larry Nedry)
 
   Note Net::IP dependency (Larry Nedry)
 
-  Various minor spelling cleanups and such (Steve Kemp, Devin Carraway) 
+  Various minor spelling cleanups and such (Steve Kemp, Devin Carraway)
 
   rpm: create .rpm files from the packaging/rpm directory (Peter J. Holzer,
   Robin Bowes, Filippo Carletti, Richard Siddell)
@@ -155,7 +264,7 @@ Next Version
   plugins/queue/maildir: multi user / multi domain support added
   set the Return-Path header when queuing into maildir mailboxes
 
-  plugins/require_resolvable_fromhost: check all MX hosts, not just the first
+  plugins/resolvable_fromhost: check all MX hosts, not just the first
 
   remove outdated virus/check_for_hi_virus plugin
 
@@ -183,7 +292,7 @@ Next Version
 
   async: Dereference the DATA deny message before sending it to the client
 
-  Change async/require_resolvable_fromhost to match the logic of
+  Change async/resolvable_fromhost to match the logic of
   the non-async version and other MTAs
 
   async: Handle End-of-data marker split across packets
@@ -445,7 +554,7 @@ Next Version
 
   example patterns for badrcptto plugin - Gordon Rowell
 
-  Extend require_resolvable_fromhost to include a configurable list of
+  Extend resolvable_fromhost to include a configurable list of
   "impossible" addresses to combat spammer forging.  (Hanno Hecker)
 
   Use qmail/control/smtpdgreeting if it exists, otherwise
@@ -562,7 +671,7 @@ Next Version
   no longer exists for that sender (great for harassment cases).
   (John Peacock)
 
-  check_earlytalker and require_resolvable_fromhost - short circuit test if
+  earlytalker and resolvable_fromhost - short circuit test if
   whitelistclient is set. (Michael Toren)
 
   check_badmailfrom - Do not say why a given message is denied.
@@ -634,7 +743,7 @@ Next Version
 
   Add a plugin hook for the DATA command
 
-  check_earlytalker -
+  earlytalker -
     + optionally react to an earlytalker by denying all MAIL-FROM commands
       rather than issuing a 4xx/5xx greeting and disconnecting. (Mark
       Powell)
@@ -720,7 +829,7 @@ Next Version
   Use $ENV{QMAIL} to override /var/qmail for where to find the
   control/ directory.
 
-  Enable "check_earlytalker" in the default plugins config
+  Enable "earlytalker" in the default plugins config
 
   Added a milter plugin to allow use of sendmail milters
 
@@ -784,7 +893,7 @@ Next Version
   unrecognized_command hook and a count_unrecognized_commands
   plugin. (Rasjid Wilcox)
 
-  check_earlytalker plugin.  Deny the connection if the client talks
+  earlytalker plugin.  Deny the connection if the client talks
   before we show our SMTP banner.  (From Devin Carraway)
 
   Patch Qpsmtpd::SMTP to allow connect plugins to give DENY and

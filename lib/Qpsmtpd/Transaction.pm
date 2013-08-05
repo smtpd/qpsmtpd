@@ -2,24 +2,26 @@ package Qpsmtpd::Transaction;
 use Qpsmtpd;
 @ISA = qw(Qpsmtpd);
 use strict;
+use warnings;
+
 use Qpsmtpd::Utils;
 use Qpsmtpd::Constants;
+
+use IO::File qw(O_RDWR O_CREAT);
 use Socket qw(inet_aton);
 use Sys::Hostname;
 use Time::HiRes qw(gettimeofday);
 
-use IO::File qw(O_RDWR O_CREAT);
-
 sub new { start(@_) }
 
 sub start {
-  my $proto = shift;
-  my $class = ref($proto) || $proto;
-  my %args = @_;
-  
-  my $self = { _rcpt => [], started => time, };
-  bless ($self, $class);
-  return $self;
+    my $proto = shift;
+    my $class = ref($proto) || $proto;
+    my %args  = @_;
+
+    my $self = {_rcpt => [], started => time,};
+    bless($self, $class);
+    return $self;
 }
 
 sub add_recipient {
@@ -28,27 +30,28 @@ sub add_recipient {
 }
 
 sub remove_recipient {
-  my ($self,$rcpt) = @_;
-  $self->{_recipients} = [grep {$_->address ne $rcpt->address}
-                               @{$self->{_recipients} || []}] if $rcpt;
+    my ($self, $rcpt) = @_;
+    $self->{_recipients} =
+      [grep { $_->address ne $rcpt->address } @{$self->{_recipients} || []}]
+      if $rcpt;
 }
 
 sub recipients {
-  my $self = shift;
-  @_ and $self->{_recipients} = [@_];
-  ($self->{_recipients} ? @{$self->{_recipients}} : ());
+    my $self = shift;
+    @_ and $self->{_recipients} = [@_];
+    ($self->{_recipients} ? @{$self->{_recipients}} : ());
 }
 
 sub sender {
-  my $self = shift;
-  @_ and $self->{_sender} = shift;
-  $self->{_sender};
+    my $self = shift;
+    @_ and $self->{_sender} = shift;
+    $self->{_sender};
 }
 
 sub header {
-  my $self = shift;
-  @_ and $self->{_header} = shift;
-  $self->{_header};
+    my $self = shift;
+    @_ and $self->{_header} = shift;
+    $self->{_header};
 }
 
 # blocked() will return when we actually can do something useful with it...
@@ -61,32 +64,33 @@ sub header {
 #}
 
 sub notes {
-  my ($self,$key) = (shift,shift);
-  # Check for any additional arguments passed by the caller -- including undef
-  return $self->{_notes}->{$key} unless @_;
-  return $self->{_notes}->{$key} = shift;
+    my ($self, $key) = (shift, shift);
+
+    # Check for any additional arguments passed by the caller -- including undef
+    return $self->{_notes}->{$key} unless @_;
+    return $self->{_notes}->{$key} = shift;
 }
 
 sub set_body_start {
     my $self = shift;
     $self->{_body_start} = $self->body_current_pos;
     if ($self->{_body_file}) {
-               $self->{_header_size} = $self->{_body_start};
+        $self->{_header_size} = $self->{_body_start};
     }
     else {
         $self->{_header_size} = 0;
         if ($self->{_body_array}) {
-            foreach my $line (@{ $self->{_body_array} }) {
+            foreach my $line (@{$self->{_body_array}}) {
                 $self->{_header_size} += length($line);
             }
         }
-   }
+    }
 }
 
 sub body_start {
-  my $self = shift;
-  @_ and die "body_start now read only";
-  $self->{_body_start};
+    my $self = shift;
+    @_ and die "body_start now read only";
+    $self->{_body_start};
 }
 
 sub body_current_pos {
@@ -98,107 +102,116 @@ sub body_current_pos {
 }
 
 sub body_filename {
-  my $self = shift;
-  $self->body_spool() unless $self->{_filename};
-  $self->{_body_file}->flush(); # so contents won't be cached
-  return $self->{_filename};
+    my $self = shift;
+    $self->body_spool() unless $self->{_filename};
+    $self->{_body_file}->flush();    # so contents won't be cached
+    return $self->{_filename};
 }
 
 sub body_spool {
-  my $self = shift;
-  $self->log(LOGINFO, "spooling message to disk");
-  $self->{_filename} = $self->temp_file();
-  $self->{_body_file} = IO::File->new($self->{_filename}, O_RDWR|O_CREAT, 0600)
-    or die "Could not open file $self->{_filename} - $! "; # . $self->{_body_file}->error;
-  if ($self->{_body_array}) {
-    foreach my $line (@{ $self->{_body_array} }) {
-      $self->{_body_file}->print($line) or die "Cannot print to temp file: $!";
+    my $self = shift;
+    $self->log(LOGINFO, "spooling message to disk");
+    $self->{_filename} = $self->temp_file();
+    $self->{_body_file} =
+      IO::File->new($self->{_filename}, O_RDWR | O_CREAT, 0600)
+      or die "Could not open file $self->{_filename} - $! "
+      ;                              # . $self->{_body_file}->error;
+    if ($self->{_body_array}) {
+        foreach my $line (@{$self->{_body_array}}) {
+            $self->{_body_file}->print($line)
+              or die "Cannot print to temp file: $!";
+        }
+        $self->{_body_start} = $self->{_header_size};
     }
-    $self->{_body_start} = $self->{_header_size};
-  }
-  $self->{_body_array} = undef;
+    else {
+        $self->log(LOGERROR, "no message body");
+    }
+    $self->{_body_array} = undef;
 }
 
 sub body_write {
-  my $self = shift;
-  my $data = shift;
-  if ($self->{_body_file}) {
-    #warn("body_write to file\n");
-    # go to the end of the file
-    seek($self->{_body_file},0,2)
-      unless $self->{_body_file_writing};
-    $self->{_body_file_writing} = 1;
-    $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data)
-      and $self->{_body_size} += length (ref $data eq "SCALAR" ? $$data : $data);
-  }
-  else {
-    #warn("body_write to array\n");
-    $self->{_body_array} ||= [];
-    my $ref = ref($data) eq "SCALAR" ? $data : \$data;
-    pos($$ref) = 0;
-    while ($$ref =~ m/\G(.*?\n)/gc) {
-      push @{ $self->{_body_array} }, $1;
-      $self->{_body_size} += length($1);
-      ++$self->{_body_current_pos};
+    my $self = shift;
+    my $data = shift;
+    if ($self->{_body_file}) {
+
+        #warn("body_write to file\n");
+        # go to the end of the file
+        seek($self->{_body_file}, 0, 2)
+          unless $self->{_body_file_writing};
+        $self->{_body_file_writing} = 1;
+        $self->{_body_file}->print(ref $data eq "SCALAR" ? $$data : $data)
+          and $self->{_body_size} +=
+          length(ref $data eq "SCALAR" ? $$data : $data);
     }
-    if ($$ref =~ m/\G(.+)\z/gc) {
-      push @{ $self->{_body_array} }, $1;
-      $self->{_body_size} += length($1);
-      ++$self->{_body_current_pos};
+    else {
+        #warn("body_write to array\n");
+        $self->{_body_array} ||= [];
+        my $ref = ref($data) eq "SCALAR" ? $data : \$data;
+        pos($$ref) = 0;
+        while ($$ref =~ m/\G(.*?\n)/gc) {
+            push @{$self->{_body_array}}, $1;
+            $self->{_body_size} += length($1);
+            ++$self->{_body_current_pos};
+        }
+        if ($$ref =~ m/\G(.+)\z/gc) {
+            push @{$self->{_body_array}}, $1;
+            $self->{_body_size} += length($1);
+            ++$self->{_body_current_pos};
+        }
+        $self->body_spool if ($self->{_body_size} >= $self->size_threshold());
     }
-    $self->body_spool if ( $self->{_body_size} >= $self->size_threshold() );
-  }
 }
 
-sub body_size { # depreceated, use data_size() instead
-  my $self = shift;
-  $self->log(LOGWARN, "WARNING: body_size() is depreceated, use data_size() instead");
-  $self->{_body_size} || 0;
+sub body_size {    # depreceated, use data_size() instead
+    my $self = shift;
+    $self->log(LOGWARN,
+               "WARNING: body_size() is depreceated, use data_size() instead");
+    $self->{_body_size} || 0;
 }
 
 sub data_size {
-  shift->{_body_size} || 0;
+    shift->{_body_size} || 0;
 }
 
 sub body_length {
-  my $self = shift;
-  $self->{_body_size}   or return 0;
-  $self->{_header_size} or return 0;
-  return $self->{_body_size} - $self->{_header_size};
+    my $self = shift;
+    $self->{_body_size}   or return 0;
+    $self->{_header_size} or return 0;
+    return $self->{_body_size} - $self->{_header_size};
 }
 
 sub body_resetpos {
-  my $self = shift;
-  
-  if ($self->{_body_file}) {
-    my $start = $self->{_body_start} || 0;
-    seek($self->{_body_file}, $start, 0);
-    $self->{_body_file_writing} = 0;
-  }
-  else {
-    $self->{_body_current_pos} = $self->{_body_start};
-  }
-  
-  1;
+    my $self = shift;
+
+    if ($self->{_body_file}) {
+        my $start = $self->{_body_start} || 0;
+        seek($self->{_body_file}, $start, 0);
+        $self->{_body_file_writing} = 0;
+    }
+    else {
+        $self->{_body_current_pos} = $self->{_body_start};
+    }
+
+    1;
 }
 
 sub body_getline {
-  my $self = shift;
-  if ($self->{_body_file}) {
-    my $start = $self->{_body_start} || 0;
-    seek($self->{_body_file}, $start,0)
-      if $self->{_body_file_writing};
-    $self->{_body_file_writing} = 0;
-    my $line = $self->{_body_file}->getline;
-    return $line;
-  }
-  else {
-    return unless $self->{_body_array};
-    $self->{_body_current_pos} ||= 0;
-    my $line = $self->{_body_array}->[$self->{_body_current_pos}];
-    $self->{_body_current_pos}++;
-    return $line;
-  }
+    my $self = shift;
+    if ($self->{_body_file}) {
+        my $start = $self->{_body_start} || 0;
+        seek($self->{_body_file}, $start, 0)
+          if $self->{_body_file_writing};
+        $self->{_body_file_writing} = 0;
+        my $line = $self->{_body_file}->getline;
+        return $line;
+    }
+    else {
+        return unless $self->{_body_array};
+        $self->{_body_current_pos} ||= 0;
+        my $line = $self->{_body_array}->[$self->{_body_current_pos}];
+        $self->{_body_current_pos}++;
+        return $line;
+    }
 }
 
 sub body_as_string {
@@ -213,45 +226,59 @@ sub body_as_string {
 }
 
 sub body_fh {
-  return shift->{_body_file};
+    return shift->{_body_file};
 }
 
 sub dup_body_fh {
-  my ($self) = @_;
-  open(my $fh, '<&=', $self->body_fh);
-  return $fh;
+    my ($self) = @_;
+    open(my $fh, '<&=', $self->body_fh);
+    return $fh;
 }
 
 sub DESTROY {
-  my $self = shift;
-  # would we save some disk flushing if we unlinked the file before
-  # closing it?
+    my $self = shift;
 
-  undef $self->{_body_file} if $self->{_body_file};
-  if ($self->{_filename} and -e $self->{_filename}) {
-    unlink $self->{_filename} or $self->log(LOGERROR, "Could not unlink ", $self->{_filename}, ": $!");
-  }
+    # would we save some disk flushing if we unlinked the file before
+    # closing it?
 
-  # These may not exist
-  if ( $self->{_temp_files} ) {
-    $self->log(LOGDEBUG, "Cleaning up temporary transaction files");
-    foreach my $file ( @{$self->{_temp_files}} ) {
-      next unless -e $file;
-      unlink $file or $self->log(LOGERROR,
-       "Could not unlink temporary file", $file, ": $!");
+    $self->log(LOGDEBUG, sprintf("DESTROY called by %s, %s, %s", (caller)));
+
+    if ($self->{_body_file}) {
+        undef $self->{_body_file};
     }
-  }
-  # Ditto
-  if ( $self->{_temp_dirs} ) {
-    eval {use File::Path};
-    $self->log(LOGDEBUG, "Cleaning up temporary directories");
-    foreach my $dir ( @{$self->{_temp_dirs}} ) {
-      rmtree($dir) or $self->log(LOGERROR, 
-        "Could not unlink temporary dir", $dir, ": $!");
+
+    if ($self->{_filename} and -e $self->{_filename}) {
+        if (unlink $self->{_filename}) {
+            $self->log(LOGDEBUG, "unlinked ", $self->{_filename});
+        }
+        else {
+            $self->log(LOGERROR, "Could not unlink ",
+                       $self->{_filename}, ": $!");
+        }
     }
-  }
+
+    # These may not exist
+    if ($self->{_temp_files}) {
+        $self->log(LOGDEBUG, "Cleaning up temporary transaction files");
+        foreach my $file (@{$self->{_temp_files}}) {
+            next unless -e $file;
+            unlink $file
+              or $self->log(LOGERROR, "Could not unlink temporary file",
+                            $file, ": $!");
+        }
+    }
+
+    # Ditto
+    if ($self->{_temp_dirs}) {
+        eval { use File::Path };
+        $self->log(LOGDEBUG, "Cleaning up temporary directories");
+        foreach my $dir (@{$self->{_temp_dirs}}) {
+            rmtree($dir)
+              or $self->log(LOGERROR, "Could not unlink temporary dir",
+                            $dir, ": $!");
+        }
+    }
 }
-
 
 1;
 __END__
@@ -358,7 +385,7 @@ the C<DATA> command. If you need the size that will be queued, use
    + $transaction->body_length;
 
 The line above is of course only valid in I<hook_queue( )>, as other plugins
-may add headers and qpsmtpd will add its I<Received:> header.
+may add headers and qpsmtpd will add it's I<Received:> header.
 
 =head2 body_length( )
 

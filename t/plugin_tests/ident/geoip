@@ -15,6 +15,12 @@ sub register_tests {
     };
 
     $self->register_test('test_geoip_lookup', 2);
+    $self->register_test('test_geoip_load_db', 2);
+    $self->register_test('test_geoip_init_cc', 2);
+    $self->register_test('test_set_country_code', 3);
+    $self->register_test('test_set_country_name', 3);
+    $self->register_test('test_set_continent', 3);
+    $self->register_test('test_set_distance', 3);
 };
 
 sub test_geoip_lookup {
@@ -26,4 +32,115 @@ sub test_geoip_lookup {
     cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "note");
 };
 
+sub test_geoip_load_db {
+    my $self = shift;
+
+    $self->open_geoip_db();
+
+    if ( $self->{_geoip_city} ) {
+        ok( ref $self->{_geoip_city}, "loaded GeoIP city db" );
+    }
+    else {
+        ok( "no GeoIP city db" );
+    };
+
+    if ( $self->{_geoip} ) {
+        ok( ref $self->{_geoip}, "loaded GeoIP db" );
+    }
+    else {
+        ok( "no GeoIP db" );
+    };
+};
+
+sub test_geoip_init_cc {
+    my $self = shift;
+
+    $self->{_my_country_code} = undef;
+    ok( ! $self->{_my_country_code}, "undefined");
+
+    my $test_ip = '208.175.177.10';
+    $self->{_args}{distance} = $test_ip;
+    $self->init_my_country_code( $test_ip );
+    cmp_ok( $self->{_my_country_code}, 'eq', 'US', "country set and matches");
+};
+
+sub test_set_country_code {
+    my $self = shift;
+
+    $self->qp->connection->remote_ip('');
+    my $cc = $self->set_country_code();
+    ok( ! $cc, "undef");
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    $cc = $self->set_country_code();
+    cmp_ok( $cc, 'eq', 'US', "$cc");
+
+    my $note = $self->connection->notes('geoip_country');
+    cmp_ok( $note, 'eq', 'US', "note has: $cc");
+};
+
+sub test_set_country_name {
+    my $self = shift;
+
+    $self->{_geoip_record} = undef;
+    $self->qp->connection->remote_ip('');
+    $self->set_country_code();
+    my $cn = $self->set_country_name();
+    ok( ! $cn, "undef") or warn "$cn\n";
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    $self->set_country_code();
+    $cn = $self->set_country_name();
+    cmp_ok( $cn, 'eq', 'United States', "$cn");
+
+    my $note = $self->connection->notes('geoip_country_name');
+    cmp_ok( $note, 'eq', 'United States', "note has: $cn");
+};
+
+sub test_set_continent {
+    my $self = shift;
+
+    $self->{_geoip_record} = undef;
+    $self->qp->connection->remote_ip('');
+    $self->set_country_code();
+    my $cn = $self->set_continent();
+    ok( ! $cn, "undef") or warn "$cn\n";
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    $self->set_country_code();
+    $cn = $self->set_continent() || '';
+    my $note = $self->connection->notes('geoip_continent');
+    if ( $cn ) {
+        cmp_ok( $cn, 'eq', 'NA', "$cn");
+        cmp_ok( $note, 'eq', 'NA', "note has: $cn");
+    }
+    else {
+        ok(1, "no continent data" );
+        ok(1, "no continent data" );
+    };
+};
+
+sub test_set_distance {
+    my $self = shift;
+
+    $self->{_geoip_record} = undef;
+    $self->qp->connection->remote_ip('');
+    $self->set_country_code();
+    my $cn = $self->set_distance_gc();
+    ok( ! $cn, "undef") or warn "$cn\n";
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    $self->set_country_code();
+    $cn = $self->set_distance_gc();
+    if ( $cn ) {
+        ok( $cn, "$cn km");
+
+        my $note = $self->connection->notes('geoip_distance');
+        ok( $note, "note has: $cn");
+    }
+    else {
+        ok( 1, "no distance data");
+        ok( 1, "no distance data");
+    }
+};
 

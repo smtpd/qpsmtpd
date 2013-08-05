@@ -116,13 +116,14 @@ sub register {
 
     if (@args % 2 == 0) {
         %args = @args;
-    } else {
+    }
+    else {
         warn "Malformed arguments to syslog plugin";
         return;
     }
 
-    my $ident = 'qpsmtpd';
-    my $logopt = 'pid';
+    my $ident    = 'qpsmtpd';
+    my $logopt   = 'pid';
     my $facility = 'LOG_MAIL';
 
     $self->{_loglevel} = LOGWARN;
@@ -150,8 +151,8 @@ sub register {
     }
 
     if ($args{logsock}) {
-       my @logopt = split(/,/, $args{logsock});
-       setlogsock(@logopt);
+        my @logopt = split(/,/, $args{logsock});
+        setlogsock(@logopt);
     }
 
     unless (openlog $ident, $logopt, $facility) {
@@ -161,15 +162,15 @@ sub register {
 }
 
 my %priorities_ = (
-    0 => 'LOG_EMERG',
-    1 => 'LOG_ALERT',
-    2 => 'LOG_CRIT',
-    3 => 'LOG_ERR',
-    4 => 'LOG_WARNING',
-    5 => 'LOG_NOTICE',
-    6 => 'LOG_INFO',
-    7 => 'LOG_DEBUG',
-);
+                   0 => 'LOG_EMERG',
+                   1 => 'LOG_ALERT',
+                   2 => 'LOG_CRIT',
+                   3 => 'LOG_ERR',
+                   4 => 'LOG_WARNING',
+                   5 => 'LOG_NOTICE',
+                   6 => 'LOG_INFO',
+                   7 => 'LOG_DEBUG',
+                  );
 
 sub hook_logging {
     my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
@@ -177,8 +178,8 @@ sub hook_logging {
     return DECLINED if $trace > $self->{_loglevel};
     return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
 
-    my $priority = $self->{_priority} ?
-                   $self->{_priority} : $priorities_{$trace};
+    my $priority =
+      $self->{_priority} ? $self->{_priority} : $priorities_{$trace};
 
     syslog $priority, '%s', join(' ', @log);
     return DECLINED;

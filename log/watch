@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+$|++;    # OUTPUT_AUTOFLUSH
+
+use Cwd;
+use Data::Dumper;
+use File::Tail;
+
+my $dir = get_qp_dir() or die "unable to find QP home dir";
+my $file = "$dir/log/main/current";
+my $fh = File::Tail->new(
+                         name        => $file,
+                         interval    => 1,
+                         maxinterval => 1,
+                         debug       => 1,
+                         tail        => 300
+                        );
+
+while (defined(my $line = $fh->read)) {
+    my (undef, $line) = split /\s/, $line, 2;    # strip off tai timestamps
+    print $line;
+}
+
+sub get_qp_dir {
+    foreach my $user (qw/ qpsmtpd smtpd /) {
+        my ($homedir) = (getpwnam($user))[7] or next;
+
+        if (-d "$homedir/plugins") {
+            return "$homedir";
+        }
+        foreach my $s (qw/ smtpd qpsmtpd qpsmtpd-dev /) {
+            if (-d "$homedir/$s/plugins") {
+                return "$homedir/$s";
+            }
+        }
+    }
+    if (-d "./plugins") {
+        return Cwd::getcwd();
+    }
+}
+

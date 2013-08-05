@@ -64,7 +64,7 @@ sub hook_logging {
                         . (
                              defined $plugin ? " $plugin plugin:"
                            : defined $hook   ? " running plugin ($hook):"
-                           : ""
+                           :                   ""
                           ),
                       @log
                      )

@@ -18,7 +18,7 @@ These are the common ones: score,required,autolearn,tests,version
 =head1 CONFIG
 
 Configured in the plugins file without any parameters, the
-spamassassin plugin will add relevant headers from the spamd
+spamassassin plugin will add relevant headers from spamd
 (X-Spam-Status etc).
 
 The format goes like
@@ -66,6 +66,11 @@ Beginning with Mail::SpamAssassin 2.60, it is possible to use Unix
 domain sockets for spamd. This is faster and more secure than using a
 TCP connection, but if you run spamd on a remote machine, you need to
 use a TCP connection.
+
+=item headers [none]
+
+By default, spamassasin headers are added to messages. To suppress header
+insertion, use 'headers none'.
 
 =item leave_old_headers [drop|rename|keep]
 
@@ -129,7 +134,7 @@ Make the "subject munge string" configurable
   * added support for per-user SpamAssassin preferences
   * updated get_spam_results so that score=N.N works (as well as hits=N.N)
   * rewrote the X-Spam-* header additions so that SA generated headers are
-    not discarded. Admin can alter SA headers with add_header in their SA
+    preserved. Admins can alter SA headers with add_header in their SA
     config. Subverting their changes there is unexpected. Making them read
     code to figure out why is an unnecessary hurdle.
   * added assemble_message, so we can calc content size which spamd wants
@@ -141,47 +146,55 @@ use warnings;
 
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
+
 use Socket qw(:DEFAULT :crlf);
 use IO::Handle;
 
 sub register {
     my ($self, $qp, %args) = @_;
 
-    $self->log(LOGERROR, "Bad parameters for the spamassassin plugin") if @_ % 2;
+    $self->log(LOGERROR, "Bad parameters for the spamassassin plugin")
+      if @_ % 2;
 
-    $self->{_args} = { %args };
+    $self->{_args} = {%args};
 
     # backwards compatibility with previous config syntax
-    if ( ! defined $self->{_args}{reject} && defined $self->{_args}{reject_threshold} ) {
+    if (  !defined $self->{_args}{reject}
+        && defined $self->{_args}{reject_threshold})
+    {
         $self->{_args}{reject} = $self->{_args}{reject_threshold};
-    };
+    }
+    if (!defined $self->{_args}{reject_type}) {
+        $self->{_args}{reject_type} = 'perm';
+    }
 
-    $self->register_hook('data_post', 'check_spam_reject');
-    $self->register_hook('data_post', 'check_spam_munge_subject');
+    $self->register_hook('data_post', 'data_post_handler');
 }
 
-sub hook_data_post {
+sub data_post_handler {
     my ($self, $transaction) = @_;
 
     return (DECLINED) if $self->is_immune();
 
-    if ( $transaction->data_size > 500_000 ) {
-        $self->log(LOGINFO, "skip: too large (".$transaction->data_size.")");
+    if ($transaction->data_size > 500_000) {
+        $self->log(LOGINFO,
+                   "skip, too large (" . $transaction->data_size . ")");
         return (DECLINED);
-    };
+    }
 
     my $SPAMD    = $self->connect_to_spamd() or return (DECLINED);
-    my $username = $self->select_spamd_username( $transaction );
+    my $username = $self->select_spamd_username($transaction);
     my $message  = $self->assemble_message($transaction);
     my $length   = length $message;
 
-    $self->print_to_spamd( $SPAMD, $message, $length, $username );
-    shutdown($SPAMD, 1); # close our side of the socket (tell spamd we're done)
-    my $headers = $self->parse_spamd_response( $SPAMD ) or return (DECLINED);
+    $self->print_to_spamd($SPAMD, $message, $length, $username);
+    shutdown($SPAMD, 1);  # close our side of the socket (tell spamd we're done)
+    my $headers = $self->parse_spamd_response($SPAMD) or return (DECLINED);
 
-    $self->insert_spam_headers( $transaction, $headers, $username );
-    return (DECLINED);
-};
+    $self->insert_spam_headers($transaction, $headers, $username);
+    $self->munge_subject($transaction);
+    return $self->reject($transaction);
+}
 
 sub select_spamd_username {
     my ($self, $transaction) = @_;
@@ -189,40 +202,41 @@ sub select_spamd_username {
     my $username = $self->{_args}{spamd_user} || getpwuid($>);
 
     my $recipient_count = scalar $transaction->recipients;
-    if ( $recipient_count > 1 ) {
+    if ($recipient_count > 1) {
         $self->log(LOGDEBUG, "Message has $recipient_count recipients");
         return $username;
-    };
+    }
 
-    if ( $username eq 'vpopmail' ) {
-# use the recipients email address as username. This enables per-user SA prefs
+    if ($username eq 'vpopmail') {
+
+  # use the recipients email address as username. This enables per-user SA prefs
         $username = ($transaction->recipients)[0]->address;
     }
     else {
         $self->log(LOGDEBUG, "skipping per-user SA prefs");
-    };
+    }
 
     return $username;
-};
+}
 
 sub parse_spamd_response {
-    my ( $self, $SPAMD ) = @_;
+    my ($self, $SPAMD) = @_;
 
-    my $line0 = <$SPAMD>; # get the first protocol line
-        if ( $line0 !~ /EX_OK/ ) {
-            $self->log(LOGERROR, "invalid response from spamd: $line0");
-            return;
-        };
+    my $line0 = <$SPAMD>;    # get the first protocol line
+    if ($line0 !~ /EX_OK/) {
+        $self->log(LOGERROR, "invalid response from spamd: $line0");
+        return;
+    }
 
     my (%new_headers, $last_header);
     while (<$SPAMD>) {
         s/[\r\n]//g;
-        if ( m/^(X-Spam-.*?): (.*)?/ ) {
+        if (m/^(X-Spam-.*?): (.*)?/) {
             $new_headers{$1} = $2 || '';
             $last_header = $1;
             next;
         }
-        if ( $last_header && m/^(\s+.*)/ ) { # a folded line, append to last
+        if ($last_header && m/^(\s+.*)/) {    # a folded line, append to last
             $new_headers{$last_header} .= CRLF . "\t" . $1;
             next;
         }
@@ -232,31 +246,41 @@ sub parse_spamd_response {
     $self->log(LOGDEBUG, "finished reading from spamd");
 
     return scalar keys %new_headers ? \%new_headers : undef;
-};
+}
 
 sub insert_spam_headers {
-    my ( $self, $transaction, $new_headers, $username ) = @_;
+    my ($self, $transaction, $new_headers, $username) = @_;
+
+    if ($self->{_args}{headers} && $self->{_args}{headers} eq 'none') {
+        my $r = $self->parse_spam_header($new_headers->{'X-Spam-Status'});
+        $transaction->notes('spamassassin', $r);
+        return;
+    }
 
     my $recipient_count = scalar $transaction->recipients;
 
-    $self->_cleanup_spam_header($transaction, 'X-Spam-User'); # always clean up
-    if ( $recipient_count > 1 ) {                 # add for multiple recipients
-        $transaction->header->add('X-Spam-User', $username . ", $recipient_count recipients", 0);
-    };
+    $self->_cleanup_spam_header($transaction, 'X-Spam-User');  # always clean up
+    if ($recipient_count > 1) {    # add for multiple recipients
+        $transaction->header->add('X-Spam-User',
+                                  $username . ", $recipient_count recipients",
+                                  0);
+    }
 
-    foreach my $name ( keys %$new_headers ) {
-        next if $name eq 'X-Spam-Prev-Subject'; # might exist if SA rewrote subject
-        if ( $name eq 'X-Spam-Report' ) {
-            next;   # Mail::Header mangles this prefolded header
-#           $self->log(LOGDEBUG, $new_headers->{$name} );
-        };
-        if ( $name eq 'X-Spam-Status' ) {
-            $self->parse_spam_header( $new_headers->{$name} );
-        };
-        $new_headers->{$name} =~ s/\015//; # hack for outlook
+    foreach my $name (keys %$new_headers) {
+        next
+          if $name eq 'X-Spam-Prev-Subject'; # might exist if SA rewrote subject
+        if ($name eq 'X-Spam-Report') {
+            next;    # Mail::Header mangles this prefolded header
+
+            #           $self->log(LOGDEBUG, $new_headers->{$name} );
+        }
+        if ($name eq 'X-Spam-Status') {
+            $self->parse_spam_header($new_headers->{$name});
+        }
+        $new_headers->{$name} =~ s/\015//;    # hack for outlook
         $self->_cleanup_spam_header($transaction, $name);
         $transaction->header->add($name, $new_headers->{$name}, 0);
-    };
+    }
 }
 
 sub assemble_message {
@@ -264,45 +288,50 @@ sub assemble_message {
 
     $transaction->body_resetpos;
 
-    my $message = "X-Envelope-From: "
-        . $transaction->sender->format . "\n"
-        . $transaction->header->as_string . "\n\n";
+    my $message =
+        "X-Envelope-From: "
+      . $transaction->sender->format . "\n"
+      . $transaction->header->as_string . "\n\n";
 
-    while (my $line = $transaction->body_getline) { $message .= $line; };
+    while (my $line = $transaction->body_getline) { $message .= $line; }
 
-    $message = join(CRLF, split/\n/, $message);
+    $message = join(CRLF, split /\n/, $message);
     return $message . CRLF;
-};
+}
 
 sub connect_to_spamd {
-    my $self = shift;
+    my $self   = shift;
     my $socket = $self->{_args}{spamd_socket};
     my $SPAMD;
-    if ( $socket && $socket =~ /\// ) {  # file path
-        $SPAMD = $self->connect_to_spamd_socket( $socket );
+    if ($socket && $socket =~ /\//) {    # file path
+        $SPAMD = $self->connect_to_spamd_socket($socket);
     }
     else {
-        $SPAMD = $self->connect_to_spamd_tcpip( $socket );
-    };
+        $SPAMD = $self->connect_to_spamd_tcpip($socket);
+    }
 
-    return if ! $SPAMD;
+    return if !$SPAMD;
     $SPAMD->autoflush(1);
     return $SPAMD;
-};
+}
 
 sub connect_to_spamd_socket {
-    my ( $self, $socket ) = @_;
+    my ($self, $socket) = @_;
 
-    if ( ! $socket || $socket !~ /^([\w\/.-]+)$/ ) {   # Unix Domain Socket
+    if (!$socket || $socket !~ /^([\w\/.-]+)$/) {    # Unix Domain Socket
         $self->log(LOGERROR, "not a valid path");
         return;
-    };
+    }
+
+    # Sanitize for use with taint mode
+    $socket =~ /^([\w\/.-]+)$/;
+    $socket = $1;
 
     socket(my $SPAMD, PF_UNIX, SOCK_STREAM, 0) or do {
         $self->log(LOGERROR, "Could not open socket: $!");
         return;
     };
-    my $paddr = sockaddr_un( $socket );
+    my $paddr = sockaddr_un($socket);
 
     connect($SPAMD, $paddr) or do {
         $self->log(LOGERROR, "Could not connect to spamd socket: $!");
@@ -311,23 +340,23 @@ sub connect_to_spamd_socket {
 
     $self->log(LOGDEBUG, "connected to spamd");
     return $SPAMD;
-};
+}
 
 sub connect_to_spamd_tcpip {
-    my ( $self, $socket ) = @_;
+    my ($self, $socket) = @_;
 
-    my $remote  = 'localhost';
-    my $port    = 783;
+    my $remote = 'localhost';
+    my $port   = 783;
 
     if (defined $socket && $socket =~ /^([\w.-]+):(\d+)$/) {
-        $remote  = $1;
-        $port    = $2;
+        $remote = $1;
+        $port   = $2;
     }
-    if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') };
-    if ( ! $port ) {
+    if ($port =~ /\D/) { $port = getservbyname($port, 'tcp') }
+    if (!$port) {
         $self->log(LOGERROR, "No spamd port, check your spamd_socket config.");
         return;
-    };
+    }
     my $iaddr = inet_aton($remote) or do {
         $self->log(LOGERROR, "Could not resolve host: $remote");
         return;
@@ -342,82 +371,100 @@ sub connect_to_spamd_tcpip {
 
     connect($SPAMD, $paddr) or do {
         $self->log(LOGERROR, "Could not connect to spamd: $!");
-         return;
+        return;
     };
 
     $self->log(LOGDEBUG, "connected to spamd");
     return $SPAMD;
-};
+}
 
 sub print_to_spamd {
-    my ( $self, $SPAMD, $message, $length, $username ) = @_;
+    my ($self, $SPAMD, $message, $length, $username) = @_;
 
     print $SPAMD "HEADERS SPAMC/1.4" . CRLF;
     print $SPAMD "Content-length: $length" . CRLF;
     print $SPAMD "User: $username" . CRLF;
     print $SPAMD CRLF;
-    print $SPAMD $message or $self->log(LOGWARN, "Could not print to spamd: $!");
+    print $SPAMD $message
+      or $self->log(LOGWARN, "Could not print to spamd: $!");
 
     $self->log(LOGDEBUG, "check_spam: finished sending to spamd");
-};
+}
 
-sub check_spam_reject {
+sub reject {
     my ($self, $transaction) = @_;
 
     my $sa_results = $self->get_spam_results($transaction) or do {
-        $self->log(LOGNOTICE, "skip: no spamassassin results");
+        $self->log(LOGNOTICE, "error, no results");
         return DECLINED;
     };
-    my $score  = $sa_results->{score} or do {
-        $self->log(LOGERROR, "skip: error getting spamassassin score");
+    my $score = $sa_results->{score};
+    if (!defined $score) {
+        $self->log(LOGERROR, "error, error getting score");
         return DECLINED;
-    };
+    }
 
     my $ham_or_spam = $sa_results->{is_spam} eq 'Yes' ? 'Spam' : 'Ham';
+    if ($ham_or_spam eq 'Spam') {
+        $self->adjust_karma(-1);
+    }
+    my $status = "$ham_or_spam, $score";
+    my $learn  = '';
+    my $al     = $sa_results->{autolearn};    # subject to local SA learn scores
+    if ($al) {
+        $self->adjust_karma(1)  if $al eq 'ham';
+        $self->adjust_karma(-1) if $al eq 'spam';
+        $learn = "learn=" . $al;
+    }
 
     my $reject = $self->{_args}{reject} or do {
-        $self->log(LOGERROR, "skip: reject not set ($ham_or_spam, $score)");
+        $self->log(LOGERROR, "error, reject disabled ($status, $learn)");
         return DECLINED;
     };
 
-    if ( $score < $reject ) {
-        $self->log(LOGINFO, "pass, $ham_or_spam, $score < $reject");
-        return DECLINED;
-    };
+    if ($score < $reject) {
+        if ($ham_or_spam eq 'Spam') {
+            $self->log(LOGINFO, "fail, tolerated, $status < $reject, $learn");
+            return DECLINED;
+        }
+        else {
+            $self->log(LOGINFO, "pass, $status < $reject, $learn");
+            return DECLINED;
+        }
+    }
 
-# default of media_unsupported is DENY, so just change the message
-    $self->log(LOGINFO, "deny, $ham_or_spam, $score > $reject");
-    return Qpsmtpd::DSN->media_unsupported("spam score exceeded threshold");
+    $self->log(LOGINFO, "fail, $status, > $reject, $learn");
+    return ($self->get_reject_type(), "spam score exceeded threshold");
 }
 
-sub check_spam_munge_subject {
+sub munge_subject {
     my ($self, $transaction) = @_;
 
+    return if ($self->{_args}{headers} && $self->{_args}{headers} eq 'none');
+
+    my $sa = $self->get_spam_results($transaction) or return;
     my $qp_num = $self->{_args}{munge_subject_threshold};
-    my $sa = $self->get_spam_results($transaction) or return DECLINED;
 
     my $required = $sa->{required} || $qp_num or do {
         $self->log(LOGDEBUG, "skipping munge, no user or qpsmtpd pref set");
-        return DECLINED;
+        return;
     };
-    return DECLINED unless $sa->{score} > $required;
+    return unless $sa->{score} > $required;
 
-    my $subject_prefix = $self->qp->config('subject_prefix') || '*** SPAM ***';
-    my $subject = $transaction->header->get('Subject') || '';
+    my $subject_prefix = $self->qp->config('subject_prefix')  || '*** SPAM ***';
+    my $subject        = $transaction->header->get('Subject') || '';
     $transaction->header->replace('Subject', "$subject_prefix $subject");
-
-    return DECLINED;
 }
 
 sub get_spam_results {
     my ($self, $transaction) = @_;
 
-    if ( defined $transaction->notes('spamassassin') ) {
+    if (defined $transaction->notes('spamassassin')) {
         return $transaction->notes('spamassassin');
-    };
+    }
 
     my $header = $transaction->header->get('X-Spam-Status') or return;
-    my $r = $self->parse_spam_header( $header );
+    my $r = $self->parse_spam_header($header);
 
     $self->log(LOGDEBUG, "$r->{is_spam}, $r->{score}");
     $transaction->notes('spamassassin', $r);
@@ -428,44 +475,48 @@ sub get_spam_results {
 sub parse_spam_header {
     my ($self, $string) = @_;
 
-# the X-Spam-Score header contents vary based on the settings in
-# the spamassassin *.cf files. Rather than parse via regexp, split
-# on the consistent whitespace and = delimiters. More reliable and
-# likely faster.
+    # the X-Spam-Score header contents vary based on the settings in
+    # the spamassassin *.cf files. Rather than parse via regexp, split
+    # on the consistent whitespace and = delimiters. More reliable and
+    # likely faster.
     my @parts = split(/\s+/, $string);
     my $is_spam = shift @parts;
     chomp @parts;
-    chop $is_spam;  # remove trailing ,
+    chop $is_spam;    # remove trailing ,
 
     my %r;
-    foreach ( @parts ) {
-        my ($key,$val) = split(/=/, $_);
+    foreach (@parts) {
+        my ($key, $val) = split(/=/, $_);
         $r{$key} = $val;
     }
     $r{is_spam} = $is_spam;
 
-    # backwards compatibility for SA versions < 3
-    if ( defined $r{hits} && ! defined $r{score} ) {
+    # compatibility for SA versions < 3
+    if (defined $r{hits} && !defined $r{score}) {
         $r{score} = delete $r{hits};
-    };
+    }
     return \%r;
-};
+}
 
 sub _cleanup_spam_header {
     my ($self, $transaction, $header_name) = @_;
 
     my $action = 'rename';
-    if ( $self->{_args}->{leave_old_headers} ) {
+    if ($self->{_args}->{leave_old_headers}) {
         $action = lc($self->{_args}->{leave_old_headers});
-    };
+    }
 
     return unless $action eq 'drop' || $action eq 'rename';
 
     my $old_header_name = $header_name;
-    $old_header_name = ($old_header_name =~ s/^X-//) ? "X-Old-$old_header_name" : "Old-$old_header_name";
+    $old_header_name =
+      ($old_header_name =~ s/^X-//)
+      ? "X-Old-$old_header_name"
+      : "Old-$old_header_name";
 
-    for my $header ( $transaction->header->get($header_name) ) {
-        $transaction->header->add($old_header_name, $header) if $action eq 'rename';
+    for my $header ($transaction->header->get($header_name)) {
+        $transaction->header->add($old_header_name, $header, 0)
+          if $action eq 'rename';
         $transaction->header->delete($header_name);
     }
 }
