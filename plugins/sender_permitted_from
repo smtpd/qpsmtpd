@@ -80,6 +80,8 @@ sub register {
 sub hook_mail {
     my ($self, $transaction, $sender, %param) = @_;
 
+    return (DECLINED) if $self->is_immune();
+
     if ( ! $self->{_args}{reject} ) {
         $self->log( LOGINFO, "skip: disabled in config" );
         return (DECLINED);
@@ -91,7 +93,7 @@ sub hook_mail {
         return (DECLINED, "SPF - null sender");
     };
 
-    if ( $self->is_relayclient() ) {
+    if ( $self->is_in_relayclients() ) {
         return (DECLINED, "SPF - relaying permitted");
     };
 
@@ -189,16 +191,11 @@ sub hook_data_post {
     return DECLINED;
 }
 
-sub is_relayclient {
+sub is_in_relayclients {
     my $self = shift;
 
     # If we are receiving from a relay permitted host, then we are probably
     # not the delivery system, and so we shouldn't check
-    if ( $self->qp->connection->relay_client() ) {
-        $self->log( LOGINFO, "skip: relaying permitted (relay_client)" );
-        return 1;
-    };
-
     my $client_ip          = $self->qp->connection->remote_ip;
     my @relay_clients      = $self->qp->config('relayclients');
     my $more_relay_clients = $self->qp->config('morerelayclients', 'map');

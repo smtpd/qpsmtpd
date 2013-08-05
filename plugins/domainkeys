@@ -88,6 +88,8 @@ sub data_post_handler {
         return DECLINED;
     };
 	
+    return DECLINED if $self->is_immune();
+
     my $body = $self->assemble_body( $transaction );
 
     my $message = load Mail::DomainKeys::Message(

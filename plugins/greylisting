@@ -17,7 +17,7 @@ has configurable timeout periods (black/grey/white) to control whether
 connections are allowed, instead of using connection counts or rates.
 
 Automatic whitelisting is enabled for relayclients, whitelisted hosts,
-whitelisted senders, TLS connections, p0f matches, and geoip matches.
+whitelisted senders, p0f matches, and geoip matches.
 
 =head1 TRIPLETS
 
@@ -169,7 +169,7 @@ use strict;
 use warnings;
 use Qpsmtpd::Constants;
 
-my $VERSION = '0.10';
+my $VERSION = '0.11';
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
@@ -268,6 +268,8 @@ sub greylist {
         join(',',map { $_ . '=' . $config->{$_} } sort keys %$config));
 
     return DECLINED if $self->is_immune();
+    return DECLINED if ! $self->is_p0f_match();
+    return DECLINED if $self->geoip_match();
 
     my $db   = $self->get_db_location();
     my $lock = $self->get_db_lock( $db ) or return DECLINED;
@@ -516,6 +518,8 @@ sub prune_db {
 sub p0f_match {
     my $self = shift;
 
+    return if ! $self->{_args}{p0f};
+
     my $p0f = $self->connection->notes('p0f');
     if ( !$p0f || !ref $p0f ) {   # p0f fingerprint info not found
         $self->LOGINFO(LOGERROR, "p0f info missing");
@@ -558,6 +562,8 @@ sub p0f_match {
 
 sub geoip_match {
     my $self = shift;
+
+    return if ! $self->{_args}{geoip};
 
     my $country = $self->connection->notes('geoip_country');
     my $c_name  = $self->connection->notes('geoip_country_name') || '';

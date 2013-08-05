@@ -19,17 +19,16 @@ sub register_tests {
 sub test_ip_whitelisted {
     my $self = shift;
 
-    $self->qp->connection->remote_ip('10.1.1.1');
+    $self->qp->connection->remote_ip('192.168.99.5');
+    ok( $self->ip_whitelisted(), "+");
 
-    $self->qp->connection->relay_client(1);
-    ok( $self->ip_whitelisted('10.1.1.1'), "yes, +");
+    $self->qp->connection->remote_ip('192.168.99.6');
+    ok( ! $self->ip_whitelisted(), "-");
 
-    $self->qp->connection->relay_client(0);
-    ok( ! $self->ip_whitelisted('10.1.1.1'), "no, -");
-
-    $self->connection->notes('whitelisthost', 'hello honey!');
-    ok( $self->ip_whitelisted('10.1.1.1'), "yes, +");
-    $self->connection->notes('whitelisthost', undef);
+    $self->qp->connection->remote_ip('192.168.99.5');
+    $self->qp->connection->notes('whitelisthost', 'hello honey!');
+    ok( $self->ip_whitelisted(), "+");
+    $self->qp->connection->notes('whitelisthost', undef);
 };
 
 sub test_is_set_rblsmtpd {

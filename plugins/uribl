@@ -478,6 +478,8 @@ sub collect_results {
 sub data_handler {
     my ($self, $transaction) = @_;
 
+    return (DECLINED) if $self->is_immune();
+
     my $queries = $self->lookup_start($transaction, sub {
         my ($self, $name) = @_;
         return $self->send_query($name);

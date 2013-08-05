@@ -58,7 +58,8 @@ sub hook_mail {
         @badmailfrom = @{$self->{_badmailfrom_config}};
     };
 
-    return DECLINED if $self->is_immune( $sender, \@badmailfrom );
+    return DECLINED if $self->is_immune();
+    return DECLINED if $self->is_immune_sender( $sender, \@badmailfrom );
 
     my $host = lc $sender->host;
     my $from = lc($sender->user) . '@' . $host;
@@ -104,7 +105,7 @@ sub hook_rcpt {
     return (DENY, $note);
 }
 
-sub is_immune {
+sub is_immune_sender {
     my ($self, $sender, $badmf ) = @_;
 
     if ( ! scalar @$badmf ) {
