@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+QPUSER=smtpd
+# limit qpsmtpd to 300MB memory
+MAXRAM=300000000
+BIN=/usr/local/bin
+PERL=/usr/bin/perl
+IP=0.0.0.0
+LANG=C
+
+# See also: http://wiki.qpsmtpd.org/deploy:start
+
+exec 2>&1 \
+sh -c "
+  exec $BIN/softlimit -m $MAXRAM   \
+    $PERL -T ./qpsmtpd-forkserver  \
+      --listen-address $IP         \
+      --port 25                    \
+      --port 587                   \
+      --limit-connections 15       \
+      --max-from-ip 5              \
+      --user $QPUSER
+"

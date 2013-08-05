@@ -1,4 +1,5 @@
 #!perl -w
+
 =head1 NAME
 
 dns_whitelist_soft - dns-based whitelist override for other qpsmtpd plugins
@@ -48,111 +49,122 @@ based on the 'whitelist' plugin by Devin Carraway <qpsmtpd@devin.com>.
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register {
+    my ($self, $qp) = (shift, shift);
+    $self->log(LOGERROR, "Bad arguments") if @_ % 2;
+    $self->{_args} = {@_};
+}
+
 sub hook_connect {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  my $remote_ip = $self->qp->connection->remote_ip;
+    my $remote_ip = $self->qp->connection->remote_ip;
 
-  my %whitelist_zones = map { (split /\s+/, $_, 2)[0,1] }
-				$self->qp->config('whitelist_zones');
+    my %whitelist_zones =
+      map { (split /\s+/, $_, 2)[0, 1] } $self->qp->config('whitelist_zones');
 
-  return DECLINED unless %whitelist_zones;
+    return DECLINED unless %whitelist_zones;
 
-  my $reversed_ip = join(".", reverse(split(/\./, $remote_ip)));
+    my $reversed_ip = join('.', reverse(split(/\./, $remote_ip)));
 
-  # we queue these lookups in the background and just fetch the
-  # results in the first rcpt handler
+    # we queue these lookups in the background and just fetch the
+    # results in the first rcpt handler
 
-  my $res = new Net::DNS::Resolver;
-  my $sel = IO::Select->new();
+    my $res = new Net::DNS::Resolver;
+    my $sel = IO::Select->new();
 
-  for my $dnsbl (keys %whitelist_zones) {
-    $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl in the background");
-    $sel->add($res->bgsend("$reversed_ip.$dnsbl", "TXT"));
-  }
+    for my $dnsbl (keys %whitelist_zones) {
+        $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl in the background");
+        $sel->add($res->bgsend("$reversed_ip.$dnsbl", 'TXT'));
+    }
 
-  $self->connection->notes('whitelist_sockets', $sel);
-
-  return DECLINED;
+    $self->connection->notes('whitelist_sockets', $sel);
+    return DECLINED;
 }
 
 sub process_sockets {
-  my ($self) = @_;
+    my ($self) = @_;
 
-  my $conn = $self->connection;
+    my $conn = $self->connection;
 
-  return $conn->notes('whitelisthost') 
-    if $conn->notes('whitelisthost');
+    return $conn->notes('whitelisthost') if $conn->notes('whitelisthost');
 
-  my $res = new Net::DNS::Resolver;
-  my $sel = $conn->notes('whitelist_sockets') or return "";
+    my $res = new Net::DNS::Resolver;
+    my $sel = $conn->notes('whitelist_sockets') or return '';
 
-  my $result; 
+    $self->log(LOGDEBUG, "waiting for whitelist dns");
 
-  $self->log(LOGDEBUG, "waiting for whitelist dns");
+    # don't wait more than 4 seconds here
+    my @ready = $sel->can_read(4);
 
-  # don't wait more than 4 seconds here
-  my @ready = $sel->can_read(4);
+    $self->log(LOGDEBUG,
+               "done waiting for whitelist dns, got ",
+               scalar @ready,
+               " answers ...");
+    return '' unless @ready;
 
-  $self->log(LOGDEBUG, "DONE waiting for whitelist dns, got ",
-  	scalar @ready, " answers ...") ;
-  return '' unless @ready;
+    my $result;
 
-  for my $socket (@ready) {
-    my $query = $res->bgread($socket);
-    $sel->remove($socket);
-    undef $socket;
+    for my $socket (@ready) {
+        my $query = $res->bgread($socket);
+        $sel->remove($socket);
+        undef $socket;
 
-    my $whitelist;
+        my $whitelist;
 
-    if ($query) {
-      my $a_record = 0;
-      foreach my $rr ($query->answer) {
-	$a_record = 1 if $rr->type eq "A";
-	my $name = $rr->name;
-	($whitelist) = ($name =~ m/(?:\d+\.){4}(.*)/) unless $whitelist;
-	$whitelist = $name unless $whitelist;
-	$self->log(LOGDEBUG, "name ", $rr->name);
-	next unless $rr->type eq "TXT";
-	$self->log(LOGDEBUG, "got txt record");
-	$result = $rr->txtdata and last;
-      }
-      $a_record and $result = "Blocked by $whitelist";
+        if ($query) {
+            my $a_record = 0;
+            foreach my $rr ($query->answer) {
+                $a_record = 1 if $rr->type eq 'A';
+                my $name = $rr->name;
+                ($whitelist) = ($name =~ m/(?:\d+\.){4}(.*)/) unless $whitelist;
+                $whitelist = $name unless $whitelist;
+                $self->log(LOGDEBUG, 'name ', $rr->name);
+                next unless $rr->type eq 'TXT';
+                $self->log(LOGDEBUG, "got txt record");
+                $result = $rr->txtdata and last;
+            }
+            $a_record and $result = "Blocked by $whitelist";
+        }
+        else {
+            $self->log(LOGERROR, "$whitelist query failed: ", $res->errorstring)
+              if $res->errorstring ne "NXDOMAIN";
+        }
+
+        if ($result) {
+
+            # kill any other pending I/O
+            $conn->notes('whitelist_sockets', undef);
+            return $conn->notes('whitelisthost', $result);
+        }
     }
-    else {
-      $self->log(LOGERROR, "$whitelist query failed: ", $res->errorstring)
-	unless $res->errorstring eq "NXDOMAIN";
+
+    if ($sel->count) {
+
+        # loop around if we have dns blacklists left to see results from
+        return $self->process_sockets();
     }
 
-    if ($result) {
-      #kill any other pending I/O
-      $conn->notes('whitelist_sockets', undef);
-      return $conn->notes('whitelisthost', $result);
-    }
-  }
+    # er, the following code doesn't make much sense anymore...
 
-  if ($sel->count) {
-    # loop around if we have dns blacklists left to see results from
-    return $self->process_sockets();
-  }
+    # if there was more to read; then forget it
+    $conn->notes('whitelist_sockets', undef);
 
-  # er, the following code doesn't make much sense anymore...
-
-  # if there was more to read; then forget it
-  $conn->notes('whitelist_sockets', undef);
-
-  return $conn->notes('whitelisthost', $result);
-
+    return $conn->notes('whitelisthost', $result);
 }
 
 sub hook_rcpt {
-  my ($self, $transaction, $rcpt, %param) = @_;
-  my $ip = $self->qp->connection->remote_ip || return (DECLINED);
-  my $note = $self->process_sockets;
-  if ( $note ) {
-    $self->log(LOGNOTICE,"Host $ip is whitelisted: $note");
-  }
-  return DECLINED;
+    my ($self, $transaction, $rcpt, %param) = @_;
+    my $ip = $self->qp->connection->remote_ip or return (DECLINED);
+    my $note = $self->process_sockets;
+    if ($note) {
+        $self->log(LOGNOTICE, "Host $ip is whitelisted: $note");
+    }
+    return DECLINED;
 }
 
-1;

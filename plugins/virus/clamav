@@ -105,127 +105,133 @@ This plugin is licensed under the same terms as the qpsmtpd package itself.
 Please see the LICENSE file included with qpsmtpd for details.
 
 =cut
- 
+
 use strict;
 use warnings;
- 
+
 use Qpsmtpd::Constants;
 
 sub register {
-  my ($self, $qp, @args) = @_;
-  my %args;
+    my ($self, $qp, @args) = @_;
+    my %args;
 
-  if ($args[0] && $args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/ && -x $1) {
-    $self->{_clamscan_loc} = $1;
-    shift @args;
-  }
-
-  for (@args) {
-    if (/^max_size=(\d+)$/) {
-        $self->{_max_size} = $1;
-    }
-    elsif (/^clamscan_path=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+    if ($args[0] && $args[0] =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/ && -x $1) {
         $self->{_clamscan_loc} = $1;
+        shift @args;
     }
-    elsif (/^clamd_conf=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
-        $self->{_clamd_conf} = "$1";
-    }
-    elsif (/^tmp_dir=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
-        $self->{_spool_dir} = $1;
-    }
-    elsif (/^action=(add-header|reject)$/) {
-        $self->{_action} = $1;
-    }
-    elsif (/back_compat/) {
-	$self->{_back_compat} = '-i --max-recursion=50';
-    }
-    elsif (/declined_on_fail/) {
-       $self->{_declined_on_fail} = 1;
-    }
-    else {
-        $self->log(LOGERROR, "Unrecognized argument '$_' to clamav plugin");
-        return undef;
-    }
-  }
 
-  $self->{_max_size} ||= 512 * 1024;
-  $self->{_spool_dir} ||= $self->spool_dir();
-  $self->{_back_compat} ||= ''; # make sure something is set
-  $self->{_clamd_conf} ||= '/etc/clamd.conf'; # make sure something is set
-  $self->{_declined_on_fail} ||= 0; # decline the message on clamav failure
+    for (@args) {
+        if (/^max_size=(\d+)$/) {
+            $self->{_max_size} = $1;
+        }
+        elsif (/^clamscan_path=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+            $self->{_clamscan_loc} = $1;
+        }
+        elsif (/^clamd_conf=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+            $self->{_clamd_conf} = "$1";
+        }
+        elsif (/^tmp_dir=(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+            $self->{_spool_dir} = $1;
+        }
+        elsif (/^action=(add-header|reject)$/) {
+            $self->{_action} = $1;
+        }
+        elsif (/back_compat/) {
+            $self->{_back_compat} = '-i --max-recursion=50';
+        }
+        elsif (/declined_on_fail/) {
+            $self->{_declined_on_fail} = 1;
+        }
+        else {
+            $self->log(LOGERROR, "Unrecognized argument '$_' to clamav plugin");
+            return undef;
+        }
+    }
 
-  unless ($self->{_spool_dir}) {
+    $self->{_max_size}    ||= 512 * 1024;
+    $self->{_spool_dir}   ||= $self->spool_dir();
+    $self->{_back_compat} ||= '';                   # make sure something is set
+    $self->{_clamd_conf}  ||= '/etc/clamd.conf';    # make sure something is set
+    $self->{_declined_on_fail} ||= 0;    # decline the message on clamav failure
+
+    unless ($self->{_spool_dir}) {
         $self->log(LOGERROR, "No spool dir configuration found");
         return undef;
-  }
-  unless (-d $self->{_spool_dir}) {
+    }
+    unless (-d $self->{_spool_dir}) {
         $self->log(LOGERROR, "Spool dir $self->{_spool_dir} does not exist");
         return undef;
-  }
+    }
 
 }
- 
+
 sub hook_data_post {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  if ($transaction->data_size > $self->{_max_size}) {
-	$self->log(LOGWARN, 'Mail too large to scan ('.
-		$transaction->data_size . " vs $self->{_max_size})" );
-	return (DECLINED);
-  }
+    if ($transaction->data_size > $self->{_max_size}) {
+        $self->log(LOGWARN,
+                       'Mail too large to scan ('
+                     . $transaction->data_size
+                     . " vs $self->{_max_size})"
+                  );
+        return (DECLINED);
+    }
 
-  my $filename = $transaction->body_filename;
-  unless (defined $filename) {
+    my $filename = $transaction->body_filename;
+    unless (defined $filename) {
         $self->log(LOGWARN, "didn't get a filename");
         return DECLINED;
-  }
-  my $mode = (stat($self->{_spool_dir}))[2];
-  if ( $mode & 07077  ) { # must be sharing spool directory with external app
-      $self->log(LOGWARN,
-        "Changing permissions on file to permit scanner access");
-      chmod $mode, $filename;
-  }
- 
-  # Now do the actual scanning!
-  my $cmd = $self->{_clamscan_loc}
-    . " --stdout "
-    . $self->{_back_compat}
-    . " --config-file=" . $self->{_clamd_conf}
-    . " --no-summary $filename 2>&1";
-  $self->log(LOGDEBUG, "Running: $cmd");
-  my $output = `$cmd`;
- 
-  my $result = ($? >> 8);
-  my $signal = ($? & 127);
- 
-  chomp($output);
- 
-  $output =~ s/^.* (.*) FOUND$/$1 /mg;
- 
-  $self->log(LOGINFO, "clamscan results: $output");
- 
-  if ($signal) {
-    $self->log(LOGINFO, "clamscan exited with signal: $signal");
-    return (DENYSOFT) if (!$self->{_declined_on_fail});
-    return (DECLINED);
-  }
-  if ($result == 1) {
-    $self->log(LOGINFO, "Virus(es) found: $output");
-    if ($self->{_action} eq 'add-header') {
-        $transaction->header->add('X-Virus-Found', 'Yes');
-        $transaction->header->add('X-Virus-Details', $output);
-    } else {
-        return (DENY, "Virus Found: $output");
     }
-  }
-  elsif ($result) {
-    $self->log(LOGERROR, "ClamAV error: $cmd: $result\n");
-    return (DENYSOFT) if (!$self->{_declined_on_fail});
-  }
-  else {
-    $transaction->header->add( 'X-Virus-Checked',
-        "Checked by ClamAV on " . $self->qp->config("me") );
-  }
-  return (DECLINED);
-} 
+    my $mode = (stat($self->{_spool_dir}))[2];
+    if ($mode & 07077) {    # must be sharing spool directory with external app
+        $self->log(LOGWARN,
+                   "Changing permissions on file to permit scanner access");
+        chmod $mode, $filename;
+    }
+
+    # Now do the actual scanning!
+    my $cmd =
+        $self->{_clamscan_loc}
+      . " --stdout "
+      . $self->{_back_compat}
+      . " --config-file="
+      . $self->{_clamd_conf}
+      . " --no-summary $filename 2>&1";
+    $self->log(LOGDEBUG, "Running: $cmd");
+    my $output = `$cmd`;
+
+    my $result = ($? >> 8);
+    my $signal = ($? & 127);
+
+    chomp($output);
+
+    $output =~ s/^.* (.*) FOUND$/$1 /mg;
+
+    $self->log(LOGINFO, "clamscan results: $output");
+
+    if ($signal) {
+        $self->log(LOGINFO, "clamscan exited with signal: $signal");
+        return (DENYSOFT) if (!$self->{_declined_on_fail});
+        return (DECLINED);
+    }
+    if ($result == 1) {
+        $self->log(LOGINFO, "Virus(es) found: $output");
+        if ($self->{_action} eq 'add-header') {
+            $transaction->header->add('X-Virus-Found',   'Yes');
+            $transaction->header->add('X-Virus-Details', $output);
+        }
+        else {
+            return (DENY, "Virus Found: $output");
+        }
+    }
+    elsif ($result) {
+        $self->log(LOGERROR, "ClamAV error: $cmd: $result\n");
+        return (DENYSOFT) if (!$self->{_declined_on_fail});
+    }
+    else {
+        $transaction->header->add('X-Virus-Checked',
+                             "Checked by ClamAV on " . $self->qp->config("me"));
+    }
+    return (DECLINED);
+}
 

@@ -33,30 +33,30 @@ sub register {
 sub hook_noop {
     my ($self, $transaction, @args) = @_;
     ++$self->{_noop_count};
-    ### the following block is not used, RFC 2821 says we SHOULD ignore 
-    ### any arguments... so we MAY return an error if we want to :-) 
+    ### the following block is not used, RFC 2821 says we SHOULD ignore
+    ### any arguments... so we MAY return an error if we want to :-)
     # return (DENY, "Syntax error, NOOP does not take any arguments")
     #   if $args[0];
-    
+
     if ($self->{_noop_count} >= $self->{_max_noop}) {
-        return (DENY_DISCONNECT, 
-		"Stop wasting my time, too many consecutive NOOPs");
+        return (DENY_DISCONNECT,
+                "Stop wasting my time, too many consecutive NOOPs");
     }
     return (DECLINED);
 }
 
 sub reset_noop_counter {
-   $_[0]->{_noop_count} = 0;
-   return (DECLINED);
+    $_[0]->{_noop_count} = 0;
+    return (DECLINED);
 }
 
 # and bind the counter reset to the hooks, QUIT not useful here:
-*hook_helo = *hook_ehlo =       # HELO / EHLO
-    *hook_mail =                # MAIL FROM: 
-    *hook_rcpt =                # RCPT TO:
-    *hook_data =                # DATA
-    *hook_reset_transaction =   # RSET
-    *hook_vrfy =                # VRFY
-    *hook_help =                # HELP
-        \&reset_noop_counter;
+*hook_helo = *hook_ehlo =      # HELO / EHLO
+  *hook_mail =                 # MAIL FROM:
+  *hook_rcpt =                 # RCPT TO:
+  *hook_data =                 # DATA
+  *hook_reset_transaction =    # RSET
+  *hook_vrfy =                 # VRFY
+  *hook_help =                 # HELP
+  \&reset_noop_counter;
 

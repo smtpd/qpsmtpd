@@ -1,0 +1,98 @@
+#!perl -w
+
+=head1 NAME
+
+bogus_bounce - Check that a bounce message isn't bogus
+
+=head1 DESCRIPTION
+
+This plugin is designed to reject bogus bounce messages.
+
+In our case a bogus bounce message is defined as a bounce message
+which has more than a single recipient.
+
+=head1 CONFIGURATION
+
+Only a single argument is recognized and is assumed to be the default
+action.  Valid settings are:
+
+=over 8
+
+=item log
+
+Merely log the receipt of the bogus bounce (the default behaviour).
+
+=item deny
+
+Deny with a hard error code.
+
+=item denysoft
+
+Deny with a soft error code.
+
+=back
+
+=head1 AUTHOR
+
+2010 - Steve Kemp - http://steve.org.uk/Software/qpsmtpd/
+
+2013 - Matt  Simerson - added Return Path check
+
+=cut
+
+sub register {
+    my ($self, $qp) = (shift, shift);
+
+    if (@_ % 2) {
+        $self->{_args}{action} = shift;
+    }
+    else {
+        $self->{_args} = {@_};
+    }
+
+    if (!defined $self->{_args}{reject}) {
+        $self->{_args}{reject} = 0;    # legacy default
+    }
+
+    # we only need to check for deferral, default is DENY
+    if ($self->{_args}{action} && $self->{_args}{action} =~ /soft/i) {
+        $self->{_args}{reject_type} = 'temp';
+    }
+}
+
+sub hook_data_post {
+    my ($self, $transaction) = (@_);
+
+    #
+    # Find the sender, quit processing if this isn't a bounce.
+    #
+    my $sender = $transaction->sender->address || undef;
+    if ($sender && $sender ne '<>') {
+        $self->log(LOGINFO, "pass, not a null sender");
+        return DECLINED;
+    }
+
+    #  at this point we know it is a bounce, via the null-envelope.
+    #
+    #  Count the recipients. Valid bounces have a single recipient
+    #
+    my @to = $transaction->recipients || ();
+    if (scalar @to != 1) {
+        $self->log(LOGINFO, "fail, bogus bounce to: " . join(',', @to));
+        return $self->get_reject(
+                         "fail, this bounce message does not have 1 recipient");
+    }
+
+    # validate that Return-Path is empty, RFC 3834
+
+    my $rp = $transaction->header->get('Return-Path');
+    if ($rp && $rp ne '<>') {
+        $self->log(LOGINFO,
+                   "fail, bounce messages must not have a Return-Path");
+        return $self->get_reject(
+                               "a bounce return path must be empty (RFC 3834)");
+    }
+
+    $self->log(LOGINFO, "pass, single recipient, empty Return-Path");
+    return DECLINED;
+}

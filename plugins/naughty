@@ -1,0 +1,150 @@
+#!perl -w
+
+=head1 NAME
+
+naughty - dispose of naughty connections
+
+=head1 SYNOPSIS
+
+Rather than immediately terminating naughty connections, plugins can flag the connection and dispose of it later. Examples are B<dnsbl>, B<karma>, B<greylisting>, B<resolvable_fromhost>, B<SPF>, and B<DKIM>.
+
+=head1 BACKGROUND
+
+Historically, deferred rejection was based on the belief that malware will retry less if we disconnect after RCPT. Observations in 2012 suggest it makes no measurable difference when we disconnect.
+
+Disconnecting early will block connections from your users who are roaming, or whose IP space is voluntarily listed by their ISP. Deferring rejection until after the remote has had the ability to authenticate allows RBLs to be safely used on port 25 and 587.
+
+Some (much older) RFCs suggest deferring later.
+
+For these and other reasons, a few plugins implemented deferred rejection on their own. By having naughty, other plugins can be much simpler.
+
+=head1 DESCRIPTION
+
+Naughty provides the following:
+
+=head2 consistency
+
+With one change to the config of naughty, all plugins can reject their messages at the preferred time. I use this feature for spam filter training. When setting up a new server, I use 'naughty reject data_post' until after dspam is trained. Once the bayesian filters are trained, I change to 'naughty reject data', and avoid processing the message bodies.
+
+=head2 efficiency
+
+After a connection is marked as naughty, subsequent plugins can detect that and skip processing. Plugins like SpamAssassin and DSPAM can benefit from using naughty connections to train their filters.
+
+Since many connections are from blacklisted IPs, naughty significantly reduces the resources required to dispose of them. Over 80% of my connections are disposed of after after a few DNS queries (B<dnsbl> or one DB query (B<karma>) and 0.01s of compute time.
+
+=head2 simplicity
+
+Rather than having plugins split processing across hooks, plugins can run to completion when they have the information they need, issue a I<reject naughty> if warranted, and be done.
+
+This may help reduce the code divergence between the sync and async deployment models.
+
+=head2 authentication
+
+When a user authenticates, the naughty flag on their connection is cleared. This allows users to send email from IPs that fail connection tests such as B<dnsbl>. Note that if I<reject connect> is set, connections will not get the chance to authenticate. To allow clients a chance to authenticate, I<reject mail> works well.
+
+=head1 HOW TO USE
+
+Set the connection note I<naughty> to the message you wish to send the naughty sender during rejection.
+
+   $self->connection->notes('naughty', $message);
+
+This happens for plugins automatically if they use the $self->get_reject()
+method and have set I<reject naughty> in the plugin configuration.
+
+=head1 CONFIGURATION
+
+=head2 reject
+
+  naughty reject [ connect | mail | rcpt | data | data_post ]
+
+The phase of the connection in which the naughty connection will be terminated.
+Keep in mind that if you choose rcpt and a plugin (like B<rcpt_ok>) runs first,
+and B<rcpt_ok> returns OK, then this plugin will not get called and the
+message will not get rejected.
+
+Solutions are to make sure B<naughty> is listed before rcpt_ok in config/plugins
+or set naughty to run in a phase after the one you wish to complete.
+In this case, use data instead of rcpt to disconnect after rcpt_ok. The latter
+is particularly useful if your rcpt plugins skip naughty testing. In that case,
+any recipient is accepted for naughty connections, which inhibits spammers
+from detecting address validity.
+
+=head2 reject_type [ temp | perm | disconnect ]
+
+If the plugin that set naughty didn't specify, what type of rejection should
+be sent? See docs/config.pod
+
+=head2 loglevel
+
+Adjust the quantity of logging for this plugin. See docs/logging.pod
+
+=head1 EXAMPLES
+
+Here's how to use naughty and get_reject in your plugin:
+
+ sub register {
+    my ($self, $qp) = (shift, shift);
+    $self->{_args} = { @_ };
+    $self->{_args}{reject} ||= 'naughty';
+ };
+
+ sub connect_handler {
+     my ($self, $transaction) = @_;
+     ... do a bunch of stuff ...
+     return DECLINED if is_okay();
+     return $self->get_reject( $message, $optional_log_message );
+ };
+
+=head1 AUTHOR
+
+ 2012 - Matt Simerson - msimerson@cpan.org
+
+=cut
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register {
+    my ($self, $qp) = (shift, shift);
+    $self->log(LOGERROR, "Bad arguments") if @_ % 2;
+    $self->{_args} = {@_};
+    $self->{_args}{reject}      ||= 'rcpt';
+    $self->{_args}{reject_type} ||= 'disconnect';
+
+    my $reject = lc $self->{_args}{reject};
+    my %hooks =
+      map { $_ => 1 } qw/ connect mail rcpt data data_post hook_queue_post /;
+
+    if (!$hooks{$reject}) {
+        $self->log(LOGERROR, "fail, invalid hook $reject");
+        $self->register_hook('data_post', 'naughty');
+        return;
+    }
+
+    # just in case naughty doesn't disconnect, which can happen if a plugin
+    # with the same hook returned OK before naughty ran, or ....
+    if ($reject ne 'data_post' && $reject ne 'hook_queue_post') {
+        $self->register_hook('data_post', 'naughty');
+    }
+
+    $self->log(LOGDEBUG, "registering hook $reject");
+    $self->register_hook($reject, 'naughty');
+}
+
+sub naughty {
+    my $self = shift;
+    my $naughty = $self->connection->notes('naughty') or do {
+        $self->log(LOGINFO, 'pass');
+        return DECLINED;
+    };
+    $self->log(LOGINFO, "disconnecting");
+    my $type = $self->get_reject_type(
+                                      'disconnect',
+                                      $self->connection->notes(
+                                                          'naughty_reject_type')
+                                     );
+    return ($type, $naughty);
+}
+

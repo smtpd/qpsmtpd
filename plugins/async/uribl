@@ -31,10 +31,13 @@ sub start_data_post {
 
     my @names;
 
-    my $queries = $self->lookup_start($transaction, sub {
-        my ($self, $name) = @_;
-        push @names, $name;
-    });
+    my $queries = $self->lookup_start(
+        $transaction,
+        sub {
+            my ($self, $name) = @_;
+            push @names, $name;
+        }
+    );
 
     my @hosts;
     foreach my $z (keys %{$self->{uribl_zones}}) {
@@ -42,10 +45,10 @@ sub start_data_post {
     }
 
     $transaction->notes(uribl_results => {});
-    $transaction->notes(uribl_zones => $self->{uribl_zones});
+    $transaction->notes(uribl_zones   => $self->{uribl_zones});
 
     return DECLINED
-        unless @hosts && $class->lookup($self->qp, [ @hosts ], [ @hosts ]);
+      unless @hosts && $class->lookup($self->qp, [@hosts], [@hosts]);
 
     return YIELD;
 }
@@ -58,9 +61,11 @@ sub finish_data_post {
         $self->log(LOGWARN, $_->{desc});
         if ($_->{action} eq 'add-header') {
             $transaction->header->add('X-URIBL-Match', $_->{desc});
-        } elsif ($_->{action} eq 'deny') {
+        }
+        elsif ($_->{action} eq 'deny') {
             return (DENY, $_->{desc});
-        } elsif ($_->{action} eq 'denysoft') {
+        }
+        elsif ($_->{action} eq 'denysoft') {
             return (DENYSOFT, $_->{desc});
         }
     }
@@ -73,8 +78,8 @@ sub process_a_result {
     my ($class, $qp, $result, $query) = @_;
 
     my $transaction = $qp->transaction;
-    my $results = $transaction->notes('uribl_results');
-    my $zones = $transaction->notes('uribl_zones');
+    my $results     = $transaction->notes('uribl_results');
+    my $zones       = $transaction->notes('uribl_zones');
 
     foreach my $z (keys %$zones) {
         if ($query =~ /^(.*)\.$z$/) {
@@ -88,8 +93,8 @@ sub process_txt_result {
     my ($class, $qp, $result, $query) = @_;
 
     my $transaction = $qp->transaction;
-    my $results = $transaction->notes('uribl_results');
-    my $zones = $transaction->notes('uribl_zones');
+    my $results     = $transaction->notes('uribl_results');
+    my $zones       = $transaction->notes('uribl_zones');
 
     foreach my $z (keys %$zones) {
         if ($query =~ /^(.*)\.$z$/) {
@@ -110,11 +115,15 @@ sub collect_results {
             if (exists $results->{$z}->{$n}->{a}) {
                 if ($self->evaluate($z, $results->{$z}->{$n}->{a})) {
                     $self->log(LOGDEBUG, "match $n in $z");
-                    push @matches, {
+                    push @matches,
+                      {
                         action => $self->{uribl_zones}->{$z}->{action},
-                        desc => "$n in $z: " .
-                            ($results->{$z}->{$n}->{txt} || $results->{$z}->{$n}->{a}),
-                    };
+                        desc   => "$n in $z: "
+                          . (
+                                  $results->{$z}->{$n}->{txt}
+                               || $results->{$z}->{$n}->{a}
+                            ),
+                      };
                 }
             }
         }

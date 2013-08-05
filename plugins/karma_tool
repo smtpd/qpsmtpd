@@ -11,24 +11,27 @@ use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 use Net::IP qw(:PROC);
 use POSIX qw(strftime);
 
-my $self = bless( { args => { db_dir => 'config' }, }, 'Karma' );
+my $self = bless({args => {db_dir => 'config'},}, 'Karma');
 my $command = $ARGV[0];
 
-if ( ! $command ) {
+if (!$command) {
     $self->usage();
 }
-elsif ( $command eq 'capture' ) {
-    $self->capture( $ARGV[1] );
+elsif ($command eq 'capture') {
+    $self->capture($ARGV[1]);
 }
-elsif ( $command eq 'release' ) {
-    $self->capture( $ARGV[1] );
+elsif ($command eq 'release') {
+    $self->release($ARGV[1]);
 }
-elsif ( $command eq 'prune' ) {
-    $self->prune_db( $ARGV[1] || 7 );
+elsif ($command eq 'prune') {
+    $self->prune_db($ARGV[1] || 7);
 }
-elsif ( $command eq 'list' ) {
+elsif ($command eq 'search' && is_ip($ARGV[1])) {
+    $self->show_ip($ARGV[1]);
+}
+elsif ($command eq 'list' | $command eq 'search') {
     $self->main();
-};
+}
 
 exit(0);
 
@@ -38,7 +41,7 @@ sub usage {
 
 list takes no arguments.
 
-search [ naughty nice both ]
+search [ naughty nice both <ip> ]
   and returns a list of matching IPs
 
 capture [ IP ]
@@ -51,135 +54,170 @@ prune takes no arguments.
   prunes database of entries older than 7 days
 
 EO_HELP
-;
-};
+      ;
+}
 
 sub capture {
     my $self = shift;
     my $ip = shift or return;
-    is_ip( $ip ) or do {
+    is_ip($ip) or do {
         warn "not an IP: $ip\n";
         return;
     };
 
     my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return;
-    my $tied = $self->get_db_tie( $db, $lock ) or return;
-    my $key  = $self->get_db_key( $ip );
+    my $lock = $self->get_db_lock($db) or return;
+    my $tied = $self->get_db_tie($db, $lock) or return;
+    my $key  = $self->get_db_key($ip);
 
-    $tied->{$key} = join(':', time, 1, 0, 1);
-    return $self->cleanup_and_return( $tied, $lock );
-};
+    my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/,
+      $tied->{$key};
+
+    $tied->{$key} = join(':', time, $naughty + 1, $nice, $connects);
+    return $self->cleanup_and_return($tied, $lock);
+}
 
 sub release {
     my $self = shift;
     my $ip = shift or return;
-    is_ip( $ip ) or do {
-        warn "not an IP: $ip\n";
-        return;
-    };
+    is_ip($ip) or do { warn "not an IP: $ip\n"; return; };
 
     my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return;
-    my $tied = $self->get_db_tie( $db, $lock ) or return;
-    my $key  = $self->get_db_key( $ip );
+    my $lock = $self->get_db_lock($db) or return;
+    my $tied = $self->get_db_tie($db, $lock) or return;
+    my $key  = $self->get_db_key($ip);
 
-    $tied->{$key} = join(':', 0, 1, 0, 1);
-    return $self->cleanup_and_return( $tied, $lock );
-};
+    my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/,
+      $tied->{$key};
+
+    $tied->{$key} = join(':', 0, 0, $nice, $connects);
+    return $self->cleanup_and_return($tied, $lock);
+}
+
+sub show_ip {
+    my $self = shift;
+    my $ip   = shift or return;
+    my $db   = $self->get_db_location();
+    my $lock = $self->get_db_lock($db) or return;
+    my $tied = $self->get_db_tie($db, $lock) or return;
+    my $key  = $self->get_db_key($ip);
+
+    my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/,
+      $tied->{$key};
+    $naughty  ||= 0;
+    $nice     ||= 0;
+    $connects ||= 0;
+    my $time_human = '';
+    if ($penalty_start_ts) {
+        $time_human = strftime "%a %b %e %H:%M", localtime $penalty_start_ts;
+    }
+    my $hostname = `dig +short -x $ip` || '';
+    chomp $hostname;
+    print
+"      IP Address                 Penalty        Naughty  Nice  Connects  Hostname\n";
+    printf(" %-18s  %24s    %3s     %3s     %3s    %-30s\n",
+           $ip, $time_human, $naughty, $nice, $connects, $hostname);
+}
 
 sub main {
     my $self = shift;
 
     my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return;
-    my $tied = $self->get_db_tie( $db, $lock ) or return;
+    my $lock = $self->get_db_lock($db) or return;
+    my $tied = $self->get_db_tie($db, $lock) or return;
     my %totals;
 
-    print "      IP Address                 Penalty        Naughty  Nice  Connects  Hostname\n";
-    foreach my $r ( sort keys %$tied ) {
-        my $ip = ip_bintoip( ip_inttobin( $r, 4 ), 4);
-        my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/, $tied->{$r};
-        $naughty ||= '';
-        $nice    ||= '';
+    print
+"      IP Address                 Penalty        Naughty  Nice  Connects  Hostname\n";
+    foreach my $r (sort keys %$tied) {
+        my $ip = ip_bintoip(ip_inttobin($r, 4), 4);
+        my ($penalty_start_ts, $naughty, $nice, $connects) = split /:/,
+          $tied->{$r};
+        $naughty  ||= '';
+        $nice     ||= '';
         $connects ||= '';
         my $time_human = '';
-        if ( $command eq 'search' ) {
+        if ($command eq 'search') {
             my $search = $ARGV[1];
-            if ( $search eq 'nice' ) {
-                next if ! $nice;
+            if ($search eq 'nice') {
+                next if !$nice;
             }
-            elsif ( $search eq 'naughty' ) {
-                next if ! $naughty;
+            elsif ($search eq 'naughty') {
+                next if !$naughty;
             }
-            elsif ( $search eq 'both' ) {
-                next if ! $naughty || ! $nice;
+            elsif ($search eq 'both') {
+                next if !$naughty || !$nice;
             }
-            elsif ( is_ip() && $search ne $ip ) {
+            elsif (is_ip($ARGV[1]) && $search ne $ip) {
                 next;
             }
-        };
-        if ( $penalty_start_ts ) {
-            $time_human = strftime "%a %b %e %H:%M", localtime $penalty_start_ts;
-        };
+        }
+        if ($penalty_start_ts) {
+            $time_human = strftime "%a %b %e %H:%M",
+              localtime $penalty_start_ts;
+        }
         my $hostname = '';
-        if ( $naughty && $nice ) {
-            $hostname = `dig +short -x $ip`; chomp $hostname;
-        };
-        printf(" %-18s  %24s    %3s     %3s     %3s    %30s\n", $ip, $time_human, $naughty, $nice, $connects, $hostname);
+        if ($naughty && $nice) {
+
+            #$hostname = `dig +short -x $ip`; chomp $hostname;
+        }
+        printf(" %-18s  %24s    %3s     %3s     %3s    %30s\n",
+               $ip, $time_human, $naughty, $nice, $connects, $hostname);
         $totals{naughty}  += $naughty  if $naughty;
         $totals{nice}     += $nice     if $nice;
         $totals{connects} += $connects if $connects;
-    };
+    }
     print Dumper(\%totals);
 }
 
 sub is_ip {
     my $ip = shift || $ARGV[0];
-    return 1 if $ip =~ /^(\d{1,3}\.){3}\d{1,3}$/;
-    return;
-};
+    new Net::IP($ip) or return;
+    return 1;
+}
 
 sub cleanup_and_return {
-    my ($self, $tied, $lock ) = @_;
+    my ($self, $tied, $lock) = @_;
     untie $tied;
     close $lock;
-};
+}
 
 sub get_db_key {
     my $self = shift;
-    my $nip = Net::IP->new( shift );
-    return $nip->intip;   # convert IP to an int
-};
+    my $nip = Net::IP->new(shift) or return;
+    return $nip->intip;    # convert IP to an int
+}
 
 sub get_db_tie {
-    my ( $self, $db, $lock ) = @_;
+    my ($self, $db, $lock) = @_;
 
-    tie( my %db, 'AnyDBM_File', $db, O_CREAT|O_RDWR, 0600) or do {
+    tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, 0600) or do {
         warn "tie to database $db failed: $!";
         close $lock;
         return;
     };
     return \%db;
-};
+}
 
 sub get_db_location {
     my $self = shift;
 
     # Setup database location
-    my @candidate_dirs = ( $self->{args}{db_dir},
-        "/var/lib/qpsmtpd/karma", "./var/db", "./config", '.' );
+    my @candidate_dirs = (
+                          $self->{args}{db_dir},
+                          "/var/lib/qpsmtpd/karma", "./var/db", "./config", '.'
+                         );
 
     my $dbdir;
-    for my $d ( @candidate_dirs ) {
-        next if ! $d || ! -d $d;   # impossible
+    for my $d (@candidate_dirs) {
+        next if !$d || !-d $d;    # impossible
         $dbdir = $d;
-        last;   # first match wins
+        last;                     # first match wins
     }
     my $db = "$dbdir/karma.dbm";
     print "using karma db at $db\n";
     return $db;
-};
+}
 
 sub get_db_lock {
     my ($self, $db) = @_;
@@ -187,12 +225,12 @@ sub get_db_lock {
     return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
 
     # Check denysoft db
-    open( my $lock, ">$db.lock" ) or do {
+    open(my $lock, ">$db.lock") or do {
         warn "opening lockfile failed: $!";
         return;
     };
 
-    flock( $lock, LOCK_EX ) or do {
+    flock($lock, LOCK_EX) or do {
         warn "flock of lockfile failed: $!";
         close $lock;
         return;
@@ -208,43 +246,44 @@ sub get_db_lock_nfs {
 
     ### set up a lock - lasts until object looses scope
     my $nfslock = new File::NFSLock {
-        file      => "$db.lock",
-        lock_type => LOCK_EX|LOCK_NB,
-        blocking_timeout   => 10,      # 10 sec
-        stale_lock_timeout => 30 * 60, # 30 min
-    } or do {
+                             file               => "$db.lock",
+                             lock_type          => LOCK_EX | LOCK_NB,
+                             blocking_timeout   => 10,                  # 10 sec
+                             stale_lock_timeout => 30 * 60,             # 30 min
+                                    }
+      or do {
         warn "nfs lockfile failed: $!";
         return;
-    };
+      };
 
-    open( my $lock, "+<$db.lock") or do {
+    open(my $lock, "+<$db.lock") or do {
         warn "opening nfs lockfile failed: $!";
         return;
     };
 
     return $lock;
-};
+}
 
 sub prune_db {
-    my $self = shift;
+    my $self       = shift;
     my $prune_days = shift;
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock( $db ) or return;
-    my $tied = $self->get_db_tie( $db, $lock ) or return;
+    my $db    = $self->get_db_location();
+    my $lock  = $self->get_db_lock($db) or return;
+    my $tied  = $self->get_db_tie($db, $lock) or return;
     my $count = keys %$tied;
 
     my $pruned = 0;
-    foreach my $key ( keys %$tied ) {
+    foreach my $key (keys %$tied) {
         my ($ts, $naughty, $nice, $connects) = split /:/, $tied->{$key};
-        my $days_old = ( time - $ts ) / 86400;
+        my $days_old = (time - $ts) / 86400;
         next if $days_old < $prune_days;
         delete $tied->{$key};
         $pruned++;
-    };
+    }
     untie $tied;
     close $lock;
     warn "pruned $pruned of $count DB entries";
-    return $self->cleanup_and_return( $tied, $lock );
-};
+    return $self->cleanup_and_return($tied, $lock);
+}
 

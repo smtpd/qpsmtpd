@@ -42,15 +42,15 @@ The hard coded F<help/> path should be changed.
 my %config = ();
 
 sub register {
-    my ($self,$qp,%args) = @_;
+    my ($self, $qp, %args) = @_;
     my ($file, $cmd);
     unless (%args) {
         $config{help_dir} = './help/';
     }
     foreach (keys %args) {
-        /^(\w+)$/ or
-            $self->log(LOGWARN, "Invalid argument for the 'help' plugin $_"), 
-            next;
+        /^(\w+)$/
+          or $self->log(LOGWARN, "Invalid argument for the 'help' plugin $_"),
+          next;
         $cmd = $1;
         if ($cmd eq 'not_implemented') {
             $config{'not_implemented'} = $args{'not_implemented'};
@@ -58,28 +58,28 @@ sub register {
         elsif ($cmd eq 'help_dir') {
             $file = $args{$cmd};
             $file =~ m#^([\w\.\-/]+)$#
-              or $self->log(LOGERROR, 
+              or $self->log(LOGERROR,
                             "Invalid charachters in filename for command $cmd"),
-                next; 
+              next;
             $config{'help_dir'} = $1;
         }
         else {
             $file = $args{$cmd};
             $file =~ m#^([\w\.\-/]+)$#
-              or $self->log(LOGERROR, 
+              or $self->log(LOGERROR,
                             "Invalid charachters in filename for command $cmd"),
-                 next;
+              next;
             $file = $1;
             if ($file =~ m#/#) {
-                -e $file 
+                -e $file
                   or $self->log(LOGWARN, "No help file for command '$cmd'"),
-                     next;
+                  next;
             }
             else {
                 $file = "help/$file";
-                if (-e "help/$file") { ## FIXME: path
+                if (-e "help/$file") {    ## FIXME: path
                     $file = "help/$file";
-                } 
+                }
                 else {
                     $self->log(LOGWARN, "No help file for command '$cmd'");
                     next;
@@ -105,8 +105,8 @@ sub hook_help {
 
     $cmd = lc $args[0];
 
-    unless ($cmd =~ /^(\w+)$/) { # else someone could request 
-                                 # "HELP ../../../../../../../../etc/passwd"
+    unless ($cmd =~ /^(\w+)$/) {    # else someone could request
+                                    # "HELP ../../../../../../../../etc/passwd"
         $self->qp->respond(502, "Invalid command name");
         return DONE;
     }
@@ -114,25 +114,25 @@ sub hook_help {
 
     if (exists $config{$cmd}) {
         $help = read_helpfile($config{$cmd}, $cmd)
-            or $self->log(LOGERROR, "failed to open help file for $cmd: $!"),
-               return OK, "No help available for SMTP command: $cmd";
+          or $self->log(LOGERROR, "failed to open help file for $cmd: $!"),
+          return OK, "No help available for SMTP command: $cmd";
     }
-    elsif (exists $config{'help_dir'} && -e $config{'help_dir'}."/$cmd") {
-        $help = read_helpfile($config{help_dir}."/$cmd", $cmd)
-            or $self->log(LOGERROR, "failed to open help file for $cmd: $!"),
-               return OK, "No help available for SMTP command: $cmd";
+    elsif (exists $config{'help_dir'} && -e $config{'help_dir'} . "/$cmd") {
+        $help = read_helpfile($config{help_dir} . "/$cmd", $cmd)
+          or $self->log(LOGERROR, "failed to open help file for $cmd: $!"),
+          return OK, "No help available for SMTP command: $cmd";
     }
-    $help = "No help available for SMTP command: $cmd" # empty file
+    $help = "No help available for SMTP command: $cmd"    # empty file
       unless $help;
     return OK, split(/\n/, $help);
 }
 
 sub read_helpfile {
-    my ($file,$cmd) = @_;
+    my ($file, $cmd) = @_;
     my $help;
     open HELP, $file
-        or return undef;
-    { 
+      or return undef;
+    {
         local $/ = undef;
         $help = <HELP>;
     };

@@ -1,0 +1,100 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Data::Dumper;
+use Net::DNS;
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+
+my $res = new Net::DNS::Resolver(dnsrch => 0);
+my $test_email = 'user@example.com';
+
+sub register_tests {
+    my $self = shift;
+
+    my %args = ( );
+    $self->register( $self->qp, reject => 0 );
+
+    $self->register_test('test_populate_invalid_networks', 2);
+    $self->register_test('test_mx_address_resolves', 2);
+    $self->register_test('test_get_host_records', 2);
+    $self->register_test('test_get_and_validate_mx', 2);
+    $self->register_test('test_check_dns', 2);
+    $self->register_test('test_hook_mail', 4);
+}
+
+sub test_hook_mail {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    my $address = Qpsmtpd::Address->new('remote@example.com');
+    $transaction->sender($address);
+
+    my $sender = $transaction->sender;
+    $sender->host('perl.com');
+
+    ok( $self->hook_mail( $transaction, $sender ) );
+    ok( $self->hook_mail( $transaction, $sender ) );
+
+    $sender->host('');
+    $self->{_args}{reject} = 1;
+    $self->{_args}{reject_type} = 'soft';
+    my ($r) = $self->hook_mail( $transaction, $sender );
+    ok( $r == DENYSOFT, "($r)");
+
+    $self->{_args}{reject_type} = 'hard';
+    ($r) = $self->hook_mail( $transaction, $sender );
+    ok( $r == DENY, "($r)");
+};
+
+sub test_check_dns {
+    my $self = shift;
+
+    my $transaction = $self->qp->transaction;
+    ok( ! $self->check_dns( '', $transaction ) );
+    ok( $self->check_dns( 'perl.com', $transaction ) );
+}
+
+sub test_get_and_validate_mx {
+    my $self = shift;
+    my $transaction = $self->qp->transaction;
+
+    ok( scalar $self->get_and_validate_mx( $res, 'perl.com', $transaction ) );
+
+    ok( ! scalar $self->get_host_records( $res, 'fake-domain-name-for-test.com', $transaction ) );
+};
+
+sub test_get_host_records {
+    my $self = shift;
+    my $transaction = $self->qp->transaction;
+
+    ok( scalar $self->get_host_records( $res, 'perl.com', $transaction ) );
+    ok( ! scalar $self->get_host_records( $res, 'fake-domain-name-for-test.com', $transaction ) );
+};
+
+sub test_mx_address_resolves {
+    my $self = shift;
+
+    my $fromhost = 'perl.com';
+
+    ok( $self->mx_address_resolves('mail.perl.com', $fromhost) );
+    ok( ! $self->mx_address_resolves('no-such-mx.perl.com', $fromhost) );
+};
+
+sub test_populate_invalid_networks {
+    my $self = shift;
+
+    my $ip = '10.9.8.7';
+    ok( $self->ip_is_valid($ip) );
+
+    $self->qp->config('invalid_resolvable_fromhost', $ip);
+    $self->populate_invalid_networks();
+    ok( ! $self->ip_is_valid($ip) );
+
+    # clean up afterwards
+    $self->qp->config('invalid_resolvable_fromhost', undef );
+    $self->{invalid} = ();
+};
+

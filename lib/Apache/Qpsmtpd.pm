@@ -7,13 +7,13 @@ use warnings FATAL => 'all';
 use Apache2::ServerUtil ();
 use Apache2::Connection ();
 use Apache2::Const -compile => qw(OK MODE_GETLINE);
-use APR::Const -compile => qw(SO_NONBLOCK EOF SUCCESS);
-use APR::Error ();
-use APR::Brigade ();
-use APR::Bucket ();
-use APR::Socket ();
+use APR::Const -compile     => qw(SO_NONBLOCK EOF SUCCESS);
+use APR::Error      ();
+use APR::Brigade    ();
+use APR::Bucket     ();
+use APR::Socket     ();
 use Apache2::Filter ();
-use ModPerl::Util ();
+use ModPerl::Util   ();
 
 our $VERSION = '0.02';
 
@@ -22,15 +22,15 @@ sub handler {
     $c->client_socket->opt_set(APR::Const::SO_NONBLOCK => 0);
 
     die "\$ENV{QPSMTPD_CONFIG} must be given" unless $ENV{QPSMTPD_CONFIG};
-    
+
     my $qpsmtpd = Qpsmtpd::Apache->new();
     $qpsmtpd->start_connection(
-        ip => $c->remote_ip,
-        host => $c->remote_host,
-        info => undef,
-        conn => $c,
-    );
-    
+                               ip   => $c->remote_ip,
+                               host => $c->remote_host,
+                               info => undef,
+                               conn => $c,
+                              );
+
     $qpsmtpd->run($c);
     $qpsmtpd->run_hooks("post-connection");
     $qpsmtpd->connection->reset;
@@ -46,20 +46,21 @@ use base qw(Qpsmtpd::SMTP);
 my %cdir_memo;
 
 sub config_dir {
-  my ($self, $config) = @_;
-  if (exists $cdir_memo{$config}) {
-      return $cdir_memo{$config};
-  }
+    my ($self, $config) = @_;
+    if (exists $cdir_memo{$config}) {
+        return $cdir_memo{$config};
+    }
 
-  if (uc($ENV{QPSMTPD_CONFIG}) eq 'USE-VIRTUAL-DOMAINS') {
-      my $cdir = $self->{conn}->base_server->dir_config("qpsmtpd.config_dir");
-      $cdir =~ /^(.*)$/; # detaint
-      my $configdir = $1 if -e "$1/$config";
-      $cdir_memo{$config} = $configdir;
-  } else {
-      $cdir_memo{$config} = $self->SUPER::config_dir(@_);
-  }
-  return $cdir_memo{$config};
+    if (uc($ENV{QPSMTPD_CONFIG}) eq 'USE-VIRTUAL-DOMAINS') {
+        my $cdir = $self->{conn}->base_server->dir_config("qpsmtpd.config_dir");
+        $cdir =~ /^(.*)$/;    # detaint
+        my $configdir = $1 if -e "$1/$config";
+        $cdir_memo{$config} = $configdir;
+    }
+    else {
+        $cdir_memo{$config} = $self->SUPER::config_dir(@_);
+    }
+    return $cdir_memo{$config};
 }
 
 sub start_connection {
@@ -67,23 +68,26 @@ sub start_connection {
     my %opts = @_;
 
     $self->{conn} = $opts{conn};
-    $self->{conn}->client_socket->timeout_set($self->config('timeout') * 1_000_000);
-    $self->{bb_in} = APR::Brigade->new($self->{conn}->pool, $self->{conn}->bucket_alloc);
-    $self->{bb_out} = APR::Brigade->new($self->{conn}->pool, $self->{conn}->bucket_alloc);
+    $self->{conn}
+      ->client_socket->timeout_set($self->config('timeout') * 1_000_000);
+    $self->{bb_in} =
+      APR::Brigade->new($self->{conn}->pool, $self->{conn}->bucket_alloc);
+    $self->{bb_out} =
+      APR::Brigade->new($self->{conn}->pool, $self->{conn}->bucket_alloc);
 
-    my $remote_host = $opts{host} || ( $opts{ip} ? "[$opts{ip}]" : "[noip!]");
+    my $remote_host = $opts{host} || ($opts{ip} ? "[$opts{ip}]" : "[noip!]");
     my $remote_info = $opts{info} ? "$opts{info}\@$remote_host" : $remote_host;
     my $remote_ip = $opts{ip};
 
     $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
 
     $self->SUPER::connection->start(
-        remote_info => $remote_info,
-        remote_ip   => $remote_ip,
-        remote_host => $remote_host,
-        local_ip    => $opts{conn}->local_ip,
-        @_
-    );
+                                    remote_info => $remote_info,
+                                    remote_ip   => $remote_ip,
+                                    remote_host => $remote_host,
+                                    local_ip    => $opts{conn}->local_ip,
+                                    @_
+                                   );
 }
 
 sub config {
@@ -117,31 +121,32 @@ sub getline {
     return if $c->aborted;
 
     my $bb = $self->{bb_in};
-    
+
     while (1) {
-        my $rc = $c->input_filters->get_brigade($bb, Apache2::Const::MODE_GETLINE);
+        my $rc =
+          $c->input_filters->get_brigade($bb, Apache2::Const::MODE_GETLINE);
         return if $rc == APR::Const::EOF;
         die APR::Error::strerror($rc) unless $rc == APR::Const::SUCCESS;
-        
+
         next unless $bb->flatten(my $data);
-        
+
         $bb->cleanup;
         return $data;
     }
-    
+
     return '';
 }
 
 sub read_input {
     my $self = shift;
-    my $c = $self->{conn};
+    my $c    = $self->{conn};
 
     while (defined(my $data = $self->getline)) {
-        $data =~ s/\r?\n$//s; # advanced chomp
+        $data =~ s/\r?\n$//s;    # advanced chomp
         $self->connection->notes('original_string', $data);
         $self->log(LOGDEBUG, "dispatching $data");
         defined $self->dispatch(split / +/, $data, 2)
-            or $self->respond(502, "command unrecognized: '$data'");
+          or $self->respond(502, "command unrecognized: '$data'");
         last if $self->{_quitting};
     }
 }
@@ -151,11 +156,12 @@ sub respond {
     my $c = $self->{conn};
     while (my $msg = shift @messages) {
         my $bb = $self->{bb_out};
-        my $line = $code . (@messages?"-":" ").$msg;
+        my $line = $code . (@messages ? "-" : " ") . $msg;
         $self->log(LOGDEBUG, $line);
         my $bucket = APR::Bucket->new(($c->bucket_alloc), "$line\r\n");
         $bb->insert_tail($bucket);
         $c->output_filters->fflush($bb);
+
         # $bucket->remove;
         $bb->cleanup;
     }

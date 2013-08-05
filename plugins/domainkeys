@@ -10,6 +10,10 @@ domainkeys: validate a DomainKeys signature on an incoming mail
 
 Performs a DomainKeys validation on the message.
 
+=head1 DEPRECATION
+
+You should probably NOT be using this plugin. DomainKeys has been deprecated in favor of DKIM. That being said, it's March 2013 and I'm still seeing ham arrive with DomainKeys signatures.
+
 =head1 CONFIGURATION
 
 =head2 reject
@@ -39,7 +43,9 @@ the same terms as Perl itself.
 
 =head1 AUTHORS
 
- Matt Simerson    - 2012
+ Matt Simerson    - 2013 - safe results to Authentication-Results header
+                           instead of DomainKey-Status
+ Matt Simerson    - 2012 - refactored, added tests, safe loading
  John Peacock     - 2005-2006
  Anthony D. Urso. - 2004
 
@@ -53,114 +59,115 @@ use Qpsmtpd::Constants;
 sub init {
     my ($self, $qp, %args) = @_;
 
-    foreach my $key ( %args ) {
+    foreach my $key (%args) {
         $self->{$key} = $args{$key};
     }
-    $self->{reject} = 1 if ! defined $self->{reject};  # default reject
-    $self->{reject_type} = 'perm' if ! defined $self->{reject_type};
+    $self->{reject} = 1 if !defined $self->{reject};    # default reject
+    $self->{reject_type} = 'perm' if !defined $self->{reject_type};
 
-    if ( $args{'warn_only'} ) {
+    if ($args{'warn_only'}) {
         $self->log(LOGNOTICE, "warn_only is deprecated. Use reject instead");
         $self->{'reject'} = 0;
-    };
+    }
 }
 
 sub register {
     my $self = shift;
 
-    for my $m ( qw/ Mail::DomainKeys::Message Mail::DomainKeys::Policy / ) {
+    for my $m (qw/ Mail::DomainKeys::Message Mail::DomainKeys::Policy /) {
         eval "use $m";
-        if ( $@ ) {
+        if ($@) {
             warn "skip: plugin disabled, could not load $m\n";
             $self->log(LOGERROR, "skip: plugin disabled, is $m installed?");
             return;
-        };
-    };
+        }
+    }
 
     $self->register_hook('data_post', 'data_post_handler');
-};
+}
 
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    if ( ! $transaction->header->get('DomainKey-Signature') ) {
-        $self->log(LOGINFO, "skip: unsigned");
-        return DECLINED;
-    };
-	
     return DECLINED if $self->is_immune();
 
-    my $body = $self->assemble_body( $transaction );
+    if (!$transaction->header->get('DomainKey-Signature')) {
+        $self->log(LOGINFO, "skip, unsigned");
+        return DECLINED;
+    }
 
-    my $message = load Mail::DomainKeys::Message(
-        HeadString => $transaction->header->as_string,
-        BodyReference => $body) or do {
-            $self->log(LOGWARN, "skip: unable to load message"),
-            return DECLINED;
-        };
+    my $body = $self->assemble_body($transaction);
+
+    my $message =
+      load Mail::DomainKeys::Message(
+                                  HeadString => $transaction->header->as_string,
+                                  BodyReference => $body)
+      or do {
+        $self->log(LOGWARN, "skip, unable to load message"), return DECLINED;
+      };
 
     # no sender domain means no verification
-    if ( ! $message->senderdomain ) {
-        $self->log(LOGINFO, "skip: failed to parse sender domain"),
+    if (!$message->senderdomain) {
+        $self->log(LOGINFO, "skip, failed to parse sender domain"),
+          return DECLINED;
+    }
+
+    my $status = $self->get_message_status($message);
+
+    if (defined $status) {
+#$transaction->header->add("DomainKey-Status", $status, 0);
+        $self->store_auth_results('domainkey=' . $status);
+        $self->log(LOGINFO, "pass, $status");
         return DECLINED;
-    };
+    }
 
-    my $status = $self->get_message_status( $message );
-
-    if ( defined $status ) {
-        $transaction->header->replace("DomainKey-Status", $status);
-        $self->log(LOGINFO, "pass: $status");
-        return DECLINED;
-    };
-
-    $self->log(LOGERROR, "fail: signature failed to verify");
-    return DECLINED if ! $self->{reject};
+    $self->log(LOGERROR, "fail, signature invalid");
+    return DECLINED if !$self->{reject};
     my $deny = $self->{reject_type} eq 'temp' ? DENYSOFT : DENY;
-    return ($deny, "DomainKeys signature failed to verify");
+    return ($deny, "DomainKeys signature validation failed");
 }
 
 sub get_message_status {
     my ($self, $message) = @_;
 
-    if ( $message->testing ) {
-        return "testing";   # key testing, don't do anything else
-    };
+    if ($message->testing) {
+        return "testing";    # key testing, don't do anything else
+    }
 
-    if ( $message->signed && $message->verify ) {
-        return $message->signature->status; # verified: add good header
-    };
+    if ($message->signed && $message->verify) {
+        return $message->signature->status;    # verified: add good header
+    }
 
     # not signed or not verified
-    my $policy = fetch Mail::DomainKeys::Policy(
-        Protocol => 'dns',
-        Domain => $message->senderdomain
-    );
+    my $policy =
+      fetch Mail::DomainKeys::Policy(Protocol => 'dns',
+                                     Domain   => $message->senderdomain);
 
-    if ( ! $policy ) {
+    if (!$policy) {
         return $message->signed ? "non-participant" : "no signature";
-    };
+    }
 
-    if ( $policy->testing ) {
-        return "testing";  # Don't do anything else
-    };
+    if ($policy->testing) {
+        return "testing";    # Don't do anything else
+    }
 
-    if ( $policy->signall ) {
-        return undef;      # policy requires all mail to be signed
-    };
+    if ($policy->signall) {
+        return undef;        # policy requires all mail to be signed
+    }
 
     # $policy->signsome
-    return "no signature"; # not signed and domain doesn't sign all
-};
+    return "no signature";    # not signed and domain doesn't sign all
+}
 
 sub assemble_body {
     my ($self, $transaction) = @_;
 
     $transaction->body_resetpos;
-    $transaction->body_getline; # \r\n seperator is NOT part of the body
+    $transaction->body_getline;    # \r\n seperator is NOT part of the body
 
     my @body;
     while (my $line = $transaction->body_getline) {
         push @body, $line;
     }
     return \@body;
-};
+}

@@ -75,6 +75,9 @@ Make sure the HELO hostname has an A or AAAA record that matches the senders
 IP address, and make sure that the senders IP has a PTR that resolves to the
 HELO hostname.
 
+Per RFC 5321 section 4.1.4, it is impermissible to block a message I<soley>
+on the basis of the HELO hostname not matching the senders IP.
+
 Since the dawn of SMTP, having matching DNS has been a minimum standard
 expected and oft required of mail servers. While requiring matching DNS is
 prudent, requiring an exact match will reject valid email. While testing this
@@ -106,25 +109,25 @@ Default: lenient
 
 =head3 lenient
 
-Reject failures of the following tests: is_in_badhelo, invalid_localhost, and
-is_forged_literal.
+Runs the following tests: is_in_badhelo, invalid_localhost,
+is_forged_literal, and is_plain_ip.
 
 This setting is lenient enough not to cause problems for your Windows users.
 It is comparable to running check_spamhelo, but with the addition of regexp
-support and the prevention of forged localhost and forged IP literals.
+support, the prevention of forged localhost, forged IP literals, and plain
+IPs.
 
 =head3 rfc
 
 Per RFC 2821, the HELO hostname is the FQDN of the sending server or an
 address literal. When I<policy rfc> is selected, all the lenient checks and
-the following are enforced: is_plain_ip, is_not_fqdn, no_forward_dns, and
-no_reverse_dns.
+the following are tested: is_not_fqdn, no_forward_dns, and no_reverse_dns.
 
 If you have Windows users that send mail via your server, do not choose
-I<policy rfc> without I<reject naughty> and the B<naughty> plugin. Windows
-users often send unqualified HELO names and will have trouble sending mail.
-<Naughty> can defer the rejection, and if the user subsequently authenticates,
-the rejection will be cancelled.
+I<policy rfc> without setting I<reject> to 0 or naughty.
+Windows PCs often send unqualified HELO names and will have trouble
+sending mail. The B<naughty> plugin defers the rejection, giving the user
+the opportunity to authenticate and bypass the rejection.
 
 =head3 strict
 
@@ -135,7 +138,7 @@ I have yet to see an address literal being used by a hammy sender. But I am
 not certain that blocking them all is prudent.
 
 It is recommended that I<policy strict> be used with <reject 0> and that you
-monitor your logs for false positives before enabling rejection.
+examine your logs for false positives.
 
 =head2 badhelo
 
@@ -187,6 +190,26 @@ that is not in FQDN form is no more than a local alias.  Local aliases MUST
 NOT appear in any SMTP transaction.
 
 
+=head1 RFC 5321
+
+=head2 4.1.4
+
+An SMTP server MAY verify that the domain name argument in the EHLO
+command actually corresponds to the IP address of the client.
+However, if the verification fails, the server MUST NOT refuse to
+accept a message on that basis.  Information captured in the
+verification attempt is for logging and tracing purposes.  Note that
+this prohibition applies to the matching of the parameter to its IP
+address only; see Section 7.9 for a more extensive discussion of
+rejecting incoming connections or mail messages.
+
+=head1 TODO
+
+is_forged_literal, if the forged IP is an internal IP, it's likely one
+of our clients that should have authenticated. Perhaps when we check back
+later in data_post, if they have added relay_client, then give back the
+karma.
+
 =head1 AUTHOR
 
 2012 - Matt Simerson
@@ -206,41 +229,42 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-use Net::DNS;
-
 sub register {
-    my ($self, $qp) = shift, shift;
-    $self->{_args} = { @_ };
+    my ($self, $qp) = (shift, shift);
+    $self->{_args} = {@_};
+
     $self->{_args}{reject_type} = 'disconnect';
     $self->{_args}{policy} ||= 'lenient';
-    $self->{_args}{timeout} ||= 5;
+    $self->{_args}{dns_timeout} ||= $self->{_args}{timeout} || 5;
 
-    if ( ! defined $self->{_args}{reject} ) {
+    if (!defined $self->{_args}{reject}) {
         $self->{_args}{reject} = 1;
-    };
-
+    }
     $self->populate_tests();
-    $self->init_resolver();
+    $self->init_resolver() or return;
 
-    $self->register_hook('helo', 'helo_handler');
-    $self->register_hook('ehlo', 'helo_handler');
+    $self->register_hook('helo',      'helo_handler');
+    $self->register_hook('ehlo',      'helo_handler');
     $self->register_hook('data_post', 'data_post_handler');
-};
+}
 
 sub helo_handler {
     my ($self, $transaction, $host) = @_;
 
-    if ( ! $host ) {
-        $self->log(LOGINFO, "fail, no helo host");
+    if (!$host) {
+        $self->log(LOGINFO, "fail, tolerated, no helo host");
         return DECLINED;
-    };
+    }
 
     return DECLINED if $self->is_immune();
 
-    foreach my $test ( @{ $self->{_helo_tests} } ) {
-        my @err = $self->$test( $host );
-        return $self->get_reject( @err ) if scalar @err;
-    };
+    foreach my $test (@{$self->{_helo_tests}}) {
+        my @err = $self->$test($host);
+        if (scalar @err) {
+            $self->adjust_karma(-1);
+            return $self->get_reject(@err);
+        }
+    }
 
     $self->log(LOGINFO, "pass");
     return DECLINED;
@@ -250,239 +274,249 @@ sub data_post_handler {
     my ($self, $transaction) = @_;
 
     $transaction->header->delete('X-HELO');
-    $transaction->header->add('X-HELO', $self->qp->connection->hello_host, 0 );
+    $transaction->header->add('X-HELO', $self->qp->connection->hello_host, 0);
 
     return (DECLINED);
-};
+}
 
 sub populate_tests {
     my $self = shift;
 
     my $policy = $self->{_args}{policy};
-    @{ $self->{_helo_tests} } = qw/ is_in_badhelo invalid_localhost is_forged_literal /;
+    @{$self->{_helo_tests}} =
+      qw/ is_in_badhelo invalid_localhost is_forged_literal is_plain_ip /;
 
-    if ( $policy eq 'rfc' || $policy eq 'strict' ) {
-        push @{ $self->{_helo_tests} }, qw/ is_plain_ip is_not_fqdn no_forward_dns
-                                       no_reverse_dns /;
-    };
+    if ($policy eq 'rfc' || $policy eq 'strict') {
+        push @{$self->{_helo_tests}},
+          qw/ is_not_fqdn no_forward_dns no_reverse_dns /;
+    }
 
-    if ( $policy eq 'strict' ) {
-        push @{ $self->{_helo_tests} }, qw/ is_address_literal no_matching_dns /;
-    };
-};
-
-sub init_resolver {
-    my $self = shift;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log( LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    my $timeout = $self->{_args}{timeout} || 5;
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
-};
+    if ($policy eq 'strict') {
+        push @{$self->{_helo_tests}}, qw/ is_address_literal no_matching_dns /;
+    }
+}
 
 sub is_in_badhelo {
-    my ( $self, $host ) = @_;
+    my ($self, $host) = @_;
 
     my $error = "I do not believe you are $host.";
 
     $host = lc $host;
     foreach my $bad ($self->qp->config('badhelo')) {
-        if ( $bad =~ /[\{\}\[\]\(\)\^\$\|\*\+\?\\\!]/ ) { # it's a regexp
-            return $self->is_regex_match( $host, $bad );
-        };
-        if ( $host eq lc $bad) {
+        if ($bad =~ /[\{\}\[\]\(\)\^\$\|\*\+\?\\\!]/) {    # it's a regexp
+            return $self->is_regex_match($host, $bad);
+        }
+        if ($host eq lc $bad) {
             return ($error, "in badhelo");
         }
     }
     return;
-};
+}
 
 sub is_regex_match {
-    my ( $self, $host, $pattern ) = @_;
+    my ($self, $host, $pattern) = @_;
 
     my $error = "Your HELO hostname is not allowed";
 
     #$self->log( LOGDEBUG, "is regex ($pattern)");
-    if ( substr( $pattern, 0, 1) eq '!' ) {
+    if (substr($pattern, 0, 1) eq '!') {
         $pattern = substr $pattern, 1;
-        if ( $host !~ /$pattern/ ) {
+        if ($host !~ /$pattern/) {
+
             #$self->log( LOGDEBUG, "matched ($pattern)");
             return ($error, "badhelo pattern match ($pattern)");
-        };
+        }
         return;
     }
-    if ( $host =~ /$pattern/ ) {
+    if ($host =~ /$pattern/) {
+
         #$self->log( LOGDEBUG, "matched ($pattern)");
         return ($error, "badhelo pattern match ($pattern)");
-    };
+    }
     return;
 }
 
 sub invalid_localhost {
-    my ( $self, $host ) = @_;
+    my ($self, $host) = @_;
     return if lc $host ne 'localhost';
-    if ( $self->qp->connection->remote_ip ne '127.0.0.1' ) {
+    if ($self->qp->connection->remote_ip ne '127.0.0.1') {
+
         #$self->log( LOGINFO, "fail, not localhost" );
         return ("You are not localhost", "invalid localhost");
-    };
-    $self->log( LOGDEBUG, "pass, is localhost" );
+    }
+    $self->log(LOGDEBUG, "pass, is localhost");
     return;
-};
+}
 
 sub is_plain_ip {
-    my ( $self, $host ) = @_;
-    return if $host =~ /[^\d\.]+/;  # has chars other than digits and a dot
+    my ($self, $host) = @_;
+    return if $host =~ /[^\d\.]+/;    # has chars other than digits and a dot
     return if $host !~ m/^(\d{1,3}\.){3}\d{1,3}$/;
 
-    $self->log( LOGDEBUG, "fail, plain IP" );
+    $self->log(LOGDEBUG, "fail, plain IP");
     return ("Plain IP is invalid HELO hostname (RFC 2821)", "plain IP");
-};
+}
 
 sub is_address_literal {
-    my ( $self, $host ) = @_;
+    my ($self, $host) = @_;
     return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
 
-    $self->log( LOGDEBUG, "fail, bracketed IP" );
-    return ("RFC 2821 allows an address literal, but we do not", "bracketed IP");
-};
+    $self->log(LOGDEBUG, "fail, bracketed IP");
+    return ("RFC 2821 allows an address literal, but we do not",
+            "bracketed IP");
+}
 
 sub is_forged_literal {
-    my ( $self, $host ) = @_;
+    my ($self, $host) = @_;
     return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
 
+  # should we add exceptions for reserved internal IP space? (192.168,10., etc?)
     $host = substr $host, 1, -1;
     return if $host eq $self->qp->connection->remote_ip;
     return ("Forged IPs not accepted here", "forged IP literal");
-};
+}
 
 sub is_not_fqdn {
     my ($self, $host) = @_;
-    return if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;  # address literal, skip
-    if ( $host !~ /\./ ) { # has no dots
+    return if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;   # address literal, skip
+    if ($host !~ /\./) {                                 # has no dots
         return ("HELO name is not fully qualified. Read RFC 2821", "not FQDN");
-    };
-    if ( $host =~ /[^a-zA-Z0-9\-\.]/ ) {
-        return ("HELO name contains invalid FQDN characters. Read RFC 1035", "invalid FQDN chars");
-    };
+    }
+    if ($host =~ /[^a-zA-Z0-9\-\.]/) {
+        return ("HELO name contains invalid FQDN characters. Read RFC 1035",
+                "invalid FQDN chars");
+    }
     return;
-};
+}
 
 sub no_forward_dns {
-    my ( $self, $host ) = @_;
+    my ($self, $host) = @_;
+
+    return if $self->is_address_literal($host);
 
     my $res = $self->init_resolver();
 
-    $host = "$host." if $host !~ /\.$/;   # fully qualify name
+    $host = "$host." if $host !~ /\.$/;    # fully qualify name
     my $query = $res->search($host);
 
-    if (! $query) {
-        if ( $res->errorstring eq 'NXDOMAIN' ) {
-            return ("HELO hostname does not exist", "HELO hostname does not exist");
+    if (!$query) {
+        if ($res->errorstring eq 'NXDOMAIN') {
+            return ("HELO hostname does not exist", "no such host");
         }
-        $self->log(LOGERROR, "skip, query failed (", $res->errorstring, ")" );
+        $self->log(LOGERROR, "skip, query failed (", $res->errorstring, ")");
         return;
-    };
+    }
     my $hits = 0;
     foreach my $rr ($query->answer) {
         next unless $rr->type =~ /^(?:A|AAAA)$/;
-        $self->check_ip_match( $rr->address );
+        $self->check_ip_match($rr->address);
         $hits++;
+        last if $self->connection->notes('helo_forward_match');
     }
-    if ( $hits ) {
+    if ($hits) {
         $self->log(LOGDEBUG, "pass, forward DNS") if $hits;
         return;
-    };
-    return ("helo hostname did not resolve", "fail, HELO forward DNS");
-};
+    }
+    return ("HELO hostname did not resolve", "no forward DNS");
+}
 
 sub no_reverse_dns {
-    my ( $self, $host, $ip ) = @_;
+    my ($self, $host, $ip) = @_;
 
     my $res = $self->init_resolver();
     $ip ||= $self->qp->connection->remote_ip;
 
-    my $query = $res->query( $ip ) or do {
-        if ( $res->errorstring eq 'NXDOMAIN' ) {
+    my $query = $res->query($ip) or do {
+        if ($res->errorstring eq 'NXDOMAIN') {
             return ("no rDNS for $ip", "no rDNS");
-        };
-        $self->log( LOGINFO, $res->errorstring );
-        return ("error getting reverse DNS for $ip", "rDNS " . $res->errorstring);
+        }
+        $self->log(LOGINFO, $res->errorstring);
+        return ("error getting reverse DNS for $ip",
+                "rDNS " . $res->errorstring);
     };
 
     my $hits = 0;
     for my $rr ($query->answer) {
         next if $rr->type ne 'PTR';
-        $self->log(LOGDEBUG, "PTR: " . $rr->ptrdname );
-        $self->check_name_match( lc $rr->ptrdname, lc $host );
+        $self->log(LOGDEBUG, "PTR: " . $rr->ptrdname);
+        $self->check_name_match(lc $rr->ptrdname, lc $host);
         $hits++;
-    };
-    if ( $hits ) {
+    }
+    if ($hits) {
         $self->log(LOGDEBUG, "has rDNS");
         return;
-    };
+    }
     return ("no reverse DNS for $ip", "no rDNS");
-};
+}
 
 sub no_matching_dns {
-    my ( $self, $host ) = @_;
+    my ($self, $host) = @_;
 
-    if ( $self->connection->notes('helo_forward_match') &&
-         $self->connection->notes('helo_reverse_match') ) {
-        $self->log( LOGDEBUG, "foward and reverse match" );
-# TODO: consider adding some karma here
-        return;
-    };
+    # this is called iprev, or "Forward-confirmed reverse DNS" and is discussed
+    # in RFC 5451. FCrDNS is done for the remote IP in the fcrdns plugin. Here
+    # we do it on the HELO hostname.
+    # consider adding status to Authentication-Results header
 
-    if ( $self->connection->notes('helo_forward_match') ) {
-        $self->log( LOGDEBUG, "name matches IP" );
+    if (   $self->connection->notes('helo_forward_match')
+        && $self->connection->notes('helo_reverse_match'))
+    {
+        $self->log(LOGDEBUG, "foward and reverse match");
+        $self->adjust_karma(1);    # a perfect match
         return;
     }
-    if ( $self->connection->notes('helo_reverse_match') ) {
-        $self->log( LOGDEBUG, "reverse matches name" );
-        return;
-    };
 
-    $self->log( LOGINFO, "fail, no forward or reverse DNS match" );
-    return ("That HELO hostname fails forward and reverse DNS checks", "no matching DNS");
-};
+    if ($self->connection->notes('helo_forward_match')) {
+        $self->log(LOGDEBUG, "name matches IP");
+        return;
+    }
+    if ($self->connection->notes('helo_reverse_match')) {
+        $self->log(LOGDEBUG, "reverse matches name");
+        return;
+    }
+
+    $self->log(LOGINFO, "fail, no forward or reverse DNS match");
+    return ("That HELO hostname fails FCrDNS", "no matching DNS");
+}
 
 sub check_ip_match {
     my $self = shift;
     my $ip = shift or return;
 
-    if ( $ip eq $self->qp->connection->remote_ip ) {
-        $self->log( LOGDEBUG, "forward ip match" );
+    if ($ip eq $self->qp->connection->remote_ip) {
+        $self->log(LOGDEBUG, "forward ip match");
         $self->connection->notes('helo_forward_match', 1);
         return;
-    };
+    }
 
-    my $dns_net = join('.', (split('\.', $ip))[0,1,2] );
-    my $rem_net = join('.', (split('\.', $self->qp->connection->remote_ip))[0,1,2] );
+    my $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
+    my $rem_net =
+      join('.', (split(/\./, $self->qp->connection->remote_ip))[0, 1, 2]);
 
-    if ( $dns_net eq $rem_net ) {
-        $self->log( LOGNOTICE, "forward network match" );
+    if ($dns_net eq $rem_net) {
+        $self->log(LOGNOTICE, "forward network match");
         $self->connection->notes('helo_forward_match', 1);
-    };
-};
+    }
+}
 
 sub check_name_match {
     my $self = shift;
     my ($dns_name, $helo_name) = @_;
 
-    if ( $dns_name eq $helo_name ) {
-        $self->log( LOGDEBUG, "reverse name match" );
+    return if !$dns_name;
+    return if split(/\./, $dns_name) < 2;    # not a FQDN
+
+    if ($dns_name eq $helo_name) {
+        $self->log(LOGDEBUG, "reverse name match");
         $self->connection->notes('helo_reverse_match', 1);
         return;
-    };
+    }
 
-    my $dns_dom  = join('.', (split('\.', $dns_name ))[-2,-1] );
-    my $helo_dom = join('.', (split('\.', $helo_name))[-2,-1] );
+    my $dns_dom  = join('.', (split(/\./, $dns_name))[-2,  -1]);
+    my $helo_dom = join('.', (split(/\./, $helo_name))[-2, -1]);
 
-    if ( $dns_dom eq $helo_dom ) {
-        $self->log( LOGNOTICE, "reverse domain match" );
+    if ($dns_dom eq $helo_dom) {
+        $self->log(LOGNOTICE, "reverse domain match");
         $self->connection->notes('helo_reverse_match', 1);
-    };
-};
+    }
+}
 

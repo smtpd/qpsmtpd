@@ -21,6 +21,7 @@ output/.*
 ^pm_to_blib$
 ~$
 ^MANIFEST\.bak
+^MYMETA\.
 ^tv\.log$
 ^MakeMaker-\d
 \#$
@@ -30,3 +31,8 @@ output/.*
 ^cover_db/
 \.(orig|rej)$
 packaging
+^log/main/
+^config/
+^supervise/
+^ssl/
+^t/config/greylist

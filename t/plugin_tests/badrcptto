@@ -1,0 +1,102 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test("test_is_match", 10);
+    $self->register_test("test_hook_rcpt", 3);
+    $self->register_test("test_get_host_and_to", 8);
+}
+
+sub _reset_connection_flags {
+    my $self = shift;
+    $self->qp->connection->relay_client(0);
+    $self->qp->connection->notes('whitelisthost', 0);
+    $self->connection->notes('naughty',0);
+    $self->connection->notes('rejected', 0);
+};
+
+sub test_is_match {
+    my $self = shift;
+
+# is_match receives ( $to, $bad, $host )
+
+    my $r = $self->is_match( 'matt@example.com', 'matt@example.com', 'example.com' );
+    ok($r, "match");
+
+    ok( $self->is_match( 'matt@exAmple.com', 'matt@example.com', 'tnpi.com' ),
+            "case insensitive match");
+
+    ok( $self->is_match( 'mAtt@example.com', 'matt@example.com', 'tnpi.com' ),
+            "case insensitive match +");
+
+    ok( ! $self->is_match( 'matt@exmple.com', 'matt@example.com', 'tnpi.com' ),
+            "non-match");
+
+    ok( ! $self->is_match( 'matt@example.com', 'matt@exAple.com', 'tnpi.com' ),
+            "case insensitive non-match");
+
+    ok( $self->is_match( 'matt@example.com', '@example.com', 'example.com' ),
+            "match host");
+
+    ok( ! $self->is_match( 'matt@example.com', '@example.not', 'example.com' ),
+            "non-match host");
+
+    ok( ! $self->is_match( 'matt@example.com', '@example.com', 'example.not' ),
+            "non-match host");
+
+    ok( $self->is_match( 'matt@example.com', 'example.com$', 'tnpi.com' ),
+            "pattern match");
+
+    ok( ! $self->is_match( 'matt@example.com', 'example.not$', 'tnpi.com' ),
+            "pattern non-match");
+};
+
+sub test_hook_rcpt {
+    my $self = shift;
+
+    $self->_reset_connection_flags();
+
+    my $transaction = $self->qp->transaction;
+    my $recipient = Qpsmtpd::Address->new( '<user@example.com>' );
+
+    my ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
+    cmp_ok( $r, '==', DECLINED, "valid +");
+
+    $recipient = Qpsmtpd::Address->new( '<bad@example.com>' );
+    ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
+    cmp_ok( $r, '==', DENY, "bad match, +, $mess");
+
+    $recipient = Qpsmtpd::Address->new( '<any@bad.example.com>' );
+    ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
+    cmp_ok( $r, '==', DENY, "bad host match, +, $mess");
+};
+
+sub test_get_host_and_to {
+    my $self = shift;
+
+    my $recipient = Qpsmtpd::Address->new( '<>' );
+    my ($host, $to) = $self->get_host_and_to( $recipient );
+    ok( ! $host, "null recipient -");
+
+    $recipient = Qpsmtpd::Address->new( '<user>' );
+    ($host, $to) = $self->get_host_and_to( $recipient );
+    ok( ! $host, "missing host -");
+    ok( ! $to, "unparseable to -");
+
+    $recipient = Qpsmtpd::Address->new( '<user@example.com>' );
+    ($host, $to) = $self->get_host_and_to( $recipient );
+    ok( $host, "valid host +");
+    ok( $to, "valid to +");
+    cmp_ok( $to, 'eq', 'user@example.com', "valid to +");
+
+    $recipient = Qpsmtpd::Address->new( '<uSer@exaMple.com>' );
+    ($host, $to) = $self->get_host_and_to( $recipient );
+    cmp_ok( $host, 'eq', 'example.com', "case normalized +");
+    cmp_ok( $to, 'eq', 'user@example.com', "case normalized +");
+};

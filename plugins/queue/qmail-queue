@@ -20,96 +20,111 @@ If set the environment variable QMAILQUEUE overrides this setting.
 
 =cut
 
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
 use POSIX ();
 
 sub register {
-  my ($self, $qp, @args) = @_;
+    my ($self, $qp, @args) = @_;
 
-  if (@args > 0) {
-    $self->{_queue_exec} = $args[0];
-    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 1);
-  }
-  else {
-    $self->{_queue_exec} = ($ENV{QMAIL} || '/var/qmail') . "/bin/qmail-queue";
-  }
+    if (@args > 0) {
+        $self->{_queue_exec} = $args[0];
+        $self->log(LOGWARN, "WARNING: Ignoring additional arguments.")
+          if @args > 1;
+    }
 
-  $self->{_queue_exec} = $ENV{QMAILQUEUE} if $ENV{QMAILQUEUE};
+    $self->{_queue_exec} ||= ($ENV{QMAIL} || '/var/qmail') . "/bin/qmail-queue";
+    $self->{_queue_exec} = $ENV{QMAILQUEUE} if $ENV{QMAILQUEUE};
 }
 
 sub hook_queue {
-  my ($self, $transaction) = @_;
+    my ($self, $transaction) = @_;
 
-  # these bits inspired by Peter Samuels "qmail-queue wrapper"
-  pipe(MESSAGE_READER, MESSAGE_WRITER) or die("Could not create message pipe");
-  pipe(ENVELOPE_READER, ENVELOPE_WRITER) or die("Could not create envelope pipe");
-  
-  local $SIG{PIPE} = sub { die "SIGPIPE" };
-  my $child = fork();
+    # these bits inspired by Peter Samuels "qmail-queue wrapper"
+    pipe(MESSAGE_READER, MESSAGE_WRITER) or die "Could not create message pipe";
+    pipe(ENVELOPE_READER, ENVELOPE_WRITER)
+      or die "Could not create envelope pipe";
 
-  not defined $child and die("Could not fork");
+    local $SIG{PIPE} = sub { die 'SIGPIPE' };
+    my $child = fork();
 
-  if ($child) {
-    # Parent
-    my $oldfh = select(MESSAGE_WRITER); $| = 1; 
-                select(ENVELOPE_WRITER); $| = 1;
-    select($oldfh);
+    !defined $child and die "Could not fork";
 
-    close MESSAGE_READER  or die("close msg reader fault");
-    close ENVELOPE_READER or die("close envelope reader fault");
+    if ($child) {
 
-    $transaction->header->print(\*MESSAGE_WRITER);
-    $transaction->body_resetpos;
-    while (my $line = $transaction->body_getline) {
-      print MESSAGE_WRITER $line;
+        # Parent
+        my $oldfh = select MESSAGE_WRITER;
+        $| = 1;
+        select ENVELOPE_WRITER;
+        $| = 1;
+        select $oldfh;
+
+        close MESSAGE_READER  or die "close msg reader fault";
+        close ENVELOPE_READER or die "close envelope reader fault";
+
+        $transaction->header->print(\*MESSAGE_WRITER);
+        $transaction->body_resetpos;
+        while (my $line = $transaction->body_getline) {
+            print MESSAGE_WRITER $line;
+        }
+        close MESSAGE_WRITER;
+
+        my @rcpt = map { "T" . $_->address } $transaction->recipients;
+        my $from = "F" . ($transaction->sender->address || "");
+        print ENVELOPE_WRITER "$from\0", join("\0", @rcpt), "\0\0"
+          or return (DECLINED, "Could not print addresses to queue");
+
+        close ENVELOPE_WRITER;
+        waitpid($child, 0);
+        my $exit_code = $? >> 8;
+        $exit_code
+          and return (DECLINED, "Unable to queue message ($exit_code)");
+
+        my $msg_id = $transaction->header->get('Message-Id') || '';
+        $msg_id =~ s/[\r\n].*//s;  # don't allow newlines in the Message-Id here
+        $msg_id = "<$msg_id>" unless $msg_id =~ /^<.*>$/;    # surround in <>'s
+        return (OK, "Queued! " . time . " qp $child $msg_id");
     }
-    close MESSAGE_WRITER;
+    elsif (defined $child) {
 
-    my @rcpt = map { "T" . $_->address } $transaction->recipients;
-    my $from = "F".($transaction->sender->address|| "" );
-    print ENVELOPE_WRITER "$from\0", join("\0",@rcpt), "\0\0"
-      or return(DECLINED,"Could not print addresses to queue");
-    
-    close ENVELOPE_WRITER;
-    waitpid($child, 0);
-    my $exit_code = $? >> 8;
-    $exit_code and return(DECLINED, "Unable to queue message ($exit_code)");
+        # Child
+        close MESSAGE_WRITER  or exit 1;
+        close ENVELOPE_WRITER or exit 2;
 
-    my $msg_id = $transaction->header->get('Message-Id') || '';
-    $msg_id =~ s/[\r\n].*//s;  # don't allow newlines in the Message-Id here
-    $msg_id = "<$msg_id>" unless $msg_id =~ /^<.*>$/;  # surround in <>'s
-    return (OK, "Queued! " . time . " qp $child $msg_id");
-  }
-  elsif (defined $child) {
-    # Child
-    close MESSAGE_WRITER or exit 1;
-    close ENVELOPE_WRITER or exit 2;
-    
-    # Untaint $self->{_queue_exec}
-    my $queue_exec = $self->{_queue_exec};
-    if ($queue_exec =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
-      $queue_exec = $1;
-    } else {
-      $self->log(LOGERROR, "FATAL ERROR: Unexpected characters in qmail-queue plugin argument");
-      # This exit is ok as we're exiting a forked child process.
-      exit 3;
+        # Untaint $self->{_queue_exec}
+        my $queue_exec = $self->{_queue_exec};
+        if ($queue_exec =~ /^(\/[\/\-\_\.a-z0-9A-Z]*)$/) {
+            $queue_exec = $1;
+        }
+        else {
+            $self->log(LOGERROR,
+"FATAL ERROR: Unexpected characters in qmail-queue plugin argument"
+            );
+
+            # This exit is ok as we're exiting a forked child process.
+            exit 3;
+        }
+
+        # save the original STDIN and STDOUT in case exec() fails below
+        open(SAVE_STDIN,  "<&STDIN");
+        open(SAVE_STDOUT, ">&STDOUT");
+
+        POSIX::dup2(fileno(MESSAGE_READER), 0)
+          or die "Unable to dup MESSAGE_READER: $!";
+        POSIX::dup2(fileno(ENVELOPE_READER), 1)
+          or die "Unable to dup ENVELOPE_READER: $!";
+
+        my $ppid = getppid();
+        $self->log(LOGNOTICE, "(for $ppid) Queuing to $queue_exec");
+
+        my $rc = exec $queue_exec;
+
+        # close the pipe
+        close(MESSAGE_READER);
+        close(MESSAGE_WRITER);
+
+        exit 6;    # we'll only get here if the exec fails
     }
-
-    # save the original STDIN and STDOUT in case exec() fails below
-    open(SAVE_STDIN, "<&STDIN");
-    open(SAVE_STDOUT, ">&STDOUT");
-
-    POSIX::dup2(fileno(MESSAGE_READER), 0) or die "Unable to dup MESSAGE_READER: $!";
-    POSIX::dup2(fileno(ENVELOPE_READER), 1) or die "Unable to dup ENVELOPE_READER: $!";
-
-    my $ppid = getppid();
-    $self->log(LOGNOTICE, "(for $ppid ) Queuing qp $$ to $queue_exec");
-
-    my $rc = exec $queue_exec;
-
-    # close the pipe
-    close(MESSAGE_READER);
-    close(MESSAGE_WRITER);
-    
-    exit 6; # we'll only get here if the exec fails
-  }
 }

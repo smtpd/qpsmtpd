@@ -1,0 +1,58 @@
+#!perl -w
+
+=head1 NAME
+
+loop - Detect mail loops
+
+=head1 DESCRIPTION
+
+This plugin detects loops by counting "Received" and "Delivered-To"
+header lines.  It's a kluge but it duplicates what qmail-smtpd does,
+and it does at least prevent messages from looping forever.
+
+=head1 CONFIGURATION
+
+Takes one optional parameter, the maximum number of "hops" ("Received"
+and lines plus "Delivered-To" lines) allowed.  The default is 100, the
+same as in qmail-smtpd.
+
+=head1 AUTHOR
+
+Written by Keith C. Ivey
+
+=head1 LICENSE
+
+Released to the public domain, 17 June 2005.
+
+=cut
+
+use Qpsmtpd::DSN;
+
+sub init {
+    my ($self, $qp, @args) = @_;
+
+    $self->{_max_hops} = $args[0] || 100;
+
+    if ($self->{_max_hops} !~ /^\d+$/) {
+        $self->log(LOGWARN, "Invalid max_hops value -- using default");
+        $self->{_max_hops} = 100;
+    }
+    $self->log(LOGWARN, "Ignoring additional arguments") if @args > 1;
+}
+
+sub hook_data_post {
+    my ($self, $transaction) = @_;
+
+    my $hops = 0;
+    $hops++
+      for $transaction->header->get('Received'),
+      $transaction->header->get('Delivered-To');
+
+    if ($hops >= $self->{_max_hops}) {
+
+        # default of too_many_hops is DENY, see comment in POD of Qpsmtpd::DSN
+        return Qpsmtpd::DSN->too_many_hops();
+    }
+
+    return DECLINED;
+}

@@ -67,7 +67,7 @@ while (<HEAD>) {
         next if /^_/;
         s#(/\*.*\*/)##;
         my $comment = $1 || "";
-        my @words = split ' ', $_;
+        my @words = split / /, $_;
         my $const = shift @words;
         if ($const eq "CLEANUP_STAT_OK") {
             push @out, "";
