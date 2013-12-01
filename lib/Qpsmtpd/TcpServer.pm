@@ -191,18 +191,18 @@ sub tcpenv {
         return ($TCPLOCALIP, $TCPREMOTEIP,
                 $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]");
     }
-    my $res = new Net::DNS::Resolver;
+    my $res = Net::DNS::Resolver->new( dnsrch => 0 );
     $res->tcp_timeout(3);
     $res->udp_timeout(3);
-    my $query = $res->query($nto_iaddr);
+    my $query = $res->query($nto_iaddr, 'PTR');
     my $TCPREMOTEHOST;
     if ($query) {
         foreach my $rr ($query->answer) {
-            next unless $rr->type eq "PTR";
+            next if $rr->type ne 'PTR';
             $TCPREMOTEHOST = $rr->ptrdname;
         }
     }
-    return ($TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST || "Unknown");
+    return ($TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST || 'Unknown');
 }
 
 sub check_socket() {
