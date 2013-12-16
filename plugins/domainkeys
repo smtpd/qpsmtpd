@@ -43,7 +43,7 @@ the same terms as Perl itself.
 
 =head1 AUTHORS
 
- Matt Simerson    - 2013 - safe results to Authentication-Results header
+ Matt Simerson    - 2013 - save results to Authentication-Results header
                            instead of DomainKey-Status
  Matt Simerson    - 2012 - refactored, added tests, safe loading
  John Peacock     - 2005-2006
