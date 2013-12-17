@@ -1,19 +1,11 @@
 
-Qpsmtpd-dev is a fork of Qpsmtpd. Qpsmtpd is a very good SMTP daemon for
-developers and hackers (admittedly, its focus). The plugin system is great
-but the plugin organization, documentation, and consistency left much
-to be desired.
+Qpsmtpd is a very good SMTP daemon for developers and hackers.
 
-The primary focus of the -dev branch is improving the consistency and
-behavior of the plugins. After using one plugin, the knowledge gained
-should carry over to other plugins.
-
-Secondary goals are making it easier to install, reducing code duplication,
+Current goals are making it easier to install, reducing code duplication,
 reducing complexity, and cooperation between plugins. Anything covered
-in Perl Best Practices is also fair game.
+in Perl Best Practices is fair game.
 
-So far, the main changes between the release and dev branches have focused
-on these goals:
+Recent changes have been made towards these goals:
 
   - plugins use is_immune and is_naughty instead of a local methods
   - plugins log a single entry summarizing their disposition
@@ -36,7 +28,7 @@ For most sites, even DNSBL, SPF, DKIM, and SpamAssassin tests alone are insuffic
 Roadmap
 =======
 
- - https://github.com/qpsmtpd-dev/qpsmtpd-dev/issues
+ - https://github.com/smtpd/qpsmtpd/issues
 
  - Bugfixes - qpsmtpd is extremely stable (in production since 2001), but
    there are always more things to fix.
