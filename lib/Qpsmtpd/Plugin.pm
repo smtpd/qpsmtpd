@@ -218,7 +218,7 @@ sub compile {
 
 sub get_reject {
     my $self      = shift;
-    my $smtp_mess = shift || "why didn't you pass an error message?";
+    my $smtp_mess = shift || "unspecified error";
     my $log_mess  = shift || '';
     $log_mess = ", $log_mess" if $log_mess;
 
@@ -320,17 +320,17 @@ sub is_immune {
 sub is_naughty {
     my ($self, $setit) = @_;
 
-    if ( defined $setit ) {
-        $self->connection->notes('naughty', $setit);
-        $self->connection->notes('rejected', $setit);
-    };
+    # see plugins/naughty
+    return $self->connection->notes('naughty') if ! defined $setit;
+
+    $self->connection->notes('naughty', $setit);
+    $self->connection->notes('rejected', $setit);
 
     if ($self->connection->notes('naughty')) {
-
-        # see plugins/naughty
         $self->log(LOGINFO, "skip, naughty");
         return 1;
     }
+
     if ($self->connection->notes('rejected')) {
 
         # http://www.steve.org.uk/Software/ms-lite/
@@ -345,7 +345,7 @@ sub adjust_karma {
 
     my $karma = $self->connection->notes('karma') || 0;
     $karma += $value;
-    $self->log(LOGDEBUG, "karma $value ($karma)");
+    $self->log(LOGINFO, "karma $value ($karma)");
     $self->connection->notes('karma', $karma);
     return $value;
 }

@@ -210,8 +210,14 @@ There is little to be gained by listing servers that are already on DNS
 blacklists, send to invalid users, earlytalkers, etc. Those already have
 very lightweight tests.
 
+=head1 TODO
+
+ * Avoid storing results for DNSBL listed IPs
+ * some type of ASN integration, for tracking karma of 'neighborhoods'
+
 =head1 AUTHOR
 
+ 2013 - MS - Addeded penalty for spammy TLDs
  2012 - Matt Simerson - msimerson@cpan.org
 
 =head1 ACKNOWLEDGEMENTS
@@ -244,8 +250,8 @@ sub register {
 
     #$self->prune_db();    # keep the DB compact
     $self->register_hook('connect',       'connect_handler');
-    $self->register_hook('mail_pre',      'from_handler');
-    $self->register_hook('rcpt_pre',      'rcpt_handler');
+    $self->register_hook('mail',          'from_handler');
+    $self->register_hook('rcpt',          'rcpt_handler');
     $self->register_hook('data',          'data_handler');
     $self->register_hook('data_post',     'data_handler');
     $self->register_hook('disconnect',    'disconnect_handler');
@@ -323,17 +329,32 @@ sub connect_handler {
 }
 
 sub from_handler {
-    my ($self, $transaction, $addr) = @_;
+    my ($self,$transaction, $sender, %args) = @_;
 
 # test if sender has placed an illegal (RFC (2)821) space in envelope from
     my $full_from = $self->connection->notes('envelope_from');
     $self->illegal_envelope_format( $full_from );
 
+    my %spammy_tlds = (
+            map { $_ => 4 } qw/ info pw /,
+            map { $_ => 3 } qw/ tw biz /,
+            map { $_ => 2 } qw/ cl br fr be jp no se sg /,
+            );
+    foreach my $tld ( keys %spammy_tlds ) {
+        my $len = length $tld;
+        my $score = $spammy_tlds{$tld} or next;
+        $len ++;
+        if ( $sender->host && ".$tld" eq substr($sender->host,-$len,$len) ) {
+            $self->log(LOGINFO, "penalizing .$tld envelope sender");
+            $self->adjust_karma(-$score);
+        };
+    };
+
     return DECLINED;
 };
 
 sub rcpt_handler {
-    my ($self, $transaction, $addr) = @_;
+    my ($self,$transaction, $recipient, %args) = @_;
 
     $self->illegal_envelope_format( 
         $self->connection->notes('envelope_rcpt'),
@@ -342,7 +363,7 @@ sub rcpt_handler {
     my $count = $self->connection->notes('recipient_count') || 0;
     $count++;
     if ( $count > 1 ) {
-        $self->log(LOGINFO, "recipients c: $count ($addr)");
+        $self->log(LOGINFO, "recipients c: $count ($recipient)");
         $self->connection->notes('recipient_count', $count);
     };
 
@@ -352,7 +373,7 @@ sub rcpt_handler {
         $self->log(LOGDEBUG, "info, no recipient count");
         return DECLINED;
     };
-    $self->log(LOGINFO, "recipients t: $recipients ($addr)");
+    $self->log(LOGINFO, "recipients t: $recipients ($recipient)");
 
     my $history = $self->connection->notes('karma_history');
     if ( $history > 0 ) {
@@ -378,7 +399,7 @@ sub data_handler {
 
 # cutting off a naughty sender at DATA prevents having to receive the message
     my $karma = $self->connection->notes('karma');
-    if ( $karma < -3 ) {     # bad karma
+    if ( $karma < -4 ) {     # bad karma
         return $self->get_reject("very bad karma: $karma");
     };
 
@@ -403,7 +424,7 @@ sub disconnect_handler {
     my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
-    if ($karma < -1) {    # they achieved at least 2 strikes
+    if ($karma < -2) {    # they achieved at least 2 strikes
         $history--;
         my $negative_limit = 0 - $self->{_args}{negative};
         if ($history <= $negative_limit) {
@@ -420,7 +441,7 @@ sub disconnect_handler {
             $log_mess = "negative";
         }
     }
-    elsif ($karma > 1) {
+    elsif ($karma > 2) {
         $nice++;
         $log_mess = "positive";
     }
@@ -439,7 +460,7 @@ sub illegal_envelope_format {
 # test if envelope address has an illegal (RFC (2)821) space
     if ( uc substr($addr,0,6) ne 'FROM:<' && uc substr($addr,0,4) ne 'TO:<' ) {
         $self->log(LOGINFO, "illegal envelope address format: $addr" );
-        $self->adjust_karma(-1);
+        $self->adjust_karma(-2);
     };
 };
 

@@ -53,6 +53,7 @@ The reject options are modeled after, and aim to match the functionality of thos
 
 =head1 AUTHOR
 
+ Matt Simerson - 2013 - populate dmarc_spf note with SPF results
  Matt Simerson - 2012 - increased policy options from 3 to 6
  Matt Simerson - 2011 - rewrote using Mail::SPF
  Matt Sergeant - 2003 - initial plugin
@@ -88,11 +89,22 @@ sub register {
 sub mail_handler {
     my ($self, $transaction, $sender, %param) = @_;
 
-    return (DECLINED) if $self->is_immune();
+    if ( $self->is_immune() ) {
+        $transaction->notes('dmarc_spf', {
+                domain => $sender->host,
+                scope  => 'mfrom',
+                result => 'pass',
+                } );
+        return (DECLINED);
+    };
 
     my $format = $sender->format;
     if ($format eq '<>' || !$sender->host || !$sender->user) {
         $self->log(LOGINFO, "skip, null sender");
+        $transaction->notes('dmarc_spf', {
+                scope  => 'helo',
+                result => 'none',
+                } );
         return (DECLINED, "SPF - null sender");
     }
 
@@ -114,6 +126,12 @@ sub mail_handler {
         $req_params{helo_identity} = $helo;
     }
 
+    $transaction->notes('dmarc_spf', {
+            domain => $scope eq 'helo' ? $helo : $sender->host,
+            scope  => $scope,
+            result => 'none',
+            } );
+
     my $spf_server = Mail::SPF::Server->new();
     my $request    = Mail::SPF::Request->new(%req_params);
     my $result     = $spf_server->process($request) or do {
@@ -132,6 +150,12 @@ sub mail_handler {
         return (DENYSOFT, "SPF - no response") if $reject >= 2;
         return (DECLINED, "SPF - no response");
     }
+
+    $transaction->notes('dmarc_spf', {
+            domain => $scope eq 'helo' ? $helo : $sender->host,
+            scope  => $scope,
+            result => $code,
+            } );
 
     $self->store_auth_results("spf=$code smtp.mailfrom=".$sender->host);
 
