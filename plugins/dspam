@@ -208,7 +208,8 @@ use IO::Handle;
 use Socket qw(:DEFAULT :crlf);
 
 sub register {
-    my ($self, $qp) = (shift, shift);
+    my $self = shift;
+    my $qp = shift;
 
     $self->log(LOGERROR, "Bad parameters for the dspam plugin") if @_ % 2;
 
@@ -590,20 +591,8 @@ sub train_error_as_ham {
     my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
     my $cmd =
 "$dspam_bin --user $user --mode=toe --source=error --class=innocent --deliver=summary --stdout";
-    my $response = $self->dspam_process($cmd, $transaction);
-    if ($response) {
-        $transaction->notes('dspam', $response);
-    }
-    else {
-        $transaction->notes(
-                            'dspam',
-                            {
-                             class      => 'Innocent',
-                             result     => 'Innocent',
-                             confidence => 1
-                            }
-                           );
-    }
+    $self->dspam_process($cmd, $transaction);
+    return;
 }
 
 sub train_error_as_spam {
@@ -614,20 +603,8 @@ sub train_error_as_spam {
     my $dspam_bin = $self->{_args}{dspam_bin} || '/usr/local/bin/dspam';
     my $cmd =
 "$dspam_bin --user $user --mode=toe --source=error --class=spam --deliver=summary --stdout";
-    my $response = $self->dspam_process($cmd, $transaction);
-    if ($response) {
-        $transaction->notes('dspam', $response);
-    }
-    else {
-        $transaction->notes(
-                            'dspam',
-                            {
-                             class      => 'Spam',
-                             result     => 'Spam',
-                             confidence => 1
-                            }
-                           );
-    }
+    $self->dspam_process($cmd, $transaction);
+    return;
 }
 
 sub autolearn {
@@ -649,6 +626,7 @@ sub autolearn {
     $self->autolearn_naughty($response, $transaction) and return;
     $self->autolearn_karma($response, $transaction) and return;
     $self->autolearn_spamassassin($response, $transaction) and return;
+    return;
 }
 
 sub autolearn_naughty {
@@ -723,8 +701,9 @@ sub autolearn_spamassassin {
         $self->log(LOGINFO, "training SA FN as spam");
         $self->train_error_as_spam($transaction);
         return 1;
-    }
-    elsif (   $sa->{is_spam} eq 'No'
+    };
+
+    if (   $sa->{is_spam} eq 'No'
            && $sa->{autolearn} eq 'ham'
            && $response->{result} eq 'Spam')
     {
