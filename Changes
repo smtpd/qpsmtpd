@@ -1,4 +1,15 @@
 
+0.94  ___ NN, 2014
+
+  Updated DMARC plugin to use Mail::DMARC
+
+  Updated SPF & DKIM plugins to store data for DMARC processing
+
+  karma plugin: added spammy TLD penalty
+
+  a few more log prefixes (corralling stragglers)
+
+
 0.93  Dec 17, 2013
 
   Added Authentication-Results header
