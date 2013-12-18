@@ -141,7 +141,7 @@ sub hook_unrecognized_command {
         return DENY, "TLS Negotiation Failed";
     }
 
-    $self->log(LOGWARN, "TLS setup returning");
+    $self->log(LOGINFO, "TLS setup returning");
     return DONE;
 }
 
