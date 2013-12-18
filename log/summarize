@@ -136,14 +136,14 @@ sub handle_dispatch {
     my ($message, $pid, $line) = @_;
     if ($message =~ /^dispatching MAIL FROM/i) {
         my ($from) = $message =~ /<(.*?)>/;
-        $pids{$pid}{from} = $from;
+        $pids{$pid}{from} = $from || '';
     }
     elsif ($message =~ /^dispatching RCPT TO/i) {
         my ($to) = $message =~ /<(.*?)>/;
-        $pids{$pid}{to} = $to;
+        $pids{$pid}{to} = $to || '';
     }
     elsif ($message =~ m/dispatching (EHLO|HELO) (.*)/) {
-        $pids{$pid}{helo_host} = $2;
+        $pids{$pid}{helo_host} = $2 || '';
     }
     elsif ($message eq 'dispatching DATA')     { }
     elsif ($message eq 'dispatching QUIT')     { }
