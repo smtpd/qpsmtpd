@@ -106,6 +106,10 @@ sub data_post_handler {
     my $dmarc = $self->{_dmarc};
     $dmarc->init();
     my $from = $transaction->header->get('From');
+    if ( ! $from ) {
+        $self->log(LOGINFO, "skip, null sender" );
+        return $self->get_reject("empty from address, null sender?");
+    };
     eval { $dmarc->header_from_raw( $from ); };
     if ( $@ ) {
         $self->log(LOGERROR, "unparseable from header: $from" );
