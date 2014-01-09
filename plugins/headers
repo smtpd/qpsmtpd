@@ -196,20 +196,20 @@ sub invalid_date_range {
     my $date = shift || $self->transaction->header->get('Date') or return;
     chomp $date;
 
-    my $ts = str2time($date) or do {
+    my $msg_ts = str2time($date) or do {
         $self->log(LOGINFO, "skip, date not parseable ($date)");
         return;
     };
 
     my $past = $self->{_args}{past};
-    if ($past && $ts < time - ($past * 24 * 3600)) {
+    if ($past && $msg_ts < time - ($past * 24 * 3600)) {
         $self->log(LOGINFO, "fail, date too old ($date)");
         $self->adjust_karma(-1);
         return "The Date header is too far in the past";
     }
 
     my $future = $self->{_args}{future};
-    if ($future && $ts > time + ($future * 24 * 3600)) {
+    if ($future && $msg_ts > time + ($future * 24 * 3600)) {
         $self->log(LOGINFO, "fail, date in future ($date)");
         $self->adjust_karma(-1);
         return "The Date header is too far in the future";
