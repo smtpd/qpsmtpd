@@ -10,6 +10,8 @@ A qpsmtpd plugin for virus scanning using the ClamAV scan daemon, clamd.
 
 =head1 RESTRICTIONS
 
+If connecting to clamd via TCP/IP host:port, then ignore this restriction.
+
 The ClamAV scan daemon, clamd, must have at least execute access to the qpsmtpd
 spool directory in order to sucessfully scan the messages.  You can ensure this
 by running clamd as the same user as qpsmtpd does, or by doing the following:
@@ -47,19 +49,26 @@ You must have the ClamAV::Client module installed to use the plugin.
 
 =item B<clamd_socket>
 
-Full path to the clamd socket (the recommended mode), if different from the
-ClamAV::Client defaults.
+Full path to the clamd socket, if different from the ClamAV::Client defaults.
+
+=item B<clamd_host>
+
+IP address where clamd is listening.
+
+Default: localhost
 
 =item B<clamd_port>
 
-If present, must be the TCP port where the clamd service is running,
-typically 3310; default disabled.  If present, overrides the clamd_socket.
+The TCP port where the clamd service is running, typically 3310.
+
+Default: disabled. When present, overrides clamd_socket.
 
 =item B<deny_viruses>
 
 Whether the scanner will automatically delete messages which have viruses.
-Takes either 'yes' or 'no' (defaults to 'yes').  If set to 'no' it will add
-a header to the message with the virus results.
+Takes either 'yes' or 'no'. If set to 'no', adds a header with the virus name.
+
+Default: yes
 
 =item B<defer_on_error>
 
@@ -71,7 +80,9 @@ backlog or be lost if the condition persists.
 
 =item B<max_size>
 
-The maximum size, in kilobytes, of messages to scan; defaults to 128k.
+The maximum size, in kilobytes, of messages to scan.
+
+Default: 1024 (1 MB)
 
 =item B<scan_all>
 
@@ -94,6 +105,7 @@ adjusted for ClamAV::Client by Devin Carraway <qpsmtpd/@/devin.com>.
 
  Copyright (c) 2005 John Peacock,
  Copyright (c) 2007 Devin Carraway
+ Copyright (c) 2013 Matt Simerson
 
 Based heavily on the clamav plugin
 
@@ -106,10 +118,13 @@ use strict;
 use warnings;
 
 #use ClamAV::Client;  # eval'ed in $self->register
+use Socket qw(:DEFAULT :crlf);
+
 use Qpsmtpd::Constants;
 
 sub register {
-    my ($self, $qp) = shift, shift;
+    my $self = shift;
+    my $qp = shift;
 
     $self->log(LOGERROR, "Bad parameters for the clamdscan plugin") if @_ % 2;
     $self->{'_args'} = {@_};
@@ -138,7 +153,6 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    my $filename = $self->get_filename($transaction) or return DECLINED;
 
     if ($self->connection->notes('naughty')) {
         $self->log(LOGINFO, "skip, naughty");
@@ -146,8 +160,6 @@ sub data_post_handler {
     }
     return (DECLINED) if $self->is_too_big($transaction);
     return (DECLINED) if $self->is_not_multipart($transaction);
-
-    $self->set_permission($filename) or return DECLINED;
 
     my $clamd = $self->get_clamd()
       or return $self->err_and_return("Cannot instantiate ClamAV::Client");
@@ -159,7 +171,18 @@ sub data_post_handler {
     my ($version) = split(/\//, $clamd->version);
     $version ||= 'ClamAV';
 
-    my ($path, $found) = eval { $clamd->scan_path($filename) };
+    my ($path, $found);
+    if ( $self->{_args}{clamd_port} ) {
+        my $message = $self->assemble_message($transaction);
+        $found = eval { $clamd->scan_scalar(\$message) };  # pass scalar ref
+#       $found = eval { $clamd->scan_stream() };           # pass IO handle
+    }
+    else {
+        my $filename = $self->get_filename($transaction) or return DECLINED;
+        $self->set_permission($filename) or return DECLINED;
+        ($path, $found) = eval { $clamd->scan_path($filename) };
+    };
+
     if ($@) {
         return $self->err_and_return("Error scanning mail: $@");
     }
@@ -184,6 +207,15 @@ sub data_post_handler {
     $transaction->header->add('X-Virus-Checked',
                               "by $version on " . $self->qp->config('me'), 0);
     return (DECLINED);
+}
+
+sub assemble_message {
+    my ($self, $transaction) = @_;
+    $transaction->body_resetpos;
+    my $message = $transaction->header->as_string . "\n\n";
+    while (my $line = $transaction->body_getline) { $message .= $line; }
+    $message = join(CRLF, split /\n/, $message);
+    return $message . CRLF;
 }
 
 sub err_and_return {

@@ -6,7 +6,7 @@ Domain-based Message Authentication, Reporting and Conformance
 
 =head1 SYNOPSIS
 
-DMARC is an extremely reliable means to authenticate email.
+DMARC is a reliable means to authenticate email.
 
 =head1 DESCRIPTION
 
@@ -14,9 +14,9 @@ From the DMARC Draft: "DMARC operates as a policy layer atop DKIM and SPF. These
 
 DMARC provides a way to exchange authentication information and policies among mail servers.
 
-DMARC benefits domain owners by preventing others from impersonating them. A domain owner can reliably tell other mail servers that "it it doesn't originate from this list of servers (SPF) and it is not signed (DKIM), then reject it!" DMARC also provides domain owners with a means to receive feedback and determine that their policies are working as desired.
+DMARC benefits domain owners by preventing others from impersonating them. A domain owner can reliably tell other mail servers that "it it doesn't originate from this list of servers (SPF) and it is not signed (DKIM), then [ignore|quarantine|reject] it." DMARC also provides domain owners with a means to receive feedback and determine that their policies are working as desired.
 
-DMARC benefits mail server operators by providing them with an extremely reliable (as opposed to DKIM or SPF, which both have reliability issues when used independently) means to block forged emails. Is that message really from PayPal, Chase, Gmail, or Facebook? Since those organizations, and many more, publish DMARC policies, operators have a definitive means to know.
+DMARC benefits mail server operators by providing them with a more reliable (than SPF or DKIM alone) means to block forged emails. Is that message really from PayPal, Chase, Gmail, or Facebook? Since those organizations publish DMARC policies, operators have a definitive means to know.
 
 =head1 HOWTO
 
@@ -46,25 +46,20 @@ _dmarc  IN TXT "v=DMARC1; p=reject; rua=mailto:dmarc-feedback@example.com;"
 
 =head2 Validate messages with DMARC
 
-1. install this plugin
+1. install Mail::DMARC
 
-2. install a public suffix list in config/public_suffix_list. See http://publicsuffix.org/list/
+2. install this plugin
 
 3. activate this plugin. (add to config/plugins, listing it after SPF & DKIM. Check that SPF and DKIM are configured to not reject mail.
 
-=head2 Parse dmarc feedback reports into a database
-
-See http://www.taugh.com/rddmarc/
 
 =head1 MORE INFORMATION
 
 http://www.dmarc.org/draft-dmarc-base-00-02.txt
 
-https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/DMARC-FAQ
+https://github.com/smtpd/qpsmtpd/wiki/DMARC-FAQ
 
 =head1 TODO
-
- provide dmarc feedback to domains that request it
 
  reject messages with multiple From: headers
 
@@ -77,402 +72,115 @@ https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/DMARC-FAQ
 use strict;
 use warnings;
 
+use Data::Dumper;
 use Qpsmtpd::Constants;
 
-sub init {
-    my ($self, $qp) = (shift, shift);
-    $self->{_args} = {@_};
+sub register {
+    my ($self, $qp, @args) = @_;
+
+    $self->log(LOGERROR, "Bad arguments") if @args % 2;
+    $self->{_args} = {@args};
+
     $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
     $self->{_args}{p_vals} = {map { $_ => 1 } qw/ none reject quarantine /};
-}
 
-sub register {
-    my $self = shift;
-
-    $self->register_hook('data_post', 'data_post_handler');
+    eval "require Mail::DMARC::PurePerl";
+    if ( $@ ) {
+        $self->log(LOGERROR, "failed to load Mail::DMARC::PurePerl" );
+    }
+    else {
+        $self->{_dmarc} = Mail::DMARC::PurePerl->new();
+        $self->register_hook('data_post', 'data_post_handler');
+    };
 }
 
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    return DECLINED if $self->is_immune();
-
-    # 11.1.  Extract Author Domain
-    my $from_dom = $self->get_from_dom($transaction) or return DECLINED;
-    my $org_dom  = $self->get_organizational_domain($from_dom);
-
-    # 6. Receivers should reject email if the domain appears to not exist
-    my $exists = $self->exists_in_dns($from_dom, $org_dom) or do {
-        $self->log(LOGINFO, "fail, $from_dom not in DNS");
-        return $self->get_reject("RFC5322.From host appears non-existent");
+    if ( $self->qp->connection->relay_client() ) {
+        $self->log(LOGINFO, "skip, relay client" );
+        return DECLINED;  # disable reporting to ourself
     };
 
-    # 11.2.  Determine Handling Policy
-    my $policy = $self->discover_policy($from_dom, $org_dom)
-      or return DECLINED;
+    my $dmarc = $self->{_dmarc};
+    $dmarc->init();
+    my $from = $transaction->header->get('From');
+    if ( ! $from ) {
+        $self->log(LOGINFO, "skip, null sender" );
+        return $self->get_reject("empty from address, null sender?");
+    };
+    eval { $dmarc->header_from_raw( $from ); };
+    if ( $@ ) {
+        $self->log(LOGERROR, "unparseable from header: $from" );
+        return $self->get_reject("unparseable from header");
+    };
+    my @recipients = $transaction->recipients;
+    eval { $dmarc->envelope_to( lc $recipients[0]->host ); }; # optional
+    eval { $dmarc->envelope_from( $transaction->sender->host ); }; # may be <>
+    $dmarc->spf( $transaction->notes('dmarc_spf') );
+    my $dkim = $self->connection->notes('dkim_verifier');
+    if ( $dkim ) { $dmarc->dkim( $dkim ); };
+    $dmarc->source_ip( $self->qp->connection->remote_ip );
+    eval { $dmarc->validate(); };
+    if ( $@ ) {
+        $self->log(LOGERROR, $@ );
+        return DECLINED if $self->is_immune;
+        $self->log(LOGINFO, "TODO: handle this validation failure");
+        return DECLINED;
+        return $self->get_reject( $@, $@ );
+    };
 
-    #   3.  Perform DKIM signature verification checks.  A single email may
-    #       contain multiple DKIM signatures.  The results MUST include the
-    #       value of the "d=" tag from all DKIM signatures that validated.
-    #my $dkim_sigs = $self->connection->notes('dkim_pass_domains') || [];
+#$self->log(LOGINFO, "result: " . Dumper( $dmarc ) );
 
-    #   4.  Perform SPF validation checks.  The results of this step
-    #       MUST include the domain name from the RFC5321.MailFrom if SPF
-    #       evaluation returned a "pass" result.
-    my $spf_dom = $transaction->notes('spf_pass_host');
+    my $pol;
+    eval { $pol = $dmarc->result->published; };
+    if ( $pol ) {
+        if ( $dmarc->has_valid_reporting_uri($pol->rua) ) {
+            eval { $dmarc->save_aggregate(); };
+            $self->log(LOGERROR, $@ ) if $@;
+        }
+        else {
+            $self->log(LOGERROR, "has policy, no report URI" );
+        };
+    };
 
-    my $effective_policy = ( $self->{_args}{is_subdomain} && defined $policy->{sp} )
-        ? $policy->{sp} : $policy->{p};
+    my $disposition = $dmarc->result->disposition;
+    my $auth_str = "dmarc=$disposition";
+       $auth_str = " (p=" . $pol->p . ")" if $pol;
 
-    #   5.  Conduct identifier alignment checks.
-    if ( $self->is_aligned($from_dom, $org_dom, $policy, $spf_dom ) ) {
-        $self->store_auth_results("dmarc=pass (p=$effective_policy) d=$from_dom");
+    if ( $dmarc->result->result eq 'pass' ) {
+        $self->log(LOGINFO, "pass");
+        $self->store_auth_results( $auth_str . " d=" . $dmarc->header_from);
         return DECLINED;
     };
 
-    #   6.  Apply policy.  Emails that fail the DMARC mechanism check are
-    #       disposed of in accordance with the discovered DMARC policy of the
-    #       Domain Owner.  See Section 6.2 for details.
-    if ( lc $effective_policy eq 'none' ) {
-        $self->store_auth_results("dmarc=fail (p=none) d=$from_dom");
+    my $reason_type = my $comment = '';
+    if ( $dmarc->result->reason && $dmarc->result->reason->[0] ) {
+        $reason_type = $dmarc->result->reason->[0]->type;
+        if ( $dmarc->result->reason->[0]->comment ) {
+            $comment = $dmarc->result->reason->[0]->comment;
+        };
+    };
+    if ( $disposition eq 'none' && $comment && $comment eq 'no policy') {
+        $self->log(LOGINFO, "skip, no policy");
         return DECLINED;
     };
 
-    my $pct = $policy->{pct} || 100;
-    if ( $pct != 100 && int(rand(100)) >= $pct ) {
-        $self->log("fail, tolerated, policy, sampled out");
-        $self->store_auth_results("dmarc=sampled_out (p=$effective_policy) d=$from_dom");
-        return DECLINED;
-    };
+    my $log_mess    = $dmarc->result->result;
+    $log_mess   .= ", tolerated" if $disposition eq 'none';
+    $log_mess   .= ", $reason_type" if $reason_type;
+    $log_mess   .= ", $comment"  if $comment;
+    $self->log(LOGINFO, $log_mess);
 
-    $self->store_auth_results("dmarc=fail (p=$effective_policy) d=$from_dom");
+    $self->store_auth_results( $auth_str . " d=" . $dmarc->header_from);
+
+    return DECLINED if $disposition eq 'none';
+    return DECLINED if ! $disposition;  # for safety
+    return DECLINED if $self->is_immune;
+
+    $self->adjust_karma(-3);
+# at what point do we reject?
     return $self->get_reject("failed DMARC policy");
 }
 
-sub is_aligned {
-    my ($self, $from_dom, $org_dom, $policy, $spf_dom) = @_;
-
-    #   5.  Conduct identifier alignment checks.  With authentication checks
-    #       and policy discovery performed, the Mail Receiver checks if
-    #       Authenticated Identifiers fall into alignment as decribed in
-    #       Section 4.  If one or more of the Authenticated Identifiers align
-    #       with the RFC5322.From domain, the message is considered to pass
-    #       the DMARC mechanism check.  All other conditions (authentication
-    #       failures, identifier mismatches) are considered to be DMARC
-    #       mechanism check failures.
-
-    my $dkim_sigs = $self->connection->notes('dkim_pass_domains') || [];
-    foreach (@$dkim_sigs) {
-        if ($_ eq $from_dom) {   # strict alignment, requires exact match
-            $self->log(LOGINFO, "pass, DKIM aligned");
-            $self->adjust_karma(1);
-            return 1;
-        }
-        next if $policy->{adkim} && lc $policy->{adkim} eq 's'; # strict pol.
-        # relaxed policy (default): Org. Dom must match a DKIM sig
-        if ( $_ eq $org_dom ) {
-            $self->log(LOGINFO, "pass, DKIM aligned, relaxed");
-            $self->adjust_karma(1);
-            return 1;
-        };
-    }
-
-    return 0 if ! $spf_dom;
-    if ($spf_dom eq $from_dom) {
-        $self->adjust_karma(1);
-        $self->log(LOGINFO, "pass, SPF aligned");
-        return 1;
-    }
-    return 0 if ($policy->{aspf} && lc $policy->{aspf} eq 's' ); # strict pol
-    if ($spf_dom eq $org_dom) {
-        $self->adjust_karma(1);
-        $self->log(LOGINFO, "pass, SPF aligned, relaxed");
-        return 1;
-    }
-
-    return 0;
-};
-
-sub discover_policy {
-    my ($self, $from_dom, $org_dom) = @_;
-
-    # 1.  Mail Receivers MUST query the DNS for a DMARC TXT record...
-    my @matches = $self->fetch_dmarc_record($from_dom, $org_dom) or return;
-
-    # 4.  Records that do not include a "v=" tag that identifies the
-    #     current version of DMARC are discarded.
-    @matches = grep /v=DMARC1/i, @matches;
-    if (0 == scalar @matches) {
-        $self->log(LOGINFO, "skip, no valid record for $from_dom");
-        return;
-    }
-
-    # 5.  If the remaining set contains multiple records, processing
-    #     terminates and the Mail Receiver takes no action.
-    if (@matches > 1) {
-        $self->log(LOGINFO, "skip, too many records");
-        return;
-    }
-
-    # 6.  If a retrieved policy record does not contain a valid "p" tag, or
-    #     contains an "sp" tag that is not valid, then:
-    my %policy = $self->parse_policy($matches[0]);
-    if (!$self->has_valid_p(\%policy) || $self->has_invalid_sp(\%policy)) {
-
-        #   A.  if an "rua" tag is present and contains at least one
-        #       syntactically valid reporting URI, the Mail Receiver SHOULD
-        #       act as if a record containing a valid "v" tag and "p=none"
-        #       was retrieved, and continue processing;
-        #   B.  otherwise, the Mail Receiver SHOULD take no action.
-        my $rua = $policy{rua};
-        if (!$rua || !$self->has_valid_reporting_uri($rua)) {
-            $self->log(LOGINFO, "skip, no valid reporting rua");
-            return;
-        }
-        $policy{v} = 'DMARC1';
-        $policy{p} = 'none';
-    }
-
-    return \%policy;
-}
-
-sub has_valid_p {
-    my ($self, $policy) = @_;
-    return 1 if $self->{_args}{p_vals}{$policy};
-    return 0;
-}
-
-sub has_invalid_sp {
-    my ($self, $policy) = @_;
-    return 0 if !$self->{_args}{p_vals}{$policy};
-    return 1;
-}
-
-sub has_valid_reporting_uri {
-    my ($self, $rua) = @_;
-    return 1 if 'mailto:' eq lc substr($rua, 0, 7);
-    return 0;
-}
-
-sub get_organizational_domain {
-    my ($self, $from_dom) = @_;
-
-    # 1.  Acquire a "public suffix" list, i.e., a list of DNS domain
-    #     names reserved for registrations. http://publicsuffix.org/list/
-    #         $self->qp->config('public_suffix_list')
-
-    # 2.  Break the subject DNS domain name into a set of "n" ordered
-    #     labels.  Number these labels from right-to-left; e.g. for
-    #     "example.com", "com" would be label 1 and "example" would be
-    #     label 2.;
-    my @labels = reverse split /\./, $from_dom;
-
-    # 3.  Search the public suffix list for the name that matches the
-    #     largest number of labels found in the subject DNS domain.  Let
-    #     that number be "x".
-    my $greatest = 0;
-    for (my $i = 0 ; $i <= scalar @labels ; $i++) {
-        next if !$labels[$i];
-        my $tld = join '.', reverse((@labels)[0 .. $i]);
-
-        # $self->log( LOGINFO, "i: $i, $tld" );
-        #warn "i: $i -  tld: $tld\n";
-        if (grep /^$tld/, $self->qp->config('public_suffix_list')) {
-            $greatest = $i + 1;
-            next;
-        }
-
-        # check for wildcards (ex: *.uk should match co.uk)
-        $tld = join '.', '\*', reverse((@labels)[0 .. $i-1]);
-        if (grep /^$tld/, $self->qp->config('public_suffix_list')) {
-            $greatest = $i + 1;
-        };
-    }
-
-    return $from_dom if $greatest == scalar @labels;    # same
-
-    # 4.  Construct a new DNS domain name using the name that matched
-    #     from the public suffix list and prefixing to it the "x+1"th
-    #     label from the subject domain. This new name is the
-    #     Organizational Domain.
-    return join '.', reverse((@labels)[0 .. $greatest]);
-}
-
-sub exists_in_dns {
-    my ($self, $domain, $org_dom) = @_;
-# 6. Receivers should endeavour to reject or quarantine email if the
-#    RFC5322.From purports to be from a domain that appears to be
-#    either non-existent or incapable of receiving mail.
-
-# That's all the draft says. I went back to the DKIM ADSP (which led me to
-# the ietf-dkim email list where some 'experts' failed to agree on The Right
-# Way to test domain validity. Let alone deliverability. They point out:
-# MX records aren't mandatory, and A|AAAA as fallback aren't reliable.
-#
-# Some experimentation proved both cases in real world usage. Instead, I test
-# existence by searching for a MX, NS, A, or AAAA record. Since this search
-# is repeated for the Organizational Name, if the NS query fails, there's no
-# delegation from the TLD. That's proven very reliable.
-    my $res = $self->init_resolver(8);
-    my @todo = $domain;
-    push @todo, $org_dom if $domain ne $org_dom;
-    foreach ( @todo ) {
-        return 1 if $self->host_has_rr('MX', $res, $_);
-        return 1 if $self->host_has_rr('NS', $res, $_);
-        return 1 if $self->host_has_rr('A',  $res, $_);
-        return 1 if $self->host_has_rr('AAAA', $res, $_);
-    };
-}
-
-sub host_has_rr {
-    my ($self, $type, $res, $domain) = @_;
-
-    my $query = $res->query($domain, $type) or do {
-        if ($res->errorstring eq 'NXDOMAIN') {
-            $self->log(LOGDEBUG, "fail, non-existent domain: $domain");
-            return;
-        }
-        return if $res->errorstring eq 'NOERROR';
-        $self->log(LOGINFO, "error, looking up $domain: " . $res->errorstring);
-        return;
-    };
-    my $matches = 0;
-    for my $rr ($query->answer) {
-        next if $rr->type ne $type;
-        $matches++;
-    }
-    if (0 == $matches) {
-        $self->log(LOGDEBUG, "no $type records for $domain");
-    }
-    return $matches;
-};
-
-sub fetch_dmarc_record {
-    my ($self, $zone, $org_dom) = @_;
-
-    # 1.  Mail Receivers MUST query the DNS for a DMARC TXT record at the
-    #     DNS domain matching the one found in the RFC5322.From domain in
-    #     the message. A possibly empty set of records is returned.
-    $self->{_args}{is_subdomain} = defined $org_dom ? 0 : 1;
-    my $res = $self->init_resolver();
-    my $query = $res->send('_dmarc.' . $zone, 'TXT');
-    my @matches;
-    for my $rr ($query->answer) {
-        next if $rr->type ne 'TXT';
-
-        #   2.  Records that do not start with a "v=" tag that identifies the
-        #       current version of DMARC are discarded.
-        next if 'v=' ne lc substr($rr->txtdata, 0, 2);
-        next if 'v=spf' eq lc substr($rr->txtdata, 0, 5); # SPF commonly found
-        $self->log(LOGINFO, $rr->txtdata);
-        push @matches, join('', $rr->txtdata);
-    }
-    return @matches if scalar @matches;  # found one! (at least)
-
-    #   3.  If the set is now empty, the Mail Receiver MUST query the DNS for
-    #       a DMARC TXT record at the DNS domain matching the Organizational
-    #       Domain in place of the RFC5322.From domain in the message (if
-    #       different).  This record can contain policy to be asserted for
-    #       subdomains of the Organizational Domain.
-    if ( defined $org_dom ) {                         #   <- recursion break
-        if ( $org_dom eq $zone ) {
-            $self->log(LOGINFO, "skip, no policy for $zone (same org)");
-            return @matches;
-        };
-        return $self->fetch_dmarc_record($org_dom);   #   <- recursion
-    };
-
-    $self->log(LOGINFO, "skip, no policy for $zone");
-    return @matches;
-}
-
-sub get_from_dom {
-    my ($self, $transaction) = @_;
-
-    my $from = $transaction->header->get('From') or do {
-        $self->log(LOGINFO, "error, unable to retrieve From header!");
-        return;
-    };
-    my ($from_dom) = (split /@/, $from)[-1];    # grab everything after the @
-    ($from_dom) = split /\s+/, $from_dom;      # remove any trailing cruft
-    chomp $from_dom;                            # remove \n
-    chop $from_dom if '>' eq substr($from_dom, -1, 1); # remove closing >
-    $self->log(LOGDEBUG, "info, from_dom is $from_dom");
-    return $from_dom;
-}
-
-sub parse_policy {
-    my ($self, $str) = @_;
-    $str =~ s/\s//g;                             # remove all whitespace
-    my %dmarc = map { split /=/, $_ } split /;/, $str;
-
-    #warn Data::Dumper::Dumper(\%dmarc);
-    return %dmarc;
-}
-
-sub external_report {
-
-=pod
-
-The report SHOULD include the following data:
-
-   o  Enough information for the report consumer to re-calculate DMARC
-      disposition based on the published policy, message dispositon, and
-      SPF, DKIM, and identifier alignment results. {R12}
-
-   o  Data for each sender subdomain separately from mail from the
-      sender's organizational domain, even if no subdomain policy is
-      applied. {R13}
-
-   o  Sending and receiving domains {R17}
-
-   o  The policy requested by the Domain Owner and the policy actually
-      applied (if different) {R18}
-
-   o  The number of successful authentications {R19}
-
-   o  The counts of messages based on all messages received even if
-      their delivery is ultimately blocked by other filtering agents {R20}
-
-=cut
-
-};
-
-sub verify_external_reporting {
-
-=head2 Verify External Destinations
-
-  1.  Extract the host portion of the authority component of the URI.
-       Call this the "destination host".
-
-   2.  Prepend the string "_report._dmarc".
-
-   3.  Prepend the domain name from which the policy was retrieved.
-
-   4.  Query the DNS for a TXT record at the constructed name.  If the
-       result of this request is a temporary DNS error of some kind
-       (e.g., a timeout), the Mail Receiver MAY elect to temporarily
-       fail the delivery so the verification test can be repeated later.
-
-   5.  If the result includes no TXT resource records or multiple TXT
-       resource records, a positive determination of the external
-       reporting relationship cannot be made; stop.
-
-   6.  Parse the result, if any, as a series of "tag=value" pairs, i.e.,
-       the same overall format as the policy record.  In particular, the
-       "v=DMARC1" tag is mandatory and MUST appear first in the list.
-       If at least that tag is present and the record overall is
-       syntactically valid per Section 6.3, then the external reporting
-       arrangement was authorized by the destination ADMD.
-
-   7.  If a "rua" or "ruf" tag is thus discovered, replace the
-       corresponding value extracted from the domain's DMARC policy
-       record with the one found in this record.  This permits the
-       report receiver to override the report destination.  However, to
-       prevent loops or indirect abuse, the overriding URI MUST use the
-       same destination host from the first step.
-
-=cut
-
-}

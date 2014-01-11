@@ -253,6 +253,7 @@ sub helo_handler {
 
     if (!$host) {
         $self->log(LOGINFO, "fail, tolerated, no helo host");
+        $self->adjust_karma(-2);
         return DECLINED;
     }
 

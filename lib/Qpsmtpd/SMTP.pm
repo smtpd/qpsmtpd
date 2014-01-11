@@ -23,7 +23,7 @@ use Net::DNS;
 
 # this is only good for forkserver
 # can't set these here, cause forkserver resets them
-#$SIG{ALRM} = sub { respond(421, "Game over pal, game over. You got a timeout; I just can't wait that long..."); exit };
+#$SIG{ALRM} = sub { respond(421, "timeout; I can't wait that long..."); exit };
 #$SIG{ALRM} = sub { warn "Connection Timed Out\n"; exit; };
 
 sub new {
@@ -818,17 +818,24 @@ sub authentication_results {
 sub clean_authentication_results {
     my $self = shift;
 
-# On messages received from the internet, we may want to remove
-# the Authentication-Results headers added by other MTAs, so our downstream
-# can trust the new A-R header we insert.
-# We do not want to invalidate DKIM signatures.
-# TODO: parse the DKIM signature(s) to see if A-R header is signed
-    return if $self->transaction->header->get('DKIM-Signature');
+# http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
 
-    my @headers = $self->transaction->header->get('Authentication-Results');
-    for ( my $i = 0; $i < scalar @headers; $i++ ) {
+# On messages received from the internet, move Authentication-Results headers
+# to Original-AR, so our downstream can trust the A-R header we insert.
+
+# TODO: Do not invalidate DKIM signatures.
+#   if $self->transaction->header->get('DKIM-Signature')
+#       Parse the DKIM signature(s)
+#       return if A-R header is signed;
+#   }
+
+    my @ar_headers = $self->transaction->header->get('Authentication-Results');
+    for ( my $i = 0; $i < scalar @ar_headers; $i++ ) {
         $self->transaction->header->delete('Authentication-Results', $i);
+        $self->transaction->header->add('Original-Authentication-Results', $ar_headers[$i]);
     }
+
+    $self->log(LOGDEBUG, "Authentication-Results moved to Original-Authentication-Results" );
 };
 
 sub received_line {

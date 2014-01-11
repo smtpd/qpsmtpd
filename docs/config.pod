@@ -89,11 +89,7 @@ connection before any auth succeeds, defaults to C<0>.
 
 =back
 
-<<<<<<< HEAD
-=head2 Plugin settings
-=======
 =head2 Plugin settings files
->>>>>>> initial import - based on my qpsmtpd fork
 
 =over 4
 

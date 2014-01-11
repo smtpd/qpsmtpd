@@ -116,10 +116,10 @@ use Qpsmtpd::Constants;
 #use Math::Trig;  # eval'ed in set_distance_gc
 
 sub register {
-    my ($self, $qp) = shift, shift;
+    my ($self, $qp, @args) = @_;
 
-    $self->log(LOGERROR, "Bad arguments") if @_ % 2;
-    $self->{_args} = {@_};
+    $self->log(LOGERROR, "Bad arguments") if @args % 2;
+    $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
     eval 'use Geo::IP';

@@ -12,9 +12,7 @@ my $test_email = 'matt@tnpi.net';
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_organizational_domain', 3);
-    $self->register_test("test_fetch_dmarc_record", 3);
-    $self->register_test("test_discover_policy", 1);
+# TODO: test against newer DMARC plugin that uses Mail::DMARC
 }
 
 sub setup_test_headers {

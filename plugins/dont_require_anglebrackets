@@ -24,9 +24,9 @@ MAIL FROM:user@example.com
 sub hook_mail_pre {
     my ($self, $transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {
-        $self->log(LOGINFO, "added MAIL angle brackets");
         $addr = '<' . $addr . '>';
-        $self->adjust_karma(-1);
+        $self->adjust_karma(-2);
+        $self->log(LOGINFO, "fail, added MAIL angle brackets");
     }
     return (OK, $addr);
 }
@@ -34,9 +34,9 @@ sub hook_mail_pre {
 sub hook_rcpt_pre {
     my ($self, $transaction, $addr) = @_;
     unless ($addr =~ /^<.*>$/) {
-        $self->log(LOGINFO, "added RCPT angle brackets");
         $addr = '<' . $addr . '>';
-        $self->adjust_karma(-1);
+        $self->adjust_karma(-2);
+        $self->log(LOGINFO, "fail, added RCPT angle brackets");
     }
     return (OK, $addr);
 }

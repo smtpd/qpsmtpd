@@ -1,4 +1,41 @@
 
+0.94  ___ NN, 2014
+
+  Updated DMARC plugin to use Mail::DMARC
+
+  Updated SPF & DKIM plugins to store data for DMARC processing
+
+  karma plugin: added spammy TLD penalty
+
+  a few more log prefixes (corralling stragglers)
+
+
+0.93  Dec 17, 2013
+
+  Added Authentication-Results header
+    moves Authentication-Results to Original-Authentication-Results on inbound.
+    no longer puts auth info in Received header
+
+  TcpServer: ignore DNS search path and explicitely request PTR lookups (speedup)
+
+  store envelope TO/FROM in connection notes
+
+  raised max msg size in clamdscan
+
+  SPF enabled by default (if Mail::SPF available)
+
+  auth_vpopmaild: added taint checking to responses
+
+  added run files for most common deployment methods (easier install)
+
+  untaint config data passed to plugins
+
+  Qpsmtpd.pm: split config args on /\s+/, was / /
+    (compatibility with newer versions of perl)
+
+  dmarc: added subdomain policy handling
+
+
 0.92  Apr 20, 2013
 
   new plugins: dmarc, fcrdns
