@@ -73,7 +73,11 @@ sub hook_queue {
           or return (DECLINED, "Unable to queue message ($!)");
     }
     $smtp->dataend() or return (DECLINED, "Unable to queue message ($!)");
+    my $qid = $smtp->message();
+    my @list = split(' ', $qid);
+    $qid = pop(@list);
+
     $smtp->quit()    or return (DECLINED, "Unable to queue message ($!)");
     $self->log(LOGINFO, "finished queueing");
-    return (OK, "Queued!");
+    return (OK, "queued as $qid");
 }
