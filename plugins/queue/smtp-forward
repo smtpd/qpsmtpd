@@ -9,6 +9,8 @@ smtp-forward
 This plugin forwards the mail via SMTP to a specified server, rather than
 delivering the email locally.
 
+It also supports the Postfix XCLIENT extension.
+
 =head1 CONFIG
 
 It takes one required parameter, the IP address or hostname to forward to. 
@@ -19,31 +21,43 @@ Optionally you can also add a port:
 
   queue/smtp-forward 10.2.2.2 9025
 
+And a flag:
+
+  queue/smtp-forward 10.2.2.2 9025 xclient
+
 =cut
 
 use Net::SMTP;
+use Net::Cmd qw//;
 
 sub init {
     my ($self, $qp, @args) = @_;
 
-    if (@args > 0) {
-        if ($args[0] =~ /^([\.\w_-]+)$/) {
-            $self->{_smtp_server} = $1;
-        }
-        else {
-            die "Bad data in smtp server: $args[0]";
-        }
-        $self->{_smtp_port} = 25;
-        if (@args > 1 and $args[1] =~ /^(\d+)$/) {
-            $self->{_smtp_port} = $1;
-        }
-        $self->log(LOGWARN, "WARNING: Ignoring additional arguments.")
-          if (@args > 2);
+    if (@args <= 0) {
+        die "No SMTP server specified in smtp-forward config";
+    };
+
+    if ($args[0] =~ /^([\.\w_-]+)$/) {
+        $self->{_smtp_server} = $1;
     }
     else {
-        die("No SMTP server specified in smtp-forward config");
+        die "Bad data in smtp server: $args[0]";
     }
 
+    $self->{_smtp_port} = 25;
+    if (@args > 1 and $args[1] =~ /^(\d+)$/) {
+        $self->{_smtp_port} = $1;
+    }
+
+    for (my $i = 2; $i < @args; $i++) {
+        if ($args[$i] !~ /^(\w+)$/) {
+            $self->log(LOGWARN, "WARNING: Rejecting invalid flag");
+            next;
+        }
+        my $flag = lc($1);
+        $self->log(LOGWARN, "WARNING: Unknown flag $flag") unless $flag eq 'xclient';
+        $self->{_flags}{$flag} = 1; 
+    }
 }
 
 sub hook_queue {
@@ -56,8 +70,12 @@ sub hook_queue {
                               Port    => $self->{_smtp_port},
                               Timeout => 60,
                               Hello   => $self->qp->config("me"),
-                             )
-      || die $!;
+                             ) || die $!;
+
+
+    my $xcret = $self->xclient($smtp);
+    return(DECLINED, $xcret) if defined $xcret;
+
     $smtp->mail($transaction->sender->address || "")
       or return (DECLINED, "Unable to queue message ($!)");
     for ($transaction->recipients) {
@@ -80,4 +98,71 @@ sub hook_queue {
     $smtp->quit()    or return (DECLINED, "Unable to queue message ($!)");
     $self->log(LOGINFO, "finished queueing");
     return (OK, "queued as $qid");
+}
+
+sub xclient {
+    my ($self, $smtp) = @_;
+
+    return unless $self->{_flags}{xclient};
+
+    my $parts = $smtp->supports('XCLIENT');
+    if (!defined($parts)) {      # what parts do they want?
+        return "Unable to queue message (Server does not advertise XCLIENT support)";
+    };
+
+    my %haveparts;
+    for my $part (split(/\s+/, $parts)) {
+        next unless $part =~ /^(\w+)$/;
+        $haveparts{uc($part)} = 1;
+    }
+
+    my $conn = $self->qp->connection;
+    my @rparts;
+
+    if ($haveparts{NAME}) {
+        my $name = $conn->remote_host || '[UNAVAILABLE]';
+        $name = '[UNAVAILABLE]' if ($name eq 'Unknown');
+        push(@rparts, "NAME=$name");
+    }
+
+    if ($haveparts{ADDR}) {
+        my $ip = $conn->remote_ip;
+        push(@rparts, "ADDR=$ip");
+    }
+
+    if ($haveparts{PORT}) {
+        my $port = $conn->remote_port;
+        push(@rparts, "PORT=$port");
+    }
+
+    my $hello_name = $self->connection->hello_host;
+    $hello_name ||= '[UNAVAILABLE]';
+    if ($haveparts{HELO}) {
+        push(@rparts, "HELO=$hello_name");
+    }
+
+    my $hello = $conn->hello;
+    if ($haveparts{PROTO} && defined($hello)) {
+        my $proto = (uc($hello) eq 'EHLO') ? 'ESMTP' : 'SMTP';
+        push(@rparts, "PROTO=$proto");
+    }
+
+    while (scalar(@rparts)) {
+        my @items;
+        my $cursz = 0;
+        while (defined(my $item = $rparts[0])) {
+            my $len = length($item);
+            last if ($cursz + $len > 500); 
+            $cursz += $len;
+            push(@items, shift @rparts); 
+        }
+
+        last unless @items;
+        if ($smtp->command('XCLIENT', @items)->response() != Net::Cmd::CMD_OK) {
+            return "Unable to queue message (XCLIENT failed)";
+        }
+    }
+
+    $smtp->hello($hello_name) or return "Unable to queue message (HELLO after XCLIENT failed)";
+    return;
 }
