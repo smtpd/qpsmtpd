@@ -1,3 +1,7 @@
+%{!?_package:%define _package @PACKAGE@}
+%{!?_version:%define _version @VERSION@}
+%{!?_release:%define _release @RELEASE@}
+
 Name:           %{_package}
 Version:        %{_version}
 Release:        %{_release}
