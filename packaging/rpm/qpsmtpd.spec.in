@@ -19,11 +19,10 @@ Requires(pre): coreutils, shadow-utils, perl
 Source0: %{name}-%{version}-%{release}.tar.gz
 Source1: qpsmtpd-forkserver.rc
 Source2: qpsmtpd-forkserver.sysconfig
-Source3: qpsmtpd-plugin-file_connection
-Source4: qpsmtpd-xinetd
-Source5: in.qpsmtpd
-Source6: qpsmtpd.conf
-Source7: README.selinux
+Source3: qpsmtpd-xinetd
+Source4: in.qpsmtpd
+Source5: qpsmtpd.conf
+Source6: README.selinux
 
 %description
 qpsmtpd is a flexible smtpd daemon written in Perl. Apart from the core
@@ -85,22 +84,20 @@ rm -f ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/*.*
 cp -r config.sample/* ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/
 echo %{_datadir}/%{name}/plugins > ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/plugin_dirs
 echo %{_localstatedir}/spool/qpsmtpd > ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/spool_dir
-echo logging/file_connection loglevel LOGINFO %{_localstatedir}/log/qpsmtpd/%Y-%m-%d > ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/logging
 mkdir -p ${RPM_BUILD_ROOT}%{_initrddir}
 cp %{SOURCE1} ${RPM_BUILD_ROOT}%{_initrddir}/qpsmtpd-forkserver
 mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/sysconfig
 cp %{SOURCE2} ${RPM_BUILD_ROOT}%{_sysconfdir}/sysconfig/qpsmtpd-forkserver
-cp %{SOURCE3} ${RPM_BUILD_ROOT}%{_datadir}/%{name}/plugins/logging/file_connection
 mkdir -p ${RPM_BUILD_ROOT}%{_localstatedir}/spool/qpsmtpd
 mkdir -p ${RPM_BUILD_ROOT}%{_localstatedir}/log/qpsmtpd
 mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d
-cp %{SOURCE4} ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d/smtp
+cp %{SOURCE3} ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d/smtp
 mkdir -p ${RPM_BUILD_ROOT}%{_sbindir}
-cp %{SOURCE5} ${RPM_BUILD_ROOT}%{_sbindir}/in.smtp
+cp %{SOURCE4} ${RPM_BUILD_ROOT}%{_sbindir}/in.smtp
 mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
-cp %{SOURCE6} ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
+cp %{SOURCE5} ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
 mkdir -p $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
-cp %{SOURCE7} $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
+cp %{SOURCE6} $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
 
 [ -x /usr/lib/rpm/brp-compress ] && /usr/lib/rpm/brp-compress
 
@@ -161,6 +158,10 @@ then
 fi
 
 %changelog
+* Fri Oct 14 2011 <richard.siddall@elirion.net> 0.84-1
+- Removed rpm/files/qpsmtpd-plugin-file_connection as there's a
+newer version in plugins/logging/file
+
 * Sun Jul 12 2009 <rpmbuild@robinbowes.com> 0.82-0.1
 - Update to latest release
 - don't add qpsmtpd to start-up by default
