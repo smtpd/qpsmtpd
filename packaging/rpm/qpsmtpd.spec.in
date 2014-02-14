@@ -41,6 +41,11 @@ Group: System Environment/Daemons
 Summary: qpsmtpd using async I/O in a single process
 Group: System Environment/Daemons
 
+%package xinetd
+Summary: xinetd support for qpsmtpd
+Group: System Environment/Daemons
+Requires: xinetd
+
 %description apache
 
 This module implements a mod_perl/apache 2.0 connection handler
@@ -50,6 +55,9 @@ that turns Apache into an SMTP server using Qpsmtpd.
 This package contains the Qpsmtpd::PollServer module, which allows
 qpsmtd to handle many connections in a single process and the 
 qpsmpd-async which uses it.
+
+%description xinetd
+This package contains the xinetd startup files for qpsmptd.
 
 %prep
 %setup -q -n %{name}-%{version}-%{release}
@@ -93,7 +101,7 @@ mkdir -p ${RPM_BUILD_ROOT}%{_localstatedir}/log/qpsmtpd
 mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d
 cp %{SOURCE3} ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d/smtp
 mkdir -p ${RPM_BUILD_ROOT}%{_sbindir}
-cp %{SOURCE4} ${RPM_BUILD_ROOT}%{_sbindir}/in.smtp
+cp %{SOURCE4} ${RPM_BUILD_ROOT}%{_sbindir}/in.qpsmtpd
 mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
 cp %{SOURCE5} ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
 mkdir -p $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
@@ -107,6 +115,7 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
         grep -v [Aa]sync                | \
         grep -v packaging               | \
         grep -v README.selinux          | \
+        grep -v in\\.qpsmtpd            | \
         grep -v /Apache                 | \
         grep -v /Danga                  | \
         grep -v Qpsmtpd/ConfigServer.pm | \
@@ -121,7 +130,6 @@ fi
 %doc CREDITS Changes LICENSE README README.plugins STATUS
 %{_initrddir}/qpsmtpd-forkserver
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
-%config(noreplace) %{_sysconfdir}/xinetd.d/smtp
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
 %attr(2750,qpsmtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
@@ -144,6 +152,11 @@ fi
 %{_mandir}/man1/qpsmtpd-async.1.gz
 %{_datadir}/%{name}/plugins/async/*
 
+%files xinetd
+%defattr(-,root,root)
+%config(noreplace) %{_sysconfdir}/xinetd.d/smtp
+%{_sbindir}/in.qpsmtpd
+
 %pre
 if ! id smtpd >/dev/null 2>&1
 then
@@ -161,6 +174,9 @@ fi
 * Fri Oct 14 2011 <richard.siddall@elirion.net> 0.84-1
 - Removed rpm/files/qpsmtpd-plugin-file_connection as there's a
 newer version in plugins/logging/file
+
+* Sat Feb 13 2010 <richard.siddall@elirion.net>
+- Split out xinetd files into separate RPM
 
 * Sun Jul 12 2009 <rpmbuild@robinbowes.com> 0.82-0.1
 - Update to latest release
