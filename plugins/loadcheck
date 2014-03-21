@@ -15,6 +15,8 @@ If this is running on a system that provides /kern/loadavg or
 Once a load value is determined, it is cached for a period of time.
 See the cache_time below.
 
+Since fork/exec is expensive in perl you'll want to use cache_time to avoid increasing your load on every connection by checking system load.
+
 =head1 CONFIG
 
 max_load
@@ -37,6 +39,14 @@ Example:
 loadcheck cache_time 30
 
 loadcheck max_load 7 uptime /usr/bin/uptime
+
+=head1 SEE ALSO
+
+Original version: http://www.nntp.perl.org/group/perl.qpsmtpd/2006/01/msg4422.html
+
+Variant with caching: http://www.nntp.perl.org/group/perl.qpsmtpd/2006/03/msg4710.html
+
+Steve Kemp's announcement of an alternate load limiter: http://www.nntp.perl.org/group/perl.qpsmtpd/2008/03/msg7814.html
 
 =head1 AUTHOR
 
