@@ -38,8 +38,6 @@ loadcheck cache_time 30
 
 loadcheck max_load 7 uptime /usr/bin/uptime
 
-=over 4
-
 =head1 AUTHOR
 
 Written by Peter Eisch <peter@boku.net>.
