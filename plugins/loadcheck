@@ -10,7 +10,7 @@ Only takes email transactions if the system load is at or below a
 specified level.  
 
 If this is running on a system that provides /kern/loadavg or 
-/proc/loadavg it will be used in stead of the 'uptime' command.
+/proc/loadavg it will be used instead of the 'uptime' command.
 
 Once a load value is determined, it is cached for a period of time.
 See the cache_time below.
@@ -46,7 +46,7 @@ Written by Peter Eisch <peter@boku.net>.
 
 =cut
 
-my $VERSION = 0.01;
+my $VERSION = 0.02;
 
 sub register {
   my ($self, $qp, @args) = @_;
