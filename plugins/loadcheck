@@ -9,6 +9,12 @@ loadcheck
 Only takes email transactions if the system load is at or below a
 specified level.  
 
+If this is running on a system that provides /kern/loadavg or 
+/proc/loadavg it will be used in stead of the 'uptime' command.
+
+Once a load value is determined, it is cached for a period of time.
+See the cache_time below.
+
 =head1 CONFIG
 
 max_load
@@ -16,12 +22,19 @@ max_load
   This is the 1 minute system load where we won't take transactions
 if our load is higher than this value.  (Default: 7)
 
+cache_time
+
+  A recently determined load value will be cached and used for the
+assigned number of seconds.  (Default: 10)
+
 uptime
 
-  The path to the command 'uptime' if different than the default.
+  The path to the command 'uptime' if different than the default.  
 (Default: /usr/bin/uptime)
 
 Example:
+
+loadcheck cache_time 30
 
 loadcheck max_load 7 uptime /usr/bin/uptime
 
@@ -46,29 +59,59 @@ sub register {
   $self->{_args}->{uptime} = '/usr/bin/uptime'
       if (! defined $self->{_args}->{uptime});
   
+  $self->{_args}->{cache_time} = 10
+      if (! defined $self->{_args}->{cache_time});
+
+  $self->{_load} = -1;
+  $self->{_time} = 0;
+
   $self->register_hook("connect", "loadcheck");
 }
 
 sub loadcheck {
   my ($self, $transaction) = @_;
 
-  my $hiload = 0;
+  if (time() > ($self->{_time} + $self->{_args}->{cache_time})) {
+      # cached value expired
 
-  my $cmd = $self->{_args}->{uptime};
-  #10:33AM  up  2:06, 1 user, load averages: 6.55, 3.76, 2.48
-  # 12:29am  2 users,  load average: 0.05, 0.05, 0.06
-  # 12:30am  up 5 days, 12:43,  1 user,  load average: 0.00, 0.00, 0.00
-
-  my $res = `$self->{_args}->{uptime}`;
-  if ($res =~ /aver\S+: (\d+\.\d+)/) {
-      $hiload = $1;
+      if ( -r '/kern/loadavg' ) { # *BSD
+	  # contains fix-point scaling value
+	  open(LD, "</kern/loadavg");
+	  my $res = <LD>;
+	  close LD;
+	  my @vals = split(/ /, $res);
+	  $self->{_load} = ($val[0] / $val[3]);
+	  $self->{_time} = time();
+	  $self->log(LOGDEBUG, "/kern/loadavg reported: $self->{_load}");
+      } elsif ( -r '/proc/loadavg' ) { # *inux
+	  # contains decimal value
+	  # contains fix-point scaling value
+	  open(LD, "</proc/loadavg");
+	  my $res = <LD>;
+	  close LD;
+	  $self->{_load} = (split(/ /, $res))[0];
+	  $self->{_time} = time();
+	  $self->log(LOGDEBUG, "/proc/loadavg reported: $self->{_load}");
+      } else {
+	  # the various formats returned:
+	  #10:33AM  up  2:06, 1 user, load averages: 6.55, 3.76, 2.48
+	  # 12:29am  2 users,  load average: 0.05, 0.05, 0.06
+	  # 12:30am  up 5 days, 12:43,  1 user,  load average: 0.00, 0.00, 0.00
+	  
+	  my $res = `$self->{_args}->{uptime}`;
+	  if ($res =~ /aver\S+: (\d+\.\d+)/) {
+	      $self->{_load} = $1;
+	      $self->{_time} = time();
+	      $self->log(LOGDEBUG, "$self->{_args}->{uptime} reported: $self->{_load}");
+	  }
+      }
   }
 
-  if ($hiload > $self->{_args}->{max_load}) {
-      $self->log(LOGERROR, "local load too high: $hiload");
+  if ($self->{_load} > $self->{_args}->{max_load}) {
+      $self->log(LOGERROR, "local load too high: $self->{_load}");
       return DENYSOFT;
   }
 
-  return (DECLINED, "continuing with load: $hiload");
+  return (DECLINED, "continuing with load: $self->{_load}");
 }
 
