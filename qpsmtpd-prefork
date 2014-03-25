@@ -5,7 +5,7 @@
 # Based on qpsmtpd-forkserver Copyright (C) 2001 Ask Bjoern Hansen
 # See the LICENSE file for details.
 #
-# For more information see http://smtpd.develooper.com/
+# For more information see http://smtpd.github.io/qpsmtpd/
 
 # safety guards
 use strict;

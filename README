@@ -7,13 +7,13 @@
 Qpsmtpd - qmail perl simple mail transfer protocol daemon
 
 web:
-  http://smtpd.develooper.com/
+  http://smtpd.github.io/qpsmtpd/
 
 mailinglist:
   qpsmtpd-subscribe@perl.org
 
 FAQ:
-  https://github.com/qpsmtpd-dev/qpsmtpd-dev/wiki/faq
+  https://github.com/smtpd/qpsmtpd/wiki/faq
 
 =head1 DESCRIPTION
 
@@ -67,7 +67,7 @@ Beware that the master branch might be unstable and unsuitable for anything
 but development, so you might want to get a specific release, for
 example (after running git clone):
 
-   git checkout -b local_branch v0.84
+   git checkout -b local_branch v0.93
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
@@ -103,8 +103,7 @@ If qmail is installed in a nonstandard location you should set the
 $QMAIL environment variable to that location in your "./run" file.
 
 If there is anything missing, then please send a patch (or just
-information about what's missing) to the mailinglist or to
-ask@develooper.com.
+information about what's missing) to the mailinglist or a PR to github.
 
 
 =head1 Better Performance

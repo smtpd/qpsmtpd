@@ -5,9 +5,7 @@
 # this is designed to be run under tcpserver (http://cr.yp.to/ucspi-tcp.html)
 # or inetd if you're into that sort of thing
 #
-#
-# For more information see http://smtpd.develooper.com/
-#
+# For more information see http://smtpd.github.io/qpsmtpd/
 #
 
 use lib 'lib';
