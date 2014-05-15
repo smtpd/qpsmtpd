@@ -98,7 +98,7 @@ sub loadcheck {
 
     if ($self->{_load} > $self->{_args}{max_load}) {
         $self->log(LOGERROR, "local load too high: $self->{_load}");
-        return DENYSOFT;
+        return (DENYSOFT, "Server load too high, please try again later.");
     }
 
     return (DECLINED, "continuing with load: $self->{_load}");
