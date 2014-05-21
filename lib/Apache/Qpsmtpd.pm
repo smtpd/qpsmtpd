@@ -58,6 +58,7 @@ sub config_dir {
         $cdir_memo{$config} = $configdir;
     }
     else {
+        shift;
         $cdir_memo{$config} = $self->SUPER::config_dir(@_);
     }
     return $cdir_memo{$config};
