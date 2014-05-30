@@ -85,6 +85,7 @@ sub reset_for_next_message {
     $self->SUPER::reset_for_next_message(@_);
 
     $self->{_commands} = {
+                          proxy => 1,
                           ehlo => 1,
                           helo => 1,
                           rset => 1,
