@@ -34,7 +34,7 @@ sub new {
 
     my $self = bless({args => \%args}, $class);
 
-    my (@commands) = qw(ehlo helo rset mail rcpt data help vrfy noop quit);
+    my (@commands) = qw(proxy ehlo helo rset mail rcpt data help vrfy noop quit);
     my (%commands);
     @commands{@commands} = ('') x @commands;
 
@@ -148,6 +148,52 @@ sub connection {
     @_ and $self->{_connection} = shift;
     return $self->{_connection}
       || ($self->{_connection} = Qpsmtpd::Connection->new());
+}
+
+# proxy command process for stunnel (protocol = proxy) config to support smtps
+sub proxy {
+    my ($self, $line) = @_;
+    # if not stunnel bypass
+    return if ( $self->connection->remote_ip() ne '127.0.0.1' );
+    # input format : PROXY TCP4 192.168.41.227 10.27.11.106 50060 465
+    if ( $line =~ m/^(.*?) (.*?) (.*?) (.*?) (.*?)$/ ) {
+        my $protocol = $1;
+        my $remote_ip = $2;
+        my $local_ip = $3;
+        my $remote_port = $4;
+        my $local_port = $5;
+        $self->connection->remote_ip( $remote_ip );
+        $self->connection->remote_port( $remote_port );
+        $self->connection->remote_info( "[$remote_ip]");
+
+        if ( $self->isa('Qpsmtpd::PollServer') ) {
+            use ParaDNS;
+            ParaDNS->new(
+                finished => sub { $self->continue_read() },
+                callback => sub { $self->connection->remote_host($_[0]) },
+                host     => $remote_ip,
+            );
+        }
+        else {
+            my $res = Net::DNS::Resolver->new( dnsrch => 0 );
+            $res->tcp_timeout(3);
+            $res->udp_timeout(3);
+            my $query = $res->query( $remote_ip, 'PTR' );
+            if ($query) {
+                foreach my $rr ($query->answer) {
+                    next if $rr->type ne 'PTR';
+                    $self->connection->remote_host( $rr->ptrdname );
+                }
+            }
+        }
+
+        $self->connection->notes('proxy', 'YES');
+        $self->connection->notes('protocol', $protocol);
+        $self->connection->notes('remote_ip', $remote_ip);
+        $self->connection->notes('remote_port', $remote_port);
+        $self->connection->notes('local_ip', $local_ip);
+        $self->connection->notes('local_port', $local_port);
+    }
 }
 
 sub helo {
