@@ -291,7 +291,7 @@ sub assemble_message {
     my $message =
         "X-Envelope-From: "
       . $transaction->sender->format . "\n"
-      . $transaction->header->as_string . "\n\n";
+      . $transaction->header->as_string;
 
     while (my $line = $transaction->body_getline) { $message .= $line; }
 
