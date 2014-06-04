@@ -783,6 +783,8 @@ sub data_respond {
         return 1;
     }
 
+    $self->authentication_results();
+    $self->received_line();
     $self->run_hooks("data_post");
 }
 
@@ -919,8 +921,6 @@ sub data_post_respond {
         return 1;
     }
     else {
-        $self->authentication_results();
-        $self->received_line();
         $self->queue($self->transaction);
     }
 }
