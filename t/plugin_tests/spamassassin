@@ -127,7 +127,7 @@ sub test_munge_subject {
     $transaction->header->add('Subject', $subject);
     $self->munge_subject($transaction);
     $r = $transaction->header->get('Subject'); chomp $r;
-    cmp_ok($r, 'eq', "*** SPAM *** $subject", "+");
+    cmp_ok($r, 'eq', "$subject", "+");
 };
 
 sub test_get_spam_results {

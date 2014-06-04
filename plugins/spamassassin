@@ -444,12 +444,14 @@ sub munge_subject {
 
     my $sa = $self->get_spam_results($transaction) or return;
     my $qp_num = $self->{_args}{munge_subject_threshold};
+    my $required = $sa->{required};
 
-    my $required = $sa->{required} || $qp_num or do {
+    if (!$qp_num) {
         $self->log(LOGDEBUG, "skipping munge, no user or qpsmtpd pref set");
         return;
     };
     return unless $sa->{score} > $required;
+    return unless $sa->{score} > $qp_num;
 
     my $subject_prefix = $self->qp->config('subject_prefix')  || '*** SPAM ***';
     my $subject        = $transaction->header->get('Subject') || '';
