@@ -14,7 +14,13 @@ tls [B<cert_path priv_key_path ca_path>]
 
 =item B<cert_path>
 
-Path to the server certificate file. Default: I<ssl/qpsmtpd-server.crt>
+Path to the server certificate file.  This file should include
+both the server's own certificate and those of any intermediate
+(non-root) certificate authorities in the cert chain.  If a chain
+of multiple certificates is given here, the file must be in PEM
+format; if only one cert is given, DER format is also acceptable.
+
+Default: I<ssl/qpsmtpd-server.crt>
 
 =item B<priv_key_path>
 
@@ -22,7 +28,7 @@ Path to the private key file. Default: I<ssl/qpsmtpd-server.key>
 
 =item B<ca_path>
 
-Path to the certificate authority file. Default: I<ssl/qpsmtpd-ca.crt>
+Path to the root certificate authority file. Default: I<ssl/qpsmtpd-ca.crt>
 
 =back
 
@@ -56,6 +62,13 @@ broken client (such as Versamail 3.x), have a look at the available
 ciphers at L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>,
 and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
 "HIGH:MEDIUM")
+
+=head1 TESTING
+
+To verify correct configuration and certificate structure, after enabling
+the plugin one can use this command to test negotiation and authentication:
+
+  openssl s_client -CApath /etc/ssl/certs -starttls smtp -connect mailhost:25
 
 =cut
 
