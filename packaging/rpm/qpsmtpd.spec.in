@@ -119,7 +119,7 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
         grep -v in\\.qpsmtpd            | \
         grep -v /Apache                 | \
         grep -v /Danga                  | \
-        grep -v Qpsmtpd/ConfigServer.pm | \
+        grep -v ConfigServer            | \
         grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
 if [ "$(cat %{name}-%{version}-%{release}-filelist)X" = "X" ] ; then
     echo "ERROR: EMPTY FILE LIST"
@@ -141,7 +141,7 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
 	grep -v [Aa]sync		| \
 	grep -v packaging		| \
 	grep -v /Danga                  | \
-	grep -v Qpsmtpd/ConfigServer.pm | \
+        grep -v ConfigServer            | \
 	grep -v Qpsmtpd/PollServer.pm   | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-apache-filelist
 if [ "$(cat %{name}-%{version}-%{release}-apache-filelist)X" = "X" ] ; then
     echo "ERROR: EMPTY FILE LIST"
