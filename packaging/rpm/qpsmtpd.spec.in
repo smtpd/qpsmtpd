@@ -12,6 +12,7 @@ Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
 BuildRoot: %{_builddir}/%{name}-%{version}-%{release}-root
 BuildRequires: perl >= 0:5.00503
+BuildRequires: perl(ExtUtils::MakeMaker)
 BuildArchitectures: noarch
 Requires: perl(Mail::Header), perl(Net::DNS) perl(Net::IP) perl(IPC::Shareable)
 Requires(pre): coreutils, shadow-utils, perl
@@ -118,9 +119,31 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
         grep -v in\\.qpsmtpd            | \
         grep -v /Apache                 | \
         grep -v /Danga                  | \
-        grep -v Qpsmtpd/ConfigServer.pm | \
+        grep -v ConfigServer            | \
         grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
 if [ "$(cat %{name}-%{version}-%{release}-filelist)X" = "X" ] ; then
+    echo "ERROR: EMPTY FILE LIST"
+    exit -1
+fi
+
+find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
+	sed "s@^$RPM_BUILD_ROOT@@g"     | \
+	grep -v packaging		| \
+	grep -v README.selinux		| \
+	grep -v /Apache                 | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-async-filelist
+if [ "$(cat %{name}-%{version}-%{release}-async-filelist)X" = "X" ] ; then
+    echo "ERROR: EMPTY FILE LIST"
+    exit -1
+fi
+
+find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
+	sed "s@^$RPM_BUILD_ROOT@@g"     | \
+	grep -v [Aa]sync		| \
+	grep -v packaging		| \
+	grep -v /Danga                  | \
+        grep -v ConfigServer            | \
+	grep -v Qpsmtpd/PollServer.pm   | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-apache-filelist
+if [ "$(cat %{name}-%{version}-%{release}-apache-filelist)X" = "X" ] ; then
     echo "ERROR: EMPTY FILE LIST"
     exit -1
 fi
@@ -134,22 +157,13 @@ fi
 %attr(2750,qpsmtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
 
-%files apache
+%files apache -f %{name}-%{version}-%{release}-apache-filelist
 %defattr(-,root,root)
-%{_prefix}/lib/perl5/site_perl/Apache/Qpsmtpd.pm
-%{_mandir}/man3/Apache::Qpsmtpd.3pm.gz
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/*
 %doc %{_docdir}/%{name}-apache-%{version}/README.selinux
 
-%files async
+%files async -f %{name}-%{version}-%{release}-async-filelist
 %defattr(-,root,root)
-%{_bindir}/qpsmtpd-async
-%{_prefix}/lib/perl5/site_perl/Danga/Client.pm
-%{_prefix}/lib/perl5/site_perl/Danga/TimeoutSocket.pm
-%{_prefix}/lib/perl5/site_perl/Qpsmtpd/ConfigServer.pm
-%{_prefix}/lib/perl5/site_perl/Qpsmtpd/Plugin/Async/DNSBLBase.pm
-%{_prefix}/lib/perl5/site_perl/Qpsmtpd/PollServer.pm
-%{_mandir}/man1/qpsmtpd-async.1.gz
 %{_datadir}/%{name}/plugins/async/*
 
 %files xinetd
