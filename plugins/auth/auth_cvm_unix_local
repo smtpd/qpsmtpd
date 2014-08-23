@@ -10,7 +10,7 @@ Bruce Guenther's Credential Validation Module (CVM)
 
 In config/plugins:
 
-  auth/auth_cvm_unix_local \
+	auth/auth_cvm_unix_local \
 	cvm_socket /var/lib/cvm/cvm-unix-local.socket	\
 	enable_smtp no \
 	enable_ssmtp yes
@@ -63,8 +63,14 @@ sub register {
 
     my $port = $ENV{PORT} || SMTP_PORT;
 
-    return 0 if ($port == SMTP_PORT  && $arg{enable_smtp} ne 'yes');
-    return 0 if ($port == SSMTP_PORT && $arg{enable_ssmtp} ne 'yes');
+    if ($arg{enable_smtp} ne 'yes' && ($port == SMTP_PORT || $port == 587)) {
+        $self->log(LOGDEBUG, "skip: enable_smtp=no");
+        return 0;
+    }
+    if ($port == SSMTP_PORT && $arg{enable_ssmtp} ne 'yes') {
+        $self->log(LOGDEBUG, "skip: enable_ssmtp=no");
+        return 0;
+    };
 
     if ($arg{cvm_socket} =~ /^([\w\/.-]+)$/) {
         $self->{_cvm_socket} = $1;
@@ -77,13 +83,17 @@ sub register {
 
     $self->register_hook("auth-plain", "authcvm_plain");
     $self->register_hook("auth-login", "authcvm_plain");
-
-    #    $self->register_hook("auth-cram-md5", "authcvm_hash");
+    #$self->register_hook("auth-cram-md5", "authcvm_hash");
 }
 
 sub authcvm_plain {
     my ($self, $transaction, $method, $user, $passClear, $passHash, $ticket) =
       @_;
+
+    if ($user =~ /\x00/) {
+        $self->log(LOGERROR, "deny: invalid username");
+        return (DENY, "authcvm, invalid username");
+    };
 
     socket(SOCK, PF_UNIX, SOCK_STREAM, 0) or do {
         $self->log(LOGERROR, "skip: socket creation attempt for: $user");
@@ -96,7 +106,7 @@ sub authcvm_plain {
 
     connect(SOCK, sockaddr_un($self->{_cvm_socket})) or do {
         $self->log(LOGERROR, "skip: socket connection attempt for: $user");
-        return (DENY, "authcvm");
+        return (DENY, "authcvm, connection failed");
     };
 
     my $o = select(SOCK);
