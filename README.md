@@ -1,5 +1,6 @@
 
-[Build Status](https://travis-ci.org/smtpd/qpsmtpd.svg?branch=master)
+![Build Status](https://travis-ci.org/smtpd/qpsmtpd.svg?branch=master "Build
+Status")
 
 # Qpsmtpd - qmail perl simple mail transfer protocol daemon
 
