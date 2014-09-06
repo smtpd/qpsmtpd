@@ -108,6 +108,7 @@ plugins/ident/geoip
 plugins/ident/p0f
 plugins/karma
 plugins/karma_tool
+plugins/loadcheck
 plugins/logging/adaptive
 plugins/logging/apache
 plugins/logging/connection_id
@@ -138,6 +139,7 @@ plugins/resolvable_fromhost
 plugins/rhsbl
 plugins/sender_permitted_from
 plugins/spamassassin
+plugins/stunnel
 plugins/tls
 plugins/tls_cert
 plugins/uribl
@@ -156,6 +158,7 @@ qpsmtpd-async
 qpsmtpd-forkserver
 qpsmtpd-prefork
 README
+README.md
 README.plugins
 run.forkserver
 run.tcpserver
@@ -208,6 +211,6 @@ t/rset.t
 t/tempstuff.t
 t/Test/Qpsmtpd.pm
 t/Test/Qpsmtpd/Plugin.pm
-UPGRADING
+UPGRADING.pod
 xt/01-syntax.t
 xt/02-pod.t
