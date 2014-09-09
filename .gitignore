@@ -23,5 +23,6 @@ greylist.dbm.lock
 
 *.tar.gz
 
+MYMETA.*
 MANIFEST.bak
 nytprof.out
