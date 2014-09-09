@@ -396,6 +396,7 @@ sub mail_pre_respond {
     }
     return $self->respond(501, "could not parse your mail from command")
       unless $from;
+    $from->notes('qp_obj',$self);
 
     $self->run_hooks("mail", $from, %$param);
 }
@@ -485,6 +486,7 @@ sub rcpt_pre_respond {
     return $self->respond(501, "could not parse recipient")
       if (!$rcpt or ($rcpt->format eq '<>'));
 
+    $rcpt->notes('qp_obj',$self);
     $self->run_hooks("rcpt", $rcpt, %$param);
 }
 
