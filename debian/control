@@ -3,6 +3,7 @@ Section: mail
 Priority: extra
 Maintainer: Jonathan Hall <jhall@efolder.net>
 Build-Depends: debhelper (>= 9), perl, libmail-dkim-perl, libgeo-ip-perl
+    libmail-spf-perl
 Standards-Version: 3.9.4
 Homepage: <insert the upstream URL, if relevant>
 #Vcs-Git: https://github.com/smtpd/qpsmtpd.git
@@ -15,7 +16,8 @@ Depends: ${misc:Depends}, ${perl:Depends}, debconf (>= 1.0.0),
     libnet-dns-perl, libnet-perl, libmailtools-perl,
     libipc-shareable-perl, libclamav-client-perl, libsocket6-perl,
     libio-socket-inet6-perl
-Suggests: spamassassin (>= 3.0.0), clamav-daemon, tinycdb
+Recommends: libmail-dkim-perl, libmail-spf-perl
+Suggests: spamassassin (>= 3.0.0), clamav-daemon, tinycdb, libgeo-ip-perl
 Homepage: http://smtpd.develooper.com/
 Description: Flexible SMTP daemon for network-level spam detection
  This is a replacement SMTP daemon which installs alongside a mail delivery
