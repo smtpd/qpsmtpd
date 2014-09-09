@@ -1,0 +1,36 @@
+Source: qpsmtpd
+Section: mail
+Priority: extra
+Maintainer: Jonathan Hall <jhall@efolder.net>
+Build-Depends: debhelper (>= 9), perl, libmail-dkim-perl, libgeo-ip-perl,
+ libmail-spf-perl (>= 2.8.0)
+Standards-Version: 3.9.4
+Homepage: http://smtpd.github.io/qpsmtpd/
+#Vcs-Git: https://github.com/smtpd/qpsmtpd.git
+#Vcs-Browser: https://github.com/smtpd/qpsmtpd
+
+Package: qpsmtpd
+Architecture: all
+Depends: ${misc:Depends}, ${perl:Depends}, debconf (>= 1.0.0),
+    adduser (>= 3.0), libdigest-hmac-perl, libmail-spf-perl (>= 2.8.0),
+    libnet-dns-perl, libnet-perl, libmailtools-perl,
+    libipc-shareable-perl, libclamav-client-perl, libsocket6-perl,
+    libio-socket-inet6-perl
+Recommends: libmail-dkim-perl
+Suggests: spamassassin (>= 3.0.0), clamav-daemon, tinycdb, libgeo-ip-perl
+Homepage: http://smtpd.develooper.com/
+Description: Flexible SMTP daemon for network-level spam detection
+ This is a replacement SMTP daemon which installs alongside a mail delivery
+ and transport system such as Exim, Postfix or Qmail, or used as an SMTP
+ proxy for a remote/DMZ MTA.
+ .
+ The qpsmtpd damon emphasizes spam detection during the SMTP transaction,
+ attempting to reach spam/nonspam decisions prior to accepting each message,
+ thereby eliminating much bounce/forgery blowback.  It exploits its visbility
+ into the network transaction to detect certain behaviors often exhibited by
+ spam sending agents.
+ .
+ Qpsmtpd is written in Perl, with an extensive plugin API making it easy to
+ add new features or replace functional components.
+
+ 
