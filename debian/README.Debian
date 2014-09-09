@@ -1,6 +1,87 @@
-qpsmtpd for Debian
-------------------
 
-<possible notes regarding this package - if none, delete this file>
+This is qpsmtpd, a flexible SMTP daemon written in Perl.
 
- -- Jonathan Hall <jhall@efolder.net>  Tue, 09 Sep 2014 12:13:09 -0500
+For source code and project details, see http://smtpd.develooper.com/
+
+For help with qpsmtpd itself, see the qpsmtpd mailing list at
+http://smtpd.develooper.com/list.html (archives are available, check there
+first).
+
+If you skipped the qpsmtpd configuration step when installing the package for
+the first time, and need to repeat it, run 'dpkg-reconfigure qpsmtpd'.
+
+
+A few notes on Debian's packaging of qpsmtpd:
+
+1. Startup
+
+Qpsmtpd does not start up automatically by default.  It is intended to fit
+alongside a preexisting MTA, such as Exim, Qmail or Postfix, or to proxy for a
+remote SMTP server.  As most Debian systems installed out-of-the-box include an
+MTA listening on all interfaces on the usual port (TCP port 25), qpsmtpd cannot
+generally start up until this is remedied.
+
+
+2. Configuration
+
+If you're new to qpsmtpd, start by reading through the configuration files in
+/etc/qpsmtpd/.  Much of qpsmtpd's functionality, including fairly basic things
+like mail delivery, is handled by plugins, so pay particular attention to
+/etc/qpsmtpd/plugins.  You might also find the mailing list archives at
+http://smtpd.develooper.com/list.html helpful.
+
+3. Delivery into a Local MTA
+
+3.a. Exim
+
+If you haven't done any particular configuration of your mail system yet, you
+probably have Exim installed as your local MTA.  The install scripts will
+detect this and attempt to configure things properly, but cannot reconfigure
+exim itself.  To allow qpsmtpd to spool into Exim without having the sender
+addresses munged, you should edit your Exim configuration to add the 'qpsmtpd'
+user to the trusted_users list.  For example:
+
+	in /etc/exim4/exim4.conf.template:
+
+	# uucp should be able to set envelope-from to arbitrary values
+	trusted_users = uucp : smtpd
+
+	or, if you use the directory tree config style, in
+	/etc/exim4/conf.d/main/02_exim4-config_options:
+
+	# trusted users can set envelope-from to arbitrary values
+	.ifndef MAIN_TRUSTED_USERS
+	MAIN_TRUSTED_USERS = uucp : smtpd
+	.endif
+
+
+
+3.b. Postfix
+
+If you select the postfix delivery method via debconf when installing or
+reconfiguring qpsmtpd, the install scripts will try to add qpsmtpd to the
+'postdrop' group, so as to be able to open the Postfix local delivery socket
+(/var/spool/postfix/public/cleanup on a Debian system).  While in a typical
+Debian install the postfix socket is itself world-accessible, it is in a
+directory accessible only to the postdrop group.
+
+If you manually configure qpsmtpd to spool into Postfix, instead of using
+debconf, you will need to make this adjustment manually, by running:
+
+	useradd qpsmtpd postdrop
+
+Although this is the fastest-performing option and is as secure as qpsmtpd
+itself, if you don't wish to give qpsmtpd membership in the postdrop group you
+can alternately configure Postfix to listen on a loopback TCP socket and use
+the SMTP proxy delivery method instead.
+
+
+4. forkserver vs tcpserver
+
+The standard 'qpsmtpd' startup script is not installed, as it depends upon Dan
+Bernstein's non-free tcpserver.  Instead the package uses qpsmtpd-forkserver,
+which manages the TCP socket itself at a modest gain in performance.  If you
+for some reason need the tcpserver binary, see the source to this package or
+download it from the URL above.
+
+

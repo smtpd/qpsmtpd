@@ -4,7 +4,7 @@ qpsmtpd (0.94) unstable; urgency=low
 
  -- Jonathan Hall <jhall@efolder.net>  Tue, 09 Sep 2014 12:13:09 -0500
 
- qpsmtpd (0.84-11) unstable; urgency=low
+qpsmtpd (0.84-11) unstable; urgency=low
 
   * Add Japanese debconf translation; thanks to victory (Closes:
     #718918)

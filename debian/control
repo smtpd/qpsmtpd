@@ -2,10 +2,10 @@ Source: qpsmtpd
 Section: mail
 Priority: extra
 Maintainer: Jonathan Hall <jhall@efolder.net>
-Build-Depends: debhelper (>= 9), perl, libmail-dkim-perl, libgeo-ip-perl
-    libmail-spf-perl
+Build-Depends: debhelper (>= 9), perl, libmail-dkim-perl, libgeo-ip-perl,
+ libmail-spf-perl (>= 2.8.0)
 Standards-Version: 3.9.4
-Homepage: <insert the upstream URL, if relevant>
+Homepage: http://smtpd.github.io/qpsmtpd/
 #Vcs-Git: https://github.com/smtpd/qpsmtpd.git
 #Vcs-Browser: https://github.com/smtpd/qpsmtpd
 
@@ -16,7 +16,7 @@ Depends: ${misc:Depends}, ${perl:Depends}, debconf (>= 1.0.0),
     libnet-dns-perl, libnet-perl, libmailtools-perl,
     libipc-shareable-perl, libclamav-client-perl, libsocket6-perl,
     libio-socket-inet6-perl
-Recommends: libmail-dkim-perl, libmail-spf-perl
+Recommends: libmail-dkim-perl
 Suggests: spamassassin (>= 3.0.0), clamav-daemon, tinycdb, libgeo-ip-perl
 Homepage: http://smtpd.develooper.com/
 Description: Flexible SMTP daemon for network-level spam detection
