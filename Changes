@@ -1,5 +1,25 @@
 
-0.94  ___ NN, 2014
+0.94  Sep 05, 2014
+
+  Added null char in username check to auth_cvm plugin
+
+  Build updates for CentOS 6 (Robert Siddall)
+
+  SpamAssassin plugin fixes (Priyadi Nurcahyo)
+
+  Added plugins/stunnel (luzluna)
+
+  Fixed a config error in Apache/Qpsmtpd.pm (luzluna)
+
+  loadcheck: imported (Robert Siddall)
+
+     return a useful error message when temp rejecting connections (Priyadi)
+
+  smtp_forward: added Postfix XCLIENT support (Chase Venters)
+
+  smtp_forward: add the remote message id in log entry (tpoindessous)
+
+  clamdscan: added support for remote (TCP/IP) clamd (M Simerson)
 
   Updated DMARC plugin to use Mail::DMARC
 
