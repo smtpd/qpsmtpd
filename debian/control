@@ -1,7 +1,7 @@
 Source: qpsmtpd
 Section: unknown
 Priority: extra
-Maintainer: Jonathan Hall <jonhall@dawntreader.priv.flimzy.com>
+Maintainer: Jonathan Hall <jhall@efolder.net>
 Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.3
 Homepage: <insert the upstream URL, if relevant>
