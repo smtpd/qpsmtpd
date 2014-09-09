@@ -1,0 +1,5 @@
+qpsmtpd (0.94-1) unstable; urgency=low
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Jonathan Hall <jonhall@dawntreader.priv.flimzy.com>  Tue, 09 Sep 2014 12:13:09 -0500
