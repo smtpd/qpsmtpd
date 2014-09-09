@@ -32,7 +32,7 @@ format for the dates in the "Received" headers.
 Gergely Risko <risko@risko.hu>: Fixed timeout bug when the client sent
 DATA and then stopped before sending the next line.
 
-Contributors listed with: git shortlog -sn | cut -c8-
+Contributors listed with: git shortlog -sn | cut -c8- | grep -v 'no author'
 Updated: Sep 8, 2014 (Update via a PR are welcome)
 ----------------------
 Matt Simerson
@@ -71,7 +71,6 @@ Hinrik Örn Sigurðsson
 Henry Baragar
 Shad L. Lords
 Guy Hulbert
-(no author)
 andreamtp
 Dongsik Park
 lnedry
