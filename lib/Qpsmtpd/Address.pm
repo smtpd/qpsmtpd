@@ -338,6 +338,19 @@ sub notes {
     return $self->{_notes}->{$key} = shift;
 }
 
+=head2 config($value)
+
+Looks up a configuration directive based on this recipient, using any plugins that utilize
+hook_rcpt_config
+
+=cut
+
+sub config {
+    my ($self,$key) = @_;
+    my $qp = $self->notes('qp_obj') or return;
+    return $qp->config($key,$self);
+}
+
 sub _addr_cmp {
     require UNIVERSAL;
     my ($left, $right, $swap) = @_;
