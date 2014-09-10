@@ -7,6 +7,7 @@ WriteMakefile(
     NAME           => 'qpsmtpd',
     VERSION_FROM   => 'lib/Qpsmtpd.pm',
     PREREQ_PM      => {
+	'Test::Output' => 0,
         'Data::Dumper' => 0,
         'Date::Parse'  => 0,
         'File::Temp'   => 0,
