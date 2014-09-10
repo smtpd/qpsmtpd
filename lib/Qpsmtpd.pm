@@ -6,8 +6,6 @@ use vars qw($TraceLevel $Spool_dir $Size_threshold);
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
-#use DashProfiler;
-
 our $VERSION = "0.94";
 
 my $git;
@@ -26,8 +24,6 @@ my %defaults = (
 my $_config_cache = {};
 our %config_dir_memo;
 
-#DashProfiler->add_profile("qpsmtpd");
-#my $SAMPLER = DashProfiler->prepare("qpsmtpd");
 our $LOGGING_LOADED = 0;
 
 sub _restart {
@@ -44,11 +40,6 @@ sub _restart {
         $Spool_dir       = undef;
         $Size_threshold  = undef;
     }
-}
-
-sub DESTROY {
-
-    #warn $_ for DashProfiler->profile_as_text("qpsmtpd");
 }
 
 sub version { $VERSION . ($git ? "/$git" : "") }
@@ -268,14 +259,14 @@ sub _config_from_file {
     $visited ||= [];
     push @{$visited}, $configfile;
 
-    open CF, "<$configfile"
+    open my $CF, '<', $configfile
       or warn "$$ could not open configfile $configfile: $!" and return;
-    my @config = <CF>;
+    my @config = <$CF>;
     chomp @config;
     @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ }
       map { s/^\s+//; s/\s+$//; $_; }    # trim leading/trailing whitespace
       @config;
-    close CF;
+    close $CF;
 
     my $pos = 0;
     while ($pos < @config) {
