@@ -1,13 +1,14 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $TraceLevel $Spool_dir $Size_threshold);
+#use warnings;
+use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
 #use DashProfiler;
 
-$VERSION = "0.94";
+our $VERSION = "0.94";
 
 my $git;
 
@@ -17,17 +18,17 @@ if (-e ".git") {
     $git && chomp $git;
 }
 
-my $hooks = {};
+our $hooks = {};
 my %defaults = (
                 me      => hostname,
                 timeout => 1200,
                );
 my $_config_cache = {};
-my %config_dir_memo;
+our %config_dir_memo;
 
 #DashProfiler->add_profile("qpsmtpd");
 #my $SAMPLER = DashProfiler->prepare("qpsmtpd");
-my $LOGGING_LOADED = 0;
+our $LOGGING_LOADED = 0;
 
 sub _restart {
     my $self = shift;
@@ -57,12 +58,11 @@ sub TRACE_LEVEL { $TraceLevel };    # leave for plugin compatibility
 sub hooks { $hooks; }
 
 sub load_logging {
-
-    # need to do this differently than other plugins so as to
-    # not trigger logging activity
-    return if $LOGGING_LOADED;
     my $self = shift;
-    return if $hooks->{"logging"};
+
+    # avoid triggering log activity
+    return if ($LOGGING_LOADED || $hooks->{'logging'});
+
     my $configdir  = $self->config_dir("logging");
     my $configfile = "$configdir/logging";
     my @loggers    = $self->_config_from_file($configfile, 'logging');
@@ -97,10 +97,7 @@ sub load_logging {
     return @loggers;
 }
 
-sub trace_level {
-    my $self = shift;
-    return $TraceLevel;
-}
+sub trace_level { return $TraceLevel; }
 
 sub init_logger {    # needed for compatibility purposes
     shift->trace_level();
@@ -205,7 +202,7 @@ sub config_dir {
     }
     my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
     my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
-    $configdir = "$path/config" if (-e "$path/config/$config");
+    $configdir = "$path/config" if -e "$path/config/$config";
     if (exists $ENV{QPSMTPD_CONFIG}) {
         $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/;    # detaint
         $configdir = $1 if -e "$1/$config";
