@@ -42,8 +42,6 @@ sub _restart {
     }
 }
 
-sub DESTROY { }
-
 sub version { $VERSION . ($git ? "/$git" : "") }
 
 sub TRACE_LEVEL { $TraceLevel };    # leave for plugin compatibility
@@ -261,14 +259,14 @@ sub _config_from_file {
     $visited ||= [];
     push @{$visited}, $configfile;
 
-    open CF, "<$configfile"
+    open my $CF, '<', $configfile
       or warn "$$ could not open configfile $configfile: $!" and return;
-    my @config = <CF>;
+    my @config = <$CF>;
     chomp @config;
     @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ }
       map { s/^\s+//; s/\s+$//; $_; }    # trim leading/trailing whitespace
       @config;
-    close CF;
+    close $CF;
 
     my $pos = 0;
     while ($pos < @config) {
