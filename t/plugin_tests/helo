@@ -11,7 +11,7 @@ sub register_tests {
     $self->register_test('test_init_resolver', 2);
     $self->register_test('test_is_in_badhelo', 2);
     $self->register_test('test_is_regex_match', 3);
-    $self->register_test('test_invalid_localhost', 4);
+    $self->register_test('test_invalid_localhost', 5);
     $self->register_test('test_is_plain_ip', 3);
     $self->register_test('test_is_address_literal', 3);
     $self->register_test('test_no_forward_dns', 2);
@@ -73,9 +73,11 @@ sub test_invalid_localhost {
     ($err, $why) = $self->invalid_localhost('localhost');
     ok( $err, "localhost, invalid remote IP: $why");
 
-    $self->qp->connection->remote_ip('127.0.0.1');
-    ($err, $why) = $self->invalid_localhost('localhost');
-    ok( ! $err, "localhost, correct remote IP");
+    foreach my $ip (qw/ ::1 127.0.0.1 / ) {
+        $self->qp->connection->remote_ip($ip);
+        ($err, $why) = $self->invalid_localhost('localhost');
+        ok( ! $err, "localhost, correct remote IP ($ip)");
+    }
 };
 
 sub test_is_plain_ip {

@@ -591,7 +591,7 @@ sub spool_dir {
     unless ($Spool_dir) {    # first time through
         $self->log(LOGDEBUG, "Initializing spool_dir");
         $Spool_dir = $self->config('spool_dir')
-          || Qpsmtpd::Utils::tildeexp('~/tmp/');
+          || Qpsmtpd::Utils->tildeexp('~/tmp/');
 
         $Spool_dir .= "/" unless ($Spool_dir =~ m!/$!);
 

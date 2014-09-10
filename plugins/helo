@@ -340,13 +340,14 @@ sub is_regex_match {
 sub invalid_localhost {
     my ($self, $host) = @_;
     return if lc $host ne 'localhost';
-    if ($self->qp->connection->remote_ip ne '127.0.0.1') {
-
-        #$self->log( LOGINFO, "fail, not localhost" );
-        return ("You are not localhost", "invalid localhost");
+    my $ip = $self->qp->connection->remote_ip;
+    if ($ip && ($ip eq '127.0.0.1' || $ip eq '::1')) {
+        $self->log(LOGDEBUG, "pass, is localhost");
+        return;
     }
-    $self->log(LOGDEBUG, "pass, is localhost");
-    return;
+
+    #$self->log( LOGINFO, "fail, not localhost" );
+    return ("You are not localhost", "invalid localhost");
 }
 
 sub is_plain_ip {
