@@ -1,0 +1,298 @@
+# Italian translation of qpsmtpd debconf messages.
+# Copyright (C) 2012, qpsmtpd package copyright holder
+# This file is distributed under the same license as the qpsmtpd package.
+# Beatrice Torracca <beatricet@libero.it>, 2012.
+msgid ""
+msgstr ""
+"Project-Id-Version: qpsmtpd\n"
+"Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
+"POT-Creation-Date: 2009-12-14 01:40-0800\n"
+"PO-Revision-Date: 2012-04-09 13:35+0200\n"
+"Last-Translator: Beatrice Torracca <beatricet@libero.it>\n"
+"Language-Team: Italian <debian-l10n-italian@lists.debian.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Generator: Virtaal 0.7.1\n"
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid "Enable qpsmtpd startup at boot time?"
+msgstr "Abilitare l'esecuzione di qpsmtpd all'avvio?"
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid ""
+"Because most MTAs in Debian listen on one or all network interfaces by "
+"default, when first installed qpsmtpd cannot normally be started."
+msgstr ""
+"Dato che la maggior parte degli MTA in Debian resta in ascolto in modo "
+"predefinito su una o tutte le interfacce di rete, normalmente non è "
+"possibile avviare qpsmtpd appena installato."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid ""
+"Before enabling qpsmtpd, you must first configure your local MTA not to bind "
+"to the SMTP TCP port on at least one interface.  The most common approach is "
+"to leave your MTA listening on the loopback interface (127.0.0.1), with "
+"qpsmtpd listening on the external interface.  Instructions for configuring "
+"common MTAs to work with qpsmtpd can be found after installation in /usr/"
+"share/doc/qpsmtpd/README.Debian."
+msgstr ""
+"Prima di abilitare qpsmtpd, è necessario configurare il proprio MTA locale "
+"in modo che non faccia il bind alla porta TCP SMTP di almeno un'interfaccia. "
+"La soluzione più comune è lasciare il proprio MTA in ascolto "
+"sull'interfaccia di loopback (127.0.0.1), con qpsmtpd in ascolto "
+"sull'interfaccia esterna. Le istruzioni per configurare gli MTA comuni in "
+"modo da funzionare insieme a qpsmtpd possono essere trovate, dopo "
+"l'installazione, in /usr/share/doc/qpsmtpd/README.Debian."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid ""
+"Once you have adjusted your MTA configuration, you can enable qpsmtpd by "
+"restarting this configuration, by running 'dpkg-reconfigure qpsmtpd'."
+msgstr ""
+"Una volta corretta la configurazione del proprio MTA, si può abilitare "
+"qpsmtpd riavviando questa configurazione, eseguendo «dpkg-reconfigure "
+"qpsmtpd»."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:2001
+msgid "Qpsmtpd server type:"
+msgstr "Tipo di server qpsmtpd:"
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:2001
+msgid ""
+"Qpsmtpd supports two process models for handling connections.  The "
+"'forkserver' model uses a single process when idle, and forks new processes "
+"to handle connections.  This uses less memory but slightly reduces server "
+"throughput.  The 'prefork' model keeps a pool of idle processes available to "
+"handle new connections, offering slightly better performance at the cost of "
+"more memory."
+msgstr ""
+"qpsmtpd gestisce due modelli per i processi per gestire le connessioni. Il "
+"modello \"forkserver\" usa un unico processo quando inattivo e fa il fork di "
+"nuovi processi per gestire le connessioni; usa meno memoria ma riduce "
+"leggermente il flusso dati del server. Il modello \"prefork\" mantiene un pool "
+"di processi inattivi disponibili per gestire le nuove connessioni, offrendo "
+"prestazioni leggermente migliori a spese di un maggior uso di memoria."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid "Addresses on which to listen for incoming SMTP connections:"
+msgstr "Indirizzi su cui rimanere in ascolto per connessioni SMTP in entrata:"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid ""
+"Enter one or more of your local IP addresses, separated by spaces, on which "
+"qpsmtpd should listen for incoming SMTP connections.  If you leave this "
+"setting empty, qpsmtpd will listen on all interfaces available at startup "
+"time."
+msgstr ""
+"Inserire uno o più indirizzi IP locali, separati da spazi, su cui qpsmtpd "
+"deve rimanere in ascolto per connessioni SMTP in entrata. Se si lascia "
+"vuoto, qpsmtpd resterà in ascolto su tutte le interfacce disponibili "
+"all'avvio."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid ""
+"If you intend to use qpsmtpd to spool deliveries from remote hosts into a "
+"local MTA, you may wish to have qpsmtpd listen on all external interfaces, "
+"while leaving your local MTA listening on the loopback device (127.0.0.1)."
+msgstr ""
+"Se si pensa di usare qpsmtpd per accodare i messaggi consegnati da host "
+"remoti in un MTA locale, si può avere qpsmtpd in ascolto su tutte le "
+"interfacce esterne e lasciare l'MTA locale in ascolto sul device loopback "
+"(127.0.0.1)."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid ""
+"For each interface you may optionally specify a port to listen on instead of "
+"the default port 25; do this by appending :<port> to the interface, as in "
+"\"127.0.0.1:2526\"."
+msgstr ""
+"Per ciascuna interfaccia si può, opzionalmente, specificare una porta su cui "
+"restare in ascolto invece della porta 25 predefinita; per farlo aggiungere "
+":<porta> dopo l'interfaccia, come in «127.0.0.1:2526»."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid "Queueing method for accepted mail:"
+msgstr "Metodo per accodare la posta accettata:"
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"Select the method for queueing mail once it's been delivered via SMTP.  If "
+"you deliver your mail locally, choose the method corresponding to the "
+"installed MTA (the installer will try to pick the correct default.)"
+msgstr ""
+"Selezionare il metodo con cui accodare la posta una volta che è stata "
+"consegnata via SMTP. Se si consegna la posta localmente, scegliere il metodo "
+"che corrisponde all'MTA installato (l'installatore cerca di scegliere il "
+"valore predefinito corretto)."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"Select \"proxy\" if you'd like qpsmtpd to act as an SMTP proxy for another "
+"MTA (local or remote).  You will then be prompted to enter a destination "
+"host."
+msgstr ""
+"Selezionare «proxy» per far sì che qpsmtpd agisca da proxy SMTP per un altro "
+"MTA (locale o remoto). Verrà chiesto di inserire un host di destinazione."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"Select \"maildir\" to have qpsmtpd deliver into a local maildir-format spool "
+"instead of queueing it for delivery (e.g. if you're setting up a spamtrap.)"
+msgstr ""
+"Selezionare «maildir» per far sì che qpsmtpd consegni la posta in uno spool "
+"locale in formato maildir, invece di accodarlo per la consegna (ad esempio, "
+"se si sta impostando una trappola per spam)."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"If you select \"none,\" no queueing will be done at all, unless you manually "
+"configure it yourself by editing /etc/qpsmtpd/plugins."
+msgstr ""
+"Se si seleziona «none», non verrà fatto alcun accodamento, a meno che non lo "
+"si configuri a mano modificando /etc/qpsmtpd/plugins."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:5001
+msgid "Destination host/port for SMTP proxy delivery:"
+msgstr "Host/porta di destinazione per la consegna del proxy SMTP:"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:5001
+msgid ""
+"To have qpsmtpd act as an SMTP proxy for another host, supply the hostname "
+"or IP address of that host here.  You can optionally add a port number after "
+"a colon, such as \"localhost:25\"."
+msgstr ""
+"Per far sì che qpsmtpd agisca da proxy SMTP per un altro host, inserire qui "
+"il nome host o l'indirizzo IP di quell'host. Si può opzionalmente aggiungere "
+"un numero di porta preceduto da due punti, come in «localhost:25»."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:6001
+msgid "Destination Maildir for maildir-type delivery:"
+msgstr "Maildir di destinazione per la consegna di tipo maildir:"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:6001
+msgid ""
+"To have qpsmtpd deliver received mail into a local maildir-format spool, "
+"enter a location for that maildir.  A maildir will be created in that "
+"location if it does not exist already."
+msgstr ""
+"Per far sì che qpsmtpd consegni la posta ricevuta in uno spool locale in "
+"formato maildir, inserire la posizione di tale maildir. Se non esiste già "
+"una maildir in quella posizione ne verrà creata una."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:7001
+msgid "Proceed without a queueing plugin selected?"
+msgstr "Procedere senza aver selezionato un plugin di accodamento?"
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:7001
+msgid ""
+"By selecting \"none\" as a queueing plugin, you have disabled local queueing "
+"of inbound mail.  This will prevent any mail being spooled by qpsmtpd until "
+"you manually configure a queueing method.  Any hosts attempting to deliver "
+"mail to you will receive 4xx soft-failure messages until then, at the "
+"potential cost of wasted bandwidth and eventual bouncing of possibly "
+"legitimate mail."
+msgstr ""
+"Avendo selezionato «none» come plugin di accodamento, è stato disabilitato "
+"l'accodamento locale della posta in entrata. Questo impedirà l'accodamento "
+"di qualsiasi messaggio di posta da parte di qpsmtpd fino a che non verrà "
+"configurato a mano un metodo di accodamento. Fino ad allora, qualsiasi host "
+"che tenti di consegnare posta al sistema riceverà un messaggio di errore "
+"temporaneo 4xx, con il rischio potenziale di sprecare banda e il possibile "
+"rimbalzo di posta potenzialmente legittima."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:7001
+msgid ""
+"To configure queueing manually, edit /etc/qpsmtpd/plugins and select one of "
+"the queueing methods listed there.  If you didn't see your installed MTA in "
+"the list and aren't sure what to do, pick \"Cancel\" here and select the "
+"SMTP proxy method instead, configuring it to proxy into your MTA on a "
+"suitable local address/port."
+msgstr ""
+"Per configurare a mano l'accodamento, modificare /etc/qpsmtpd/plugins e "
+"selezionare uno dei metodi di accodamento lì elencati. Se il proprio MTA non "
+"era presente nell'elenco e non si sa cosa fare, scegliere qui «Annulla» e "
+"selezionare invece il metodo per proxy SMTP, configurandolo per fare da "
+"proxy per il proprio MTA locale su un indirizzo/porta locale adatto."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:8001
+msgid "Destination domain(s) to accept mail for (blank for none):"
+msgstr "Domini di destinazione per cui accettare la posta (vuoto per nessuno):"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:8001
+msgid ""
+"Enter a list of domain name(s) for which qpsmtpd should accept mail, "
+"separated by spaces.  This list should include any hostname or domain name "
+"for which you intend to accept delivery locally, as well as any recipient "
+"domains for which you intend to act as a mail relay.  In general, if you "
+"intend to spool received mail into a local MTA, this list should be the same "
+"as used for that MTA (the installer will attempt to extract that setting as "
+"a default.)"
+msgstr ""
+"Inserire un elenco di nomi di dominio, separati da spazi, per i quali "
+"qpsmtpd deve accettare la posta. Questo elenco dovrebbe includere ogni nome "
+"di host o nome di dominio per i quali si desidera accettare la consegna in "
+"locale, così come ogni dominio di destinazione per il quale si vuole fare da "
+"relay di posta. In generale, se si desidera accodare la posta ricevuta in "
+"un MTA locale, questo elenco dovrebbe essere uguale a quello usato nell'MTA "
+"(l'installatore cercherà di estrarre quell'impostazione come predefinita)."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:8001
+msgid ""
+"If you prefer to manage this list manually, leave the entry blank and edit "
+"the file /etc/qpsmtpd/rcpthosts."
+msgstr ""
+"Se si preferisce gestire questo elenco a mano, lasciare il campo vuoto e "
+"modificare il file /etc/qpsmtpd/rcpthosts."

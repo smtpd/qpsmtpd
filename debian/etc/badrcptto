@@ -1,0 +1,10 @@
+# badrcptto -- a list of envelope recipient addresses to which any mail will
+# be declined (for that specific recipient.)  This can be used to close an
+# address off to external senders.
+#
+# Addresses given here can be complete addresses or hostnames prefixed with
+# a single @ sign.
+#
+# Example:
+# closedaddress@localdomain.tld
+# @closeddomain.tld

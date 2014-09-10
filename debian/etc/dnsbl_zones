@@ -1,0 +1,10 @@
+# This file specifies the RBL zones list, used by the dnsbl plugin.  It has
+# no effect unless that plugin is enabled (in /etc/qpsmtpd/plugins).  If
+# enabled, the IP address of each connecting host will be checked against each
+# zone given.  A few sample DNSBLs are listed here, but you should evaluate
+# the efficacy and listing policies of a DNSBL before using it.
+#
+# rbl.mail-abuse.org
+# spamsources.fabel.dk
+# relays.ordb.org
+# sbl-xbl.spamhaus.org

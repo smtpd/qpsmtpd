@@ -1,0 +1,23 @@
+# Qpsmtpd logging plugin configuration
+#
+# This file has the same format as the main qpsmtpd plugins configuration
+# (/etc/qpsmtpd/plugins), but is used exclusively to specify plugins used for
+# logging (they must be configured separately, being initialized at a
+# different time and used to indicate errors with all other plugins loaded
+# afterward.)
+
+# The file logging plugin logs to /var/log/qpsmtpd:
+logging/file loglevel LOGINFO /var/log/qpsmtpd/qpsmtpd.log
+
+# The syslog logging plugin logs to the syslog facility:
+#
+# logging/syslog loglevel LOGINFO
+
+# The 'warn' plugin logs to STDERR via perl's warn():
+#
+# logging/warn LOGINFO
+
+# The 'adaptive' plugin logs to STDERR via warn(), but does so according to
+# different severity thresholds when a message is accepted or rejected
+#
+# logging/adaptive accept LOGINFO reject LOGWARN

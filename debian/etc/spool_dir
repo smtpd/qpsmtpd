@@ -1,0 +1,13 @@
+# spool_dir -- this setting controls the directory used as temporary and
+# spooling space by qpsmtpd.  In most configurations it should not be
+# adjusted from the installation default.
+#
+# Because qpsmtpd does not generally do any actual mail delivery (generally
+# done by the local MTA instead), its spool space is generally used as a
+# private temporary directory by various plugins to pass copies of mail to
+# external programs.  Actual spooling of undelivered mail is generally very
+# short-lived, as the queue plugin will have handed off the mail before the
+# SMTP transaction completes (as compared to store-and-forward spools used
+# by MTAs doing remote delivery.)
+#
+/var/spool/qpsmtpd

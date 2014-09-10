@@ -1,0 +1,12 @@
+# badmailfrom -- a list of envelope sender addresses from which any mail will
+# be declined.  Although of minimal use with most spammers, which as of this
+# writing typically forge randomly generated email addresses at any of the
+# major web-mail providers or the ISP hosting the zombie sender, but can help
+# with some unusual aggressive massmailers or malicious human hosts.
+#
+# Addresses given here can be complete addresses or hostnames prefixed with
+# a single @ sign.
+#
+# Example:
+# eviluser@host.tld
+# @evilhost.tld

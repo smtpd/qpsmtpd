@@ -1,0 +1,267 @@
+# Qpsmtpd plugin configuration
+#
+# This file gives a list of plugins to be loaded by qpsmtpd.  Plugins affect
+# and in some cases implement aspects of qpsmtpd's functionality.
+#
+# Plugins listed here can be found in /usr/share/qpsmtpd/plugins/.  For
+# documentation on each, consult their POD documentation by running perldoc
+# on the plugin (for example, 'perldoc /usr/share/qpsmtpd/plugins/dnsbl').
+#
+# Each plugin hooks one or more aspect of the SMTP transaction.  For each
+# stage of the transaction, the plugins hooked to that stage are executed in
+# the order they appear in this file.  Some plugins can preempt others; for
+# example, any plugin which issues a hard-DENY to any SMTP stage will preempt
+# the execution of any others for that stage.
+
+## Filtering/SMTP exchange plugins
+
+# check_earlytalker -- listens to the connection breifly before the SMTP
+# greeting is issued, disconnecting (or logging) any host that starts
+# transmitting before that point in violation of RFC; legitimate MTAs wait for
+# the greeting, while some spam agents, many viruses and most HTTP proxy
+# abusers do not.  Although this is believed safe, buggy MTAs that do not wait
+# for the greeting will be inadvertantly blocked.
+#
+# usage:
+# check_earlytalker [wait <secs>] [action <deny|denysoft|log>] [defer-reject]
+#
+check_earlytalker action log
+
+# check_relay -- checks connecting hosts against /etc/qpsmtpd/relayclients and
+# (if present) /etc/qpsmtpd/relayclients.cdb to grant or deny mail relaying.
+#
+check_relay
+
+# require_resolvable_fromhost -- checks envelope sender addresses in DNS for
+# resovability, declining the mail if the hostname in the address has neither
+# an A or MX record (meaning, apart from any other issue, that the mail cannot
+# be bounced.)
+#
+# require_resolvable_fromhost
+
+# rhsbl -- checks the envelope sender hostname (the "right-hand side") against
+# a list of DNS blacklists given in /etc/qpsmtpd/rhsbl_zones.  Although this
+# plugin is enabled by default, that list has no blacklists enabled.
+# 
+rhsbl
+
+# dnsbl -- checks the IP address of the connecting host against a list of DNS
+# blacklists given in /etc/qpsmtpd/dnsbl_zones, declining any mail from any
+# hosts with a positive record.  A list of IP addresses can be given in the
+# file /etc/qpsmtpd/dnsbl_allow; any host found in this second list will be
+# exempted from the DNSBL check.  This is the conventional host-based DNS
+# blacklisting technique.  Although the plugin is enabled by default, that
+# list has no blacklists enabled.
+#
+dnsbl
+
+# check_spamhelo -- checks the HELO/EHLO greeting sent by the remote host
+# against a blacklist given in /etc/qpsmtpd/badhelo.  A host which introduces
+# itself with a matching HELO will be rejected at the HELO stage.  This can
+# be used to block spammers who forge the domain names of common email
+# providers as their HELO greeting, while the real providers give a real
+# mailserver name in their greetings.  While enabled by default, the list
+# initially has no greetings listed.
+#
+check_spamhelo
+
+# check_badmailfrom -- checks the envelope sender address of inbound mail
+# against a blacklist given in /etc/qpsmtpd/badmailfrom.  This plugin is
+# enabled by default but has no addresses listed.
+#
+check_badmailfrom
+
+# check_badrcptto -- checks the envelope recipient address(es) of inbound mail
+# against a blacklist given in /etc/qpsmtpd/badrcptto.  Delivery to those
+# addresses will be declined (though if the sender lists other non-listed
+# addresses as recipients, they will be tolerated unless another plugin
+# refuses them.)  This plugin can be used to implement disposable addresses
+# at locally hosted domains, with no mail accepted once those addresses are
+# closed.
+#
+check_badrcptto
+
+# badrcptto_patterns -- a more sophisticated form of badrcptto, this plugin
+# checks envelope recipient addresses against a list of perl patterns given in
+# /etc/qpsmtpd/badrcptto_patterns.
+#
+# check_badrcptto
+
+# check_loop -- implements a simple form of mail loop detection, by counting
+# the number of "Received" and "Delivered-To" headers in the mail.  If that
+# number exceeds the given limit, the mail is decliend as looping.  By
+# default, the mail is rejected if it contains more than 100 such headers.
+#
+# usage:
+# check_loop [max-hops]
+check_loop
+
+# count_unrecognized_commands -- disconnects a host which issues too many
+# unrecognized SMTP commands.  This can be useful to mitigate the effects of
+# buggy hosts which spew garbage into the connection, or the abuse of some
+# forms of proxies (e.g. some HTTP proxies) which include non-SMTP commands
+# before the spam payload.
+#
+# usage:
+# count_unrecognized_commands [count]
+
+# greylisting -- implements SMTP greylisting (for a further discussion of
+# which see http://en.wikipedia.org/wiki/Greylisting).  The greylist plugin
+# is configured externally by editing /etc/qpsmtpd/denysoft_greylist, or by
+# specifying options here.  For configuration details, see the plugin's
+# POD documentation.
+#
+# greylisting
+
+# milter -- integrates Sendmail milter filters for use by qpsmtpd.  Requires
+# the Net::Milter perl module (not shipped with Debian, as of this writing.)
+#
+# usage:
+# milter [milter-name] [[hostname:]port]
+# e.g. milter Brightmail bmcluster.host.tld:5513
+#
+# milter
+
+# virus/clamav -- checks inbound mail with the ClamAV virus scanner.  This
+# version of the plugin uses clamscan, which executes the scan locally, at the
+# cost of some startup time not affecting clamdscan.
+#
+# For details of configuring the clamav plugin, see its POD documentation.
+#
+# virus/clamav 
+
+# virus/clamdscan -- checks inbound mail with the ClamAV virus scanner.  This
+# version of the plugin uses clamdscan, which requests that the 'clamd' damon
+# scan the mail in the spool.  While it eliminates the startup overhead of the
+# clamav plugin, it requires that the clamd user be able to read files from
+# the qpsmtpd spool, which is not permitted by default.
+#
+# usage:
+# virus/clamdscan [max_size size-in-kb]
+#                 [clamd_socket /path/to/socket]
+#                 [deny_viruses <yes|no>]
+#
+# virus/clamdscan
+
+# spamassassin -- checks inbound mail with a spamassassin daemon, marking or
+# rejecting the mail based on spamd's response.  Requires that you have spamd
+# running either via TCP or a UNIX domain socket.  This plugin should
+# generally be configured near the end of the content checks plugin list, as
+# spamassassin is computationally quite expensive relative to many other sorts
+# of tests.
+#
+# usage:
+# spamassassin [reject_threshold <points>] [munge_subject_threshold <points>]
+#              [spamd_socket /path/to/spamd.socket]
+#              [leave_old_headers <drop|rename|keep>]
+#
+# spamassassin munge_subject_threshold 8 reject_threshold 10
+
+## (for a list of further virus scanner plugins, see the directory
+## /usr/share/qpsmtpd/plugins/virus)
+
+# quit_fortune -- prints an entry from the fortune file (by running
+# /usr/games/fortune) in the response to a QUIT message in a connection which
+# began with a HELO (not EHLO).  This does nothing whatsoever for spam, but
+# can help amuse fellow mail administrators and make SMTP logs more bearable.
+#
+# quit_fortune
+
+# rcpt_ok -- checks /etc/qpsmtpd/me and /etc/qpsmtpd/rcpthosts to see if the
+# recipient hostname is intended to be accepted here.  This should be the last
+# plugin before the queue plugin(s), and should not be disabled unless you
+# know what you're doing.
+#
+rcpt_ok
+
+# sender_permitted_from -- performs a Sender Policy Framework (SPF, often also
+# called "Sender Permitted From") test on inbound mail.  For further details
+# of SPF, see http://spf.pobox.com/ or
+# http://en.wikipedia.org/wiki/Sender_Policy_Framework.  For more
+# configuration details, see the plugin's POD documentation.
+#
+# usage:
+# sender_permitted_from [spf_deny <0|1|2>]
+
+## Queue/delivery plugins
+##
+## These plugins control what happens to mail once it has been accepted.
+## Queueing methods correspond generally to your particular MTA, and select
+## the plugin needed to inject mail into its spool.  Some MTAs, such as
+## Postfix, Exim and Qmail, have specific plugins available for efficient
+## injection.  For others, you should configure qpsmtpd to listen on your
+## external, public interface and your MTA on the loopback (127.0.0.1) only.
+## You can then use the queue/smtp-forward plugin as described below to
+## inject the mail into that MTA via SMTP proxy once qpsmtpd has decided to
+## accept it.
+
+## When first configured, the qpsmtpd package will attempt to determine the
+## correct queueing plugin to use, and will try to confirm its guess with a
+## debconf question.  The result is written to a debian-managed plugins
+## file included from here.  If you wish to configure the queueing manually,
+## comment out or remove the $include directive below and enable one of the
+## queue plugins listed here.  If you do not enable a queue plugin, qpsmtpd
+## will defer deliveries of mail with 4xx soft-failure errors, which is
+## probably not what you want.
+
+# install-time Debian default
+$include /etc/qpsmtpd/debian-queue-method
+
+# explicit queue options
+
+# queue/smtp-forward -- forwards received mail into another SMTP server,
+# possibly on a remote host.  Use this if your MTA does not have a direct
+# queue injection plugin (e.g. for use with sendmail).  It can also enable
+# qpsmtpd to act as a frontend spam-filtering proxy for a backend or DMZ
+# mailserver.
+#
+# usage: queue/smtp-forward <hostname> [port]
+# e.g.   queue/smtp-forward localhost 25
+# e.g.   queue/smtp-forward smtp-in.dmz.domain.tld 1025
+#
+# queue/smtp-forward 127.0.0.1
+
+# queue/exim-bsmtp -- injects received mail into a local Exim queue, using
+# Exim's BSMTP interface.  If your exim install's rsmtp binary is not in the
+# standard Debian location (/usr/bin/rsmtp), specify that as well.
+#
+# usage: queue/exim-bsmtp [exim_path /path/to/rsmtp]
+#
+# queue/exim-bsmtp
+
+# queue/postfix-queue -- injects received mail into a local Postfix spool.
+# If your Postfix queue socket is not at /var/spool/postfix/public/cleanup,
+# then you should specify that as well.
+#
+# usage: queue/postfix-queue [socket]
+# e.g. queue/postfix-queue /var/spool/postfix/public/cleanup
+#
+# queue/postfix-queue
+
+# queue/qmail-queue -- injects received mail into a local Qmail spool.  If
+# your qmail installation puts the qmail-queue binary at a location other
+# than the Qmail default of /var/qmail/bin/qmail-queue, you should specify
+# that location in the plugin configuration.  If you use the Debian qmail
+# package (via the qmail-src source-only package), it places its qmail-queue
+# binary at /usr/sbin/qmail-queue.
+#
+# usage: queue/qmail-queue [/path/to/qmail-queue]
+# e.g. queue/qmail-queue /var/qmail/bin/qmail-queue
+#
+# queue/qmail-queue /usr/sbin/qmail-queue
+
+# queue/maildir -- spools received mail directly into a Maildir-format local
+# mailbox.  This is of little use on a multi-user mail system, but can be
+# helpful for very simple mail setups or when using qpsmtpd as a spamtrap.
+# If this queue method is selected when the qpsmtpd package is configured,
+# the maildir will be created in the location chosen.  To select a new
+# location, specify it here or run 'dpkg-reconfigure qpsmtpd'.  If you
+# specify a new location here, first create a Maildir there (a maildir is
+# simply a directory containing three subdirectories named 'cur', 'tmp' and
+# 'new', each with mode 0700).
+#
+# usage: queue/maildir </path/to/maildir>
+# e.g. queue/maildir /var/qpsmtpd/spool/Maildir
+#
+# queue/maildir /var/qpsmtpd/spool/Maildir
+
