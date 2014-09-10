@@ -152,7 +152,7 @@ sub connect_handler {
     return DECLINED if $self->is_immune();
 
     # run a couple cheap tests before the more expensive DNS tests
-    foreach my $test (qw/ invalid_localhost is_not_fqdn /) {
+    foreach my $test (qw/ is_valid_localhost is_not_fqdn /) {
         $self->$test() or return DECLINED;
     }
 
@@ -163,19 +163,24 @@ sub connect_handler {
     return DECLINED;
 }
 
-sub invalid_localhost {
+sub is_valid_localhost {
     my ($self) = @_;
-    return 1 if lc $self->qp->connection->remote_host ne 'localhost';
-    if (   $self->qp->connection->remote_ip ne '127.0.0.1'
-        && $self->qp->connection->remote_ip ne '::1')
-    {
-        $self->adjust_karma(-1);
-        $self->log(LOGINFO, "fail, not localhost");
-        return;
-    }
-    $self->adjust_karma(1);
-    $self->log(LOGDEBUG, "pass, is localhost");
-    return 1;
+
+    if (Qpsmtpd::Utils->is_localhost($self->qp->connection->remote_ip)) {
+        $self->adjust_karma(1);
+        $self->log(LOGDEBUG, "pass, is localhost");
+        return 1;
+    };
+
+    my $rh = $self->qp->connection->remote_host;
+    if ($rh && lc $self->qp->connection->remote_host eq 'localhost') {
+        $self->log(LOGDEBUG, "pass, remote_host is localhost");
+        return 1;
+    };
+
+    $self->adjust_karma(-1);
+    $self->log(LOGINFO, "fail, not localhost");
+    return;
 }
 
 sub is_not_fqdn {

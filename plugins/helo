@@ -340,8 +340,7 @@ sub is_regex_match {
 sub invalid_localhost {
     my ($self, $host) = @_;
     return if lc $host ne 'localhost';
-    my $ip = $self->qp->connection->remote_ip;
-    if ($ip && ($ip eq '127.0.0.1' || $ip eq '::1')) {
+    if (Qpsmtpd::Utils->is_localhost($self->qp->connection->remote_ip)) {
         $self->log(LOGDEBUG, "pass, is localhost");
         return;
     }
