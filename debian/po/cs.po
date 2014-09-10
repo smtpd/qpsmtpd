@@ -1,0 +1,299 @@
+#
+#    Translators, if you are not familiar with the PO format, gettext
+#    documentation is worth reading, especially sections dedicated to
+#    this format, e.g. by running:
+#         info -n '(gettext)PO Files'
+#         info -n '(gettext)Header Entry'
+#
+#    Some information specific to po-debconf are available at
+#            /usr/share/doc/po-debconf/README-trans
+#         or http://www.debian.org/intl/l10n/po-debconf/README-trans
+#
+#    Developers do not need to manually edit POT or PO files.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: qpsmtpd\n"
+"Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
+"POT-Creation-Date: 2009-12-14 01:40-0800\n"
+"PO-Revision-Date: 2010-10-14 19:37+0200\n"
+"Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
+"Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid "Enable qpsmtpd startup at boot time?"
+msgstr "Povolit spouštění qpsmtpd při zavádění systému?"
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid ""
+"Because most MTAs in Debian listen on one or all network interfaces by "
+"default, when first installed qpsmtpd cannot normally be started."
+msgstr ""
+"Protože většina poštovních serverů v Debianu implicitně naslouchá na jednom "
+"nebo všech síťových rozhraních, nebude se qpsmtpd moci normálně spustit."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid ""
+"Before enabling qpsmtpd, you must first configure your local MTA not to bind "
+"to the SMTP TCP port on at least one interface.  The most common approach is "
+"to leave your MTA listening on the loopback interface (127.0.0.1), with "
+"qpsmtpd listening on the external interface.  Instructions for configuring "
+"common MTAs to work with qpsmtpd can be found after installation in /usr/"
+"share/doc/qpsmtpd/README.Debian."
+msgstr ""
+"Před povolením qpsmtpd musíte nastavit svůj lokální poštovní server, aby se "
+"nevázal na TCP port SMTP alespoň na jednom rozhraní. Nejběžnější postup je "
+"nechat stávající server poslouchat na lokální smyčce (127.0.0.1) a navázat "
+"qpsmtpd na externí rozhraní. Návod pro nastavení většiny poštovních serverů "
+"tak, aby pracovaly s qpsmtpd, naleznete po instalaci v souboru /usr/share/"
+"doc/qpsmtpd/README.Debian."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:1001
+msgid ""
+"Once you have adjusted your MTA configuration, you can enable qpsmtpd by "
+"restarting this configuration, by running 'dpkg-reconfigure qpsmtpd'."
+msgstr ""
+"Až upravíte konfiguraci svého stávajícího poštovního serveru, můžete povolit "
+"qpsmtpd znovuspuštěním této konfigurace příkazem „dpkg-reconfigure qpsmtpd“."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:2001
+msgid "Qpsmtpd server type:"
+msgstr "Typ qpsmtpd serveru:"
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:2001
+msgid ""
+"Qpsmtpd supports two process models for handling connections.  The "
+"'forkserver' model uses a single process when idle, and forks new processes "
+"to handle connections.  This uses less memory but slightly reduces server "
+"throughput.  The 'prefork' model keeps a pool of idle processes available to "
+"handle new connections, offering slightly better performance at the cost of "
+"more memory."
+msgstr ""
+"Qpsmtpd může obsloužit příchozí spojení dvěma způsoby. Model „forkserver“ "
+"používá v době nečinnosti jediný proces a nové procesy vytváří až v "
+"okamžiku příchozích spojení, což má mírně větší režii (trošku snižuje "
+"propustnost serveru), ale zato používá méně paměti. Oproti tomu model "
+"„prefork“ si udržuje stálou zásobu volných procesů, které okamžitě mohou "
+"zpracovat příchozí spojení a nabídnout tak o něco lepší výkon na úkor "
+"vyššího použití paměti."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid "Addresses on which to listen for incoming SMTP connections:"
+msgstr "Adresa, na které se má naslouchat příchozím SMTP spojením:"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid ""
+"Enter one or more of your local IP addresses, separated by spaces, on which "
+"qpsmtpd should listen for incoming SMTP connections.  If you leave this "
+"setting empty, qpsmtpd will listen on all interfaces available at startup "
+"time."
+msgstr ""
+"Zadejte mezerami oddělený seznam místních IP adres, na kterých má qpsmtpd "
+"naslouchat příchozím SMTP spojením. Ponecháte-li pole prázdné, qpsmtpd bude "
+"naslouchat na všech rozhraních dostupných při jeho spuštění."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid ""
+"If you intend to use qpsmtpd to spool deliveries from remote hosts into a "
+"local MTA, you may wish to have qpsmtpd listen on all external interfaces, "
+"while leaving your local MTA listening on the loopback device (127.0.0.1)."
+msgstr ""
+"Chcete-li použít qpsmtpd pro předávání přijaté pošty místnímu poštovnímu "
+"serveru, budete pravděpodobně chtít, aby qpsmtpd naslouchal na všech "
+"externích rozhraních, zatímco místní poštovní server necháte naslouchat "
+"pouze na lokální smyčce (127.0.0.1)."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:3001
+msgid ""
+"For each interface you may optionally specify a port to listen on instead of "
+"the default port 25; do this by appending :<port> to the interface, as in "
+"\"127.0.0.1:2526\"."
+msgstr ""
+"Místo standardního portu 25 můžete ke každému rozhraní volitelně zadat "
+"port, na kterém má qpsmtpd naslouchat. Stačí k rozhraní přidat :<port>, "
+"například „127.0.0.1:2526“."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid "Queueing method for accepted mail:"
+msgstr "Způsob doručování přijaté pošty:"
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"Select the method for queueing mail once it's been delivered via SMTP.  If "
+"you deliver your mail locally, choose the method corresponding to the "
+"installed MTA (the installer will try to pick the correct default.)"
+msgstr ""
+"Vyberte způsob, jakým se bude zacházet s poštou po přijetí přes SMTP. Pokud "
+"doručujete poštu místně, zvolte metodu odpovídající instalovanému poštovnímu "
+"serveru (instalátor se pokusí vybrat vhodné výchozí nastavení)."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"Select \"proxy\" if you'd like qpsmtpd to act as an SMTP proxy for another "
+"MTA (local or remote).  You will then be prompted to enter a destination "
+"host."
+msgstr ""
+"Pokud se má qpsmtpd chovat jako SMTP proxy pro jiné poštovní servery (místní "
+"nebo vzdálené), vyberte „proxy“. Následně budete dotázáni na zadání jména "
+"cílového počítače."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"Select \"maildir\" to have qpsmtpd deliver into a local maildir-format spool "
+"instead of queueing it for delivery (e.g. if you're setting up a spamtrap.)"
+msgstr ""
+"Možnost „maildir“ vyberte v případě, že má qpsmtpd doručovat do lokálních "
+"schránek ve formátu maildir místo toho, aby poštu zařadil do fronty na "
+"předání dále (např. pokud připravujete past na spam)."
+
+#. Type: select
+#. Description
+#: ../qpsmtpd.templates:4001
+msgid ""
+"If you select \"none,\" no queueing will be done at all, unless you manually "
+"configure it yourself by editing /etc/qpsmtpd/plugins."
+msgstr ""
+"Zvolíte-li „none“, nebude se provádět žádné řazení do front (pokud to ovšem "
+"nenastavíte ručně v /etc/qpsmtpd/plugins)."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:5001
+msgid "Destination host/port for SMTP proxy delivery:"
+msgstr "Cílový počítač/port pro doručení ze SMTP proxy:"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:5001
+msgid ""
+"To have qpsmtpd act as an SMTP proxy for another host, supply the hostname "
+"or IP address of that host here.  You can optionally add a port number after "
+"a colon, such as \"localhost:25\"."
+msgstr ""
+"Aby se qpsmtpd choval jako SMTP proxy pro jiný počítač, zadejte jméno nebo "
+"IP adresu daného počítače. Volitelně můžete za dvojtečku přidat číslo portu, "
+"např. „localhost:25“."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:6001
+msgid "Destination Maildir for maildir-type delivery:"
+msgstr "Cílový Maildir adresář pro doručení do lokální schránky:"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:6001
+msgid ""
+"To have qpsmtpd deliver received mail into a local maildir-format spool, "
+"enter a location for that maildir.  A maildir will be created in that "
+"location if it does not exist already."
+msgstr ""
+"Aby qpsmtpd doručoval přijatou poštu do lokální schránky typu maildir, "
+"musíte zadat umístění schránky. Pokud ještě zadaný adresář neexistuje, bude "
+"vytvořen."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:7001
+msgid "Proceed without a queueing plugin selected?"
+msgstr "Pokračovat bez modulu pro řazení do front?"
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:7001
+msgid ""
+"By selecting \"none\" as a queueing plugin, you have disabled local queueing "
+"of inbound mail.  This will prevent any mail being spooled by qpsmtpd until "
+"you manually configure a queueing method.  Any hosts attempting to deliver "
+"mail to you will receive 4xx soft-failure messages until then, at the "
+"potential cost of wasted bandwidth and eventual bouncing of possibly "
+"legitimate mail."
+msgstr ""
+"Výběrem „none“ jste zakázali řazení příchozí pošty do front, což efektivně "
+"zamezilo přijímání pošty do té doby, než v qpsmtpd nenastavíte způsob řazení "
+"do front. Do té doby obdrží počítače, snažící se vám doručit poštu, jemné "
+"chybové hlášky typu 4xx. Je to ovšem na úkor potenciálně vyplýtvaného "
+"přenosového pásma a zbytečného vracení legitimní pošty."
+
+#. Type: boolean
+#. Description
+#: ../qpsmtpd.templates:7001
+msgid ""
+"To configure queueing manually, edit /etc/qpsmtpd/plugins and select one of "
+"the queueing methods listed there.  If you didn't see your installed MTA in "
+"the list and aren't sure what to do, pick \"Cancel\" here and select the "
+"SMTP proxy method instead, configuring it to proxy into your MTA on a "
+"suitable local address/port."
+msgstr ""
+"Pro ruční nastavení řazení do front upravte /etc/qpsmtpd/plugins a vyberte "
+"některou z dostupných metod. Pokud v seznamu nevidíte váš nainstalovaný "
+"poštovní server a nejste si jisti dalším postupem, zvolte zde „Zrušit“ a "
+"místo toho vyberte metodu SMTP proxy, kterou nastavíte tak, aby pracovala s "
+"vaším poštovním serverem na vhodné místní adrese/portu."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:8001
+msgid "Destination domain(s) to accept mail for (blank for none):"
+msgstr "Cílové domény, pro které přijímat poštu (prázdné pro žádné):"
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:8001
+msgid ""
+"Enter a list of domain name(s) for which qpsmtpd should accept mail, "
+"separated by spaces.  This list should include any hostname or domain name "
+"for which you intend to accept delivery locally, as well as any recipient "
+"domains for which you intend to act as a mail relay.  In general, if you "
+"intend to spool received mail into a local MTA, this list should be the same "
+"as used for that MTA (the installer will attempt to extract that setting as "
+"a default.)"
+msgstr ""
+"Zadejte mezerami oddělený seznam doménových jmen, pro které má qpsmtpd "
+"přijímat poštu. Seznam by měl obsahovat všechna jména počítačů nebo jména "
+"domén, pro které chcete lokálně přijímat poštu, nebo pro které se chcete "
+"chovat jako poštovní relay. Obecně řečeno, pokud plánujete předávat "
+"doručenou poštu lokálnímu poštovnímu serveru, měl by být tento seznam shodný "
+"se seznamem v daném poštovním serveru (instalační skript se pokusí tento "
+"seznam zjistit automaticky a nabídnout ho jako výchozí možnost)."
+
+#. Type: string
+#. Description
+#: ../qpsmtpd.templates:8001
+msgid ""
+"If you prefer to manage this list manually, leave the entry blank and edit "
+"the file /etc/qpsmtpd/rcpthosts."
+msgstr ""
+"Jestliže byste raději seznam spravovali ručně, ponechte pole prázdné a "
+"upravte soubor /etc/qpsmtpd/rcpthosts."

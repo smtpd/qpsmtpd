@@ -1,0 +1,14 @@
+# Blacklist of HELO/EHLO greetings used by the check_spamhelo plugin.  This
+# will have no effect unless the check_spamhelo plugin is enabled in the
+# qpsmtpd plugins configuration file, /etc/qpsmtpd/plugins.  It can contain
+# a list of HELO greetings never used by the hosts named, but frequently
+# forged by spammers (e.g. the domain names of the major webmail providers,
+# your own external IP address(es), etc.)
+#
+# (for example:)
+# yahoo.com
+# excite.com
+# hotmail.com
+# msn.com
+# aol.com
+# 1.2.3.4

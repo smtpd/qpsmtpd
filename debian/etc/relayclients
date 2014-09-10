@@ -1,0 +1,12 @@
+# Qpsmtpd relay-client configuration.  Connecting hosts whose IP addresses
+# match an entry in this file will be permitted to deliver mail to non-local
+# recipients (that is, to relay the mail).  This list does not preclude
+# other methods of permitting relaying (e.g. SMTP authentication.)
+#
+# The format used here is of one or more IPv4 octets, giving either a full
+# IP address or a partial address if ending with a '.'
+#
+# accept from localhost:
+127.0.0.1
+# accept from 192.168.0.0/16:
+# 192.168.

@@ -1,0 +1,19 @@
+# Selects the log level for qpsmtpd's builtin (stderr) logging.  Any message at
+# or below the severity level will be logged unless further excluded by the log
+# plugin configuration (see /etc/qpsmtpd/logging).  Lower values are more
+# urgent.
+#
+# This setting normally takes effect only at startup, prior to daemon startup
+# and initialization of the usual logging plugin.  It does not apply to the
+# individual logging plugins, whose thresholds are specified in the logging
+# plugin configuration, /etc/qpsmtpd/logging .
+#
+# LOGDEBUG   = 7
+# LOGINFO    = 6
+# LOGNOTICE  = 5
+# LOGWARN    = 4
+# LOGERROR   = 3
+# LOGCRIT    = 2
+# LOGALERT   = 1
+# LOGEMERG   = 0
+6

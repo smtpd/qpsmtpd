@@ -1,0 +1,42 @@
+#!/bin/sh
+
+set -e
+
+#DEBHELPER#
+
+Q_USER=qpsmtpd
+Q_GROUP=qpsmtpd
+
+SPOOLDIR=/var/spool/qpsmtpd
+GREYLISTDIR=/var/lib/qpsmtpd/greylisting
+LOGDIR=/var/log/qpsmtpd
+PIDDIR=/var/run/qpsmtpd
+
+case "$1" in
+	purge)
+		# purge the maintainer script-generated configs
+		rm -f /etc/qpsmtpd/debconf-settings \
+			/etc/qpsmtpd/debian-queue-method \
+			/etc/qpsmtpd/debian-rcpthosts
+
+		# purge the logs
+		rm -f /var/log/qpsmtpd/*
+
+		# unregister the statoverrides before dpkg removes the dirs
+		for d in "$SPOOLDIR" "$GREYLISTDIR" "$LOGDIR" "$PIDDIR" ; do
+			if ( dpkg-statoverride --list "$d" > /dev/null) ; then
+				dpkg-statoverride --remove "$d" || true
+			fi
+		done
+
+        # debconf purge will be inserted by debhelper
+
+		# remove the run-as user
+		deluser --quiet "$Q_USER" || true
+		;;
+	*)
+		;;
+esac
+
+exit 0
+

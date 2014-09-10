@@ -1,0 +1,18 @@
+# rcpthosts -- this file should contain the list of host and/or domain names
+# for which mail will be accepted (either for local delivery or for relaying,
+# it doesn't matter for qpsmtpd's purposes.) In general, this setting should be
+# equal to the list of local and relayed domain names configured in your MTA.
+#
+# Debconf will prompt for this setting when qpsmtpd is configured.  If you wish
+# to manage the rcpthosts manually, comment out or remove the $include
+# reference to debian-rcpthosts below.
+#
+# The format of this file is a list of host or domain names, one per line, with
+# no other formatting.  For example:
+#
+# mydomain.tld
+# myhost.mydomain.tld
+
+# By default, use the debconf-generated rcpthosts list:
+$include /etc/qpsmtpd/debian-rcpthosts
+

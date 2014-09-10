@@ -1,0 +1,6 @@
+# rhsbl_zones -- gives a list of RHSBL ("Right-hand side block list," meaning
+# the portion of an email address to the right of the "@") blacklist zones
+# against which the envelope sender addresses from inbound mail will be
+# checked.
+#
+# No lists are configured by default.
