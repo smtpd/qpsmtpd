@@ -339,11 +339,14 @@ sub is_regex_match {
 
 sub invalid_localhost {
     my ($self, $host) = @_;
-    return if lc $host ne 'localhost';
     if (Qpsmtpd::Utils->is_localhost($self->qp->connection->remote_ip)) {
         $self->log(LOGDEBUG, "pass, is localhost");
         return;
     }
+    if ($host && lc $host eq 'localhost') {
+        $self->log(LOGDEBUG, "pass, host is localhost");
+        return;
+    };
 
     #$self->log( LOGINFO, "fail, not localhost" );
     return ("You are not localhost", "invalid localhost");
