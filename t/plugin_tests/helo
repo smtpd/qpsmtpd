@@ -112,8 +112,8 @@ sub test_no_forward_dns {
     ok( ! $err, "perl.org");
 
     # reserved .test TLD: http://tools.ietf.org/html/rfc2606
-    ($err, $why) = $self->no_forward_dns('perl.org.test');
-    ok( $err, "test.perl.org.test");
+    ($err, $why) = $self->no_forward_dns('perl.test');
+    ok( $err, "perl.test");
 };
 
 sub test_no_reverse_dns {
@@ -125,8 +125,8 @@ sub test_no_reverse_dns {
     ($err, $why) = $self->no_reverse_dns('test-host', '192.0.2.1');
     ok( $err, "192.0.2.1, $why");
 
-    ($err, $why) = $self->no_reverse_dns('mail.theartfarm.com', '208.75.177.101');
-    ok( ! $err, "208.75.177.101");
+    ($err, $why) = $self->no_reverse_dns('mail.theartfarm.com', '66.128.51.165');
+    ok( ! $err, "66.128.51.165");
 };
 
 sub test_no_matching_dns {

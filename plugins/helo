@@ -401,7 +401,7 @@ sub no_forward_dns {
     my $res = $self->init_resolver();
 
     $host = "$host." if $host !~ /\.$/;    # fully qualify name
-    my $query = $res->search($host);
+    my $query = $res->query($host);
 
     if (!$query) {
         if ($res->errorstring eq 'NXDOMAIN') {
