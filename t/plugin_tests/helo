@@ -65,11 +65,11 @@ sub test_invalid_localhost {
     foreach my $ip ( undef, '', '192.0.99.5' ) {
         $self->qp->connection->remote_ip(undef);
         ($err, $why) = $self->invalid_localhost('localhost' );
-        ok(!$err, "host: localhost, remote ip: $ip");
+        ok(!$err, "host: localhost, invalid remote ip");
 
         $self->qp->connection->remote_ip(undef);
         ($err, $why) = $self->invalid_localhost('not-localhost');
-        ok($err, "host: not-localhost, remote ip: $ip");
+        ok($err, "host: not-localhost, invalid remote ip");
     };
 
     foreach my $ip (qw/ ::1 127.0.0.1 / ) {
