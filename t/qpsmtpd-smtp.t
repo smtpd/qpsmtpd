@@ -33,12 +33,12 @@ sub __fault {
 
     my $fault;
     stderr_like { $fault = $smtpd->fault }
-        qr/program fault - command not performed \(/,
+        qr/program fault - command not performed.*Last system error:/ms,
         'fault outputs proper warning to STDOUT';
     is($fault->[0], 451, 'fault returns 451');
 
     stderr_like { $fault = $smtpd->fault('test message') }
-           qr/test message \(/,
+           qr/test message.*Last system error/ms,
            'fault outputs proper custom warning to STDOUT';
     is($fault->[1], 'Internal error - try again later - test message',
            'returns the input message');
