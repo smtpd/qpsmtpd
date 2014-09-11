@@ -90,7 +90,9 @@ sub fault {
     my $self = shift;
     my ($msg) = shift || "program fault - command not performed";
     my ($name) = split /\s+/, $0, 2;
-    print STDERR $name, "[$$]: $msg ($!)\n";
+    print STDERR $name, "[$$]: $msg\n";
+    print STDERR $name, "[$$]: Last system error: $!"
+        ." (Likely irelevant--debug the crashed plugin to ensure it handles \$! properly)";
     return $self->respond(451, "Internal error - try again later - " . $msg);
 }
 

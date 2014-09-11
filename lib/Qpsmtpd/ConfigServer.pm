@@ -58,7 +58,9 @@ sub respond {
 sub fault {
     my $self = shift;
     my ($msg) = shift || "program fault - command not performed";
-    print STDERR "$0 [$$]: $msg ($!)\n";
+    print STDERR "$0 [$$]: $msg\n";
+    print STDERR $name, "[$$]: Last system error: $!"
+        ." (Likely irelevant--debug the crashed plugin to ensure it handles \$! properly)";
     $self->respond("Error - " . $msg);
     return $PROMPT;
 }
