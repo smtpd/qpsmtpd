@@ -1,4 +1,4 @@
-#!/perl (Editor hint)
+#!perl
 use strict;
 use warnings;
 
