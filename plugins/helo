@@ -227,7 +227,10 @@ additional check ideas from Haraka helo plugin
 use strict;
 use warnings;
 
+use Net::IP;
+
 use Qpsmtpd::Constants;
+use Qpsmtpd::Utils;
 
 sub register {
     my ($self, $qp) = (shift, shift);
@@ -354,8 +357,7 @@ sub invalid_localhost {
 
 sub is_plain_ip {
     my ($self, $host) = @_;
-    return if $host =~ /[^\d\.]+/;    # has chars other than digits and a dot
-    return if $host !~ m/^(\d{1,3}\.){3}\d{1,3}$/;
+    return if !Qpsmtpd::Utils->is_valid_ip($host);
 
     $self->log(LOGDEBUG, "fail, plain IP");
     return ("Plain IP is invalid HELO hostname (RFC 2821)", "plain IP");
@@ -363,7 +365,11 @@ sub is_plain_ip {
 
 sub is_address_literal {
     my ($self, $host) = @_;
-    return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+
+    my ($ip) = $host =~ /^\[(.*)\]/;  # strip off any brackets
+    return if !$ip;   # no brackets, not a literal
+
+    return if !Qpsmtpd::Utils->is_valid_ip($ip);
 
     $self->log(LOGDEBUG, "fail, bracketed IP");
     return ("RFC 2821 allows an address literal, but we do not",
@@ -372,9 +378,9 @@ sub is_address_literal {
 
 sub is_forged_literal {
     my ($self, $host) = @_;
-    return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+    return if !Qpsmtpd::Utils->is_valid_ip($host);
 
-  # should we add exceptions for reserved internal IP space? (192.168,10., etc?)
+  # should we add exceptions for reserved internal IP space? (192.168,10., etc)
     $host = substr $host, 1, -1;
     return if $host eq $self->qp->connection->remote_ip;
     return ("Forged IPs not accepted here", "forged IP literal");
@@ -486,15 +492,25 @@ sub check_ip_match {
     my $self = shift;
     my $ip = shift or return;
 
-    if ($ip eq $self->qp->connection->remote_ip) {
+    my $rip = $self->qp->connection->remote_ip;
+    if ($ip eq $rip) {
         $self->log(LOGDEBUG, "forward ip match");
         $self->connection->notes('helo_forward_match', 1);
         return;
     }
 
-    my $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
-    my $rem_net =
-      join('.', (split(/\./, $self->qp->connection->remote_ip))[0, 1, 2]);
+    my ($dns_net, $rem_net);
+    if ($ip =~ /:/) {
+        if ($ip  =~ /::/) { $ip  = Net::IP::ip_expand_address($ip,  6); }
+        if ($rip =~ /::/) { $rip = Net::IP::ip_expand_address($rip, 6); }
+
+        $dns_net = join(':', (split(/:/, $ip ))[0, 1, 2, 3, 4, 5]);
+        $rem_net = join(':', (split(/:/, $rip))[0, 1, 2, 3, 4, 5]);
+    }
+    else {
+        $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
+        $rem_net = join('.', (split(/\./, $rip))[0, 1, 2]);
+    }
 
     if ($dns_net eq $rem_net) {
         $self->log(LOGNOTICE, "forward network match");

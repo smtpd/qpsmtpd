@@ -18,7 +18,7 @@ sub register_tests {
     $self->register_test('test_no_reverse_dns', 3);
     $self->register_test('test_no_matching_dns', 2);
     $self->register_test('test_helo_handler', 1);
-    $self->register_test('test_check_ip_match', 3);
+    $self->register_test('test_check_ip_match', 6);
     $self->register_test('test_check_name_match', 3);
 }
 
@@ -82,26 +82,26 @@ sub test_invalid_localhost {
 sub test_is_plain_ip {
     my $self = shift;
 
-    my ($err, $why) = $self->is_plain_ip('0.0.0.0');
+    my ($err, $why) = $self->is_plain_ip('1.0.0.0');
     ok( $err, "plain IP, $why");
 
-    ($err, $why) = $self->is_plain_ip('255.255.255.255');
+    ($err, $why) = $self->is_plain_ip('254.254.254.254');
     ok( $err, "plain IP, $why");
 
-    ($err, $why) = $self->is_plain_ip('[255.255.255.255]');
+    ($err, $why) = $self->is_plain_ip('[254.254.254.254]');
     ok( ! $err, "address literal");
 };
 
 sub test_is_address_literal {
     my $self = shift;
 
-    my ($err, $why) = $self->is_address_literal('[0.0.0.0]');
+    my ($err, $why) = $self->is_address_literal('[1.0.0.0]');
     ok( $err, "plain IP, $why");
 
-    ($err, $why) = $self->is_address_literal('[255.255.255.255]');
+    ($err, $why) = $self->is_address_literal('[254.254.254.254]');
     ok( $err, "plain IP, $why");
 
-    ($err, $why) = $self->is_address_literal('255.255.255.255');
+    ($err, $why) = $self->is_address_literal('254.254.254.254');
     ok( ! $err, "address literal");
 };
 
@@ -146,19 +146,32 @@ sub test_no_matching_dns {
 sub test_check_ip_match {
     my $self = shift;
 
-    $self->qp->connection->remote_ip('192.0.2.1');
+    my @good_tests = (
+        { ip => '192.0.2.1',   ip2 => '192.0.2.1',   r => 'exact'   },
+        { ip => '192.0.2.1',   ip2 => '192.0.2.2',   r => 'network' },
+        { ip => '2001:db8::1', ip2 => '2001:db8::1', r => 'exact'   },
+        { ip => '2001:db8::1', ip2 => '2001:db8::2', r => 'network' },
+    );
 
-    $self->connection->notes('helo_forward_match', 0);
-    $self->check_ip_match('192.0.2.1');
-    ok( $self->connection->notes('helo_forward_match'), "exact");
+    my @bad_tests = (
+        { ip => '192.0.2.1',   ip2 => '192.0.1.1',   r => 'miss'   },
+        { ip => '2001:db8::1', ip2 => '2001:db7::1', r => 'miss'   },
+    );
 
-    $self->connection->notes('helo_forward_match', 0);
-    $self->check_ip_match('192.0.2.2');
-    ok( $self->connection->notes('helo_forward_match'), "network");
+    foreach my $t ( @good_tests ) {
+        $self->qp->connection->remote_ip($t->{ip});
+        $self->connection->notes('helo_forward_match', 0);
+        $self->check_ip_match($t->{ip2});
+        ok( $self->connection->notes('helo_forward_match'), $t->{r});
+    };
 
-    $self->connection->notes('helo_forward_match', 0);
-    $self->check_ip_match('192.0.1.1');
-    ok( ! $self->connection->notes('helo_forward_match'), "miss");
+    foreach my $t ( @bad_tests ) {
+        $self->qp->connection->remote_ip($t->{ip});
+
+        $self->connection->notes('helo_forward_match', 0);
+        $self->check_ip_match($t->{ip2});
+        ok( ! $self->connection->notes('helo_forward_match'), $t->{r});
+    };
 };
 
 sub test_check_name_match {
