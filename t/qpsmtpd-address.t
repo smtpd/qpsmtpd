@@ -13,20 +13,6 @@ use_ok('Test::Qpsmtpd');
 
 __config();
 
-sub __config {
-    ok( my ($qp,$cxn) = Test::Qpsmtpd->new_conn(), "get new connection" );
-    ok( $qp->command('HELO test') );
-    ok( $qp->command('MAIL FROM:<test@example.com>') );
-    my $sender = $qp->transaction->sender;
-    $qp->hooks->{user_config} = undef;
-    is( $qp->config('size_threshold'), 10000, 'use global config when user_config is absent' );
-    is( $sender->config('test config'), undef, 'no user_config plugins exist' );
-    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return DECLINED } }];
-    is( $sender->config('test config'), undef, 'no user_config plugins return OK' );
-    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return OK, 'test data' } }];
-    is( $sender->config('test config'), 'test data', 'user_config plugins return a value' );
-}
-
 __new();
 __parse();
 
@@ -135,3 +121,17 @@ sub __parse {
     is($ao && $ao->address, $as, "address $as");
     ok($ao eq $as, "overloaded 'cmp' operator");
 };
+
+sub __config {
+    ok( my ($qp,$cxn) = Test::Qpsmtpd->new_conn(), "get new connection" );
+    ok( $qp->command('HELO test') );
+    ok( $qp->command('MAIL FROM:<test@example.com>') );
+    my $sender = $qp->transaction->sender;
+    $qp->hooks->{user_config} = undef;
+    is( $qp->config('size_threshold'), 10000, 'use global config when user_config is absent' );
+    is( $sender->config('test config'), undef, 'no user_config plugins exist' );
+    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return DECLINED } }];
+    is( $sender->config('test config'), undef, 'no user_config plugins return OK' );
+    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return OK, 'test data' } }];
+    is( $sender->config('test config'), 'test data', 'user_config plugins return a value' );
+}
