@@ -18,7 +18,8 @@ sub __config {
     ok( $qp->command('HELO test') );
     ok( $qp->command('MAIL FROM:<test@example.com>') );
     my $sender = $qp->transaction->sender;
-    $qp->hooks->{user_config} = [];
+    $qp->hooks->{user_config} = undef;
+    is( $qp->config('size_threshold'), 10000, 'use global config when user_config is absent' );
     is( $sender->config('test config'), undef, 'no user_config plugins exist' );
     $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return DECLINED } }];
     is( $sender->config('test config'), undef, 'no user_config plugins return OK' );
