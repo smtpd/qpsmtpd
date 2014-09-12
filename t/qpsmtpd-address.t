@@ -6,8 +6,24 @@ use Test::More;
 
 use lib 'lib';
 
-BEGIN {
-    use_ok('Qpsmtpd::Address');
+BEGIN { use_ok('Qpsmtpd::Constants'); }
+use_ok('Qpsmtpd::Address');
+use lib 't';
+use_ok('Test::Qpsmtpd');
+
+__config();
+
+sub __config {
+    ok( my ($qp,$cxn) = Test::Qpsmtpd->new_conn(), "get new connection" );
+    ok( $qp->command('HELO test') );
+    ok( $qp->command('MAIL FROM:<test@example.com>') );
+    my $sender = $qp->transaction->sender;
+    $qp->hooks->{user_config} = [];
+    is( $sender->config('test config'), undef, 'no user_config plugins exist' );
+    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return DECLINED } }];
+    is( $sender->config('test config'), undef, 'no user_config plugins return OK' );
+    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return OK, 'test data' } }];
+    is( $sender->config('test config'), 'test data', 'user_config plugins return a value' );
 }
 
 __new();
