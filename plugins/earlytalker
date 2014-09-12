@@ -88,7 +88,7 @@ sub register {
         $check_at{CONNECT} = 1;
     }
     $self->{_args} = {
-                      'wait' => 1,
+                      wait => 1,
                       @args,
                       'check-at' => \%check_at,
                      };
@@ -106,8 +106,8 @@ sub register {
     if (!defined $self->{_args}{reject_type}) {
         $self->{_args}{reject_type} = 'perm';
     }
-
     # /end compat
+
     if ($qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
         require APR::Const;
         APR::Const->import(qw(POLLIN SUCCESS));
@@ -118,9 +118,12 @@ sub register {
         $self->register_hook('connect', 'connect_handler');
         $self->register_hook('data',    'data_handler');
     }
-    $self->register_hook('mail', 'mail_handler')
-      if $self->{_args}{'defer-reject'};
-    $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
+    if ($self->{_args}{'defer-reject'}) {
+        $self->register_hook('mail', 'mail_handler')
+    };
+    if (!defined $self->{_args}{reject}) {
+        $self->{_args}{reject} = 1;
+    };
 }
 
 sub apr_connect_handler {
@@ -152,7 +155,7 @@ sub apr_data_handler {
 
     my $c      = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;
-    my $timeout = $self->{_args}{'wait'} * 1_000_000;
+    my $timeout = $self->{_args}{wait} * 1_000_000;
 
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
@@ -163,7 +166,6 @@ sub apr_data_handler {
 
 sub connect_handler {
     my ($self, $transaction) = @_;
-    my $in = new IO::Select;
 
     return DECLINED unless $self->{_args}{'check-at'}{CONNECT};
     return DECLINED if $self->is_immune();
@@ -175,8 +177,9 @@ sub connect_handler {
         return DECLINED;
     }
 
+    my $in = new IO::Select;
     $in->add(\*STDIN) or return DECLINED;
-    if (!$in->can_read($self->{_args}{'wait'})) {
+    if (!$in->can_read($self->{_args}{wait})) {
         return $self->log_and_pass();
     }
 
@@ -197,7 +200,7 @@ sub data_handler {
     return DECLINED if $self->is_immune();
 
     $in->add(\*STDIN) or return DECLINED;
-    if (!$in->can_read($self->{_args}{'wait'})) {
+    if (!$in->can_read($self->{_args}{wait})) {
         return $self->log_and_pass();
     }
 
