@@ -183,13 +183,12 @@ sub check_dns {
 
 sub ip_is_valid {
     my ($self, $ip) = @_;
-    my ($net, $mask);
     ### while (($net,$mask) = each %invalid) {
     ###      ... does NOT reset to beginning, will start on
     ###      2nd invocation after where it denied the first time..., so
     ###      2nd time the same "MAIL FROM" would be accepted!
-    foreach $net (keys %invalid) {
-        $mask = $invalid{$net};
+    foreach my $net (keys %invalid) {
+        my $mask = $invalid{$net};
         $mask = pack "B32", "1" x ($mask) . "0" x (32 - $mask);
         return if $net eq join('.', unpack("C4", inet_aton($ip) & $mask));
     }
