@@ -148,14 +148,17 @@ sub config {
     # first try the cache
     # XXX - is this always the right thing to do? what if a config hook
     # can return different values on subsequent calls?
-    if ($_config_cache->{$c}) {
+    my $is_address = (ref $type and $type->can('address'));
+    if ($_config_cache->{$c} and ! $is_address) {
         $self->log(LOGDEBUG,
                    "config($c) returning (@{$_config_cache->{$c}}) from cache");
         return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
     }
 
     # then run the hooks
-    my ($rc, @config) = $self->run_hooks_no_respond("config", $c);
+    my @args = $is_address ? ('user_config',$type,$c) : ('config',$c);
+    my ($rc, @config) = $self->run_hooks_no_respond(@args);
+    return wantarray ? @config : $config[0] if $is_address;
     $self->log(LOGDEBUG, "config($c): hook returned ($rc, @config) ");
     if ($rc == OK) {
         $self->log(LOGDEBUG,
