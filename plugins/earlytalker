@@ -26,6 +26,12 @@ greeting timeouts -- these are known to range as low as 30 seconds, and may
 in some cases be configured lower by mailserver admins.  Network transit time
 must also be allowed for.
 
+=head3 overriding wait
+
+Other plugins can set a connection specific delay by setting the connection
+note $connection->notes_relayclient_wait. This is ideally used in conjunction with
+a reputation database.
+
 =head2 reject <boolean>
 
 Do we reject/deny connections to early talkers?
