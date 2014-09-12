@@ -11,7 +11,7 @@ sub register_tests {
     $self->register_test('test_init_resolver', 2);
     $self->register_test('test_is_in_badhelo', 2);
     $self->register_test('test_is_regex_match', 3);
-    $self->register_test('test_invalid_localhost', 4);
+    $self->register_test('test_invalid_localhost', 8);
     $self->register_test('test_is_plain_ip', 3);
     $self->register_test('test_is_address_literal', 3);
     $self->register_test('test_no_forward_dns', 2);
@@ -50,7 +50,7 @@ sub test_is_regex_match {
 
     my ($err, $why) = $self->is_regex_match('yahoo.com', 'ya.oo\.com$' );
     ok( $err, "yahoo.com, $why");
-    
+
     ($err, $why) = $self->is_regex_match('yoda.com', 'ya.oo\.com$' );
     ok( ! $err, "yahoo.com");
 
@@ -61,21 +61,22 @@ sub test_is_regex_match {
 sub test_invalid_localhost {
     my $self = shift;
 
-    $self->qp->connection->remote_ip(undef);
-    my ($err, $why) = $self->invalid_localhost('localhost' );
-    ok( $err, "localhost, undefined remote IP: $why");
-    
-    $self->qp->connection->remote_ip('');
-    ($err, $why) = $self->invalid_localhost('localhost' );
-    ok( $err, "localhost, empty remote IP: $why");
+    my ($err, $why);
+    foreach my $ip ( undef, '', '192.0.99.5' ) {
+        $self->qp->connection->remote_ip(undef);
+        ($err, $why) = $self->invalid_localhost('localhost' );
+        ok(!$err, "host: localhost, invalid remote ip");
 
-    $self->qp->connection->remote_ip('192.0.99.5');
-    ($err, $why) = $self->invalid_localhost('localhost');
-    ok( $err, "localhost, invalid remote IP: $why");
+        $self->qp->connection->remote_ip(undef);
+        ($err, $why) = $self->invalid_localhost('not-localhost');
+        ok($err, "host: not-localhost, invalid remote ip");
+    };
 
-    $self->qp->connection->remote_ip('127.0.0.1');
-    ($err, $why) = $self->invalid_localhost('localhost');
-    ok( ! $err, "localhost, correct remote IP");
+    foreach my $ip (qw/ ::1 127.0.0.1 / ) {
+        $self->qp->connection->remote_ip($ip);
+        ($err, $why) = $self->invalid_localhost('not-localhost');
+        ok( ! $err, "localhost, correct remote IP ($ip)");
+    }
 };
 
 sub test_is_plain_ip {
@@ -109,7 +110,7 @@ sub test_no_forward_dns {
 
     my ($err, $why) = $self->no_forward_dns('perl.org');
     ok( ! $err, "perl.org");
-    
+
     # reserved .test TLD: http://tools.ietf.org/html/rfc2606
     ($err, $why) = $self->no_forward_dns('perl.org.test');
     ok( $err, "test.perl.org.test");

@@ -122,10 +122,6 @@ If the X-Spam-User header is present, the LDA should submit the message to
 spamd for re-processing with the recipients address.
 
 
-=head1 TODO
-
-Make the "subject munge string" configurable
-
 =head1 CHANGES
 
 2012.04.02 - Matt Simerson
@@ -450,10 +446,11 @@ sub munge_subject {
         $self->log(LOGDEBUG, "skipping munge, no user or qpsmtpd pref set");
         return;
     };
-    return unless $sa->{score} > $required;
-    return unless $sa->{score} > $qp_num;
+    return if !defined $sa->{score};
+    return if $required && $sa->{score} <= $required;
+    return if $sa->{score} <= $qp_num;
 
-    my $subject_prefix = $self->qp->config('subject_prefix')  || '*** SPAM ***';
+    my $subject_prefix = $self->{_args}{subject_prefix} || $self->qp->config('subject_prefix') || '*** SPAM ***';
     my $subject        = $transaction->header->get('Subject') || '';
     $transaction->header->replace('Subject', "$subject_prefix $subject");
 }

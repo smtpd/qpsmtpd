@@ -16,6 +16,9 @@ WriteMakefile(
         'Net::IP'      => 0,
         'Time::HiRes'  => 0,
         'IO::Socket::SSL' => 0,
+# Dev/Test modules
+	    'Test::More'   => 0,
+	    'Test::Output' => 0,
 # modules for specific features
         'Mail::DKIM'         => 0,
         'File::Tail'         => 0,   # log/summarize, log/watch

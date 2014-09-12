@@ -207,6 +207,9 @@ t/plugin_tests/sender_permitted_from
 t/plugin_tests/spamassassin
 t/plugin_tests/virus/clamdscan
 t/qpsmtpd-address.t
+t/qpsmtpd-smtp.t
+t/qpsmtpd-utils.t
+t/qpsmtpd.t
 t/rset.t
 t/tempstuff.t
 t/Test/Qpsmtpd.pm

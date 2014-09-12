@@ -1,13 +1,12 @@
 package Qpsmtpd;
 use strict;
-use vars qw($VERSION $TraceLevel $Spool_dir $Size_threshold);
+#use warnings;
+use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
 
-#use DashProfiler;
-
-$VERSION = "0.94";
+our $VERSION = "0.94";
 
 my $git;
 
@@ -17,17 +16,15 @@ if (-e ".git") {
     $git && chomp $git;
 }
 
-my $hooks = {};
+our $hooks = {};
 my %defaults = (
                 me      => hostname,
                 timeout => 1200,
                );
 my $_config_cache = {};
-my %config_dir_memo;
+our %config_dir_memo;
 
-#DashProfiler->add_profile("qpsmtpd");
-#my $SAMPLER = DashProfiler->prepare("qpsmtpd");
-my $LOGGING_LOADED = 0;
+our $LOGGING_LOADED = 0;
 
 sub _restart {
     my $self = shift;
@@ -45,11 +42,6 @@ sub _restart {
     }
 }
 
-sub DESTROY {
-
-    #warn $_ for DashProfiler->profile_as_text("qpsmtpd");
-}
-
 sub version { $VERSION . ($git ? "/$git" : "") }
 
 sub TRACE_LEVEL { $TraceLevel };    # leave for plugin compatibility
@@ -57,12 +49,11 @@ sub TRACE_LEVEL { $TraceLevel };    # leave for plugin compatibility
 sub hooks { $hooks; }
 
 sub load_logging {
-
-    # need to do this differently than other plugins so as to
-    # not trigger logging activity
-    return if $LOGGING_LOADED;
     my $self = shift;
-    return if $hooks->{"logging"};
+
+    # avoid triggering log activity
+    return if ($LOGGING_LOADED || $hooks->{'logging'});
+
     my $configdir  = $self->config_dir("logging");
     my $configfile = "$configdir/logging";
     my @loggers    = $self->_config_from_file($configfile, 'logging');
@@ -97,10 +88,7 @@ sub load_logging {
     return @loggers;
 }
 
-sub trace_level {
-    my $self = shift;
-    return $TraceLevel;
-}
+sub trace_level { return $TraceLevel; }
 
 sub init_logger {    # needed for compatibility purposes
     shift->trace_level();
@@ -208,7 +196,7 @@ sub config_dir {
     }
     my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
     my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
-    $configdir = "$path/config" if (-e "$path/config/$config");
+    $configdir = "$path/config" if -e "$path/config/$config";
     if (exists $ENV{QPSMTPD_CONFIG}) {
         $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/;    # detaint
         $configdir = $1 if -e "$1/$config";
@@ -274,14 +262,14 @@ sub _config_from_file {
     $visited ||= [];
     push @{$visited}, $configfile;
 
-    open CF, "<$configfile"
+    open my $CF, '<', $configfile
       or warn "$$ could not open configfile $configfile: $!" and return;
-    my @config = <CF>;
+    my @config = <$CF>;
     chomp @config;
     @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ }
       map { s/^\s+//; s/\s+$//; $_; }    # trim leading/trailing whitespace
       @config;
-    close CF;
+    close $CF;
 
     my $pos = 0;
     while ($pos < @config) {
@@ -606,7 +594,7 @@ sub spool_dir {
     unless ($Spool_dir) {    # first time through
         $self->log(LOGDEBUG, "Initializing spool_dir");
         $Spool_dir = $self->config('spool_dir')
-          || Qpsmtpd::Utils::tildeexp('~/tmp/');
+          || Qpsmtpd::Utils->tildeexp('~/tmp/');
 
         $Spool_dir .= "/" unless ($Spool_dir =~ m!/$!);
 

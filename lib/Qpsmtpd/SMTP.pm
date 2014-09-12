@@ -1,12 +1,15 @@
 package Qpsmtpd::SMTP;
-use Qpsmtpd;
-@ISA = qw(Qpsmtpd);
-my %auth_mechanisms = ();
-
-package Qpsmtpd::SMTP;
 use strict;
-use Carp;
 
+use base 'Qpsmtpd';
+
+use Carp;
+#use Data::Dumper;
+use POSIX qw(strftime);
+use Mail::Header;
+use Net::DNS;
+
+use Qpsmtpd;
 use Qpsmtpd::Connection;
 use Qpsmtpd::Transaction;
 use Qpsmtpd::Plugin;
@@ -15,11 +18,7 @@ use Qpsmtpd::Auth;
 use Qpsmtpd::Address ();
 use Qpsmtpd::Command;
 
-use Mail::Header ();
-
-#use Data::Dumper;
-use POSIX qw(strftime);
-use Net::DNS;
+my %auth_mechanisms = ();
 
 # this is only good for forkserver
 # can't set these here, cause forkserver resets them
@@ -27,19 +26,16 @@ use Net::DNS;
 #$SIG{ALRM} = sub { warn "Connection Timed Out\n"; exit; };
 
 sub new {
-    my $proto = shift;
+    my ($proto, %args) = @_;
     my $class = ref($proto) || $proto;
-
-    my %args = @_;
 
     my $self = bless({args => \%args}, $class);
 
-    my (@commands) = qw(ehlo helo rset mail rcpt data help vrfy noop quit);
-    my (%commands);
-    @commands{@commands} = ('') x @commands;
+    # this list of valid commands should probably be a method or a set of methods
+    $self->{_commands} = {
+        map { $_ => '' } qw(ehlo helo rset mail rcpt data help vrfy noop quit)
+    };
 
-   # this list of valid commands should probably be a method or a set of methods
-    $self->{_commands} = \%commands;
     $self->SUPER::_restart(%args) if $args{restart}; # calls Qpsmtpd::_restart()
     $self;
 }
@@ -90,7 +86,9 @@ sub fault {
     my $self = shift;
     my ($msg) = shift || "program fault - command not performed";
     my ($name) = split /\s+/, $0, 2;
-    print STDERR $name, "[$$]: $msg ($!)\n";
+    print STDERR $name, "[$$]: $msg\n";
+    print STDERR $name, "[$$]: Last system error: $!"
+        ." (Likely irelevant--debug the crashed plugin to ensure it handles \$! properly)";
     return $self->respond(451, "Internal error - try again later - " . $msg);
 }
 
