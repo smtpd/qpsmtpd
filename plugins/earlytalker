@@ -126,6 +126,14 @@ sub register {
     };
 }
 
+sub wait_length {
+    my ($self) = @_;
+    if ($self->connection->notes('earlytalker_wait')) {
+        return $self->connection->notes('earlytalker_wait');
+    }
+    return $self->{_args}{wait};
+};
+
 sub apr_connect_handler {
     my ($self, $transaction) = @_;
 
@@ -134,7 +142,7 @@ sub apr_connect_handler {
 
     my $c      = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;
-    my $timeout = $self->{_args}{'wait'} * 1_000_000;
+    my $timeout = $self->wait_length() * 1_000_000;
 
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
@@ -155,7 +163,7 @@ sub apr_data_handler {
 
     my $c      = $self->qp->{conn} or return DECLINED;
     my $socket = $c->client_socket or return DECLINED;
-    my $timeout = $self->{_args}{wait} * 1_000_000;
+    my $timeout = $self->wait_length() * 1_000_000;
 
     my $rc = $socket->poll($c->pool, $timeout, APR::Const::POLLIN());
     if ($rc == APR::Const::SUCCESS()) {
@@ -179,7 +187,7 @@ sub connect_handler {
 
     my $in = new IO::Select;
     $in->add(\*STDIN) or return DECLINED;
-    if (!$in->can_read($self->{_args}{wait})) {
+    if (!$in->can_read($self->wait_length())) {
         return $self->log_and_pass();
     }
 
@@ -200,7 +208,7 @@ sub data_handler {
     return DECLINED if $self->is_immune();
 
     $in->add(\*STDIN) or return DECLINED;
-    if (!$in->can_read($self->{_args}{wait})) {
+    if (!$in->can_read($self->wait_length())) {
         return $self->log_and_pass();
     }
 
@@ -209,15 +217,12 @@ sub data_handler {
 
 sub log_and_pass {
     my $self = shift;
-    my $ip = $self->qp->connection->remote_ip || 'remote host';
     $self->log(LOGINFO, "pass, not spontaneous");
     return DECLINED;
 }
 
 sub log_and_deny {
     my $self = shift;
-
-    my $ip = $self->qp->connection->remote_ip || 'remote host';
 
     $self->connection->notes('earlytalker', 1);
     $self->adjust_karma(-1);
