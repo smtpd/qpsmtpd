@@ -22,7 +22,17 @@ __load_logging();
 done_testing();
 
 sub __log {
+    my $warned = '';
+    local $SIG{__WARN__} = sub {
+        if ( $_[0] eq "$$ test log message\n" ) {
+            $warned = join ' ', @_;
+        }
+        else {
+            warn @_;
+        }
+    };
     ok( $qp->log(LOGWARN, "test log message"), 'log');
+    is( $warned, "$$ test log message\n", 'LOGWARN emitted correct warning' );
 }
 
 sub __config_dir {
