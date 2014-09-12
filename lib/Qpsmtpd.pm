@@ -145,46 +145,24 @@ sub config {
 
     $self->log(LOGDEBUG, "in config($c)");
 
-    # first try the cache
-    # XXX - is this always the right thing to do? what if a config hook
-    # can return different values on subsequent calls?
     my $is_address = (ref $type and $type->can('address'));
-    if ($_config_cache->{$c} and ! $is_address) {
-        $self->log(LOGDEBUG,
-                   "config($c) returning (@{$_config_cache->{$c}}) from cache");
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
-    }
-
-    # then run the hooks
     my @args = $is_address ? ('user_config',$type,$c) : ('config',$c);
     my ($rc, @config) = $self->run_hooks_no_respond(@args);
     return wantarray ? @config : $config[0] if $is_address;
     $self->log(LOGDEBUG, "config($c): hook returned ($rc, @config) ");
     if ($rc == OK) {
-        $self->log(LOGDEBUG,
-"setting _config_cache for $c to [@config] from hooks and returning it"
-        );
-        $_config_cache->{$c} = \@config;
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
+        return wantarray ? @config : $config[0];
     }
 
     # and then get_qmail_config
     @config = $self->get_qmail_config($c, $type);
     if (@config) {
-        $self->log(LOGDEBUG,
-"setting _config_cache for $c to [@config] from get_qmail_config and returning it"
-        );
-        $_config_cache->{$c} = \@config;
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
+        return wantarray ? @config : $config[0];
     }
 
     # finally we use the default if there is any:
     if (exists($defaults{$c})) {
-        $self->log(LOGDEBUG,
-"setting _config_cache for $c to @{[$defaults{$c}]} from defaults and returning it"
-        );
-        $_config_cache->{$c} = [$defaults{$c}];
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
+        return wantarray ? @config : $config[0];
     }
     return;
 }
