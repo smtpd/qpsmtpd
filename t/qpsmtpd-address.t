@@ -127,11 +127,42 @@ sub __config {
     ok( $qp->command('HELO test') );
     ok( $qp->command('MAIL FROM:<test@example.com>') );
     my $sender = $qp->transaction->sender;
-    $qp->hooks->{user_config} = undef;
-    is( $qp->config('size_threshold'), 10000, 'use global config when user_config is absent' );
-    is( $sender->config('test config'), undef, 'no user_config plugins exist' );
-    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return DECLINED } }];
-    is( $sender->config('test config'), undef, 'no user_config plugins return OK' );
-    $qp->hooks->{user_config} = [{ name => 'test hook', code => sub { return OK, 'test data' } }];
-    is( $sender->config('test config'), 'test data', 'user_config plugins return a value' );
+    my @test_data = (
+        {
+            pref     => 'size_threshold',
+            result   => [], 
+            expected => 10000,
+            descr    => 'fall back to global config when user_config is absent',
+        },
+        {
+            pref     => 'test_config',
+            result   => [], 
+            expected => undef,
+            descr    => 'return nothing when no user_config plugins exist',
+        },
+        {
+            pref     => 'test_config',
+            result   => [DECLINED], 
+            expected => undef,
+            descr    => 'return nothing when user_config plugins return DECLINED',
+        },
+        {
+            pref     => 'test_config',
+            result   => [OK,'test value'], 
+            expected => 'test value',
+            descr    => 'return results when user_config plugin returns a value',
+        },
+    );
+    for (@test_data) {
+        $qp->hooks->{user_config}
+            = @{ $_->{result} }
+                ? [{ name => 'test hook', code => sub { return @{ $_->{result} }} }]
+                : undef;
+        is( $sender->config($_->{pref}), $_->{expected}, $_->{descr} );
+    }
+}
+
+sub fake_hook {
+    my ( $r ) = @_;
+    return @$r ? [{ name => 'test hook', code => sub { return @{ $_->{result} }} }] : undef;
 }
