@@ -161,8 +161,3 @@ sub __config {
         is( $sender->config($_->{pref}), $_->{expected}, $_->{descr} );
     }
 }
-
-sub fake_hook {
-    my ( $r ) = @_;
-    return @$r ? [{ name => 'test hook', code => sub { return @{ $_->{result} }} }] : undef;
-}
