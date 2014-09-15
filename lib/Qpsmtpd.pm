@@ -152,7 +152,8 @@ sub config {
     return wantarray ? @config : $config[0]
         if defined $rc and $rc == OK;
     ($rc, @config) = $self->run_hooks_no_respond('config',$c);
-    $self->log(LOGDEBUG, "config($c): hook returned ($rc, @config) ");
+    $self->log(LOGDEBUG, "config($c): hook returned ("
+        . join( ',', map { defined $_ ? $_ : 'undef' } ($rc,@config) ) . ")");
     return wantarray ? @config : $config[0]
         if defined $rc and $rc == OK;
 
