@@ -1,5 +1,6 @@
 package Qpsmtpd;
 use strict;
+
 #use warnings;
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
@@ -7,7 +8,7 @@ use Sys::Hostname;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Address;
 
-our $VERSION = "0.94";
+our $VERSION = "0.95";
 
 my $git;
 
@@ -91,7 +92,7 @@ sub load_logging {
 
 sub trace_level { return $TraceLevel; }
 
-sub init_logger {    # needed for compatibility purposes
+sub init_logger {                 # needed for compatibility purposes
     shift->trace_level();
 }
 
@@ -103,17 +104,17 @@ sub log {
 sub varlog {
     my ($self, $trace) = (shift, shift);
     my ($hook, $plugin, @log);
-    if ($#_ == 0) {    # log itself
+    if ($#_ == 0) {               # log itself
         (@log) = @_;
     }
-    elsif ($#_ == 1) {    # plus the hook
+    elsif ($#_ == 1) {            # plus the hook
         ($hook, @log) = @_;
     }
-    else {                # called from plugin
+    else {                        # called from plugin
         ($hook, $plugin, @log) = @_;
     }
 
-    $self->load_logging;    # in case we don't have this loaded yet
+    $self->load_logging;          # in case we don't have this loaded yet
 
     my ($rc) =
       $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log)
@@ -148,24 +149,30 @@ sub config {
 
     # first run the hooks
     my ($rc, @config);
-    ($rc, @config) = $self->run_hooks_no_respond('user_config',$type,$c)
-        if ref $type and $type->can('address');
-    return wantarray ? @config : $config[0]
-        if defined $rc and $rc == OK;
-    ($rc, @config) = $self->run_hooks_no_respond('config',$c);
-    $self->log(LOGDEBUG, "config($c): hook returned ("
-        . join( ',', map { defined $_ ? $_ : 'undef' } ($rc,@config) ) . ")");
-    return wantarray ? @config : $config[0]
-        if defined $rc and $rc == OK;
+    if (ref $type && $type->can('address')) {
+        ($rc, @config) = $self->run_hooks_no_respond('user_config', $type, $c);
+    };
+    if (defined $rc && $rc == OK) {
+        return wantarray ? @config : $config[0];
+    };
+    ($rc, @config) = $self->run_hooks_no_respond('config', $c);
+    $self->log(LOGDEBUG,
+                   "config($c): hook returned ("
+                 . join(',', map { defined $_ ? $_ : 'undef' } ($rc, @config))
+                 . ")"
+              );
+    if (defined $rc && $rc == OK) {
+        return wantarray ? @config : $config[0];
+    };
 
-    # and then get_qmail_config
+    # then get_qmail_config
     @config = $self->get_qmail_config($c, $type);
-    return wantarray ? @config : $config[0]
-        if @config;
+    return wantarray ? @config : $config[0] if @config;
 
-    # finally we use the default if there is any:
-    return wantarray ? ($defaults{$c}) : $defaults{$c}
-        if exists $defaults{$c};
+    # then the default, if any
+    if (exists $defaults{$c}) {
+        return wantarray ? ($defaults{$c}) : $defaults{$c};
+    };
     return;
 }
 
@@ -205,7 +212,7 @@ sub get_qmail_config {
     # CDB config support really should be moved to a plugin
     if ($type and $type eq "map") {
         return $self->get_qmail_config_map($config, $configfile);
-    };
+    }
 
     return $self->_config_from_file($configfile, $config);
 }
@@ -236,7 +243,7 @@ sub get_qmail_config_map {
     # the data is in a CDB file in the first place because there's
     # lots of data and the cache hit ratio would be low.
     return \%h;
-};
+}
 
 sub _config_from_file {
     my ($self, $configfile, $config, $visited) = @_;
@@ -357,13 +364,13 @@ sub _load_plugin {
     my ($plugin_line, @plugin_dirs) = @_;
 
     # untaint the config data before passing it to plugins
-    my ($safe_line) = $plugin_line =~ /^([ -~]+)$/  # all ascii printable
-        or die "unsafe characters in config line: $plugin_line\n";
+    my ($safe_line) = $plugin_line =~ /^([ -~]+)$/    # all ascii printable
+      or die "unsafe characters in config line: $plugin_line\n";
     my ($plugin, @args) = split /\s+/, $safe_line;
 
     if ($plugin =~ m/::/) {
         return $self->_load_package_plugin($plugin, $safe_line, \@args);
-    };
+    }
 
     # regular plugins/$plugin plugin
     my $plugin_name = $plugin;
@@ -383,19 +390,19 @@ sub _load_plugin {
     my $package = "Qpsmtpd::Plugin::$plugin_name";
 
     # don't reload plugins if they are already loaded
-    unless (defined &{"${package}::plugin_name"}) {
+    if (!defined &{"${package}::plugin_name"}) {
         PLUGIN_DIR: for my $dir (@plugin_dirs) {
-            if (-e "$dir/$plugin") {
-                Qpsmtpd::Plugin->compile($plugin_name, $package,
-                                "$dir/$plugin", $self->{_test_mode}, $plugin);
-                $self->log(LOGDEBUG, "Loading $safe_line from $dir/$plugin")
-                    unless $safe_line =~ /logging/;
-                last PLUGIN_DIR;
-            }
+            next if !-e "$dir/$plugin";
+            Qpsmtpd::Plugin->compile($plugin_name, $package,
+                "$dir/$plugin", $self->{_test_mode}, $plugin);
+            if ($safe_line !~ /logging/) {
+                $self->log(LOGDEBUG, "Loading $safe_line from $dir/$plugin");
+            };
+            last PLUGIN_DIR;
         }
-        die "Plugin $plugin_name not found in our plugin dirs (",
-            join(", ", @plugin_dirs), ")"
-            unless defined &{"${package}::plugin_name"};
+        if (! defined &{"${package}::plugin_name"}) {
+            die "Plugin $plugin_name not found in our plugin dirs (", join(', ', @plugin_dirs), ")";
+        };
     }
 
     my $plug = $package->new();
@@ -406,23 +413,25 @@ sub _load_plugin {
 
 sub _load_package_plugin {
     my ($self, $plugin, $plugin_line, $args) = @_;
+
     # "full" package plugin (My::Plugin)
     my $package = $plugin;
     $package =~ s/[^_a-z0-9:]+//gi;
-    my $eval = qq[require $package;\n]
-        . qq[sub ${plugin}::plugin_name { '$plugin' }];
+    my $eval =
+      qq[require $package;\n] . qq[sub ${plugin}::plugin_name { '$plugin' }];
     $eval =~ m/(.*)/s;
     $eval = $1;
     eval $eval;
     die "Failed loading $package - eval $@" if $@;
-    $self->log(LOGDEBUG, "Loading $package ($plugin_line)")
-        unless $plugin_line =~ /logging/;
+    if ($plugin_line !~ /logging/) {
+        $self->log(LOGDEBUG, "Loading $package ($plugin_line)");
+    };
 
     my $plug = $package->new();
     $plug->_register($self, @$args);
 
     return $plug;
-};
+}
 
 sub transaction { return {}; }    # base class implements empty transaction
 

@@ -352,9 +352,9 @@ sub qp {
 }
 
 sub config {
-    my ($self,$key) = @_;
+    my ($self, $key) = @_;
     my $qp = $self->qp or return;
-    return $qp->config($key,$self);
+    return $qp->config($key, $self);
 }
 
 sub _addr_cmp {

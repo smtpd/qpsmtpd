@@ -143,6 +143,7 @@ plugins/stunnel
 plugins/tls
 plugins/tls_cert
 plugins/uribl
+plugins/user_config
 plugins/virus/aveclient
 plugins/virus/bitdefender
 plugins/virus/clamav
@@ -205,6 +206,7 @@ t/plugin_tests/relay
 t/plugin_tests/resolvable_fromhost
 t/plugin_tests/sender_permitted_from
 t/plugin_tests/spamassassin
+t/plugin_tests/user_config
 t/plugin_tests/virus/clamdscan
 t/qpsmtpd-address.t
 t/qpsmtpd-smtp.t
