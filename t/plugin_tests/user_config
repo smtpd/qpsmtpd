@@ -15,7 +15,7 @@ BEGIN {    # need this to happen before anything else
 
 sub register_tests {
     my ($self) = @_;
-    $self->register_test('test_hook_user_config', 1);
+    $self->register_test('test_hook_user_config', 4);
 }
 
 sub test_hook_user_config {
