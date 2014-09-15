@@ -648,6 +648,13 @@ sub auth_mechanism {
     return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "");
 }
 
+sub address {
+    my $self = shift;
+    my $addr = Qpsmtpd::Address->new(@_);
+    $addr->{qp} = $self;
+    return $addr;
+}
+
 1;
 
 __END__

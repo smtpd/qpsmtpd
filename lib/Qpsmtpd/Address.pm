@@ -345,9 +345,14 @@ hook_user_config
 
 =cut
 
+sub qp {
+    my ($self) = @_;
+    return $self->{qp};
+}
+
 sub config {
     my ($self,$key) = @_;
-    my $qp = $self->notes('qp_obj') or return;
+    my $qp = $self->qp or return;
     return $qp->config($key,$self);
 }
 
