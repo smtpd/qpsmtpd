@@ -712,20 +712,20 @@ Allowed return codes are
 
 plugin didn't find the requested value
 
-=item OK
+=item OK, @values
 
 requested values as C<@list>, example:
 
-  return (OK, @{$config{$value}}) 
-    if exists $config{$value};
+  return (OK, @{$config{$key}})
+    if exists $config{$key};
   return (DECLINED);
 
 =back
 
 Arguments:
 
-  my ($self,$transaction,$value) = @_; 
-  # $value: the requested config item(s)
+  my ($self,$transaction,$key) = @_;
+  # $key: the requested config item(s)
 
 B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
 is called. It's probably best not to try acessing it.
@@ -744,20 +744,20 @@ Allowed return codes are
 
 plugin didn't find the requested value
 
-=item OK
+=item OK, @values
 
 requested values as C<@list>, example:
 
-  return (OK, @{$config{$value}}) 
-    if exists $config{$value};
+  return (OK, @{$config{$key}})
+    if exists $config{$key};
   return (DECLINED);
 
 =back
 
 Arguments:
 
-  my ($self,$transaction,$user,$value) = @_; 
-  # $value: the requested config item(s)
+  my ($self,$transaction,$user,$key) = @_;
+  # $key: the requested config item(s)
 
 Example plugin is F<user_config> from the qpsmtpd distribution.
 

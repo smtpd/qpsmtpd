@@ -341,7 +341,7 @@ sub notes {
 =head2 config($value)
 
 Looks up a configuration directive based on this recipient, using any plugins that utilize
-hook_rcpt_config
+hook_user_config
 
 =cut
 
