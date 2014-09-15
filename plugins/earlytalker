@@ -29,7 +29,7 @@ must also be allowed for.
 =head3 overriding wait
 
 Other plugins can set specify a per-connection delay by setting
-connection->notes->relayclient_wait. This is ideally used in conjunction with
+connection->notes->('relayclient_wait'). This is ideally used in conjunction with
 a reputation database.
 
 =head2 reject <boolean>
