@@ -5,6 +5,7 @@ use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Address;
 
 our $VERSION = "0.94";
 
@@ -651,7 +652,7 @@ sub auth_mechanism {
 sub address {
     my $self = shift;
     my $addr = Qpsmtpd::Address->new(@_);
-    $addr->{qp} = $self;
+    $addr->qp($self);
     return $addr;
 }
 

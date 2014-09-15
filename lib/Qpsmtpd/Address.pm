@@ -346,7 +346,8 @@ hook_user_config
 =cut
 
 sub qp {
-    my ($self) = @_;
+    my $self = shift;
+    $self->{qp} = $_[0] if @_;
     return $self->{qp};
 }
 
