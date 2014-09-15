@@ -221,33 +221,39 @@ sub get_qmail_config {
 
     # CDB config support really should be moved to a plugin
     if ($type and $type eq "map") {
-        unless (-e $configfile . ".cdb") {
-            $_config_cache->{$config} ||= [];
-            return +{};
-        }
-        eval { require CDB_File };
-
-        if ($@) {
-            $self->log(LOGERROR,
-"No CDB Support! Did NOT read $configfile.cdb, could not load CDB_File module: $@"
-            );
-            return +{};
-        }
-
-        my %h;
-        unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
-            $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
-            return +{};
-        }
-
-        # We explicitly don't cache cdb entries. The assumption is that
-        # the data is in a CDB file in the first place because there's
-        # lots of data and the cache hit ratio would be low.
-        return \%h;
-    }
+        return $self->get_qmail_config_map($config, $configfile);
+    };
 
     return $self->_config_from_file($configfile, $config);
 }
+
+sub get_qmail_config_map {
+    my ($self, $config, $configfile) = @_;
+
+    unless (-e $configfile . ".cdb") {
+        $_config_cache->{$config} ||= [];
+        return +{};
+    }
+    eval { require CDB_File };
+
+    if ($@) {
+        $self->log(LOGERROR,
+"No CDB Support! Did NOT read $configfile.cdb, could not load CDB_File module: $@"
+        );
+        return +{};
+    }
+
+    my %h;
+    unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
+        $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
+        return +{};
+    }
+
+    # We explicitly don't cache cdb entries. The assumption is that
+    # the data is in a CDB file in the first place because there's
+    # lots of data and the cache hit ratio would be low.
+    return \%h;
+};
 
 sub _config_from_file {
     my ($self, $configfile, $config, $visited) = @_;
@@ -257,10 +263,12 @@ sub _config_from_file {
     }
 
     $visited ||= [];
-    push @{$visited}, $configfile;
+    push @$visited, $configfile;
 
-    open my $CF, '<', $configfile
-      or warn "$$ could not open configfile $configfile: $!" and return;
+    open my $CF, '<', $configfile or do {
+        warn "$$ could not open configfile $configfile: $!";
+        return;
+    };
     my @config = <$CF>;
     chomp @config;
     @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ }
