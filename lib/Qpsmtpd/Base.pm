@@ -1,4 +1,4 @@
-package Qpsmtpd::Utils;
+package Qpsmtpd::Base;
 use strict;
 
 use Net::IP;

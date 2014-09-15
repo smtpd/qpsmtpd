@@ -4,11 +4,11 @@ use warnings;
 
 use Test::More;
 
-use lib 'lib';      # test lib/Qpsmtpd/Utils (vs site_perl)
+use lib 'lib';      # test lib/Qpsmtpd/Base (vs site_perl)
 
-BEGIN { use_ok('Qpsmtpd::Utils'); }
+BEGIN { use_ok('Qpsmtpd::Base'); }
 
-my $utils = bless {}, 'Qpsmtpd::Utils';
+my $utils = bless {}, 'Qpsmtpd::Base';
 
 __tildeexp();
 __is_localhost();

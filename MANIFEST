@@ -39,6 +39,7 @@ lib/Danga/TimeoutSocket.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
+lib/Qpsmtpd/Base.pm
 lib/Qpsmtpd/Command.pm
 lib/Qpsmtpd/ConfigServer.pm
 lib/Qpsmtpd/Connection.pm
@@ -55,7 +56,6 @@ lib/Qpsmtpd/SMTP/Prefork.pm
 lib/Qpsmtpd/TcpServer.pm
 lib/Qpsmtpd/TcpServer/Prefork.pm
 lib/Qpsmtpd/Transaction.pm
-lib/Qpsmtpd/Utils.pm
 LICENSE
 log/log2sql
 log/log2sql.sql

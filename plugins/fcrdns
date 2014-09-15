@@ -166,7 +166,7 @@ sub connect_handler {
 sub is_valid_localhost {
     my ($self) = @_;
 
-    if (Qpsmtpd::Utils->is_localhost($self->qp->connection->remote_ip)) {
+    if (Qpsmtpd::Base->is_localhost($self->qp->connection->remote_ip)) {
         $self->adjust_karma(1);
         $self->log(LOGDEBUG, "pass, is localhost");
         return 1;

@@ -1,14 +1,16 @@
 package Qpsmtpd;
 use strict;
-
 #use warnings;
+
+our $VERSION = "0.95";
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
-use Qpsmtpd::Constants;
-use Qpsmtpd::Address;
 
-our $VERSION = "0.95";
+use lib 'lib';
+use base 'Qpsmtpd::Base';
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
 
 my $git;
 
@@ -592,8 +594,7 @@ sub spool_dir {
 
     unless ($Spool_dir) {    # first time through
         $self->log(LOGDEBUG, "Initializing spool_dir");
-        $Spool_dir = $self->config('spool_dir')
-          || Qpsmtpd::Utils->tildeexp('~/tmp/');
+        $Spool_dir = $self->config('spool_dir') || $self->tildeexp('~/tmp/');
 
         $Spool_dir .= "/" unless ($Spool_dir =~ m!/$!);
 
@@ -627,8 +628,8 @@ sub temp_file {
 }
 
 sub temp_dir {
-    my $self    = shift;
-    my $mask    = shift || 0700;
+    my ($self, $mask) = @_;
+    $mask ||= '0700';
     my $dirname = $self->temp_file();
     -d $dirname
       or mkdir($dirname, $mask)
@@ -638,10 +639,10 @@ sub temp_dir {
 
 sub size_threshold {
     my $self = shift;
-    unless (defined $Size_threshold) {
-        $Size_threshold = $self->config('size_threshold') || 0;
-        $self->log(LOGDEBUG, "size_threshold set to $Size_threshold");
-    }
+    return $Size_threshold if defined $Size_threshold;
+
+    $Size_threshold = $self->config('size_threshold') || 0;
+    $self->log(LOGDEBUG, "size_threshold set to $Size_threshold");
     return $Size_threshold;
 }
 

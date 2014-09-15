@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use File::Path;
 use Test::More;
 
 use lib 'lib';    # test lib/Qpsmtpd (vs site_perl)
@@ -20,12 +21,18 @@ my $qp = bless {}, 'Qpsmtpd';
 ok($qp->version(), "version, " . $qp->version());
 is_deeply(Qpsmtpd::hooks(), {}, 'hooks, empty');
 
+__temp_dir();
+__size_threshold();
 __authenticated();
+__auth_user();
+__auth_mechanism();
+
+__log();
+__load_logging();
+
 __config_dir();
 __get_qmail_config();
 __config();
-__log();
-__load_logging();
 
 done_testing();
 
@@ -73,17 +80,6 @@ sub __load_logging {
     ok(!$qp->load_logging(), "load_logging, logging hook");
 
     $Qpsmtpd::hooks->{logging} = undef;    # restore
-}
-
-sub __authenticated {
-
-    ok(!$qp->authenticated(), "authenticated, undef");
-
-    $qp->{_auth} = 1;
-    ok($qp->authenticated(), "authenticated, true");
-
-    $qp->{_auth} = 0;
-    ok(!$qp->authenticated(), "authenticated, false");
 }
 
 sub __config {
@@ -187,11 +183,60 @@ sub __config {
     }
 }
 
+sub __temp_dir {
+    my $r = $qp->temp_dir();
+    ok( $r, "temp_dir, $r");
+
+    $r = $qp->temp_dir('0775');
+    ok( $r, "temp_dir with mask, $r");
+
+    if ($r && -d $r) { File::Path::rmtree $r; }
+}
+
+sub __size_threshold {
+    ok( ! $qp->size_threshold(), "size_threshold is undefined")
+        or warn "size_threshold: " . $qp->size_threshold;
+
+    $Qpsmtpd::Size_threshold = 5;
+    cmp_ok( 5, '==', $qp->size_threshold(), "size_threshold equals 5");
+
+    $Qpsmtpd::Size_threshold = undef;
+}
+
+sub __authenticated {
+    ok( ! $qp->authenticated(), "authenticated is undefined");
+
+    $qp->{_auth} = 1;
+    ok($qp->authenticated(), "authenticated is true");
+
+    $qp->{_auth} = 0;
+    ok(! $qp->authenticated(), "authenticated is false");
+}
+
+sub __auth_user {
+    ok( ! $qp->auth_user(), "auth_user is undefined");
+
+    $qp->{_auth_user} = 'matt';
+    cmp_ok('matt', 'eq', $qp->auth_user(), "auth_user set");
+
+    $qp->{_auth_user} = undef;
+}
+
+sub __auth_mechanism {
+    ok( ! $qp->auth_mechanism(), "auth_mechanism is undefined");
+
+    $qp->{_auth_mechanism} = 'MD5';
+    cmp_ok('MD5', 'eq', $qp->auth_mechanism(), "auth_mechanism set");
+
+    $qp->{_auth_mechanism} = undef;
+}
+
+
 package FakeAddress;
 
 sub new {
-    shift;
-    return bless {@_};
+   my $class = shift;
+   return bless {@_}, $class;
 }
 
 sub address { }    # pass the can('address') conditional
