@@ -724,8 +724,8 @@ requested values as C<@list>, example:
 
 Arguments:
 
-  my ($self,$transaction,$key) = @_;
-  # $key: the requested config item(s)
+  my ($self,$transaction,@keys) = @_;
+  # @keys: the requested config item(s)
 
 B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
 is called. It's probably best not to try acessing it.
@@ -756,8 +756,8 @@ requested values as C<@list>, example:
 
 Arguments:
 
-  my ($self,$transaction,$user,$key) = @_;
-  # $key: the requested config item(s)
+  my ($self,$transaction,$user,@keys) = @_;
+  # @keys: the requested config item(s)
 
 Example plugin is F<user_config> from the qpsmtpd distribution.
 
