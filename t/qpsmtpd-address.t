@@ -6,9 +6,12 @@ use Test::More;
 
 use lib 'lib';
 
-BEGIN {
-    use_ok('Qpsmtpd::Address');
-}
+BEGIN { use_ok('Qpsmtpd::Constants'); }
+use_ok('Qpsmtpd::Address');
+use lib 't';
+use_ok('Test::Qpsmtpd');
+
+__config();
 
 __new();
 __parse();
@@ -118,3 +121,43 @@ sub __parse {
     is($ao && $ao->address, $as, "address $as");
     ok($ao eq $as, "overloaded 'cmp' operator");
 };
+
+sub __config {
+    ok( my ($qp,$cxn) = Test::Qpsmtpd->new_conn(), "get new connection" );
+    ok( $qp->command('HELO test') );
+    ok( $qp->command('MAIL FROM:<test@example.com>') );
+    my $sender = $qp->transaction->sender;
+    my @test_data = (
+        {
+            pref     => 'size_threshold',
+            result   => [], 
+            expected => 10000,
+            descr    => 'fall back to global config when user_config is absent',
+        },
+        {
+            pref     => 'test_config',
+            result   => [], 
+            expected => undef,
+            descr    => 'return nothing when no user_config plugins exist',
+        },
+        {
+            pref     => 'test_config',
+            result   => [DECLINED], 
+            expected => undef,
+            descr    => 'return nothing when user_config plugins return DECLINED',
+        },
+        {
+            pref     => 'test_config',
+            result   => [OK,'test value'], 
+            expected => 'test value',
+            descr    => 'return results when user_config plugin returns a value',
+        },
+    );
+    for (@test_data) {
+        $qp->hooks->{user_config}
+            = @{ $_->{result} }
+                ? [{ name => 'test hook', code => sub { return @{ $_->{result} }} }]
+                : undef;
+        is( $sender->config($_->{pref}), $_->{expected}, $_->{descr} );
+    }
+}

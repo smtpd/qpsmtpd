@@ -712,25 +712,54 @@ Allowed return codes are
 
 plugin didn't find the requested value
 
-=item OK
+=item OK, @values
 
 requested values as C<@list>, example:
 
-  return (OK, @{$config{$value}}) 
-    if exists $config{$value};
+  return (OK, @{$config{$key}})
+    if exists $config{$key};
   return (DECLINED);
 
 =back
 
 Arguments:
 
-  my ($self,$transaction,$value) = @_; 
-  # $value: the requested config item(s)
+  my ($self,$transaction,@keys) = @_;
+  # @keys: the requested config item(s)
 
 B<NOTE:> C<$transaction> may be C<undef>, depending when / where this hook
 is called. It's probably best not to try acessing it.
 
 Example plugin is F<http_config> from the qpsmtpd distribution.
+
+=head2 hook_user_config
+
+Called when a per-user configuration directive is requested, for example
+if someone calls C<my @cfg = $rcpt-E<gt>config($cfg_name);>. 
+Allowed return codes are
+
+=over 4
+
+=item DECLINED
+
+plugin didn't find the requested value
+
+=item OK, @values
+
+requested values as C<@list>, example:
+
+  return (OK, @{$config{$key}})
+    if exists $config{$key};
+  return (DECLINED);
+
+=back
+
+Arguments:
+
+  my ($self,$transaction,$user,@keys) = @_;
+  # @keys: the requested config item(s)
+
+Example plugin is F<user_config> from the qpsmtpd distribution.
 
 =head2 hook_unrecognized_command
 

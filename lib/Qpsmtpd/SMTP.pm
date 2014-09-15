@@ -15,7 +15,6 @@ use Qpsmtpd::Transaction;
 use Qpsmtpd::Plugin;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Auth;
-use Qpsmtpd::Address ();
 use Qpsmtpd::Command;
 
 my %auth_mechanisms = ();
@@ -389,10 +388,10 @@ sub mail_pre_respond {
       unless $from =~ /^<.*>$/;
 
     if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
-        $from = Qpsmtpd::Address->new("<>");
+        $from = $self->address("<>");
     }
     else {
-        $from = (Qpsmtpd::Address->parse($from))[0];
+        $from = $self->address($from);
     }
     return $self->respond(501, "could not parse your mail from command")
       unless $from;
@@ -480,7 +479,7 @@ sub rcpt_pre_respond {
     return $self->respond(501, "could not parse recipient")
       unless $rcpt =~ /^<.*>$/;
 
-    $rcpt = (Qpsmtpd::Address->parse($rcpt))[0];
+    $rcpt = $self->address($rcpt);
 
     return $self->respond(501, "could not parse recipient")
       if (!$rcpt or ($rcpt->format eq '<>'));

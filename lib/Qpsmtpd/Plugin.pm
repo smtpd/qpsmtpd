@@ -9,7 +9,7 @@ use Qpsmtpd::Constants;
 
 # more or less in the order they will fire
 our @hooks = qw(
-  logging config post-fork pre-connection connect ehlo_parse ehlo
+  logging config user_config post-fork pre-connection connect ehlo_parse ehlo
   helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
   rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre
   data data_headers_end data_post queue_pre queue queue_post vrfy noop

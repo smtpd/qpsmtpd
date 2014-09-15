@@ -5,6 +5,7 @@ use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use Sys::Hostname;
 use Qpsmtpd::Constants;
+use Qpsmtpd::Address;
 
 our $VERSION = "0.94";
 
@@ -145,44 +146,26 @@ sub config {
 
     $self->log(LOGDEBUG, "in config($c)");
 
-    # first try the cache
-    # XXX - is this always the right thing to do? what if a config hook
-    # can return different values on subsequent calls?
-    if ($_config_cache->{$c}) {
-        $self->log(LOGDEBUG,
-                   "config($c) returning (@{$_config_cache->{$c}}) from cache");
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
-    }
-
-    # then run the hooks
-    my ($rc, @config) = $self->run_hooks_no_respond("config", $c);
-    $self->log(LOGDEBUG, "config($c): hook returned ($rc, @config) ");
-    if ($rc == OK) {
-        $self->log(LOGDEBUG,
-"setting _config_cache for $c to [@config] from hooks and returning it"
-        );
-        $_config_cache->{$c} = \@config;
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
-    }
+    # first run the hooks
+    my ($rc, @config);
+    ($rc, @config) = $self->run_hooks_no_respond('user_config',$type,$c)
+        if ref $type and $type->can('address');
+    return wantarray ? @config : $config[0]
+        if defined $rc and $rc == OK;
+    ($rc, @config) = $self->run_hooks_no_respond('config',$c);
+    $self->log(LOGDEBUG, "config($c): hook returned ("
+        . join( ',', map { defined $_ ? $_ : 'undef' } ($rc,@config) ) . ")");
+    return wantarray ? @config : $config[0]
+        if defined $rc and $rc == OK;
 
     # and then get_qmail_config
     @config = $self->get_qmail_config($c, $type);
-    if (@config) {
-        $self->log(LOGDEBUG,
-"setting _config_cache for $c to [@config] from get_qmail_config and returning it"
-        );
-        $_config_cache->{$c} = \@config;
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
-    }
+    return wantarray ? @config : $config[0]
+        if @config;
 
     # finally we use the default if there is any:
-    if (exists($defaults{$c})) {
-        $self->log(LOGDEBUG,
-"setting _config_cache for $c to @{[$defaults{$c}]} from defaults and returning it"
-        );
-        $_config_cache->{$c} = [$defaults{$c}];
-        return wantarray ? @{$_config_cache->{$c}} : $_config_cache->{$c}->[0];
-    }
+    return wantarray ? ($defaults{$c}) : $defaults{$c}
+        if exists $defaults{$c};
     return;
 }
 
@@ -664,6 +647,13 @@ sub auth_user {
 sub auth_mechanism {
     my $self = shift;
     return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "");
+}
+
+sub address {
+    my $self = shift;
+    my $addr = Qpsmtpd::Address->new(@_);
+    $addr->qp($self);
+    return $addr;
 }
 
 1;
