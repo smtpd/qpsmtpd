@@ -144,4 +144,3 @@ sub test_reject_type {
     $self->{_args}{reject_type} = 'disconnect';
     cmp_ok( $self->get_reject_type(), '==', DENY_DISCONNECT, "disconnect");
 };
-
