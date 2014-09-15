@@ -147,14 +147,16 @@ sub config {
 
     $self->log(LOGDEBUG, "in config($c)");
 
-    # first run the hooks
+    # first run the user_config hooks
     my ($rc, @config);
     if (ref $type && $type->can('address')) {
         ($rc, @config) = $self->run_hooks_no_respond('user_config', $type, $c);
+        if (defined $rc && $rc == OK) {
+            return wantarray ? @config : $config[0];
+        };
     };
-    if (defined $rc && $rc == OK) {
-        return wantarray ? @config : $config[0];
-    };
+
+    # then run the config hooks
     ($rc, @config) = $self->run_hooks_no_respond('config', $c);
     $self->log(LOGDEBUG,
                    "config($c): hook returned ("
