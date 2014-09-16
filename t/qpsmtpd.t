@@ -24,6 +24,9 @@ __hooks_none();
 ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
 __hooks();
 
+__register_hook();
+__hook_responder();
+
 __temp_file();
 __temp_dir();
 __size_threshold();
@@ -59,6 +62,35 @@ sub __hooks_none {
 
     my $r = $qp->hooks('connect');
     is_deeply($r, [], 'hooks, empty, specified');
+}
+
+sub __hook_responder {
+    # my ($self, $hook, $msg, $args) = @_;
+    my ($code, $msg) = $qp->hook_responder('test-hook', ['test code','test mesg'], ['test-arg']);
+    is($code, 'test code', "hook_responder, code");
+    is($msg, 'test mesg', "hook_responder, test msg");
+
+    ($code, $msg) = $smtpd->hook_responder('connect', ['test code','test mesg'], ['test-arg']);
+    is($code->[0], 220, "hook_responder, code");
+    ok($code->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $code->[1]);
+
+    my $rej_msg = 'Your father smells of elderberries';
+    #($smtpd, $conn) = Test::Qpsmtpd->new_conn();
+    ($code, $msg) = $smtpd->hook_responder('connect', [DENY, $rej_msg]);
+#    warn Data::Dumper::Dumper($code);
+#    warn Data::Dumper::Dumper($msg);
+#   is($code, undef, "hook_responder, disconnected yields undef code");
+    is($msg, undef, "hook_responder, disconnected yields undef msg");
+
+    #warn Data::Dumper::Dumper($msg);
+}
+
+sub __register_hook {
+    my $hook = 'test';
+    is( $Qpsmtpd::hooks->{'test'}, undef, "_register_hook, test hook is undefined");
+
+    $smtpd->_register_hook('test', 'fake-code-ref');
+    is_deeply( $Qpsmtpd::hooks->{'test'}, ['fake-code-ref'], "test hook is registered");
 }
 
 sub __log {

@@ -369,11 +369,9 @@ sub run_continuation {
 
 sub hook_responder {
     my ($self, $hook, $msg, $args) = @_;
-
     my $code = shift @$msg;
 
-    my $responder = $hook . '_respond';
-    if (my $meth = $self->can($responder)) {
+    if (my $meth = $self->can($hook . '_respond')) {
         return $meth->($self, $code, $msg, $args);
     }
     return $code, @$msg;
