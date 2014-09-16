@@ -140,7 +140,7 @@ sub register {
     if ( ! defined $self->{_args}{deny_viruses} ) {
         $self->{_args}{deny_viruses} = 'yes';
     }
-    if ( ! $self->{_args}{scan_all} ) {
+    if ( ! defined $self->{_args}{scan_all} ) {
         $self->{_args}{scan_all} = 1;
     }
     for my $setting (qw( deny_viruses defer_on_error scan_all )) {
@@ -159,7 +159,7 @@ sub data_post_handler {
 
     if ($self->connection->notes('naughty')) {
         $self->log(LOGINFO, "skip, naughty");
-        return (DECLINED);
+        return DECLINED;
     }
     return DECLINED if ! $self->should_scan($transaction);
 
@@ -196,19 +196,19 @@ sub data_post_handler {
         $self->adjust_karma(-1);
 
         if ($self->{_args}{deny_viruses}) {
-            return (DENY, "Virus found: $found");
+            return DENY, "Virus found: $found";
         }
 
         $transaction->header->add('X-Virus-Found',   'Yes',  0);
         $transaction->header->add('X-Virus-Details', $found, 0);
-        return (DECLINED);
+        return DECLINED;
     }
 
     $self->log(LOGINFO, "pass, clean");
     $transaction->header->add('X-Virus-Found', 'No', 0);
     $transaction->header->add('X-Virus-Checked',
                               "by $version on " . $self->qp->config('me'), 0);
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub assemble_message {
@@ -226,9 +226,9 @@ sub err_and_return {
     if ($message) {
         $self->log(LOGERROR, $message);
     }
-    return (DENYSOFT, "Unable to scan for viruses")
+    return DENYSOFT, "Unable to scan for viruses"
       if $self->{_args}{defer_on_error};
-    return (DECLINED, "skip");
+    return DECLINED, "skip";
 }
 
 sub get_filename {
@@ -320,7 +320,7 @@ sub is_too_big {
     }
 
     $self->log(LOGDEBUG, "data_size, $size");
-    return;
+    return 0;
 }
 
 sub is_not_multipart {
