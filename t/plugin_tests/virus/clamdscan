@@ -21,7 +21,7 @@ sub register_tests {
     $self->register_test('test_get_filename', 1);
     $self->register_test('test_set_permission', 1);
     $self->register_test('test_is_too_big', 2);
-    $self->register_test('test_is_not_multipart', 2);
+    $self->register_test('test_is_multipart', 2);
     $self->register_test('test_should_scan',4);
 }
 
@@ -77,15 +77,15 @@ sub test_is_too_big {
     ok( $self->is_too_big( $tran ), "is_too_big 2");
 }
 
-sub test_is_not_multipart {
+sub test_is_multipart {
     my $self = shift;
     my $tran = Qpsmtpd::Transaction->new();
 
-    ok( $self->is_not_multipart($tran), "not_multipart 1" );
+    ok( ! $self->is_multipart($tran), "is_multipart 1" );
     $tran->header( Mail::Header->new( [
         'Content-Type: multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"'
     ] ) );
-    ok( ! $self->is_not_multipart($tran), "not_multipart 2" );
+    ok( $self->is_multipart($tran), "is_multipart 2" );
 }
 
 sub test_should_scan {

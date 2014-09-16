@@ -323,21 +323,21 @@ sub is_too_big {
     return 0;
 }
 
-sub is_not_multipart {
+sub is_multipart {
     my $self = shift;
     my $transaction = shift || $self->qp->transaction;
 
-    return 1 if !$transaction->header;
+    return 0 if !$transaction->header;
 
     # Ignore non-multipart emails
-    my $content_type = $transaction->header->get('Content-Type') or return 1;
+    my $content_type = $transaction->header->get('Content-Type') or return 0;
     $content_type =~ s/\s/ /g;
     if ($content_type !~ m!\bmultipart/.*\bboundary="?([^"]+)!i) {
         $self->log(LOGNOTICE, "skip, not multipart");
-        return 1;
+        return 0;
     }
 
-    return 0;
+    return 1;
 }
 
 sub should_scan {
@@ -345,6 +345,6 @@ sub should_scan {
     my $tran = shift;
     return 0 if $self->is_too_big($tran);
     return 1 if $self->{_args}{scan_all};
-    return 0 if $self->is_not_multipart($tran);
+    return 0 if ! $self->is_multipart($tran);
     return 1;
 }
