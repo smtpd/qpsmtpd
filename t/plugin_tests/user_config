@@ -19,32 +19,40 @@ sub register_tests {
 }
 
 sub test_hook_user_config {
-    my ( $self ) = @_;
+    my ($self) = @_;
     my $dirname = $self->qp->temp_dir;
     $self->{pattern} = $dirname . '/%u_%h_%a';
     $dirname .= '/testuser_testhost_testaddress';
     -d $dirname
-        or mkdir($dirname, 0700)
-        or die "Could not create $dirname: $!";
+      or mkdir($dirname, 0700)
+      or die "Could not create $dirname: $!";
     open my $fh, '>', "$dirname/testfield";
     print $fh "testdata";
     close $fh;
-    my $a = FakeAddress->new( user => 'testuser', host => 'testhost', address => 'testaddress' );
-    my ( $r, $value ) = $self->hook_user_config( $self->qp->transaction, $a, 'testfield' );
-    is( $r, OK, 'hook_user_config returned OK when config file present' );
-    is( $value, 'testdata', 'hook_user_config returned the correct value' );
-    ( $r, $value ) = $self->hook_user_config( $self->qp->transaction, $a, 'noconfig' );
-    is( $r, DECLINED, 'hook_user_config returned DECLINED when no config file present' );
-    is( $value, undef, 'hook_user_config returned no value when no config file present' );
+    my $a = FakeAddress->new(
+                             user    => 'testuser',
+                             host    => 'testhost',
+                             address => 'testaddress'
+                            );
+    my ($r, $value) =
+      $self->hook_user_config($self->qp->transaction, $a, 'testfield');
+    is($r, OK, 'hook_user_config returned OK when config file present');
+    is($value, 'testdata', 'hook_user_config returned the correct value');
+    ($r, $value) =
+      $self->hook_user_config($self->qp->transaction, $a, 'noconfig');
+    is($r, DECLINED,
+        'hook_user_config returned DECLINED when no config file present');
+    is($value, undef,
+        'hook_user_config returned no value when no config file present');
     rmtree($dirname);
 }
 
 package FakeAddress;
 
 sub new {
-   shift;
-   return bless {@_};
+    shift;
+    return bless {@_};
 }
 sub address { return shift->{address} }
-sub user { return shift->{user} }
-sub host { return shift->{host} }
+sub user    { return shift->{user} }
+sub host    { return shift->{host} }

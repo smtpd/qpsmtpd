@@ -4,6 +4,7 @@ use strict;
 use base 'Qpsmtpd';
 
 use Carp;
+
 #use Data::Dumper;
 use POSIX qw(strftime);
 use Mail::Header;
@@ -30,10 +31,9 @@ sub new {
 
     my $self = bless({args => \%args}, $class);
 
-    # this list of valid commands should probably be a method or a set of methods
-    $self->{_commands} = {
-        map { $_ => '' } qw(ehlo helo rset mail rcpt data help vrfy noop quit)
-    };
+   # this list of valid commands should probably be a method or a set of methods
+    $self->{_commands} =
+      {map { $_ => '' } qw(ehlo helo rset mail rcpt data help vrfy noop quit)};
 
     $self->SUPER::_restart(%args) if $args{restart}; # calls Qpsmtpd::_restart()
     $self;
@@ -87,7 +87,7 @@ sub fault {
     my ($name) = split /\s+/, $0, 2;
     print STDERR $name, "[$$]: $msg\n";
     print STDERR $name, "[$$]: Last system error: $!"
-        ." (Likely irelevant--debug the crashed plugin to ensure it handles \$! properly)";
+      . " (Likely irelevant--debug the crashed plugin to ensure it handles \$! properly)";
     return $self->respond(451, "Internal error - try again later - " . $msg);
 }
 
@@ -260,11 +260,12 @@ sub ehlo_respond {
         }
 
         # Check if we should only offer AUTH after TLS is completed
-        my $tls_before_auth =
-          ($self->config('tls_before_auth')
-            ? ($self->config('tls_before_auth'))[0]
-              && $self->transaction->notes('tls_enabled')
-            : 0);
+        my $tls_before_auth = (
+                               $self->config('tls_before_auth')
+                               ? ($self->config('tls_before_auth'))[0]
+                                 && $self->transaction->notes('tls_enabled')
+                               : 0
+                              );
         if (%auth_mechanisms && !$tls_before_auth) {
             push @capabilities, 'AUTH ' . join(" ", keys(%auth_mechanisms));
             $self->{_commands}->{'auth'} = "";
@@ -789,53 +790,57 @@ sub authentication_results {
     my ($self) = @_;
 
     my @auth_list = $self->config('me');
-#   $self->clean_authentication_results();
 
-    if ( ! defined $self->{_auth} ) {
+    #   $self->clean_authentication_results();
+
+    if (!defined $self->{_auth}) {
         push @auth_list, 'auth=none';
     }
     else {
         my $mechanism = "(" . $self->{_auth_mechanism} . ")";
-        my $user = "smtp.auth=" . $self->{_auth_user};
-        if ( $self->{_auth} == OK) {
+        my $user      = "smtp.auth=" . $self->{_auth_user};
+        if ($self->{_auth} == OK) {
             push @auth_list, "auth=pass $mechanism $user";
         }
         else {
             push @auth_list, "auth=fail $mechanism $user";
-        };
-    };
+        }
+    }
 
     # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
-    if ( $self->connection->notes('authentication_results') ) {
+    if ($self->connection->notes('authentication_results')) {
         push @auth_list, $self->connection->notes('authentication_results');
-    };
+    }
 
-    $self->log(LOGDEBUG, "adding auth results header" );
-    $self->transaction->header->add('Authentication-Results', join('; ', @auth_list), 0);
-};
+    $self->log(LOGDEBUG, "adding auth results header");
+    $self->transaction->header->add('Authentication-Results',
+                                    join('; ', @auth_list), 0);
+}
 
 sub clean_authentication_results {
     my $self = shift;
 
-# http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
+    # http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
 
-# On messages received from the internet, move Authentication-Results headers
-# to Original-AR, so our downstream can trust the A-R header we insert.
+   # On messages received from the internet, move Authentication-Results headers
+   # to Original-AR, so our downstream can trust the A-R header we insert.
 
-# TODO: Do not invalidate DKIM signatures.
-#   if $self->transaction->header->get('DKIM-Signature')
-#       Parse the DKIM signature(s)
-#       return if A-R header is signed;
-#   }
+    # TODO: Do not invalidate DKIM signatures.
+    #   if $self->transaction->header->get('DKIM-Signature')
+    #       Parse the DKIM signature(s)
+    #       return if A-R header is signed;
+    #   }
 
     my @ar_headers = $self->transaction->header->get('Authentication-Results');
-    for ( my $i = 0; $i < scalar @ar_headers; $i++ ) {
+    for (my $i = 0 ; $i < scalar @ar_headers ; $i++) {
         $self->transaction->header->delete('Authentication-Results', $i);
-        $self->transaction->header->add('Original-Authentication-Results', $ar_headers[$i]);
+        $self->transaction->header->add('Original-Authentication-Results',
+                                        $ar_headers[$i]);
     }
 
-    $self->log(LOGDEBUG, "Authentication-Results moved to Original-Authentication-Results" );
-};
+    $self->log(LOGDEBUG,
+             "Authentication-Results moved to Original-Authentication-Results");
+}
 
 sub received_line {
     my ($self) = @_;
@@ -870,7 +875,7 @@ sub received_line {
         return join("\n", @received);
     }
     else {    # assume $rc == DECLINED
-        $header_str = 
+        $header_str =
             "from "
           . $self->connection->remote_info
           . " (HELO "
@@ -883,7 +888,7 @@ sub received_line {
           . ") with $sslheader$smtp; "
           . (strftime('%a, %d %b %Y %H:%M:%S %z', localtime));
     }
-    $self->transaction->header->add('Received', $header_str, 0 );
+    $self->transaction->header->add('Received', $header_str, 0);
 }
 
 sub data_post_respond {
