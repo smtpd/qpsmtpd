@@ -157,24 +157,26 @@ Adjust the quantity of logging for this plugin. See docs/logging.pod
 
 Written by Gavin Carr <gavin@openfusion.com.au>.
 
-nfslock feature by JT Moree <jtmoree@kahalacorp.com> - 2007-01-22
+2007-01-22 - nfslock feature by JT Moree <jtmoree@kahalacorp.com>
 
-p0f feature by Matt Simerson <msimerson@cpan.org> - 2010-05-03
+2010-05-03 - p0f feature by Matt Simerson <msimerson@cpan.org>
 
-geoip, loglevel, reject added. Refactored into subs - Matt Simerson - 2012-05
+2012-05 - geoip, loglevel, reject added. Refactored into subs by Matt Simerson
 
 =cut
 
 use strict;
 use warnings;
+
+use Net::IP;
+
 use Qpsmtpd::Constants;
 
-my $VERSION = '0.11';
+my $VERSION = '0.12';
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
-use Net::IP;
 
 my $DENYMSG        = "This mail is temporarily denied";
 my ($QPHOME)       = ($0 =~ m!(.*?)/([^/]+)$!);
@@ -197,9 +199,10 @@ my %DEFAULTS = (
 
 sub register {
     my ($self, $qp, %arg) = @_;
+    my $c = $self->qp->config('denysoft_greylist');
     my $config = {
               %DEFAULTS,
-              map { split /\s+/, $_, 2 } $self->qp->config('denysoft_greylist'),
+              ($c ? map { split /\s+/, $_, 2 } $c : ()),
               %arg
     };
     if (my @bad = grep { !exists $PERMITTED_ARGS{$_} } sort keys %$config) {
@@ -265,9 +268,8 @@ sub hook_data {
     return DECLINED unless $transaction->notes('greylist');
 
     # Decline if ALL recipients are whitelisted
-    if (($transaction->notes('whitelistrcpt') || 0) ==
-        scalar($transaction->recipients))
-    {
+    my $recips = scalar $transaction->recipients || 0;
+    if (($transaction->notes('whitelistrcpt') || 0) == $recips) {
         $self->log(LOGWARN, "skip: all recipients whitelisted");
         return DECLINED;
     }
@@ -370,7 +372,7 @@ sub get_db_key {
 sub get_db_tie {
     my ($self, $db, $lock) = @_;
 
-    tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, 0600) or do {
+    tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, oct('0600')) or do {
         $self->log(LOGCRIT, "tie to database $db failed: $!");
         close $lock;
         return;
@@ -419,7 +421,7 @@ sub get_db_lock {
     return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
 
     # Check denysoft db
-    open(my $lock, ">$db.lock") or do {
+    open(my $lock, '>', "$db.lock") or do {
         $self->log(LOGCRIT, "opening lockfile failed: $!");
         return;
     };
@@ -450,7 +452,7 @@ sub get_db_lock_nfs {
         return;
       };
 
-    open(my $lock, "+<$db.lock") or do {
+    open(my $lock, '+<', "$db.lock") or do {
         $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
         return;
     };

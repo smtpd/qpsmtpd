@@ -142,9 +142,9 @@ sub reset_transaction {
 
 sub connection {
     my $self = shift;
-    @_ and $self->{_connection} = shift;
-    return $self->{_connection}
-      || ($self->{_connection} = Qpsmtpd::Connection->new());
+    if (@_) { $self->{_connection} = shift; }
+    return $self->{_connection} if $self->{_connection};
+    return $self->{_connection} = Qpsmtpd::Connection->new();
 }
 
 sub helo {

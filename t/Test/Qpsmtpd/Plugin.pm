@@ -1,4 +1,5 @@
 package Test::Qpsmtpd::Plugin;
+use strict;
 1;
 
 # Additional plugin methods used during testing

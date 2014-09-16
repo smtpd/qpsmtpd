@@ -5,11 +5,10 @@ use strict;
 our $VERSION = "0.95";
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
-use Sys::Hostname;
-
 use lib 'lib';
 use base 'Qpsmtpd::Base';
 use Qpsmtpd::Address;
+use Qpsmtpd::Config;
 use Qpsmtpd::Constants;
 
 my $git;
@@ -21,12 +20,6 @@ if (-e ".git") {
 }
 
 our $hooks = {};
-my %defaults = (
-                me      => hostname,
-                timeout => 1200,
-               );
-my $_config_cache = {};
-our %config_dir_memo;
 
 our $LOGGING_LOADED = 0;
 
@@ -36,10 +29,9 @@ sub _restart {
     if ($args{restart}) {
 
         # reset all global vars to defaults
-        $self->clear_config_cache;
+        $self->conf->clear_cache();
         $hooks           = {};
         $LOGGING_LOADED  = 0;
-        %config_dir_memo = ();
         $TraceLevel      = LOGWARN;
         $Spool_dir       = undef;
         $Size_threshold  = undef;
@@ -60,11 +52,11 @@ sub load_logging {
 
     my $configdir  = $self->config_dir("logging");
     my $configfile = "$configdir/logging";
-    my @loggers    = $self->_config_from_file($configfile, 'logging');
+    my @loggers    = $self->conf->from_file($configfile, 'logging');
 
     $configdir  = $self->config_dir('plugin_dirs');
     $configfile = "$configdir/plugin_dirs";
-    my @plugin_dirs = $self->_config_from_file($configfile, 'plugin_dirs');
+    my @plugin_dirs = $self->conf->from_file($configfile, 'plugin_dirs');
     unless (@plugin_dirs) {
         my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
         @plugin_dirs = ("$name/plugins");
@@ -81,7 +73,7 @@ sub load_logging {
 
     $configdir  = $self->config_dir("loglevel");
     $configfile = "$configdir/loglevel";
-    $TraceLevel = $self->_config_from_file($configfile, 'loglevel');
+    $TraceLevel = $self->conf->from_file($configfile, 'loglevel');
 
     unless (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
         $TraceLevel = LOGWARN;    # Default if no loglevel file found.
@@ -94,7 +86,7 @@ sub load_logging {
 
 sub trace_level { return $TraceLevel; }
 
-sub init_logger {                 # needed for compatibility purposes
+sub init_logger {                 # needed for compatibility
     shift->trace_level();
 }
 
@@ -106,17 +98,11 @@ sub log {
 sub varlog {
     my ($self, $trace) = (shift, shift);
     my ($hook, $plugin, @log);
-    if ($#_ == 0) {               # log itself
-        (@log) = @_;
-    }
-    elsif ($#_ == 1) {            # plus the hook
-        ($hook, @log) = @_;
-    }
-    else {                        # called from plugin
-        ($hook, $plugin, @log) = @_;
-    }
+    if    ($#_ == 0) { (@log) = @_; }                 # log itself
+    elsif ($#_ == 1) { ($hook, @log) = @_; }          # plus the hook
+    else             { ($hook, $plugin, @log) = @_; } # from a plugin
 
-    $self->load_logging;          # in case we don't have this loaded yet
+    $self->load_logging;
 
     my ($rc) =
       $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log)
@@ -135,15 +121,14 @@ sub varlog {
     warn join(' ', $$ . $prefix, @log), "\n";
 }
 
-sub clear_config_cache {
-    $_config_cache = {};
+sub conf {
+    my $self = shift;
+    if (!$self->{_config}) {
+        $self->{_config} = Qpsmtpd::Config->new();
+    };
+    return $self->{_config};
 }
 
-#
-# method to get the configuration.  It just calls get_qmail_config by
-# default, but it could be overwritten to look configuration up in a
-# database or whatever.
-#
 sub config {
     my ($self, $c, $type) = @_;
 
@@ -169,30 +154,17 @@ sub config {
         return wantarray ? @config : $config[0];
     };
 
-    # then get_qmail_config
-    @config = $self->get_qmail_config($c, $type);
+    # then qmail
+    @config = $self->conf->get_qmail($c, $type);
     return wantarray ? @config : $config[0] if @config;
 
-    # then the default, if any
-    if (exists $defaults{$c}) {
-        return wantarray ? ($defaults{$c}) : $defaults{$c};
-    };
-    return;
+    # then the default, which may be undefined
+    return $self->conf->default($c);
 }
 
 sub config_dir {
-    my ($self, $config) = @_;
-    if (exists $config_dir_memo{$config}) {
-        return $config_dir_memo{$config};
-    }
-    my $configdir = ($ENV{QMAIL} || '/var/qmail') . '/control';
-    my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;
-    $configdir = "$path/config" if -e "$path/config/$config";
-    if (exists $ENV{QPSMTPD_CONFIG}) {
-        $ENV{QPSMTPD_CONFIG} =~ /^(.*)$/;    # detaint
-        $configdir = $1 if -e "$1/$config";
-    }
-    return $config_dir_memo{$config} = $configdir;
+    my $self = shift;
+    return $self->conf->config_dir(@_);
 }
 
 sub plugin_dirs {
@@ -204,143 +176,6 @@ sub plugin_dirs {
         @plugin_dirs = ("$path/plugins");
     }
     return @plugin_dirs;
-}
-
-sub get_qmail_config {
-    my ($self, $config, $type) = @_;
-    $self->log(LOGDEBUG, "trying to get config for $config");
-    my $configdir = $self->config_dir($config);
-
-    my $configfile = "$configdir/$config";
-
-    # CDB config support really should be moved to a plugin
-    if ($type and $type eq "map") {
-        return $self->get_qmail_config_map($config, $configfile);
-    }
-
-    return $self->_config_from_file($configfile, $config);
-}
-
-sub get_qmail_config_map {
-    my ($self, $config, $configfile) = @_;
-
-    unless (-e $configfile . ".cdb") {
-        $_config_cache->{$config} ||= [];
-        return +{};
-    }
-    eval { require CDB_File };
-
-    if ($@) {
-        $self->log(LOGERROR,
-"No CDB Support! Did NOT read $configfile.cdb, could not load CDB_File module: $@"
-        );
-        return +{};
-    }
-
-    my %h;
-    unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
-        $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
-        return +{};
-    }
-
-    # We explicitly don't cache cdb entries. The assumption is that
-    # the data is in a CDB file in the first place because there's
-    # lots of data and the cache hit ratio would be low.
-    return \%h;
-}
-
-sub _config_from_file {
-    my ($self, $configfile, $config, $visited) = @_;
-    unless (-e $configfile) {
-        $_config_cache->{$config} ||= [];
-        return;
-    }
-
-    $visited ||= [];
-    push @$visited, $configfile;
-
-    open my $CF, '<', $configfile or do {
-        warn "$$ could not open configfile $configfile: $!";
-        return;
-    };
-    my @config = <$CF>;
-    close $CF;
-
-    chomp @config;
-    @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
-    for (@config) { s/^\s+//; s/\s+$//; }    # trim leading/trailing whitespace
-
-    my $pos = 0;
-    while ($pos < @config) {
-
-       # recursively pursue an $include reference, if found.  An inclusion which
-       # begins with a leading slash is interpreted as a path to a file and will
-       # supercede the usual config path resolution.  Otherwise, the normal
-       # config_dir() lookup is employed (the location in which the inclusion
-       # appeared receives no special precedence; possibly it should, but it'd
-       # be complicated beyond justifiability for so simple a config system.
-        if ($config[$pos] =~ /^\s*\$include\s+(\S+)\s*$/) {
-            my ($includedir, $inclusion) = ('', $1);
-
-            splice @config, $pos, 1;    # remove the $include line
-            if ($inclusion !~ /^\//) {
-                $includedir = $self->config_dir($inclusion);
-                $inclusion  = "$includedir/$inclusion";
-            }
-
-            if (grep($_ eq $inclusion, @{$visited})) {
-                $self->log(LOGERROR,
-                           "Circular \$include reference in config $config:");
-                $self->log(LOGERROR, "From $visited->[0]:");
-                $self->log(LOGERROR, "  includes $_")
-                  for (@{$visited}[1 .. $#{$visited}], $inclusion);
-                return wantarray ? () : undef;
-            }
-            push @{$visited}, $inclusion;
-
-            for my $inc ($self->expand_inclusion_($inclusion, $configfile)) {
-                my @insertion =
-                  $self->_config_from_file($inc, $config, $visited);
-                splice @config, $pos, 0, @insertion;    # insert the inclusion
-                $pos += @insertion;
-            }
-        }
-        else {
-            $pos++;
-        }
-    }
-
-    $_config_cache->{$config} = \@config;
-
-    return wantarray ? @config : $config[0];
-}
-
-sub expand_inclusion_ {
-    my $self      = shift;
-    my $inclusion = shift;
-    my $context   = shift;
-    my @includes;
-
-    if (-d $inclusion) {
-        $self->log(LOGDEBUG, "inclusion of directory $inclusion from $context");
-
-        if (opendir(INCD, $inclusion)) {
-            @includes = map { "$inclusion/$_" }
-              (grep { -f "$inclusion/$_" and !/^\./ } sort readdir INCD);
-            closedir INCD;
-        }
-        else {
-            $self->log(LOGERROR,
-                           "Couldn't open directory $inclusion,"
-                         . " referenced from $context ($!)"
-                      );
-        }
-    }
-    else {
-        $self->log(LOGDEBUG, "inclusion of file $inclusion from $context");
-        @includes = ($inclusion);
-    }
-    return @includes;
 }
 
 sub load_plugins {

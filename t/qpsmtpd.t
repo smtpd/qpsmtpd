@@ -7,19 +7,22 @@ use File::Path;
 use Test::More;
 
 use lib 'lib';    # test lib/Qpsmtpd (vs site_perl)
+use lib 't';
 
 BEGIN {
     use_ok('Qpsmtpd');
     use_ok('Qpsmtpd::Constants');
-}
+    use_ok('Test::Qpsmtpd');
 
-use lib 't';
-use_ok('Test::Qpsmtpd');
+}
 
 my $qp = bless {}, 'Qpsmtpd';
 
 ok($qp->version(), "version, " . $qp->version());
 is_deeply(Qpsmtpd::hooks(), {}, 'hooks, empty');
+
+ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
+ok(Qpsmtpd::hooks(), "hooks, populated");
 
 __temp_file();
 __temp_dir();
@@ -33,25 +36,9 @@ __log();
 __load_logging();
 
 __config_dir();
-__config_from_file();
-__get_qmail_config();
 __config();
 
 done_testing();
-
-sub __get_qmail_config {
-    ok(!$qp->get_qmail_config('me'), "get_qmail_config, me");
-
-    # TODO: add positive tests.
-}
-
-sub __config_from_file {
-    my $test_file = 't/config/test_config_file';
-    my @r = $qp->_config_from_file($test_file);
-    ok( @r, "_config_from_file, $test_file");
-    cmp_ok('1st line with content', 'eq', $r[0], "_config_from_file string compare");
-    ok( !$r[1], "_config_from_file");
-};
 
 sub __log {
     my $warned = '';
@@ -65,15 +52,6 @@ sub __log {
     };
     ok($qp->log(LOGWARN, "test log message"), 'log');
     is($warned, "$$ test log message\n", 'LOGWARN emitted correct warning');
-}
-
-sub __config_dir {
-    my $dir = $qp->config_dir('logging');
-    ok($dir, "config_dir, $dir");
-
-    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
-    $dir = $Qpsmtpd::config_dir_memo{logging};
-    ok($dir, "config_dir, $dir (memo)");
 }
 
 sub __load_logging {
@@ -90,6 +68,25 @@ sub __load_logging {
 sub __spool_dir {
     my $dir = $qp->spool_dir();
     ok( $dir, "spool_dir is at $dir");
+
+    my $cwd = `pwd`;
+    chomp($cwd);
+    open my $spooldir, '>', "./config.sample/spool_dir";
+    print $spooldir "$cwd/t/tmp";
+    close $spooldir;
+
+    my $spool_dir = $smtpd->spool_dir();
+    ok($spool_dir =~ m!t/tmp/$!,   "Located the spool directory");
+
+    my $tempfile  = $smtpd->temp_file();
+    my $tempdir   = $smtpd->temp_dir();
+
+    ok($tempfile =~ /^$spool_dir/, "Temporary filename");
+    ok($tempdir =~ /^$spool_dir/,  "Temporary directory");
+    ok(-d $tempdir,                "And that directory exists");
+
+    unlink "./config.sample/spool_dir";
+    rmtree($spool_dir);
 }
 
 sub __temp_file {
@@ -112,7 +109,7 @@ sub __temp_dir {
 }
 
 sub __size_threshold {
-    ok( ! $qp->size_threshold(), "size_threshold is undefined")
+    is( $qp->size_threshold(), 10000, "size_threshold from t/config is 1000")
         or warn "size_threshold: " . $qp->size_threshold;
 
     $Qpsmtpd::Size_threshold = 5;
@@ -149,9 +146,19 @@ sub __auth_mechanism {
     $qp->{_auth_mechanism} = undef;
 }
 
+sub __config_dir {
+    my $dir = $qp->config_dir('logging');
+    ok($dir, "config_dir, $dir");
+
+    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
+    $dir = $Qpsmtpd::Config::dir_memo{logging};
+    ok($dir, "config_dir, $dir (memo)");
+}
+
 sub __config {
     my @r = $qp->config('badhelo');
     ok($r[0], "config, badhelo, @r");
+
     my $a = FakeAddress->new(test => 'test value');
     ok(my ($qp, $cxn) = Test::Qpsmtpd->new_conn(), "get new connection");
     my @test_data = (
@@ -250,6 +257,8 @@ sub __config {
     }
 }
 
+1;
+
 package FakeAddress;
 
 sub new {
@@ -258,3 +267,5 @@ sub new {
 }
 
 sub address { }    # pass the can('address') conditional
+
+1;

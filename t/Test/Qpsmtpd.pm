@@ -1,10 +1,13 @@
 package Test::Qpsmtpd;
 use strict;
+
+use Carp qw(croak);
+use Test::More;
+
 use lib 't';
 use lib 'lib';
-use Carp qw(croak);
-use base qw(Qpsmtpd::SMTP);
-use Test::More;
+use parent 'Qpsmtpd::SMTP';
+
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
 
@@ -78,7 +81,7 @@ sub input {
 
 sub config_dir {
     return './t/config' if $ENV{QPSMTPD_DEVELOPER};
-    './config.sample';
+    return './config.sample';
 }
 
 sub plugin_dirs {

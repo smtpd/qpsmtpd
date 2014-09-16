@@ -3,6 +3,10 @@ use strict;
 
 use Net::IP;
 
+sub new {
+    return bless {}, shift;
+};
+
 sub tildeexp {
     my ($self, $path) = @_;
     $path =~ s{^~([^/]*)} {  

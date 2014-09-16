@@ -6,9 +6,12 @@ use Test::More;
 
 use lib 'lib';      # test lib/Qpsmtpd/Base (vs site_perl)
 
-BEGIN { use_ok('Qpsmtpd::Base'); }
+BEGIN {
+    use_ok('Qpsmtpd::Base');
+    use_ok('Qpsmtpd::Constants');
+}
 
-my $base = bless {}, 'Qpsmtpd::Base';
+my $base = Qpsmtpd::Base->new();
 
 __tildeexp();
 __is_localhost();
