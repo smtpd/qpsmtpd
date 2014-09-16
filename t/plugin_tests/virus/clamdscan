@@ -4,6 +4,8 @@ use strict;
 use warnings;
 
 use Qpsmtpd::Constants;
+use Qpsmtpd::Transaction;
+use Mail::Header;
 
 sub register_tests {
     my $self = shift;
@@ -20,6 +22,7 @@ sub register_tests {
     $self->register_test('test_set_permission', 1);
     $self->register_test('test_is_too_big', 2);
     $self->register_test('test_is_not_multipart', 2);
+    $self->register_test('test_should_scan',4);
 }
 
 sub test_register {
@@ -64,22 +67,40 @@ sub test_get_clamd {
 
 sub test_is_too_big {
     my $self = shift;
-    my $tran = shift || $self->qp->transaction();
+    my $tran = Qpsmtpd::Transaction->new();
 
     $self->{_args}{max_size} = 8;
-    $tran->{_body_size} = (7 * 1024 );
-    ok( ! $self->is_too_big( $tran ), "is_too_big");
+    $tran->{_body_size} = 7 * 1024;
+    ok( ! $self->is_too_big( $tran ), "is_too_big 1");
 
-    $tran->{_body_size} = (9 * 1024 );
-    ok( $self->is_too_big( $tran ), "is_too_big");
+    $tran->{_body_size} = 9 * 1024;
+    ok( $self->is_too_big( $tran ), "is_too_big 2");
 }
 
 sub test_is_not_multipart {
     my $self = shift;
-    my $tran = $self->qp->transaction();
+    my $tran = Qpsmtpd::Transaction->new();
 
-    ok( $self->is_not_multipart(), "not_multipart" );
-    $tran->header->add('Content-Type', 'multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"');
-    ok( ! $self->is_not_multipart(), "not_multipart" );
+    ok( $self->is_not_multipart($tran), "not_multipart 1" );
+    $tran->header( Mail::Header->new( [
+        'Content-Type: multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"'
+    ] ) );
+    ok( ! $self->is_not_multipart($tran), "not_multipart 2" );
 }
 
+sub test_should_scan {
+    my $self = shift;
+    my $trans = Qpsmtpd::Transaction->new();
+    $trans->{_body_size} = 1;
+    $self->{_args}{scan_all} = 1;
+    ok( $self->should_scan($trans), "Should scan small message, scan_all=1");
+    $self->{_args}{scan_all} = 0;
+    ok( ! $self->should_scan($trans), "Should not scan small message, scan_all=0");
+    $trans->{_body_size} = 99999999999;
+    ok( !$self->should_scan($trans), "Should not scan large message" );
+    $trans->{_body_size} = 1;
+    $trans->header( Mail::Header->new( [
+        'Content-Type: multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"'
+    ] ) );
+    ok( $self->should_scan($trans), "Should not scan multi-part message" );
+}

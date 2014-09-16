@@ -140,7 +140,7 @@ sub register {
     if ( ! defined $self->{_args}{deny_viruses} ) {
         $self->{_args}{deny_viruses} = 'yes';
     }
-    if ( ! defined $self->{_args}{scan_all} ) {
+    if ( ! $self->{_args}{scan_all} ) {
         $self->{_args}{scan_all} = 1;
     }
     for my $setting (qw( deny_viruses defer_on_error scan_all )) {
@@ -161,8 +161,7 @@ sub data_post_handler {
         $self->log(LOGINFO, "skip, naughty");
         return (DECLINED);
     }
-    return (DECLINED) if $self->is_too_big($transaction);
-    return (DECLINED) if $self->is_not_multipart($transaction);
+    return DECLINED if ! $self->should_scan($transaction);
 
     my $clamd = $self->get_clamd()
       or return $self->err_and_return("Cannot instantiate ClamAV::Client");
@@ -328,8 +327,6 @@ sub is_not_multipart {
     my $self = shift;
     my $transaction = shift || $self->qp->transaction;
 
-    return if $self->{'_args'}{'scan_all'};
-
     return 1 if !$transaction->header;
 
     # Ignore non-multipart emails
@@ -340,5 +337,14 @@ sub is_not_multipart {
         return 1;
     }
 
-    return;
+    return 0;
+}
+
+sub should_scan {
+    my $self = shift;
+    my $tran = shift;
+    return 0 if $self->is_too_big($tran);
+    return 1 if $self->{_args}{scan_all};
+    return 0 if $self->is_not_multipart($tran);
+    return 1;
 }
