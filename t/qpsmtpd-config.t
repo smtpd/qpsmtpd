@@ -4,6 +4,7 @@ use warnings;
 use Data::Dumper;
 use File::Path;
 use Test::More;
+use Sys::Hostname;
 
 use lib 'lib';    # test lib/Qpsmtpd (vs site_perl)
 use lib 't';
@@ -30,8 +31,12 @@ isa_ok($config, 'Qpsmtpd::Config');
 
 __log();
 __config_dir();
+__clear_cache();
+__default();
 __from_file();
 __get_qmail();
+__get_qmail_map();
+__expand_inclusion();
 __config_via_smtpd();
 
 foreach my $f (@mes) { unlink $f; }
@@ -52,9 +57,43 @@ sub __log {
     is($warned, "$$ test log message\n", 'LOGWARN emitted correct warning');
 }
 
+sub __config_dir {
+    my $dir = $config->config_dir('logging');
+    ok($dir, "config_dir, $dir");
+
+    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
+    $dir = $Qpsmtpd::Config::dir_memo{logging};
+    ok($dir, "config_dir, $dir (memo)");
+}
+
+sub __clear_cache {
+    $Qpsmtpd::Config::config_cache{foo} = 2;
+    $Qpsmtpd::Config::dir_memo{dir1} = 'some/path';
+
+    $config->clear_cache();
+    ok(! $Qpsmtpd::Config::config_cache{foo}, "clear_cache, config_cache")
+        or diag Data::Dumper::Dumper($Qpsmtpd::Config::config_cache{foo});
+    ok(! $Qpsmtpd::Config::dir_memo{dir1}, "clear_cache, dir_memo")
+};
+
+sub __default {
+    is($config->default('me'), hostname, "default, my hostname");
+    is($config->default('timeout'), 1200, "default timeout is 1200");
+    ok(!$config->default('undefined-test'), "default, undefined");
+}
+
 sub __get_qmail {
     is($config->get_qmail('me'), 'host.example.org', 'get_qmail("me")');
     ok(!$config->get_qmail('not-me'), 'get_qmail("not-me")');
+}
+
+sub __get_qmail_map {
+    eval "require CDB_File";   ## no critic (StringyEval)
+    if (!$@) {
+        my $r = $config->get_qmail_map('users', 't/config/users');
+        ok(keys %$r, 'get_qmail_map("users.cdb")');
+        ok($r->{'!example.com-'}, "get_qmail_map, known entry");
+    };
 }
 
 sub __from_file {
@@ -63,15 +102,10 @@ sub __from_file {
     ok( @r, "from_file, $test_file");
     cmp_ok('1st line with content', 'eq', $r[0], "from_file string compare");
     ok( !$r[1], "from_file");
-};
+}
 
-sub __config_dir {
-    my $dir = $config->config_dir('logging');
-    ok($dir, "config_dir, $dir");
-
-    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
-    $dir = $Qpsmtpd::Config::dir_memo{logging};
-    ok($dir, "config_dir, $dir (memo)");
+sub __expand_inclusion {
+    # TODO
 }
 
 sub __config_via_smtpd {

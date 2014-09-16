@@ -8,7 +8,7 @@ use lib 'lib';
 use parent 'Qpsmtpd::Base';
 use Qpsmtpd::Constants;
 
-our $_config_cache = {};
+our %config_cache = ();
 our %dir_memo;
 our %defaults = (
                 me      => hostname,
@@ -43,7 +43,7 @@ sub config_dir {
 }
 
 sub clear_cache {
-    $_config_cache = {};
+    %config_cache = ();
     %dir_memo = ();
 }
 
@@ -72,7 +72,8 @@ sub get_qmail_map {
     my ($self, $config, $configfile) = @_;
 
     if (!-e $configfile . ".cdb") {
-        $_config_cache->{$config} ||= [];
+        $self->log(LOGERROR, "File $configfile.cdb does not exist");
+        $config_cache{$config} ||= [];
         return +{};
     }
     eval { require CDB_File };
@@ -99,7 +100,7 @@ sub get_qmail_map {
 sub from_file {
     my ($self, $configfile, $config, $visited) = @_;
     if (!-e $configfile) {
-        $_config_cache->{$config} ||= [];
+        $config_cache{$config} ||= [];
         return;
     }
 
@@ -145,7 +146,7 @@ sub from_file {
             }
             push @{$visited}, $inclusion;
 
-            for my $inc ($self->expand_inclusion_($inclusion, $configfile)) {
+            for my $inc ($self->expand_inclusion($inclusion, $configfile)) {
                 my @insertion = $self->from_file($inc, $config, $visited);
                 splice @config, $pos, 0, @insertion;    # insert the inclusion
                 $pos += @insertion;
@@ -156,12 +157,12 @@ sub from_file {
         }
     }
 
-    $_config_cache->{$config} = \@config;
+    $config_cache{$config} = \@config;
 
     return wantarray ? @config : $config[0];
 }
 
-sub expand_inclusion_ {
+sub expand_inclusion {
     my $self      = shift;
     my $inclusion = shift;
     my $context   = shift;
