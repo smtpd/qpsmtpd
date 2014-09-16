@@ -395,14 +395,14 @@ sub _load_plugin {
 
     # don't reload plugins if they are already loaded
     if (!defined &{"${package}::plugin_name"}) {
-        PLUGIN_DIR: for my $dir (@plugin_dirs) {
+        for my $dir (@plugin_dirs) {
             next if !-e "$dir/$plugin";
             Qpsmtpd::Plugin->compile($plugin_name, $package,
                 "$dir/$plugin", $self->{_test_mode}, $plugin);
             if ($safe_line !~ /logging/) {
                 $self->log(LOGDEBUG, "Loading $safe_line from $dir/$plugin");
             };
-            last PLUGIN_DIR;
+            last;
         }
         if (! defined &{"${package}::plugin_name"}) {
             die "Plugin $plugin_name not found in our plugin dirs (", join(', ', @plugin_dirs), ")";
@@ -456,9 +456,10 @@ sub run_hooks_no_respond {
         my @r;
         for my $code (@{$hooks->{$hook}}) {
             eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-            $@
-              and warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@)
-              and next;
+            if ($@) {
+                warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
+                next;
+            }
             if ($r[0] == YIELD) {
                 die "YIELD not valid from $hook hook";
             }
@@ -490,11 +491,10 @@ sub run_continuation {
         $self->varlog(LOGDEBUG, $hook, $code->{name});
         my $tran = $self->transaction;
         eval { (@r) = $code->{code}->($self, $tran, @$args); };
-        $@
-          and
-          $self->log(LOGCRIT, "FATAL PLUGIN ERROR [" . $code->{name} . "]: ",
-                     $@)
-          and next;
+        if ($@) {
+            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
+            next;
+        }
 
         !defined $r[0]
           and $self->log(LOGERROR,
