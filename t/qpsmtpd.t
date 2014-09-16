@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 
+use Cwd;
 use Data::Dumper;
 use File::Path;
 use Test::More;
@@ -13,7 +14,6 @@ BEGIN {
     use_ok('Qpsmtpd');
     use_ok('Qpsmtpd::Constants');
     use_ok('Test::Qpsmtpd');
-
 }
 
 my $qp = bless {}, 'Qpsmtpd';
@@ -67,16 +67,17 @@ sub __load_logging {
 
 sub __spool_dir {
     my $dir = $qp->spool_dir();
-    ok( $dir, "spool_dir is at $dir");
+    ok($dir, "spool_dir is at $dir");
 
-    my $cwd = `pwd`;
-    chomp($cwd);
-    open my $spooldir, '>', "./config.sample/spool_dir";
-    print $spooldir "$cwd/t/tmp";
-    close $spooldir;
+    my $cwd = getcwd;
+    chomp $cwd;
+    open my $SD, '>', "./config.sample/spool_dir";
+    print $SD "$cwd/t/tmp";
+    close $SD;
 
     my $spool_dir = $smtpd->spool_dir();
-    ok($spool_dir =~ m!t/tmp/$!,   "Located the spool directory");
+    ok($spool_dir =~ m!/tmp/$!,   "Located the spool directory")
+        or diag ("spool_dir: $spool_dir instead of tmp");
 
     my $tempfile  = $smtpd->temp_file();
     my $tempdir   = $smtpd->temp_dir();
