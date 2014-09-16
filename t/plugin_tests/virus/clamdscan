@@ -14,7 +14,7 @@ sub register_tests {
         eval 'use ClamAV::Client';  ## no critic (Stringy)
         skip "Could not load ClamAV::Client", 4
             if $@;
-        $self->register_test('test_register', 3);
+        $self->register_test('test_register', 6);
         $self->register_test('test_get_clamd', 1);
     }
     $self->register_test('test_err_and_return', 2);
@@ -28,9 +28,17 @@ sub register_tests {
 sub test_register {
     my $self = shift;
     
-    ok( $self->{_args}{deny_viruses} eq 'yes', "deny_viruses");
-    ok( $self->{_args}{max_size} == 1024, "max_size");
-    ok( $self->{_args}{scan_all} == 1, "scan_all");
+    ok( $self->{_args}{deny_viruses},   "deny_viruses 1");
+    is( $self->{_args}{max_size}, 1024, "max_size 1");
+    ok( $self->{_args}{scan_all},       "scan_all 1");
+
+    my $qp = $self->qp;
+
+    # Re-initialize the plugin with some different options
+    $self->register($qp,qw( scan_all 0 max_size 200 deny_viruses no));
+    ok( ! $self->{_args}{deny_viruses}, "deny_viruses 2");
+    is( $self->{_args}{max_size}, 200,  "max_size 2");
+    ok( !$self->{_args}{scan_all},      "scan_all 2");
 };
 
 sub test_err_and_return {
