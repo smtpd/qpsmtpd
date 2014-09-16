@@ -9,11 +9,10 @@ sub new {
 
 sub tildeexp {
     my ($self, $path) = @_;
-    $path =~ s{^~([^/]*)} {  
-	  $1
-	      ? (getpwnam($1))[7] 
-	      : ( $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7])
-	  }ex;
+    $path =~ s{^~([^/]*)} {
+        $1  ? (getpwnam($1))[7]
+            : ( $ENV{HOME} || $ENV{LOGDIR} || (getpwuid($>))[7])
+    }ex;
     return $path;
 }
 
