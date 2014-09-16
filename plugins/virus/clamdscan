@@ -136,10 +136,14 @@ sub register {
     }
 
     # Set sensible defaults
-    $self->{_args}{deny_viruses} ||= 'yes';
     $self->{_args}{max_size}     ||= 1024;
-    $self->{_args}{scan_all}     ||= 1;
-    for my $setting ('deny_viruses', 'defer_on_error') {
+    if ( ! defined $self->{_args}{deny_viruses} ) {
+        $self->{_args}{deny_viruses} = 'yes';
+    }
+    if ( ! defined $self->{_args}{scan_all} ) {
+        $self->{_args}{scan_all} = 1;
+    }
+    for my $setting (qw( deny_viruses defer_on_error scan_all )) {
         next unless $self->{'_args'}{$setting};
         if (lc $self->{'_args'}{$setting} eq 'no') {
             $self->{'_args'}{$setting} = 0;
