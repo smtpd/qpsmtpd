@@ -136,10 +136,14 @@ sub register {
     }
 
     # Set sensible defaults
-    $self->{_args}{deny_viruses} ||= 'yes';
     $self->{_args}{max_size}     ||= 1024;
-    $self->{_args}{scan_all}     ||= 1;
-    for my $setting ('deny_viruses', 'defer_on_error') {
+    if ( ! defined $self->{_args}{deny_viruses} ) {
+        $self->{_args}{deny_viruses} = 'yes';
+    }
+    if ( ! defined $self->{_args}{scan_all} ) {
+        $self->{_args}{scan_all} = 1;
+    }
+    for my $setting (qw( deny_viruses defer_on_error scan_all )) {
         next unless $self->{'_args'}{$setting};
         if (lc $self->{'_args'}{$setting} eq 'no') {
             $self->{'_args'}{$setting} = 0;
@@ -155,10 +159,9 @@ sub data_post_handler {
 
     if ($self->connection->notes('naughty')) {
         $self->log(LOGINFO, "skip, naughty");
-        return (DECLINED);
+        return DECLINED;
     }
-    return (DECLINED) if $self->is_too_big($transaction);
-    return (DECLINED) if $self->is_not_multipart($transaction);
+    return DECLINED if ! $self->should_scan($transaction);
 
     my $clamd = $self->get_clamd()
       or return $self->err_and_return("Cannot instantiate ClamAV::Client");
@@ -193,19 +196,19 @@ sub data_post_handler {
         $self->adjust_karma(-1);
 
         if ($self->{_args}{deny_viruses}) {
-            return (DENY, "Virus found: $found");
+            return DENY, "Virus found: $found";
         }
 
         $transaction->header->add('X-Virus-Found',   'Yes',  0);
         $transaction->header->add('X-Virus-Details', $found, 0);
-        return (DECLINED);
+        return DECLINED;
     }
 
     $self->log(LOGINFO, "pass, clean");
     $transaction->header->add('X-Virus-Found', 'No', 0);
     $transaction->header->add('X-Virus-Checked',
                               "by $version on " . $self->qp->config('me'), 0);
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub assemble_message {
@@ -223,9 +226,9 @@ sub err_and_return {
     if ($message) {
         $self->log(LOGERROR, $message);
     }
-    return (DENYSOFT, "Unable to scan for viruses")
+    return DENYSOFT, "Unable to scan for viruses"
       if $self->{_args}{defer_on_error};
-    return (DECLINED, "skip");
+    return DECLINED, "skip";
 }
 
 sub get_filename {
@@ -317,24 +320,31 @@ sub is_too_big {
     }
 
     $self->log(LOGDEBUG, "data_size, $size");
-    return;
+    return 0;
 }
 
-sub is_not_multipart {
+sub is_multipart {
     my $self = shift;
     my $transaction = shift || $self->qp->transaction;
 
-    return if $self->{'_args'}{'scan_all'};
-
-    return 1 if !$transaction->header;
+    return 0 if !$transaction->header;
 
     # Ignore non-multipart emails
-    my $content_type = $transaction->header->get('Content-Type') or return 1;
+    my $content_type = $transaction->header->get('Content-Type') or return 0;
     $content_type =~ s/\s/ /g;
     if ($content_type !~ m!\bmultipart/.*\bboundary="?([^"]+)!i) {
         $self->log(LOGNOTICE, "skip, not multipart");
-        return 1;
+        return 0;
     }
 
-    return;
+    return 1;
+}
+
+sub should_scan {
+    my $self = shift;
+    my $tran = shift;
+    return 0 if $self->is_too_big($tran);
+    return 1 if $self->{_args}{scan_all};
+    return 0 if ! $self->is_multipart($tran);
+    return 1;
 }

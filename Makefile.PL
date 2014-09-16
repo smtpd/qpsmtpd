@@ -17,9 +17,10 @@ WriteMakefile(
         'Net::IP'         => 0,
         'Time::HiRes'     => 0,
         'IO::Socket::SSL' => 0,
+        'ClamAV::Client'  => 0,      # virus/clamdscan
 # Dev/Test modules
-	    'Test::More'      => 0,
-	    'Test::Output'    => 0,
+        'Test::More'      => 0,
+        'Test::Output'    => 0,
 # modules for specific features
         'Mail::DKIM'         => 0,
         'File::Tail'         => 0,   # log/summarize, log/watch
@@ -49,8 +50,8 @@ sub MY::postamble {
     qq[
 testcover :
 \t cover -delete && \\
-	HARNESS_PERL_SWITCHES=-MDevel::Cover \$(MAKE) test && \\
-	cover
+    HARNESS_PERL_SWITCHES=-MDevel::Cover \$(MAKE) test && \\
+    cover
 ]
 
 }
