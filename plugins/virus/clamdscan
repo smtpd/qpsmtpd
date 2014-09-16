@@ -129,17 +129,16 @@ sub register {
     $self->log(LOGERROR, "Bad parameters for the clamdscan plugin") if @_ % 2;
     $self->{'_args'} = {@_};
 
-    eval 'use ClamAV::Client';
+    eval 'use ClamAV::Client'; ## no critic (Stringy)
     if ($@) {
-        warn "unable to load ClamAV::Client\n";
         $self->log(LOGERROR, "unable to load ClamAV::Client");
         return;
     }
 
-    # Set some sensible defaults
-    $self->{'_args'}{'deny_viruses'} ||= 'yes';
-    $self->{'_args'}{'max_size'}     ||= 1024;
-    $self->{'_args'}{'scan_all'}     ||= 1;
+    # Set sensible defaults
+    $self->{_args}{deny_viruses} ||= 'yes';
+    $self->{_args}{max_size}     ||= 1024;
+    $self->{_args}{scan_all}     ||= 1;
     for my $setting ('deny_viruses', 'defer_on_error') {
         next unless $self->{'_args'}{$setting};
         if (lc $self->{'_args'}{$setting} eq 'no') {
@@ -241,9 +240,11 @@ sub get_filename {
     }
 
     if (!-f $filename) {
-        $self->log(LOGERROR, "spool file missing! Attempting to respool");
-        $transaction->body_spool;
-        $filename = $transaction->body_filename;
+        if ($transaction->data_size) {
+            $self->log(LOGERROR, "spool file missing! Attempting to respool");
+            $transaction->body_spool;
+            $filename = $transaction->body_filename;
+        };
         if (!-f $filename) {
             $self->log(LOGERROR, "skip: failed spool to $filename! Giving up");
             return;
@@ -264,14 +265,14 @@ sub set_permission {
     my $dir_mode = (stat($self->spool_dir()))[2];
     $self->log(LOGDEBUG, "spool dir mode: $dir_mode");
 
-    if ($dir_mode & 0010 || $dir_mode & 0001) {
+    if ($dir_mode & oct('0010') || $dir_mode & oct('0001')) {
 
         # match the spool file mode with the mode of the directory -- add
         # the read bit for group, world, or both, depending on what the
         # spool dir had, and strip all other bits, especially the sticky bit
         my $fmode =
-          ($dir_mode & 0044) | ($dir_mode & 0010 ? 0040 : 0) |
-          ($dir_mode & 0001 ? 0004 : 0);
+          ($dir_mode & oct('0044')) | ($dir_mode & oct('0010') ? oct('0040') : 0) |
+          ($dir_mode & oct('0001') ? oct('0004') : 0);
 
         unless (chmod $fmode, $filename) {
             $self->log(LOGERROR, "chmod: $filename: $!");

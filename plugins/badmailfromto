@@ -30,8 +30,9 @@ sub hook_mail {
     my $from = lc($sender->user) . '@' . $host;
 
     for my $bad (@badmailfromto) {
+        next if !$bad;
         $bad =~ s/^\s*(\S+).*/$1/;
-        next unless $bad;
+        next if !$bad;
         $bad = lc $bad;
         if ($bad !~ m/\@/) {
             $self->log(LOGWARN, 'bad config, no @ sign in ' . $bad);

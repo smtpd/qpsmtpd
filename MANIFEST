@@ -39,7 +39,9 @@ lib/Danga/TimeoutSocket.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
+lib/Qpsmtpd/Base.pm
 lib/Qpsmtpd/Command.pm
+lib/Qpsmtpd/Config.pm
 lib/Qpsmtpd/ConfigServer.pm
 lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
@@ -55,7 +57,6 @@ lib/Qpsmtpd/SMTP/Prefork.pm
 lib/Qpsmtpd/TcpServer.pm
 lib/Qpsmtpd/TcpServer/Prefork.pm
 lib/Qpsmtpd/Transaction.pm
-lib/Qpsmtpd/Utils.pm
 LICENSE
 log/log2sql
 log/log2sql.sql
@@ -166,7 +167,6 @@ run.tcpserver
 STATUS
 t/addresses.t
 t/auth.t
-t/config.t
 t/config/badhelo
 t/config/badrcptto
 t/config/dnsbl_allow
@@ -178,6 +178,8 @@ t/config/plugins
 t/config/public_suffix_list
 t/config/rcpthosts
 t/config/relayclients
+t/config/size_threshold
+t/config/test_config_file
 t/helo.t
 t/misc.t
 t/plugin_tests.t
@@ -209,11 +211,11 @@ t/plugin_tests/spamassassin
 t/plugin_tests/user_config
 t/plugin_tests/virus/clamdscan
 t/qpsmtpd-address.t
+t/qpsmtpd-base.t
+t/qpsmtpd-config.t
 t/qpsmtpd-smtp.t
-t/qpsmtpd-utils.t
 t/qpsmtpd.t
 t/rset.t
-t/tempstuff.t
 t/Test/Qpsmtpd.pm
 t/Test/Qpsmtpd/Plugin.pm
 UPGRADING.pod

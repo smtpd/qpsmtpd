@@ -8,7 +8,7 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    eval 'use ClamAV::Client';
+    eval 'use ClamAV::Client';  ## no critic (Stringy)
     if ( ! $@ ) {
         $self->register_test('test_register', 3);
         $self->register_test('test_get_clamd', 1);
@@ -42,6 +42,9 @@ sub test_err_and_return {
 
 sub test_get_filename {
     my $self = shift;
+    my $tran = $self->qp->transaction();
+    $tran->{_body_array} = ['line','two'];
+
     my $filename = $self->get_filename();
     ok( $filename, "get_filename ($filename)" );
 }

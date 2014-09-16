@@ -396,7 +396,7 @@ sub cmd_hup {
 
     # clear cache
     print "Clearing cache\n";
-    Qpsmtpd::clear_config_cache();
+    Qpsmtpd::Config::clear_cache();
 
     # should also reload modules... but can't do that yet.
 }

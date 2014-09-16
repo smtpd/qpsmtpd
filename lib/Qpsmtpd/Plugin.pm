@@ -1,5 +1,4 @@
 package Qpsmtpd::Plugin;
-
 use strict;
 use warnings;
 
