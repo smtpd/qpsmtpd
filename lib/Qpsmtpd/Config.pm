@@ -11,12 +11,13 @@ use Qpsmtpd::Constants;
 our %config_cache = ();
 our %dir_memo;
 our %defaults = (
-                me      => hostname,
-                timeout => 1200,
-               );
+                 me      => hostname,
+                 timeout => 1200,
+                );
 
 sub log {
     my ($self, $trace, @log) = @_;
+
     # logging methods attempt to read config files, this log() prevents that
     # until after logging has fully loaded
     return if $trace > LOGWARN;
@@ -38,19 +39,19 @@ sub config {
         ($rc, @config) = $qp->run_hooks_no_respond('user_config', $type, $c);
         if (defined $rc && $rc == OK) {
             return wantarray ? @config : $config[0];
-        };
-    };
+        }
+    }
 
     # then run the config hooks
     ($rc, @config) = $qp->run_hooks_no_respond('config', $c);
     $qp->log(LOGDEBUG,
-                   "config($c): hook returned ("
-                 . join(',', map { defined $_ ? $_ : 'undef' } ($rc, @config))
-                 . ")"
-              );
+                 "config($c): hook returned ("
+               . join(',', map { defined $_ ? $_ : 'undef' } ($rc, @config))
+               . ")"
+            );
     if (defined $rc && $rc == OK) {
         return wantarray ? @config : $config[0];
-    };
+    }
 
     # then qmail
     @config = $self->get_qmail($c, $type);
@@ -77,12 +78,12 @@ sub config_dir {
 
 sub clear_cache {
     %config_cache = ();
-    %dir_memo = ();
+    %dir_memo     = ();
 }
 
 sub default {
     my ($self, $def) = @_;
-    return if ! $defaults{$def};
+    return if !exists $defaults{$def};
     return wantarray ? ($defaults{$def}) : $defaults{$def};
 }
 

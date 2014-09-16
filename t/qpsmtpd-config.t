@@ -79,7 +79,11 @@ sub __clear_cache {
 sub __default {
     is($config->default('me'), hostname, "default, my hostname");
     is($config->default('timeout'), 1200, "default timeout is 1200");
-    ok(!$config->default('undefined-test'), "default, undefined");
+
+    is($config->default('undefined-test'), undef, "default, undefined");
+
+    $Qpsmtpd::Config::defaults{'zero-test'} = 0;
+    is($config->default('zero-test'), 0, "default, zero");
 }
 
 sub __get_qmail {

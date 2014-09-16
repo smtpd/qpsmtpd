@@ -1,5 +1,6 @@
 package Qpsmtpd;
 use strict;
+
 #use warnings;
 
 our $VERSION = "0.95";
@@ -30,11 +31,11 @@ sub _restart {
 
         # reset all global vars to defaults
         $self->conf->clear_cache();
-        $hooks           = {};
-        $LOGGING_LOADED  = 0;
-        $TraceLevel      = LOGWARN;
-        $Spool_dir       = undef;
-        $Size_threshold  = undef;
+        $hooks          = {};
+        $LOGGING_LOADED = 0;
+        $TraceLevel     = LOGWARN;
+        $Spool_dir      = undef;
+        $Size_threshold = undef;
     }
 }
 
@@ -108,7 +109,7 @@ sub varlog {
       $self->run_hooks_no_respond("logging", $trace, $hook, $plugin, @log)
       or return;
 
-    return if $rc == DECLINED || $rc == OK;    # plugin success
+    return if $rc == DECLINED || $rc == OK;              # plugin success
     return if $trace > $TraceLevel;
 
     # no logging plugins registered, fall back to STDERR
@@ -125,14 +126,14 @@ sub conf {
     my $self = shift;
     if (!$self->{_config}) {
         $self->{_config} = Qpsmtpd::Config->new();
-    };
+    }
     return $self->{_config};
 }
 
 sub config {
     my $self = shift;
     return $self->conf->config($self, @_);
-};
+}
 
 sub config_dir {
     my $self = shift;
@@ -205,15 +206,17 @@ sub _load_plugin {
         for my $dir (@plugin_dirs) {
             next if !-e "$dir/$plugin";
             Qpsmtpd::Plugin->compile($plugin_name, $package,
-                "$dir/$plugin", $self->{_test_mode}, $plugin);
+                                     "$dir/$plugin", $self->{_test_mode},
+                                     $plugin);
             if ($safe_line !~ /logging/) {
                 $self->log(LOGDEBUG, "Loading $safe_line from $dir/$plugin");
-            };
+            }
             last;
         }
-        if (! defined &{"${package}::plugin_name"}) {
-            die "Plugin $plugin_name not found in our plugin dirs (", join(', ', @plugin_dirs), ")";
-        };
+        if (!defined &{"${package}::plugin_name"}) {
+            die "Plugin $plugin_name not found in our plugin dirs (",
+              join(', ', @plugin_dirs), ")";
+        }
     }
 
     my $plug = $package->new();
@@ -232,11 +235,12 @@ sub _load_package_plugin {
       qq[require $package;\n] . qq[sub ${plugin}::plugin_name { '$plugin' }];
     $eval =~ m/(.*)/s;
     $eval = $1;
-    eval $eval;  ## no critic (Eval)
+    eval $eval;    ## no critic (Eval)
     die "Failed loading $package - eval $@" if $@;
+
     if ($plugin_line !~ /logging/) {
         $self->log(LOGDEBUG, "Loading $package ($plugin_line)");
-    };
+    }
 
     my $plug = $package->new();
     $plug->_register($self, @$args);
@@ -299,7 +303,8 @@ sub run_continuation {
         my $tran = $self->transaction;
         eval { (@r) = $code->{code}->($self, $tran, @$args); };
         if ($@) {
-            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
+            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [" . $code->{name} . "]: ",
+                       $@);
             next;
         }
 
@@ -402,20 +407,20 @@ sub spool_dir {
     $Spool_dir .= "/" if $Spool_dir !~ m!/$!;
 
     $Spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
-    $Spool_dir = $1;     # cleanse the taint
+    $Spool_dir = $1;                    # cleanse the taint
 
     my $Spool_perms = $self->config('spool_perms') || '0700';
 
-    if (!-d $Spool_dir) {    # create if it doesn't exist
+    if (!-d $Spool_dir) {               # create if it doesn't exist
         mkdir($Spool_dir, oct($Spool_perms))
-            or die "Could not create spool_dir $Spool_dir: $!";
+          or die "Could not create spool_dir $Spool_dir: $!";
     }
 
     # Make sure the spool dir has appropriate rights
     if (((stat $Spool_dir)[2] & oct('07777')) != oct($Spool_perms)) {
         $self->log(LOGWARN,
-            "Permissions on spool_dir $Spool_dir are not $Spool_perms")
-    };
+                   "Permissions on spool_dir $Spool_dir are not $Spool_perms");
+    }
 
     return $Spool_dir;
 }
@@ -433,10 +438,12 @@ sub temp_file {
 
 sub temp_dir {
     my ($self, $mask) = @_;
+    $mask ||= '0700';
     my $dirname = $self->temp_file();
-    -d $dirname
-      or mkdir($dirname, $mask || '0700')
-      or die "Could not create temporary directory $dirname: $!";
+    if (!-d $dirname) {
+        mkdir($dirname, $mask)
+            or die "Could not create temporary directory $dirname: $!";
+    }
     return $dirname;
 }
 
