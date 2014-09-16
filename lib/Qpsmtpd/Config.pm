@@ -106,7 +106,7 @@ sub get_qmail_map {
     my ($self, $config, $configfile) = @_;
 
     if (!-e $configfile . ".cdb") {
-        $self->log(LOGERROR, "File $configfile.cdb does not exist");
+        $self->log(LOGDEBUG, "File $configfile.cdb does not exist");
         $config_cache{$config} ||= [];
         return +{};
     }
