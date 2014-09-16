@@ -8,11 +8,13 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    eval 'use ClamAV::Client';  ## no critic (Stringy)
-    if ( ! $@ ) {
+    SKIP: {
+        eval 'use ClamAV::Client';  ## no critic (Stringy)
+        skip "Could not load ClamAV::Client", 4
+            if $@;
         $self->register_test('test_register', 3);
         $self->register_test('test_get_clamd', 1);
-    };
+    }
     $self->register_test('test_err_and_return', 2);
     $self->register_test('test_get_filename', 1);
     $self->register_test('test_set_permission', 1);
@@ -24,8 +26,8 @@ sub test_register {
     my $self = shift;
     
     ok( $self->{_args}{deny_viruses} eq 'yes', "deny_viruses");
-    ok( $self->{_args}{max_size} == 128, "max_size");
-    ok( $self->{_args}{scan_all} == 0, "scan_all");
+    ok( $self->{_args}{max_size} == 1024, "max_size");
+    ok( $self->{_args}{scan_all} == 1, "scan_all");
 };
 
 sub test_err_and_return {
@@ -74,16 +76,10 @@ sub test_is_too_big {
 
 sub test_is_not_multipart {
     my $self = shift;
-    my $tran = shift || $self->qp->transaction();
+    my $tran = $self->qp->transaction();
 
     ok( $self->is_not_multipart(), "not_multipart" );
-
-    if ( $tran->header ) {
-        $tran->header->add('Content-Type', 'multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"');
-        ok( ! $self->is_not_multipart(), "not_multipart" );
-    }
-    else {
-        ok( 1 );
-    }
+    $tran->header->add('Content-Type', 'multipart/alternative; boundary="Jx3Wbb8BMHsO=_?:"');
+    ok( ! $self->is_not_multipart(), "not_multipart" );
 }
 
