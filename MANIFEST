@@ -209,8 +209,8 @@ t/plugin_tests/spamassassin
 t/plugin_tests/user_config
 t/plugin_tests/virus/clamdscan
 t/qpsmtpd-address.t
+t/qpsmtpd-base.t
 t/qpsmtpd-smtp.t
-t/qpsmtpd-utils.t
 t/qpsmtpd.t
 t/rset.t
 t/tempstuff.t
