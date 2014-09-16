@@ -27,6 +27,39 @@ sub log {
     warn join(' ', $$, @log) . "\n";
 }
 
+sub config {
+    my ($self, $qp, $c, $type) = @_;
+
+    $qp->log(LOGDEBUG, "in config($c)");
+
+    # first run the user_config hooks
+    my ($rc, @config);
+    if (ref $type && $type->can('address')) {
+        ($rc, @config) = $qp->run_hooks_no_respond('user_config', $type, $c);
+        if (defined $rc && $rc == OK) {
+            return wantarray ? @config : $config[0];
+        };
+    };
+
+    # then run the config hooks
+    ($rc, @config) = $qp->run_hooks_no_respond('config', $c);
+    $qp->log(LOGDEBUG,
+                   "config($c): hook returned ("
+                 . join(',', map { defined $_ ? $_ : 'undef' } ($rc, @config))
+                 . ")"
+              );
+    if (defined $rc && $rc == OK) {
+        return wantarray ? @config : $config[0];
+    };
+
+    # then qmail
+    @config = $self->get_qmail($c, $type);
+    return wantarray ? @config : $config[0] if @config;
+
+    # then the default, which may be undefined
+    return $self->default($c);
+}
+
 sub config_dir {
     my ($self, $config) = @_;
     if (exists $dir_memo{$config}) {

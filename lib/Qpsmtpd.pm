@@ -130,37 +130,9 @@ sub conf {
 }
 
 sub config {
-    my ($self, $c, $type) = @_;
-
-    $self->log(LOGDEBUG, "in config($c)");
-
-    # first run the user_config hooks
-    my ($rc, @config);
-    if (ref $type && $type->can('address')) {
-        ($rc, @config) = $self->run_hooks_no_respond('user_config', $type, $c);
-        if (defined $rc && $rc == OK) {
-            return wantarray ? @config : $config[0];
-        };
-    };
-
-    # then run the config hooks
-    ($rc, @config) = $self->run_hooks_no_respond('config', $c);
-    $self->log(LOGDEBUG,
-                   "config($c): hook returned ("
-                 . join(',', map { defined $_ ? $_ : 'undef' } ($rc, @config))
-                 . ")"
-              );
-    if (defined $rc && $rc == OK) {
-        return wantarray ? @config : $config[0];
-    };
-
-    # then qmail
-    @config = $self->conf->get_qmail($c, $type);
-    return wantarray ? @config : $config[0] if @config;
-
-    # then the default, which may be undefined
-    return $self->conf->default($c);
-}
+    my $self = shift;
+    return $self->conf->config($self, @_);
+};
 
 sub config_dir {
     my $self = shift;
