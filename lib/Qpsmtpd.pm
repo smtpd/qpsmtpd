@@ -264,11 +264,11 @@ sub _config_from_file {
         return;
     };
     my @config = <$CF>;
-    chomp @config;
-    @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ }
-      map { s/^\s+//; s/\s+$//; $_; }    # trim leading/trailing whitespace
-      @config;
     close $CF;
+
+    chomp @config;
+    @config = grep { length($_) and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
+    for (@config) { s/^\s+//; s/\s+$//; }    # trim leading/trailing whitespace
 
     my $pos = 0;
     while ($pos < @config) {
@@ -425,7 +425,7 @@ sub _load_package_plugin {
       qq[require $package;\n] . qq[sub ${plugin}::plugin_name { '$plugin' }];
     $eval =~ m/(.*)/s;
     $eval = $1;
-    eval $eval;
+    eval $eval;  ## no critic (Eval)
     die "Failed loading $package - eval $@" if $@;
     if ($plugin_line !~ /logging/) {
         $self->log(LOGDEBUG, "Loading $package ($plugin_line)");
@@ -476,7 +476,6 @@ sub pause_read { die "Continuations only work in qpsmtpd-async" }
 sub run_continuation {
     my $self = shift;
 
-    #my $t1 = $SAMPLER->("run_hooks", undef, 1);
     die "No continuation in progress" unless $self->{_continuation};
     $self->continue_read();
     my $todo = $self->{_continuation};
@@ -488,8 +487,6 @@ sub run_continuation {
     while (@$todo) {
         my $code = shift @$todo;
 
-        #my $t2 = $SAMPLER->($hook . "_" . $code->{name}, undef, 1);
-        #warn("Got sampler called: ${hook}_$code->{name}\n");
         $self->varlog(LOGDEBUG, $hook, $code->{name});
         my $tran = $self->transaction;
         eval { (@r) = $code->{code}->($self, $tran, @$args); };
@@ -567,7 +564,6 @@ sub run_continuation {
 sub hook_responder {
     my ($self, $hook, $msg, $args) = @_;
 
-    #my $t1 = $SAMPLER->("hook_responder", undef, 1);
     my $code = shift @$msg;
 
     my $responder = $hook . '_respond';
@@ -578,40 +574,41 @@ sub hook_responder {
 }
 
 sub _register_hook {
-    my $self = shift;
-    my ($hook, $code, $unshift) = @_;
+    my ($self, $hook, $code, $unshift) = @_;
 
     if ($unshift) {
         unshift @{$hooks->{$hook}}, $code;
+        return;
     }
-    else {
-        push @{$hooks->{$hook}}, $code;
-    }
+
+    push @{$hooks->{$hook}}, $code;
 }
 
 sub spool_dir {
     my $self = shift;
 
-    unless ($Spool_dir) {    # first time through
-        $self->log(LOGDEBUG, "Initializing spool_dir");
-        $Spool_dir = $self->config('spool_dir') || $self->tildeexp('~/tmp/');
+    return $Spool_dir if $Spool_dir;    # already set
 
-        $Spool_dir .= "/" unless ($Spool_dir =~ m!/$!);
+    $self->log(LOGDEBUG, "Initializing spool_dir");
+    $Spool_dir = $self->config('spool_dir') || $self->tildeexp('~/tmp/');
 
-        $Spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
-        $Spool_dir = $1;     # cleanse the taint
-        my $Spool_perms = $self->config('spool_perms') || '0700';
+    $Spool_dir .= "/" if $Spool_dir !~ m!/$!;
 
-        if (!-d $Spool_dir) {    # create it if it doesn't exist
-            mkdir($Spool_dir, oct($Spool_perms))
-              or die "Could not create spool_dir $Spool_dir: $!";
-        }
+    $Spool_dir =~ /^(.+)$/ or die "spool_dir not configured properly";
+    $Spool_dir = $1;     # cleanse the taint
 
-        # Make sure the spool dir has appropriate rights
-        $self->log(LOGWARN,
-                   "Permissions on spool_dir $Spool_dir are not $Spool_perms")
-          unless ((stat $Spool_dir)[2] & 07777) == oct($Spool_perms);
+    my $Spool_perms = $self->config('spool_perms') || '0700';
+
+    if (!-d $Spool_dir) {    # create if it doesn't exist
+        mkdir($Spool_dir, oct($Spool_perms))
+            or die "Could not create spool_dir $Spool_dir: $!";
     }
+
+    # Make sure the spool dir has appropriate rights
+    if (((stat $Spool_dir)[2] & oct('07777')) != oct($Spool_perms)) {
+        $self->log(LOGWARN,
+            "Permissions on spool_dir $Spool_dir are not $Spool_perms")
+    };
 
     return $Spool_dir;
 }
@@ -629,10 +626,9 @@ sub temp_file {
 
 sub temp_dir {
     my ($self, $mask) = @_;
-    $mask ||= '0700';
     my $dirname = $self->temp_file();
     -d $dirname
-      or mkdir($dirname, $mask)
+      or mkdir($dirname, $mask || '0700')
       or die "Could not create temporary directory $dirname: $!";
     return $dirname;
 }
