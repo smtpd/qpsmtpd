@@ -75,7 +75,7 @@ sub hook_connect {
     # we queue these lookups in the background and just fetch the
     # results in the first rcpt handler
 
-    my $res = new Net::DNS::Resolver;
+    my $res = $self->qp->dns_resolver;
     my $sel = IO::Select->new();
 
     for my $dnsbl (keys %whitelist_zones) {
@@ -94,7 +94,7 @@ sub process_sockets {
 
     return $conn->notes('whitelisthost') if $conn->notes('whitelisthost');
 
-    my $res = new Net::DNS::Resolver;
+    my $res = $self->qp->dns_resolver;
     my $sel = $conn->notes('whitelist_sockets') or return '';
 
     $self->log(LOGDEBUG, "waiting for whitelist dns");

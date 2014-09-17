@@ -444,7 +444,6 @@ sub no_reverse_dns {
         return ("error getting reverse DNS for $ip",
                 "rDNS " . $res->errorstring);
     };
-
     my $hits = 0;
     for my $rr ($query->answer) {
         next if $rr->type ne 'PTR';
