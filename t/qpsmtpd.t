@@ -19,10 +19,10 @@ BEGIN {
 my $qp = bless {}, 'Qpsmtpd';
 
 ok($qp->version(), "version, " . $qp->version());
-is_deeply(Qpsmtpd::hooks(), {}, 'hooks, empty');
+__hooks_none();
 
 ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
-ok(Qpsmtpd::hooks(), "hooks, populated");
+__hooks();
 
 __temp_file();
 __temp_dir();
@@ -39,6 +39,27 @@ __config_dir();
 __config();
 
 done_testing();
+
+sub __hooks {
+    ok(Qpsmtpd::hooks(), "hooks, populated");
+    my $r = $qp->hooks;
+    ok(%$r, "hooks, populated returns a hashref");
+
+    $r = $qp->hooks('connect');
+    ok(@$r, "hooks, populated, connect");
+    #warn Data::Dumper::Dumper($r);
+
+    my @r = $qp->hooks('connect');
+    ok(@r, "hooks, populated, connect, wants array");
+}
+
+sub __hooks_none {
+    is_deeply(Qpsmtpd::hooks(), {}, 'hooks, empty');
+    is_deeply($qp->hooks, {}, 'hooks, empty');
+
+    my $r = $qp->hooks('connect');
+    is_deeply($r, [], 'hooks, empty, specified');
+}
 
 sub __log {
     my $warned = '';
