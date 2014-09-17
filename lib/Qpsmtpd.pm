@@ -496,6 +496,8 @@ Qpsmtpd - base class for the qpsmtpd mail server
 This is the base class for the qpsmtpd mail server.  See
 L<http://smtpd.develooper.com/> and the I<README> file for more information.
 
+=encoding UTF8
+
 =head1 COPYRIGHT
 
 Copyright 2001-2012 Ask Bjørn Hansen, Develooper LLC.  See the

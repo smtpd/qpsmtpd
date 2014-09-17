@@ -57,6 +57,8 @@ Default: temp (temporary, aka soft, aka 4xx).
  86627 (mail) resolvable_fromhost: palmalar.com has no MX
  86627 (mail) resolvable_fromhost: fail, palmalar.com (SERVFAIL)
 
+=encoding UTF8
+
 =head1 AUTHORS
 
 2012 - Matt Simerson - refactored, added: POD, tests, reject, reject_type
