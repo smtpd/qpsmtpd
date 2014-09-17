@@ -43,7 +43,14 @@ sub version { $VERSION . ($git ? "/$git" : "") }
 
 sub TRACE_LEVEL { $TraceLevel };    # leave for plugin compatibility
 
-sub hooks { $hooks; }
+sub hooks {
+    my ($self, $hook) = @_;
+    if ($hook) {
+        if (!defined $hooks->{$hook}) { return wantarray ? () : []; };
+        return wantarray ? @{$hooks->{$hook}} : $hooks->{$hook};
+    };
+    return $hooks;
+}
 
 sub load_logging {
     my $self = shift;
@@ -252,9 +259,7 @@ sub transaction { return {}; }    # base class implements empty transaction
 
 sub run_hooks {
     my ($self, $hook) = (shift, shift);
-    if ($hooks->{$hook}) {
-        my @r;
-        my @local_hooks = @{$hooks->{$hook}};
+    if (my @local_hooks = $self->hooks($hook)) {
         $self->{_continuation} = [$hook, [@_], @local_hooks];
         return $self->run_continuation();
     }
@@ -265,7 +270,7 @@ sub run_hooks_no_respond {
     my ($self, $hook) = (shift, shift);
     if ($hooks->{$hook}) {
         my @r;
-        for my $code (@{$hooks->{$hook}}) {
+        for my $code ($self->hooks($hook)) {
             eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
             if ($@) {
                 warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
