@@ -1,9 +1,8 @@
 package Qpsmtpd;
 use strict;
-
 #use warnings;
 
-our $VERSION = "0.95";
+our $VERSION = '0.95';
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use lib 'lib';
@@ -12,17 +11,9 @@ use Qpsmtpd::Address;
 use Qpsmtpd::Config;
 use Qpsmtpd::Constants;
 
-my $git;
-
-if (-e ".git") {
-    local $ENV{PATH} = "/usr/bin:/usr/local/bin:/opt/local/bin/";
-    $git = `git describe`;
-    $git && chomp $git;
-}
-
 our $hooks = {};
-
 our $LOGGING_LOADED = 0;
+my $git = git_version();
 
 sub _restart {
     my $self = shift;
@@ -40,6 +31,16 @@ sub _restart {
 }
 
 sub version { $VERSION . ($git ? "/$git" : "") }
+
+sub git_version {
+    return if !-e '.git';
+    {
+        local $ENV{PATH} = "/usr/bin:/usr/local/bin:/opt/local/bin/";
+        $git = `git describe --tags`;
+        $git && chomp $git;
+    }
+    return $git;
+}
 
 sub TRACE_LEVEL { $TraceLevel };    # leave for plugin compatibility
 
