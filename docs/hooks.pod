@@ -4,7 +4,7 @@
 
 ### 
 # Conventions:
-#  plugin names:  F<myplugin>, F<qpsmtpd-async>
+#  plugin names:  F<myplugin>
 #  constants:     I<LOGDEBUG>
 #  smtp commands, answers: B<HELO>, B<250 Queued!>
 #
@@ -42,8 +42,7 @@ connection to the worker process).
 Useful for load-management and rereading large config files at some
 frequency less than once per session.
 
-This hook is available in the F<qpsmtpd-forkserver>, F<qpsmtpd-prefork> and
-F<qpsmtpd-async> flavours. 
+This hook is available in F<qpsmtpd-forkserver> and F<qpsmtpd-prefork> flavors.
 
 =cut 
 
@@ -56,8 +55,7 @@ methods which (I<may>) take some time, like DNS lookups. This will slow down
 B<all> incoming connections, no other connection will be accepted while this
 hook is running!
 
-Arguments this hook receives are (B<NOTE>: currently no C<%args> for 
-F<qpsmtpd-async>):
+Arguments this hook receives are:
 
   my ($self,$transaction,%args) = @_;
   # %args is:
@@ -367,8 +365,6 @@ likely the packets are already in flight due to buffering and pipelining).
 B<NOTE:> BE CAREFUL! If you drop the connection legal MTAs will retry again 
 and again, spammers will probably not. This is not RFC compliant and can lead
 to an unpredictable mess. Use with caution.
-
-B<NOTE:> This hook does not currently work in async mode.
 
 Why this hook may be useful for you, see 
 L<http://www.nntp.perl.org/group/perl.qpsmtpd/2009/02/msg8502.html>, ff.
@@ -898,20 +894,6 @@ Give the default answer of B<250 OK>.
 Arguments are
 
   my ($self,$transaction,@args) = @_;
-
-=head2 hook_post_fork
-
-B<NOTE:> This hook is only available in qpsmtpd-async.
-
-It is called while starting qpsmtpd-async. You can run more than one 
-instance of qpsmtpd-async (one per CPU probably). This hook is called 
-after forking one instance.
-
-Arguments: 
-
- my $self = shift;
-
-The return values of this hook are discarded.
 
 =head1 Authentication hooks
 

@@ -68,18 +68,19 @@ Names of the substitution parameters and the replaced charachters are the same
 L<spamd(8)> supports, for more info see the C<--virtual-config-dir> 
 option of L<spamd(8)>.
 
-When called with more than one parameter, this plugin is probably not usable
-with qpsmtpd-async.
-
 With the the second parameter being C<%d> it will still deliver one message 
 for each recipient: With the two recpients C<user@example.org> and 
 C<user2@example.org> you get two messages in the C<example.org/> directory.
 
 =cut
 
+use strict;
+
 use File::Path qw(mkpath);
 use Sys::Hostname qw(hostname);
 use Time::HiRes qw(gettimeofday);
+
+use Qpsmtpd::Constants;
 
 sub register {
     my ($self, $qp, @args) = @_;
@@ -108,8 +109,7 @@ sub register {
         $self->{_perms} = oct($self->{_perms});
     }
 
-    $self->{_perms} = 0700
-      unless $self->{_perms};
+    $self->{_perms} ||= 0700;
 
     unless ($self->{_maildir}) {
         $self->log(LOGWARN, "WARNING: maildir directory not specified");

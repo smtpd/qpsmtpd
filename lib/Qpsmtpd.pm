@@ -277,9 +277,6 @@ sub run_hooks_no_respond {
                 warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
                 next;
             }
-            if ($r[0] == YIELD) {
-                die "YIELD not valid from $hook hook";
-            }
             last unless $r[0] == DECLINED;
         }
         $r[0] = DECLINED if not defined $r[0];
@@ -288,14 +285,10 @@ sub run_hooks_no_respond {
     return (0, '');
 }
 
-sub continue_read { }    # subclassed in -async
-sub pause_read { die "Continuations only work in qpsmtpd-async" }
-
 sub run_continuation {
     my $self = shift;
 
     die "No continuation in progress" unless $self->{_continuation};
-    $self->continue_read();
     my $todo = $self->{_continuation};
     $self->{_continuation} = undef;
     my $hook = shift @$todo || die "No hook in the continuation";
@@ -335,12 +328,7 @@ sub run_continuation {
               if (!defined $cnotes || ref $cnotes eq "HASH");
         }
 
-        if ($r[0] == YIELD) {
-            $self->pause_read();
-            $self->{_continuation} = [$hook, $args, @$todo];
-            return @r;
-        }
-        elsif (   $r[0] == DENY
+        if (   $r[0] == DENY
                or $r[0] == DENYSOFT
                or $r[0] == DENY_DISCONNECT
                or $r[0] == DENYSOFT_DISCONNECT)

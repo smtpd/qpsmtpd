@@ -85,7 +85,7 @@ sub config_dir {
 }
 
 sub plugin_dirs {
-    ('./plugins', './plugins/ident', './plugins/async');
+    ('./plugins', './plugins/ident');
 }
 
 sub log {

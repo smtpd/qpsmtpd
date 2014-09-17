@@ -731,8 +731,6 @@ sub data_respond {
 
                 $self->transaction->header($header);
 
-                # NOTE: This will not work properly under async.  A
-                # data_headers_end_respond needs to be created.
                 my ($rc, $msg) = $self->run_hooks('data_headers_end');
                 if ($rc == DENY_DISCONNECT) {
                     $self->respond(554, $msg || "Message denied");
@@ -871,10 +869,7 @@ sub received_line {
     my $header_str;
     my ($rc, @received) =
       $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
-    if ($rc == YIELD) {
-        die "YIELD not supported for received_line hook";
-    }
-    elsif ($rc == OK) {
+    if ($rc == OK) {
         return join("\n", @received);
     }
     else {    # assume $rc == DECLINED

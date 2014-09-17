@@ -4,7 +4,7 @@
 
 ### 
 # Conventions:
-#  plugin names:  F<myplugin>, F<qpsmtpd-async>
+#  plugin names:  F<myplugin>
 #  constants:     I<LOGDEBUG>
 #  smtp commands, answers: B<HELO>, B<250 Queued!>
 #

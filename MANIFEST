@@ -68,13 +68,6 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml			Module meta-data (added by MakeMaker)
-plugins/async/dns_whitelist_soft
-plugins/async/dnsbl
-plugins/async/earlytalker
-plugins/async/queue/smtp-forward
-plugins/async/resolvable_fromhost
-plugins/async/rhsbl
-plugins/async/uribl
 plugins/auth/auth_checkpassword
 plugins/auth/auth_cvm_unix_local
 plugins/auth/auth_flat_file
@@ -156,7 +149,6 @@ plugins/virus/sophie
 plugins/virus/uvscan
 plugins/whitelist
 qpsmtpd
-qpsmtpd-async
 qpsmtpd-forkserver
 qpsmtpd-prefork
 README

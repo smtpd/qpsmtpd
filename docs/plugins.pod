@@ -4,7 +4,7 @@
 
 ### 
 # Conventions:
-#  plugin names:  F<myplugin>, F<qpsmtpd-async>
+#  plugin names:  F<myplugin>
 #  constants:     I<LOGDEBUG>
 #  smtp commands, answers: B<HELO>, B<250 Queued!>
 #
@@ -132,7 +132,7 @@ a good idea. This initialisation happens before any C<fork()> is done.
 Therefore the file handle will be shared by all qpsmtpd processes and the 
 database will probably be confused if several different queries arrive on 
 the same file handle at the same time (and you may get the wrong answer, if
-any). This is also true for F<qpsmtpd-async> and the pperl flavours, but 
+any). This is also true for the pperl flavor but 
 not for F<qpsmtpd> started by (x)inetd or tcpserver. 
 
 In short: don't do it if you want to write portable plugins.
@@ -390,12 +390,6 @@ See note above about SMTP specs.
 Finishing processing of the request. Usually used when the plugin sent the 
 response to the client.
 
-=item YIELD
-
-Only used in F<qpsmtpd-async>, see F<plugins/async/*> 
-
 =back
 
 =cut
-
-# vim: ts=2 sw=2 expandtab

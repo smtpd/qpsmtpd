@@ -94,8 +94,7 @@ information about what's missing) to the mailinglist or a PR to github.
 
 For better performance we recommend using "qpsmtpd-forkserver" or
 running qpsmtpd under Apache 2.x.  If you need extremely high
-concurrency and all your plugins are compatible, you might want to try
-the "qpsmtpd-async" model.
+concurrency use [Haraka](http://haraka.github.io/).
 
 # Plugins
 
