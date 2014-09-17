@@ -6,7 +6,7 @@ Name:           %{_package}
 Version:        %{_version}
 Release:        %{_release}
 
-Summary: qpsmtpd + qpsmtpd-apache + qpsmtpd-async
+Summary: qpsmtpd + qpsmtpd-apache
 License: MIT
 Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
@@ -38,10 +38,6 @@ Requires: perl(mod_perl2)
 Summary: mod_perl-2 connection handler for qpsmtpd
 Group: System Environment/Daemons
 
-%package async
-Summary: qpsmtpd using async I/O in a single process
-Group: System Environment/Daemons
-
 %package xinetd
 Summary: xinetd support for qpsmtpd
 Group: System Environment/Daemons
@@ -51,11 +47,6 @@ Requires: xinetd
 
 This module implements a mod_perl/apache 2.0 connection handler
 that turns Apache into an SMTP server using Qpsmtpd.
-
-%description async
-This package contains the Qpsmtpd::PollServer module, which allows
-qpsmtd to handle many connections in a single process and the 
-qpsmpd-async which uses it.
 
 %description xinetd
 This package contains the xinetd startup files for qpsmptd.
@@ -128,16 +119,6 @@ fi
 
 find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
 	sed "s@^$RPM_BUILD_ROOT@@g"     | \
-	grep -v packaging		| \
-	grep -v README.selinux		| \
-	grep -v /Apache                 | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-async-filelist
-if [ "$(cat %{name}-%{version}-%{release}-async-filelist)X" = "X" ] ; then
-    echo "ERROR: EMPTY FILE LIST"
-    exit -1
-fi
-
-find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
-	sed "s@^$RPM_BUILD_ROOT@@g"     | \
 	grep -v [Aa]sync		| \
 	grep -v packaging		| \
 	grep -v /Danga                  | \
@@ -161,10 +142,6 @@ fi
 %defattr(-,root,root)
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/*
 %doc %{_docdir}/%{name}-apache-%{version}/README.selinux
-
-%files async -f %{name}-%{version}-%{release}-async-filelist
-%defattr(-,root,root)
-%{_datadir}/%{name}/plugins/async/*
 
 %files xinetd
 %defattr(-,root,root)

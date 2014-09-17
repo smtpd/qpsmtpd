@@ -64,29 +64,16 @@ sub hook_unrecognized_command {
 		$self->log(LOGINFO, "stunnel : $remote_ip:$remote_port");
 
 		# DNS reverse 
-		if ( $self->isa('Qpsmtpd::PollServer') ) {
-		eval {
-			use ParaDNS;
-			ParaDNS->new(
-				finished => sub { $self->continue_read() },
-				callback => sub { $self->connection->remote_host($_[0]) },
-				host     => $remote_ip,
-		    	);
-
-		};
-		}
-		else {
-		    my $res = Net::DNS::Resolver->new( dnsrch => 0 );
-		    $res->tcp_timeout(3);
-		    $res->udp_timeout(3);
-		    my $query = $res->query( $remote_ip, 'PTR' );
-		    if ($query) {
-			foreach my $rr ($query->answer) {
-			    next if $rr->type ne 'PTR';
-			    $self->connection->remote_host( $rr->ptrdname );
-			}
-		    }
-		}
+        my $res = Net::DNS::Resolver->new( dnsrch => 0 );
+        $res->tcp_timeout(3);
+        $res->udp_timeout(3);
+        my $query = $res->query( $remote_ip, 'PTR' );
+        if ($query) {
+            foreach my $rr ($query->answer) {
+                next if $rr->type ne 'PTR';
+                $self->connection->remote_host( $rr->ptrdname );
+            }
+        }
 	}
 	else {
 		return DENY_DISCONNECT;

@@ -36,8 +36,6 @@ Since many connections are from blacklisted IPs, naughty significantly reduces t
 
 Rather than having plugins split processing across hooks, plugins can run to completion when they have the information they need, issue a I<reject naughty> if warranted, and be done.
 
-This may help reduce the code divergence between the sync and async deployment models.
-
 =head2 authentication
 
 When a user authenticates, the naughty flag on their connection is cleared. This allows users to send email from IPs that fail connection tests such as B<dnsbl>. Note that if I<reject connect> is set, connections will not get the chance to authenticate. To allow clients a chance to authenticate, I<reject mail> works well.

@@ -59,7 +59,11 @@ and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
 
 =cut
 
+use strict;
+
 use IO::Socket::SSL 0.98;
+
+use Qpsmtpd::Constants;
 
 sub init {
     my ($self, $qp, $cert, $key, $ca) = @_;
@@ -179,10 +183,6 @@ sub hook_post_connection {
 sub _convert_to_ssl {
     my ($self) = @_;
 
-    if ($self->qp->isa('Qpsmtpd::PollServer')) {
-        return _convert_to_ssl_async($self);
-    }
-
     eval {
         my $tlssocket =
           IO::Socket::SSL->new_from_fd(
@@ -207,14 +207,6 @@ sub _convert_to_ssl {
     if ($@) {
         return 0;
     }
-    return 1;
-}
-
-sub _convert_to_ssl_async {
-    my ($self) = @_;
-    my $upgrader =
-      $self->connection->notes('tls_upgrader', UpgradeClientSSL->new($self));
-    $upgrader->upgrade_socket();
     return 1;
 }
 
@@ -265,10 +257,9 @@ sub bad_ssl_hook {
 package UpgradeClientSSL;
 
 # borrowed heavily from Perlbal::SocketSSL
-
 use strict;
 use warnings;
-no warnings qw(deprecated);
+no warnings 'deprecated';
 
 use IO::Socket::SSL 0.98;
 use Errno qw( EAGAIN );
