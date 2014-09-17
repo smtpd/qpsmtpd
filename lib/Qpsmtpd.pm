@@ -269,26 +269,28 @@ sub run_hooks {
 
 sub run_hooks_no_respond {
     my ($self, $hook) = (shift, shift);
-    if ($hooks->{$hook}) {
-        my @r;
-        for my $code ($self->hooks($hook)) {
-            eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
-            if ($@) {
-                warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
-                next;
-            }
-            last unless $r[0] == DECLINED;
+    return (0, '') if !$hooks->{$hook};
+
+    my @r;
+    for my $code (@{$hooks->{$hook}}) {
+        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
+        if ($@) {
+            warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
+            next;
         }
-        $r[0] = DECLINED if not defined $r[0];
-        return @r;
+        if ($r[0] == YIELD) {
+            die "YIELD not valid from $hook hook";
+        }
+        last if $r[0] != DECLINED;
     }
-    return (0, '');
+    $r[0] = DECLINED if not defined $r[0];
+    return @r;
 }
 
 sub run_continuation {
     my $self = shift;
 
-    die "No continuation in progress" if !$self->{_continuation};
+    die "No continuation in progress\n" if !$self->{_continuation};
     my $todo = $self->{_continuation};
     $self->{_continuation} = undef;
     my $hook = shift @$todo or die "No hook in the continuation";
@@ -301,7 +303,7 @@ sub run_continuation {
 
         $self->varlog(LOGDEBUG, $hook, $name);
         my $tran = $self->transaction;
-        eval { (@r) = $code->{code}->($self, $tran, @$args); };
+        eval { @r = $code->{code}->($self, $tran, @$args); };
         if ($@) {
             $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $@);
             next;
@@ -313,7 +315,6 @@ sub run_continuation {
             next;
         }
 
-        # note this is wrong as $tran is always true in the current code...
         if ($tran) {
             my $tnotes = $tran->notes($name);
             if (!defined $tnotes || ref $tnotes eq 'HASH') {
@@ -328,20 +329,20 @@ sub run_continuation {
         }
 
         if (   $r[0] == DENY
-               or $r[0] == DENYSOFT
-               or $r[0] == DENY_DISCONNECT
-               or $r[0] == DENYSOFT_DISCONNECT)
+            || $r[0] == DENYSOFT
+            || $r[0] == DENY_DISCONNECT
+            || $r[0] == DENYSOFT_DISCONNECT)
         {
             $r[1] = '' if !defined $r[1];
             $self->log(LOGDEBUG, $log_msg . return_code($r[0]) . ", $r[1]");
             if ($hook ne 'deny') {
-                $self->run_hooks_no_respond("deny", $name, $r[0], $r[1])
+                $self->run_hooks_no_respond('deny', $name, $r[0], $r[1]);
             };
         }
         else {
             $r[1] = '' if not defined $r[1];
             $self->log(LOGDEBUG, $log_msg . return_code($r[0]) . ", $r[1]");
-            $self->run_hooks_no_respond("ok", $name, $r[0], $r[1]) if $hook ne "ok";
+            $self->run_hooks_no_respond('ok', $name, $r[0], $r[1]) if $hook ne 'ok';
         }
 
         last if $r[0] != DECLINED;

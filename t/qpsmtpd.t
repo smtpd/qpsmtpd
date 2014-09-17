@@ -26,7 +26,8 @@ __hooks();
 
 __register_hook();
 __hook_responder();
-#done_testing() and exit;
+__run_continuation();
+done_testing() and exit;
 
 __temp_file();
 __temp_dir();
@@ -63,6 +64,22 @@ sub __hooks_none {
 
     my $r = $qp->hooks('connect');
     is_deeply($r, [], 'hooks, empty, specified');
+}
+
+sub __run_continuation {
+    my $r;
+    eval { $smtpd->run_continuation };
+    ok($@, "run_continuation w/o continuation: " . $@);
+
+    my @local_hooks = @{$Qpsmtpd::hooks->{'connect'}};
+    $smtpd->{_continuation} = ['connect', [DECLINED, "test mess"], @local_hooks];
+
+    eval { $r = $smtpd->run_continuation };
+    ok(!$@, "run_continuation with a continuation doesn't throw exception");
+    is($r->[0], 220, "hook_responder, code");
+    ok($r->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $r->[1]);
+
+    #print Data::Dumper::Dumper(@r);
 }
 
 sub __hook_responder {
