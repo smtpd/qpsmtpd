@@ -94,7 +94,7 @@ sub __get_qmail {
 sub __get_qmail_map {
     eval "require CDB_File";   ## no critic (StringyEval)
     if (!$@) {
-        my $r = $config->get_qmail_map('users', 't/config/users');
+        my $r = $config->get_qmail_map('users', 't/config/users.cdb');
         ok(keys %$r, 'get_qmail_map("users.cdb")');
         ok($r->{'!example.com-'}, "get_qmail_map, known entry");
     };
@@ -102,7 +102,7 @@ sub __get_qmail_map {
 
 sub __from_file {
     my $test_file = 't/config/test_config_file';
-    my @r = $config->from_file($test_file, 'test_config_file');
+    my @r = $config->from_file('test_config_file', $test_file);
     ok( @r, "from_file, $test_file");
     cmp_ok('1st line with content', 'eq', $r[0], "from_file string compare");
     ok( !$r[1], "from_file");

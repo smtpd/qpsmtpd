@@ -99,7 +99,7 @@ sub adjust_log_level {
 
 sub transaction {
 
-    # not sure if this will work in a non-forking or a threaded daemon
+    # does this work in a non-forking or a threaded daemon?
     shift->qp->transaction;
 }
 
@@ -137,7 +137,7 @@ sub temp_dir {
 # usage:
 #  sub init {
 #    my $self = shift;
-#    $self->isa_plugin("rhsbl");
+#    $self->isa_plugin('rhsbl');
 #    $self->SUPER::register(@_);
 #  }
 sub isa_plugin {
@@ -164,30 +164,29 @@ sub isa_plugin {
     $self->compile($self->plugin_name . "_isa_$cleanParent",
                    $newPackage, "$parent_dir/$parent");
     warn "---- $newPackage\n";
-    no strict 'refs';
+    no strict 'refs'; ## no critic (strict)
     push @{"${currentPackage}::ISA"}, $newPackage;
 }
 
-# why isn't compile private?  it's only called from Plugin and Qpsmtpd.
 sub compile {
     my ($class, $plugin, $package, $file, $test_mode, $orig_name) = @_;
 
     my $sub;
-    open F, $file or die "could not open $file: $!";
+    open my $F, '<', $file or die "could not open $file: $!";
     {
         local $/ = undef;
-        $sub = <F>;
+        $sub = <$F>;
     }
-    close F;
+    close $F;
 
     my $line = "\n#line 0 $file\n";
 
     if ($test_mode) {
-        if (open(F, "t/plugin_tests/$orig_name")) {
+        if (open(my $F, '<', "t/plugin_tests/$orig_name")) {
             local $/ = undef;
             $sub .= "#line 1 t/plugin_tests/$orig_name\n";
-            $sub .= <F>;
-            close F;
+            $sub .= <$F>;
+            close $F;
         }
     }
 
@@ -206,12 +205,10 @@ sub compile {
         "\n",                               # last line comment without newline?
                    );
 
-    #warn "eval: $eval";
-
     $eval =~ m/(.*)/s;
     $eval = $1;
 
-    eval $eval;
+    eval $eval;  ## no critic (Eval)
     die "eval $@" if $@;
 }
 
@@ -355,8 +352,8 @@ sub _register_standard_hooks {
     for my $hook (@hooks) {
         my $hooksub = "hook_$hook";
         $hooksub =~ s/\W/_/g;
+        next if !$plugin->can($hooksub);
         $plugin->register_hook($hook, $hooksub)
-          if ($plugin->can($hooksub));
     }
 }
 

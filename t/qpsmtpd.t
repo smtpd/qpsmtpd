@@ -24,6 +24,13 @@ __hooks_none();
 ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
 __hooks();
 
+__run_hooks_no_respond();
+__run_hooks();
+
+__register_hook();
+__hook_responder();
+__run_continuation();
+
 __temp_file();
 __temp_dir();
 __size_threshold();
@@ -40,6 +47,33 @@ __config();
 
 done_testing();
 
+sub __run_hooks {
+    my @r = $qp->run_hooks('nope');
+    is($r[0], 0, "run_hooks, invalid hook");
+
+    @r = $smtpd->run_hooks('nope');
+    is($r[0], 0, "run_hooks, invalid hook");
+
+    foreach my $hook (qw/ connect helo rset /) {
+        my $r = $smtpd->run_hooks('connect');
+        is($r->[0], 220, "run_hooks, $hook code");
+        ok($r->[1] =~ /ready/, "run_hooks, $hook result");
+    }
+}
+
+sub __run_hooks_no_respond {
+    my @r = $qp->run_hooks_no_respond('nope');
+    is($r[0], 0, "run_hooks_no_respond, invalid hook");
+
+    @r = $smtpd->run_hooks_no_respond('nope');
+    is($r[0], 0, "run_hooks_no_respond, invalid hook");
+
+    foreach my $hook (qw/ connect helo rset /) {
+        @r = $smtpd->run_hooks_no_respond('connect');
+        is($r[0], 909, "run_hooks_no_respond, $hook hook");
+    }
+}
+
 sub __hooks {
     ok(Qpsmtpd::hooks(), "hooks, populated");
     my $r = $qp->hooks;
@@ -47,7 +81,6 @@ sub __hooks {
 
     $r = $qp->hooks('connect');
     ok(@$r, "hooks, populated, connect");
-    #warn Data::Dumper::Dumper($r);
 
     my @r = $qp->hooks('connect');
     ok(@r, "hooks, populated, connect, wants array");
@@ -59,6 +92,43 @@ sub __hooks_none {
 
     my $r = $qp->hooks('connect');
     is_deeply($r, [], 'hooks, empty, specified');
+}
+
+sub __run_continuation {
+    my $r;
+    eval { $smtpd->run_continuation };
+    ok($@, "run_continuation w/o continuation: " . $@);
+
+    my @local_hooks = @{$Qpsmtpd::hooks->{'connect'}};
+    $smtpd->{_continuation} = ['connect', [DECLINED, "test mess"], @local_hooks];
+
+    eval { $r = $smtpd->run_continuation };
+    ok(!$@, "run_continuation with a continuation doesn't throw exception");
+    is($r->[0], 220, "hook_responder, code");
+    ok($r->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $r->[1]);
+}
+
+sub __hook_responder {
+    my ($code, $msg) = $qp->hook_responder('test-hook', ['test code','test mesg']);
+    is($code, 'test code', "hook_responder, code");
+    is($msg, 'test mesg', "hook_responder, test msg");
+
+    ($code, $msg) = $smtpd->hook_responder('connect', ['test code','test mesg']);
+    is($code->[0], 220, "hook_responder, code");
+    ok($code->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $code->[1]);
+
+    my $rej_msg = 'Your father smells of elderberries';
+    ($code, $msg) = $smtpd->hook_responder('connect', [DENY, $rej_msg]);
+    is($code, undef, "hook_responder, disconnected yields undef code");
+    is($msg, undef, "hook_responder, disconnected yields undef msg");
+}
+
+sub __register_hook {
+    my $hook = 'test';
+    is( $Qpsmtpd::hooks->{'test'}, undef, "_register_hook, test hook is undefined");
+
+    $smtpd->_register_hook('test', 'fake-code-ref');
+    is_deeply( $Qpsmtpd::hooks->{'test'}, ['fake-code-ref'], "test hook is registered");
 }
 
 sub __log {
@@ -172,7 +242,6 @@ sub __config_dir {
     my $dir = $qp->config_dir('logging');
     ok($dir, "config_dir, $dir");
 
-    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
     $dir = $Qpsmtpd::Config::dir_memo{logging};
     ok($dir, "config_dir, $dir (memo)");
 }
