@@ -631,7 +631,7 @@ Arguments:
 __NOTE:__ `$transaction` may be `undef`, depending when / where this hook
 is called. It's probably best not to try acessing it.
 
-Example plugin is `http_config` from the qpsmtpd distribution.
+Example plugin is `config/http` from the qpsmtpd distribution.
 
 ## hook\_user\_config
 

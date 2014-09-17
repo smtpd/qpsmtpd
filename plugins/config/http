@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-http_config
+config/http
 
 =head1 DESCRIPTION
 
@@ -10,10 +10,10 @@ Example config plugin.  Gets configuration data via http requests.
 
 =head1 CONFIG
 
-http_config is configured at plugin loading time via the plugins
+config/http is configured at plugin loading time via the plugins
 config.  Load the plugin with a list of urls like the following (on one line)
  
-  http_config http://localhost/~smtpd/config/ http://www.example.com/cgi-bin/qp?config=
+  config/http http://localhost/~smtpd/config/ http://www.example.com/cgi-bin/qp?config=
 
 Looking to config "me", qpsmtpd will try loading
 http://localhost/~smtpd/config/me and if failing that try
@@ -21,7 +21,7 @@ http://www.example.com/cgi-bin/qp?config=me
 
 =head1 BUGS
 
-http_config doesn't do any caching.  It should do some simple caching
+config/http doesn't do any caching.  It should do some simple caching
 to be used in production.
 
 =cut
@@ -37,9 +37,9 @@ sub register {
 
 sub hook_config {
     my ($self, $transaction, $config) = @_;
-    $self->log(LOGNOTICE, "http_config called with $config");
+    $self->log(LOGNOTICE, "config/http called with $config");
     for my $url (@urls) {
-        $self->log(LOGDEBUG, "http_config loading from $url");
+        $self->log(LOGDEBUG, "config/http loading from $url");
         my @config = split /[\r\n]+/, (get "$url$config" || "");
         chomp @config;
         @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;

@@ -3,8 +3,8 @@
 #
 
 # enable this to get configuration via http; see perldoc
-# plugins/http_config for details.
-#   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
+# plugins/config/http for details.
+#   config/http http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
 
 # tls should load before count_unrecognized_commands
 # to support legacy port 465, tls must load before connection plugins
