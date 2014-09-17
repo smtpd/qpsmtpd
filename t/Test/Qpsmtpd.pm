@@ -66,16 +66,16 @@ sub command {
 }
 
 sub input {
-    my $self    = shift;
-    my $command = shift;
+    my ($self, $command) = @_;
 
     my $timeout = $self->config('timeout');
     alarm $timeout;
 
     $command =~ s/\r?\n$//s;    # advanced chomp
     $self->log(LOGDEBUG, "dispatching $command");
-    defined $self->dispatch(split / +/, $command, 2)
-      or $self->respond(502, "command unrecognized: '$command'");
+    if (!defined $self->dispatch(split / +/, $command, 2)) {
+        $self->respond(502, "command unrecognized: '$command'");
+    }
     alarm $timeout;
 }
 
@@ -91,8 +91,8 @@ sub plugin_dirs {
 sub log {
     my ($self, $trace, $hook, $plugin, @log) = @_;
     my $level = Qpsmtpd::TRACE_LEVEL() || 5;
-    $level = $self->init_logger unless defined $level;
-    print("# " . join(" ", $$, @log) . "\n") if $trace <= $level;
+    $level = $self->init_logger if !defined $level;
+    print("# " . join(' ', $$, @log) . "\n") if $trace <= $level;
 }
 
 sub varlog {
@@ -107,24 +107,14 @@ sub run_plugin_tests {
     $self->{_test_mode} = 1;
     my @plugins = $self->load_plugins();
 
-    # First count test number
-    my $num_tests = 0;
-    foreach my $plugin (@plugins) {
-        $plugin->register_tests();
-        $num_tests += $plugin->total_tests();
-    }
-
     require Test::Builder;
     my $Test = Test::Builder->new();
 
-    $Test->plan(tests => $num_tests);
-
-    # Now run them
-
     foreach my $plugin (@plugins) {
+        $plugin->register_tests();
         $plugin->run_tests($self);
     }
+    $Test->done_testing();
 }
 
 1;
-

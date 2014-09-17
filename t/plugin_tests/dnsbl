@@ -8,10 +8,10 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_hook_connect', 1);
-    $self->register_test('test_ip_whitelisted', 3);
-    $self->register_test('test_is_set_rblsmtpd', 4);
-    $self->register_test('test_reject_type', 3);
+    $self->register_test('test_hook_connect');
+    $self->register_test('test_ip_whitelisted');
+    $self->register_test('test_is_set_rblsmtpd');
+    $self->register_test('test_reject_type');
 }
 
 sub test_ip_whitelisted {

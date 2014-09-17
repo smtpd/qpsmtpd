@@ -11,9 +11,9 @@ my $r;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_dspam_results', 6);
-    $self->register_test('test_log_and_return', 6);
-    $self->register_test('test_reject_type', 3);
+    $self->register_test('test_get_dspam_results');
+    $self->register_test('test_log_and_return');
+    $self->register_test('test_reject_type');
 }
 
 sub test_log_and_return {
@@ -79,7 +79,6 @@ sub test_get_dspam_results {
         $transaction->header->add('X-DSPAM-Result', $header);
         my $r = $self->get_dspam_results($transaction);
         ok( ref $r, "r: ($header)" );
-        #warn Data::Dumper::Dumper($r);
     };
 };
 

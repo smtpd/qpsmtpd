@@ -8,10 +8,10 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_v2_query', 1);
-    $self->register_test('test_get_v3_query', 1);
-    $self->register_test('test_store_v2_results', 2);
-    $self->register_test('test_store_v3_results', 2);
+    $self->register_test('test_get_v2_query');
+    $self->register_test('test_get_v3_query');
+    $self->register_test('test_store_v2_results');
+    $self->register_test('test_store_v3_results');
 };
 
 sub test_query_p0f_v2 {
@@ -44,7 +44,6 @@ sub test_get_v2_query {
 
     my $r = $self->get_v2_query();
     ok( $r, 'r +' );
-    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
 };
 
 sub test_get_v3_query {
@@ -68,7 +67,6 @@ sub test_store_v2_results {
 
     ok( $r, "r: +") or return;
     ok( $r->{genre} =~ /windows/i, "genre +" );
-    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
 };
 
 sub test_store_v3_results {

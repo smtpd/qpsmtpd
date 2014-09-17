@@ -1,7 +1,6 @@
 #!perl -w
 
 use strict;
-use Data::Dumper;
 use POSIX qw(strftime);
 
 use Qpsmtpd::Address;
@@ -12,8 +11,8 @@ my $test_email = 'matt@example.com';
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_invalid_date_range', 7);
-    $self->register_test("test_hook_data_post", 7);
+    $self->register_test('test_invalid_date_range');
+    $self->register_test("test_hook_data_post");
 }
 
 sub setup_test_headers {

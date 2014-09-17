@@ -2,7 +2,7 @@
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("test_authdeny", 1);
+    $self->register_test("test_authdeny");
 }
 
 sub test_authdeny {

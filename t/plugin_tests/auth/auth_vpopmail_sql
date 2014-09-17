@@ -11,7 +11,7 @@ sub register_tests {
         warn "skipping auth_vpopmail_sql tests, is DBI installed?\n";
         return;
     };
-    $self->register_test("auth_vpopmail_sql", 3);
+    $self->register_test("auth_vpopmail_sql");
 }
 
 sub auth_vpopmail_sql {

@@ -8,8 +8,8 @@ package Qpsmtpd::Plugin;
 use strict;
 use warnings;
 
-use Qpsmtpd::Constants;
 use Test::More;
+use Qpsmtpd::Constants;
 
 sub register_tests {
 
@@ -17,28 +17,17 @@ sub register_tests {
 }
 
 sub register_test {
-    my ($plugin, $test, $num_tests) = @_;
-    $num_tests = 1 unless defined($num_tests);
+    my ($plugin, $test) = @_;
 
     # print STDERR "Registering test $test ($num_tests)\n";
-    push @{$plugin->{_tests}}, {name => $test, num => $num_tests};
-}
-
-sub total_tests {
-    my ($plugin) = @_;
-    my $total = 0;
-    foreach my $t (@{$plugin->{_tests}}) {
-        $total += $t->{num};
-    }
-    return $total;
+    push @{$plugin->{_tests}}, {name => $test};
 }
 
 sub run_tests {
     my ($plugin, $qp) = @_;
     foreach my $t (@{$plugin->{_tests}}) {
         my $method = $t->{name};
-        print "# Running $method tests for plugin "
-          . $plugin->plugin_name . "\n";
+        print "# " . $plugin->plugin_name . "\t $method\n";
         local $plugin->{_qp} = $qp;
         $plugin->$method();
     }

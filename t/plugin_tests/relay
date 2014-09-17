@@ -8,10 +8,10 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_relay_only', 2);
-    $self->register_test('test_is_octet_match', 3);
-    $self->register_test('test_is_in_cidr_block', 4);
-    $self->register_test('test_is_in_norelayclients', 5);
+    $self->register_test('test_relay_only');
+    $self->register_test('test_is_octet_match');
+    $self->register_test('test_is_in_cidr_block');
+    $self->register_test('test_is_in_norelayclients');
 }
 
 sub test_relay_only {

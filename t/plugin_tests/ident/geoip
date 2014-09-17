@@ -14,13 +14,13 @@ sub register_tests {
         return;
     };
 
-    $self->register_test('test_geoip_lookup', 2);
-    $self->register_test('test_geoip_load_db', 2);
-    $self->register_test('test_geoip_init_cc', 2);
-    $self->register_test('test_set_country_code', 3);
-    $self->register_test('test_set_country_name', 3);
-    $self->register_test('test_set_continent', 3);
-    $self->register_test('test_set_distance', 3);
+    $self->register_test('test_geoip_lookup');
+    $self->register_test('test_geoip_load_db');
+    $self->register_test('test_geoip_init_cc');
+    $self->register_test('test_set_country_code');
+    $self->register_test('test_set_country_name');
+    $self->register_test('test_set_continent');
+    $self->register_test('test_set_distance');
 };
 
 sub test_geoip_lookup {

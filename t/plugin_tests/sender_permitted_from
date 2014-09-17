@@ -13,7 +13,7 @@ sub register_tests {
     eval 'use Mail::SPF';
     return if $@;
 
-    $self->register_test('test_is_special_recipient', 5);
+    $self->register_test('test_is_special_recipient');
 }
 
 sub test_is_special_recipient {

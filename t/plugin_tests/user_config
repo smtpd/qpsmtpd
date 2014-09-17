@@ -15,7 +15,7 @@ BEGIN {    # need this to happen before anything else
 
 sub register_tests {
     my ($self) = @_;
-    $self->register_test('test_hook_user_config', 4);
+    $self->register_test('test_hook_user_config');
 }
 
 sub test_hook_user_config {
@@ -49,10 +49,7 @@ sub test_hook_user_config {
 
 package FakeAddress;
 
-sub new {
-    shift;
-    return bless {@_};
-}
+sub new     { return bless {@_}, shift; }
 sub address { return shift->{address} }
 sub user    { return shift->{user} }
 sub host    { return shift->{host} }
