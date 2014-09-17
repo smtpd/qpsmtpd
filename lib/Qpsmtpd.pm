@@ -180,8 +180,7 @@ sub load_plugins {
 }
 
 sub _load_plugin {
-    my $self = shift;
-    my ($plugin_line, @plugin_dirs) = @_;
+    my ($self, $plugin_line, @plugin_dirs) = @_;
 
     # untaint the config data before passing it to plugins
     my ($safe_line) = $plugin_line =~ /^([ -~]+)$/    # all ascii printable
@@ -273,7 +272,7 @@ sub run_hooks_no_respond {
 
     my @r;
     for my $code (@{$hooks->{$hook}}) {
-        eval { (@r) = $code->{code}->($self, $self->transaction, @_); };
+        eval { @r = $code->{code}->($self, $self->transaction, @_); };
         if ($@) {
             warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
             next;

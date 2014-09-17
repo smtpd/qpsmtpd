@@ -24,10 +24,12 @@ __hooks_none();
 ok(my ($smtpd, $conn) = Test::Qpsmtpd->new_conn(), "get new connection");
 __hooks();
 
+__run_hooks_no_respond();
+__run_hooks();
+
 __register_hook();
 __hook_responder();
 __run_continuation();
-done_testing() and exit;
 
 __temp_file();
 __temp_dir();
@@ -45,6 +47,33 @@ __config();
 
 done_testing();
 
+sub __run_hooks {
+    my @r = $qp->run_hooks('nope');
+    is($r[0], 0, "run_hooks, invalid hook");
+
+    @r = $smtpd->run_hooks('nope');
+    is($r[0], 0, "run_hooks, invalid hook");
+
+    foreach my $hook (qw/ connect helo rset /) {
+        my $r = $smtpd->run_hooks('connect');
+        is($r->[0], 220, "run_hooks, $hook code");
+        ok($r->[1] =~ /ready/, "run_hooks, $hook result");
+    }
+}
+
+sub __run_hooks_no_respond {
+    my @r = $qp->run_hooks_no_respond('nope');
+    is($r[0], 0, "run_hooks_no_respond, invalid hook");
+
+    @r = $smtpd->run_hooks_no_respond('nope');
+    is($r[0], 0, "run_hooks_no_respond, invalid hook");
+
+    foreach my $hook (qw/ connect helo rset /) {
+        @r = $smtpd->run_hooks_no_respond('connect');
+        is($r[0], 909, "run_hooks_no_respond, $hook hook");
+    }
+}
+
 sub __hooks {
     ok(Qpsmtpd::hooks(), "hooks, populated");
     my $r = $qp->hooks;
@@ -52,7 +81,6 @@ sub __hooks {
 
     $r = $qp->hooks('connect');
     ok(@$r, "hooks, populated, connect");
-    #warn Data::Dumper::Dumper($r);
 
     my @r = $qp->hooks('connect');
     ok(@r, "hooks, populated, connect, wants array");
@@ -78,8 +106,6 @@ sub __run_continuation {
     ok(!$@, "run_continuation with a continuation doesn't throw exception");
     is($r->[0], 220, "hook_responder, code");
     ok($r->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $r->[1]);
-
-    #print Data::Dumper::Dumper(@r);
 }
 
 sub __hook_responder {
@@ -216,7 +242,6 @@ sub __config_dir {
     my $dir = $qp->config_dir('logging');
     ok($dir, "config_dir, $dir");
 
-    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
     $dir = $Qpsmtpd::Config::dir_memo{logging};
     ok($dir, "config_dir, $dir (memo)");
 }
