@@ -14,7 +14,7 @@ sub get_qp_version {
     my $rvfile = get_file_contents('lib/Qpsmtpd.pm')
         or return;
     my ($ver_line) = grep { $_ =~ /^our \$VERSION/ } @$rvfile;
-    my ($ver) = $ver_line =~ /"([0-9\.]+)"/;
+    my ($ver) = $ver_line =~ /['"]([0-9\.]+)['"]/;
     return $ver;
 };
 
