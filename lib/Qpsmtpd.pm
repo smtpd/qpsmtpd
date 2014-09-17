@@ -266,9 +266,6 @@ sub run_hooks_no_respond {
             warn("FATAL PLUGIN ERROR [" . $code->{name} . "]: ", $@);
             next;
         }
-        if ($r[0] == YIELD) {
-            die "YIELD not valid from $hook hook";
-        }
         last if $r[0] != DECLINED;
     }
     $r[0] = DECLINED if not defined $r[0];
