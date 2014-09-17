@@ -10,6 +10,7 @@ use parent 'Qpsmtpd::SMTP';
 
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
+use Test::FakeResolver './t/dns_cache.txt'
 
 sub new_conn {
     ok(my $smtpd = __PACKAGE__->new(), "new");
