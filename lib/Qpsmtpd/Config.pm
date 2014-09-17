@@ -36,14 +36,15 @@ sub config {
     # first run the user_config hooks
     my ($rc, @config);
     if (ref $type && $type->can('address')) {
-        ($rc, @config) = $qp->run_hooks_no_respond('user_config', $type, $c);
+        my $address = $type;
+        ($rc, @config) = $qp->run_hooks_no_respond('user_config', $address, $c);
         if (defined $rc && $rc == OK) {
             return wantarray ? @config : $config[0];
         }
     }
 
     # then run the config hooks
-    ($rc, @config) = $qp->run_hooks_no_respond('config', $c);
+    ($rc, @config) = $qp->run_hooks_no_respond('config', $c, $type);
     $qp->log(LOGDEBUG,
                  "config($c): hook returned ("
                . join(',', map { defined $_ ? $_ : 'undef' } ($rc, @config))
@@ -90,42 +91,7 @@ sub default {
 sub get_qmail {
     my ($self, $config, $type) = @_;
     $self->log(LOGDEBUG, "trying to get config for $config");
-
-    # CDB config support really should be moved to a plugin
-    if ($type and $type eq "map") {
-        return $self->get_qmail_map($config);
-    }
-
     return $self->from_file($config);
-}
-
-sub get_qmail_map {
-    my ($self, $config, $file) = @_;
-
-    $file ||= $self->config_dir($config) . "/$config.cdb";
-
-    if (!-e $file) {
-        $self->log(LOGDEBUG, "File $file does not exist");
-        $config_cache{$config} ||= [];
-        return +{};
-    }
-    eval { require CDB_File };
-
-    if ($@) {
-        $self->log(LOGERROR, "No CDB Support! Did NOT read $file, could not load CDB_File: $@");
-        return +{};
-    }
-
-    my %h;
-    unless (tie(%h, 'CDB_File', $file)) {
-        $self->log(LOGERROR, "tie of $file failed: $!");
-        return +{};
-    }
-
-    # We explicitly don't cache cdb entries. The assumption is that
-    # the data is in a CDB file in the first place because there's
-    # lots of data and the cache hit ratio would be low.
-    return \%h;
 }
 
 sub from_file {
