@@ -23,7 +23,6 @@ sub hook_config {
     my $configfile = $self->qp->conf->config_file($config);
     if (!-e $configfile . ".cdb") {
         $self->log(LOGDEBUG, "File $configfile.cdb does not exist");
-        $config_cache{$config} ||= [];
         return OK, +{};
     }
     eval { require CDB_File };
