@@ -20,6 +20,8 @@ Pattern to use when searching for user config directory
 Substitute %u for username, %h for host, or %a for full addressn.
 Default: I</home/%u/.qpsmtpd/>
 
+=back
+
 =head1 DESCRIPTION
 
 This plugin implements very basic support for storing user configuration
