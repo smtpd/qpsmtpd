@@ -158,7 +158,7 @@ sub check_dns {
         return 1;
     }
 
-    my $res = new Net::DNS::Resolver(dnsrch => 0);
+    my $res = $self->qp->dns_resolver;
     $res->tcp_timeout(30);
     $res->udp_timeout(30);
 
@@ -257,11 +257,9 @@ sub get_host_records {
 
 sub mx_address_resolves {
     my ($self, $name, $fromhost) = @_;
-
     # IP in MX
     return $self->ip_is_valid($name) if ip_is_ipv4($name) || ip_is_ipv6($name);
-
-    my $res = new Net::DNS::Resolver(dnsrch => 0);
+    my $res = $self->qp->dns_resolver;
     my @mx_answers;
     my $query = $res->search($name, 'A');
     if ($query) {

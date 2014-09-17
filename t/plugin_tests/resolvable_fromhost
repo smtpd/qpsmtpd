@@ -7,7 +7,7 @@ use Net::DNS;
 use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
 
-my $res = new Net::DNS::Resolver(dnsrch => 0);
+my $res = Test::Qpsmtpd->dns_resolver;
 my $test_email = 'user@example.com';
 
 sub register_tests {

@@ -1,11 +1,15 @@
 package Test::FakeResolver;
-use Net::DNS::Resolver;
 use strict;
 use warnings;
+use base 'Net::DNS::Resolver';
+use Net::IP;
+use Socket;
+use Storable qw(freeze thaw);
 
 our ($file,%_dns);
 sub import {
-    ( undef, $file ) = @_;
+    my $class = shift;
+    $file = shift;
     die "Must provide path!  i.e.: use Test::FakeResolver '/tmp/file.txt'\n" unless $file;
     open my $FH, $file or die "Unable to open '$file': $!\n";
     my $line;
@@ -16,11 +20,13 @@ sub import {
         s/\s+$//;
         next if /^$/;
         my ( $host, $type, $value )
-            = /^\s*([_a-z\.0-9-]+)\s+(?:\d+\s+)?IN\s+([A-Z]+)\b\s*([^\s].*)?/;
+            = /^\s*([\/_a-z\.0-9-]+)\s+(?:\d+\s+)?IN\s+([A-Z]+)\b\s*([^\s].*)?/;
         if ( $host ) {
             $_ = $value if defined $value and $value =~ /^error\s/;
-            $host =~ s/\.$//;
-            push @{ $_dns{"$host-$type"} ||= [] }, ( $value ? $_ : undef );
+            if ( ! $host =~ /\.$/ ) {
+                $host .= '.';
+            }
+            push @{ $_dns{"$host $type"} ||= [] }, ( $value ? $_ : undef );
         } else {
             die "Error in '$file', line $line:\n\t>> $_\n";
         }
@@ -28,30 +34,24 @@ sub import {
     unless ( $ENV{FAKERESOLVER_APPEND} ) {
         unlink "/tmp/FakeResolver.log";
     }
-}
-
-package Net::DNS::Resolver;
-use strict;
-use warnings;
-use Net::DNS::Resolver;
-use Socket;
-use Storable qw(freeze thaw);
-
-sub search {
-    $_[1] = 'localhost.' if $_[1] eq 'localhost';
-    shift->SUPER::search( @_ );
-}
-
-sub query {
-    $_[1] = 'localhost.' if $_[1] eq 'localhost';
-    shift->SUPER::query( @_ );
+    $class->SUPER::import;
 }
 
 sub send {
     my ( $self, $host, $type ) = @_;
-    $host =~ s/\.$//;
-    if ( ! exists $Test::FakeResolver::_dns{"$host-$type"} ) {
-        if ( $type eq 'CNAME' or ! exists $Test::FakeResolver::_dns{"$host-CNAME"} ) {
+    if ( ! $type ) {
+        if ( Net::IP::ip_is_ipv4($host) or Net::IP::ip_is_ipv6($host) ) {
+            $type = 'PTR';
+            $host = Net::IP::ip_reverse($host);
+        } else {
+            $type = 'A';
+        }
+    }
+    if ( $host !~ /\.$/ ) {
+        $host .= '.';
+    }
+    if ( ! exists $Test::FakeResolver::_dns{"$host $type"} ) {
+        if ( $type eq 'CNAME' or ! exists $Test::FakeResolver::_dns{"$host CNAME"} ) {
             open my $L, ">> /tmp/FakeResolver.log";
             print $L "$host. $type\n";
             warn "\n *\n *\n * No answer available for '$host $type' !!!\n"
@@ -64,7 +64,7 @@ sub send {
         }
         $type = 'CNAME';
     }
-    my $cache = $Test::FakeResolver::_dns{"$host-$type"};
+    my $cache = $Test::FakeResolver::_dns{"$host $type"};
     if ( defined $cache->[0] and $cache->[0] =~ /^error\s+"(.*)"$/ ) {
         $self->{errorstring} = $1;
         return;

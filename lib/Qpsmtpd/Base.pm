@@ -2,6 +2,7 @@ package Qpsmtpd::Base;
 use strict;
 
 use Net::IP;
+use Net::DNS::Resolver;
 
 sub new {
     return bless {}, shift;
@@ -37,6 +38,16 @@ sub is_valid_ip {
     return 1 if Net::IP::ip_is_ipv6($ip);
 
     return;
+}
+
+=head2 dns_resolver
+
+Returns a Net::DNS::Resolver object
+
+=cut
+sub dns_resolver {
+    my $self = shift;
+    return Net::DNS::Resolver->new(@_);
 }
 
 1;
