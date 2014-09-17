@@ -34,8 +34,6 @@ docs/logging.pod
 docs/plugins.pod
 docs/writing.pod
 lib/Apache/Qpsmtpd.pm
-lib/Danga/Client.pm
-lib/Danga/TimeoutSocket.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
@@ -47,8 +45,6 @@ lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
 lib/Qpsmtpd/DSN.pm
 lib/Qpsmtpd/Plugin.pm
-lib/Qpsmtpd/Plugin/Async/DNSBLBase.pm
-lib/Qpsmtpd/PollServer.pm
 lib/Qpsmtpd/Postfix.pm
 lib/Qpsmtpd/Postfix/Constants.pm
 lib/Qpsmtpd/Postfix/pf2qp.pl
