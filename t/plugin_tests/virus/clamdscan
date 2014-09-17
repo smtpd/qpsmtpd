@@ -3,26 +3,27 @@
 use strict;
 use warnings;
 
+use Mail::Header;
+
 use Qpsmtpd::Constants;
 use Qpsmtpd::Transaction;
-use Mail::Header;
 
 sub register_tests {
     my $self = shift;
 
-    SKIP: {
-        eval 'use ClamAV::Client';  ## no critic (Stringy)
-        skip "Could not load ClamAV::Client", 4
-            if $@;
-        $self->register_test('test_register', 6);
-        $self->register_test('test_get_clamd', 1);
-    }
-    $self->register_test('test_err_and_return', 2);
-    $self->register_test('test_get_filename', 1);
-    $self->register_test('test_set_permission', 1);
-    $self->register_test('test_is_too_big', 2);
-    $self->register_test('test_is_multipart', 2);
-    $self->register_test('test_should_scan',4);
+    eval 'use ClamAV::Client';  ## no critic (Stringy)
+    if (!$@) {
+        warn "Could not load ClamAV::Client";
+        $self->register_test('test_register');
+        $self->register_test('test_get_clamd');
+    };
+
+    $self->register_test('test_err_and_return');
+    $self->register_test('test_get_filename');
+    $self->register_test('test_set_permission');
+    $self->register_test('test_is_too_big');
+    $self->register_test('test_is_multipart');
+    $self->register_test('test_should_scan');
 }
 
 sub test_register {

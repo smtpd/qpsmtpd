@@ -3,7 +3,6 @@
 use strict;
 use warnings;
 
-use Data::Dumper;
 use Net::DNS;
 use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
@@ -17,12 +16,12 @@ sub register_tests {
     my %args = ( );
     $self->register( $self->qp, reject => 0 );
 
-    $self->register_test('test_populate_invalid_networks', 2);
-    $self->register_test('test_mx_address_resolves', 2);
-    $self->register_test('test_get_host_records', 2);
-    $self->register_test('test_get_and_validate_mx', 2);
-    $self->register_test('test_check_dns', 2);
-    $self->register_test('test_hook_mail', 4);
+    $self->register_test('test_populate_invalid_networks');
+    $self->register_test('test_mx_address_resolves');
+    $self->register_test('test_get_host_records');
+    $self->register_test('test_get_and_validate_mx');
+    $self->register_test('test_check_dns');
+    $self->register_test('test_hook_mail');
 }
 
 sub test_hook_mail {

@@ -2,7 +2,7 @@
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("test_auth_flat_file", 3);
+    $self->register_test("test_auth_flat_file");
 }
 
 my @u_list = qw ( good bad none );

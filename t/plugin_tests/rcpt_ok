@@ -8,12 +8,11 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_rcpt_host', 7);
-    $self->register_test('test_is_in_rcpthosts', 3);
-    $self->register_test('test_is_in_morercpthosts', 2);
-    $self->register_test('test_hook_rcpt', 3);
+    $self->register_test('test_get_rcpt_host');
+    $self->register_test('test_is_in_rcpthosts');
+    $self->register_test('test_is_in_morercpthosts');
+    $self->register_test('test_hook_rcpt');
 }
-
 
 sub test_hook_rcpt {
     my $self = shift;

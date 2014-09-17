@@ -23,11 +23,11 @@ my @sample_headers = (
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_connect_to_spamd', 4);
-    $self->register_test('test_parse_spam_header', 10);
-    $self->register_test('test_get_spam_results', 20);
-    $self->register_test('test_munge_subject', 4);
-    $self->register_test('test_reject', 2);
+    $self->register_test('test_connect_to_spamd');
+    $self->register_test('test_parse_spam_header');
+    $self->register_test('test_get_spam_results');
+    $self->register_test('test_munge_subject');
+    $self->register_test('test_reject');
 }
 
 sub test_connect_to_spamd {
@@ -48,7 +48,6 @@ sub test_connect_to_spamd {
         $self->print_to_spamd( $SPAMD, $message, $length, $username );
         shutdown($SPAMD, 1); # close our side of the socket (tell spamd we're done)
         my $headers = $self->parse_spamd_response( $SPAMD );
-        #warn Data::Dumper::Dumper($headers);
         ok( $headers, "socket response\n");
     }
     else {
@@ -61,11 +60,9 @@ sub test_connect_to_spamd {
     $SPAMD = $self->connect_to_spamd();
     if ( $SPAMD ) {
         ok( $SPAMD, "tcp/ip");
-        #warn Data::Dumper::Dumper($SPAMD);
         $self->print_to_spamd( $SPAMD, $message, $length, $username );
         shutdown($SPAMD, 1); # close our side of the socket (tell spamd we're done)
         my $headers = $self->parse_spamd_response( $SPAMD );
-        #warn Data::Dumper::Dumper($headers);
         ok( $headers, "tcp/ip response\n");
     }
     else {

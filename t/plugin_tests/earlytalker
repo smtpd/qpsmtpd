@@ -8,14 +8,14 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_reject_type', 3);
-    $self->register_test('test_log_and_pass', 1);
-    $self->register_test('test_log_and_deny', 3);
-    $self->register_test('test_data_handler', 3);
-    $self->register_test('test_connect_handler', 3);
-    $self->register_test('test_apr_data_handler', 3);
-    $self->register_test('test_apr_connect_handler', 3);
-    $self->register_test('test_mail_handler', 4);
+    $self->register_test('test_reject_type');
+    $self->register_test('test_log_and_pass');
+    $self->register_test('test_log_and_deny');
+    $self->register_test('test_data_handler');
+    $self->register_test('test_connect_handler');
+    $self->register_test('test_apr_data_handler');
+    $self->register_test('test_apr_connect_handler');
+    $self->register_test('test_mail_handler');
 }
 
 sub test_apr_connect_handler {

@@ -16,14 +16,14 @@ foreach ( @greydbs ) {
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_hook_data', 4);
-    $self->register_test('test_get_db_key', 4);
-    $self->register_test('test_get_db_location', 1);
-    $self->register_test("test_greylist_geoip", 7);
-    $self->register_test("test_greylist_p0f_genre", 2);
-    $self->register_test("test_greylist_p0f_distance", 2);
-    $self->register_test("test_greylist_p0f_link", 2);
-    $self->register_test("test_greylist_p0f_uptime", 2);
+    $self->register_test('test_hook_data');
+    $self->register_test('test_get_db_key');
+    $self->register_test('test_get_db_location');
+    $self->register_test("test_greylist_geoip");
+    $self->register_test("test_greylist_p0f_genre");
+    $self->register_test("test_greylist_p0f_distance");
+    $self->register_test("test_greylist_p0f_link");
+    $self->register_test("test_greylist_p0f_uptime");
 }
 
 sub test_hook_data {

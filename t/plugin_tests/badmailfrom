@@ -1,7 +1,4 @@
-#!perl -w
-
 use strict;
-use Data::Dumper;
 
 use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
@@ -9,9 +6,9 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_badmailfrom_is_immune_sender", 5);
-    $self->register_test("test_badmailfrom_match", 7);
-    $self->register_test("test_badmailfrom_hook_mail", 4);
+    $self->register_test("test_badmailfrom_is_immune_sender");
+    $self->register_test("test_badmailfrom_match");
+    $self->register_test("test_badmailfrom_hook_mail");
 }
 
 sub test_badmailfrom_is_immune_sender {

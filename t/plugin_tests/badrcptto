@@ -8,9 +8,9 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_is_match", 10);
-    $self->register_test("test_hook_rcpt", 3);
-    $self->register_test("test_get_host_and_to", 8);
+    $self->register_test("test_is_match");
+    $self->register_test("test_hook_rcpt");
+    $self->register_test("test_get_host_and_to");
 }
 
 sub _reset_connection_flags {

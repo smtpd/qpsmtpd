@@ -1,7 +1,6 @@
 #!perl -w
 
 use strict;
-use Data::Dumper;
 use POSIX qw(strftime);
 
 use Qpsmtpd::Address;
@@ -37,7 +36,6 @@ sub test_fetch_dmarc_record {
     
     foreach ( qw/ tnpi.net nictool.com / ) {
         my @matches = $self->fetch_dmarc_record($_);
-#warn Data::Dumper::Dumper(\@matches);
         cmp_ok( scalar @matches, '==', 1, 'fetch_dmarc_record');
     };
     foreach ( qw/ example.com / ) {
