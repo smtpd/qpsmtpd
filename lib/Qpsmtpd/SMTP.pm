@@ -131,12 +131,14 @@ sub connect_respond {
 
 sub transaction {
     my $self = shift;
-    return $self->{_transaction} || $self->reset_transaction();
+    return $self->{_transaction} || $self->reset_transaction;
 }
 
 sub reset_transaction {
     my $self = shift;
-    $self->run_hooks("reset_transaction") if $self->{_transaction};
+    if ($self->{_transaction}) {
+        $self->run_hooks('reset_transaction');
+    };
     return $self->{_transaction} = Qpsmtpd::Transaction->new();
 }
 
@@ -591,7 +593,7 @@ sub vrfy_respond {
     elsif ($rc == DENY) {
         $msg->[0] ||= "Access Denied";
         $self->respond(554, @$msg);
-        $self->reset_transaction();
+        $self->reset_transaction;
         return 1;
     }
     elsif ($rc == OK) {
@@ -631,7 +633,8 @@ sub disconnect {
     my $self = shift;
     $self->run_hooks("disconnect");
     $self->connection->notes(disconnected => 1);
-    $self->reset_transaction;
+    $self->run_hooks('reset_transaction') if $self->{_transaction};
+    return;
 }
 
 sub data {
@@ -647,13 +650,13 @@ sub data_respond {
     elsif ($rc == DENY) {
         $msg->[0] ||= "Message denied";
         $self->respond(554, @$msg);
-        $self->reset_transaction();
+        $self->reset_transaction;
         return 1;
     }
     elsif ($rc == DENYSOFT) {
         $msg->[0] ||= "Message denied temporarily";
         $self->respond(451, @$msg);
-        $self->reset_transaction();
+        $self->reset_transaction;
         return 1;
     }
     elsif ($rc == DENY_DISCONNECT) {
