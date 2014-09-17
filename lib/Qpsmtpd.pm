@@ -30,7 +30,7 @@ sub _restart {
     }
 }
 
-sub version { $VERSION . ($git ? "/$git" : "") }
+sub version { $VERSION . ($git ? "/$git" : '') }
 
 sub git_version {
     return if !-e '.git';
@@ -204,7 +204,7 @@ sub _load_plugin {
     (/+)       # directory
     (\d?)      # package's first character
     }[
-        "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : "")
+        "::" . (length $2 ? sprintf("_%2x",unpack("C",$2)) : '')
     ]egx;
 
     my $package = "Qpsmtpd::Plugin::$plugin_name";
@@ -288,44 +288,43 @@ sub run_hooks_no_respond {
 sub run_continuation {
     my $self = shift;
 
-    die "No continuation in progress" unless $self->{_continuation};
+    die "No continuation in progress" if !$self->{_continuation};
     my $todo = $self->{_continuation};
     $self->{_continuation} = undef;
-    my $hook = shift @$todo || die "No hook in the continuation";
-    my $args = shift @$todo || die "No hook args in the continuation";
+    my $hook = shift @$todo or die "No hook in the continuation";
+    my $args = shift @$todo or die "No hook args in the continuation";
     my @r;
 
     while (@$todo) {
         my $code = shift @$todo;
+        my $name = $code->{name};
 
-        $self->varlog(LOGDEBUG, $hook, $code->{name});
+        $self->varlog(LOGDEBUG, $hook, $name);
         my $tran = $self->transaction;
         eval { (@r) = $code->{code}->($self, $tran, @$args); };
         if ($@) {
-            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [" . $code->{name} . "]: ",
-                       $@);
+            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $@);
             next;
         }
 
-        !defined $r[0]
-          and $self->log(LOGERROR,
-                             "plugin "
-                           . $code->{name}
-                           . " running the $hook hook returned undef!"
-                        )
-          and next;
+        my $log_msg = "Plugin $name, hook $hook returned ";
+        if (!defined $r[0]) {
+            $self->log(LOGERROR, $log_msg . "undef!");
+            next;
+        }
 
-        # note this is wrong as $tran is always true in the
-        # current code...
+        # note this is wrong as $tran is always true in the current code...
         if ($tran) {
-            my $tnotes = $tran->notes($code->{name});
-            $tnotes->{"hook_$hook"}->{'return'} = $r[0]
-              if (!defined $tnotes || ref $tnotes eq "HASH");
+            my $tnotes = $tran->notes($name);
+            if (!defined $tnotes || ref $tnotes eq 'HASH') {
+                $tnotes->{"hook_$hook"}{return} = $r[0];
+            };
         }
         else {
-            my $cnotes = $self->connection->notes($code->{name});
-            $cnotes->{"hook_$hook"}->{'return'} = $r[0]
-              if (!defined $cnotes || ref $cnotes eq "HASH");
+            my $cnotes = $self->connection->notes($name);
+            if (!defined $cnotes || ref $cnotes eq 'HASH') {
+                $cnotes->{"hook_$hook"}{return} = $r[0];
+            };
         }
 
         if (   $r[0] == DENY
@@ -333,37 +332,27 @@ sub run_continuation {
                or $r[0] == DENY_DISCONNECT
                or $r[0] == DENYSOFT_DISCONNECT)
         {
-            $r[1] = "" if not defined $r[1];
-            $self->log(LOGDEBUG,
-                           "Plugin "
-                         . $code->{name}
-                         . ", hook $hook returned "
-                         . return_code($r[0])
-                         . ", $r[1]"
-                      );
-            $self->run_hooks_no_respond("deny", $code->{name}, $r[0], $r[1])
-              unless ($hook eq "deny");
+            $r[1] = '' if !defined $r[1];
+            $self->log(LOGDEBUG, $log_msg . return_code($r[0]) . ", $r[1]");
+            if ($hook ne 'deny') {
+                $self->run_hooks_no_respond("deny", $name, $r[0], $r[1])
+            };
         }
         else {
-            $r[1] = "" if not defined $r[1];
-            $self->log(LOGDEBUG,
-                           "Plugin "
-                         . $code->{name}
-                         . ", hook $hook returned "
-                         . return_code($r[0])
-                         . ", $r[1]"
-                      );
-            $self->run_hooks_no_respond("ok", $code->{name}, $r[0], $r[1])
-              unless ($hook eq "ok");
+            $r[1] = '' if not defined $r[1];
+            $self->log(LOGDEBUG, $log_msg . return_code($r[0]) . ", $r[1]");
+            $self->run_hooks_no_respond("ok", $name, $r[0], $r[1]) if $hook ne "ok";
         }
 
-        last unless $r[0] == DECLINED;
+        last if $r[0] != DECLINED;
     }
-    $r[0] = DECLINED if not defined $r[0];
+    $r[0] = DECLINED if ! defined $r[0];
 
     # hook_*_parse() may return a CODE ref..
     # ... which breaks when splitting as string:
-    @r = map { split /\n/ } @r unless (ref($r[1]) eq "CODE");
+    if ('CODE' ne ref $r[1]) {
+        @r = map { split /\n/ } @r;
+    };
     return $self->hook_responder($hook, \@r, $args);
 }
 
@@ -450,17 +439,17 @@ sub size_threshold {
 
 sub authenticated {
     my $self = shift;
-    return (defined $self->{_auth} ? $self->{_auth} : "");
+    return (defined $self->{_auth} ? $self->{_auth} : '');
 }
 
 sub auth_user {
     my $self = shift;
-    return (defined $self->{_auth_user} ? $self->{_auth_user} : "");
+    return (defined $self->{_auth_user} ? $self->{_auth_user} : '');
 }
 
 sub auth_mechanism {
     my $self = shift;
-    return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : "");
+    return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : '');
 }
 
 sub address {
