@@ -16,7 +16,7 @@ my $git;
 
 if (-e ".git") {
     local $ENV{PATH} = "/usr/bin:/usr/local/bin:/opt/local/bin/";
-    $git = `git describe`;
+    $git = `git describe --tags`;
     $git && chomp $git;
 }
 
