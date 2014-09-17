@@ -90,38 +90,35 @@ sub default {
 sub get_qmail {
     my ($self, $config, $type) = @_;
     $self->log(LOGDEBUG, "trying to get config for $config");
-    my $configdir = $self->config_dir($config);
-
-    my $configfile = "$configdir/$config";
 
     # CDB config support really should be moved to a plugin
     if ($type and $type eq "map") {
-        return $self->get_qmail_map($config, $configfile);
+        return $self->get_qmail_map($config);
     }
 
-    return $self->from_file($configfile, $config);
+    return $self->from_file($config);
 }
 
 sub get_qmail_map {
-    my ($self, $config, $configfile) = @_;
+    my ($self, $config, $file) = @_;
 
-    if (!-e $configfile . ".cdb") {
-        $self->log(LOGDEBUG, "File $configfile.cdb does not exist");
+    $file ||= $self->config_dir($config) . "/$config.cdb";
+
+    if (!-e $file) {
+        $self->log(LOGDEBUG, "File $file does not exist");
         $config_cache{$config} ||= [];
         return +{};
     }
     eval { require CDB_File };
 
     if ($@) {
-        $self->log(LOGERROR,
-"No CDB Support! Did NOT read $configfile.cdb, could not load CDB_File module: $@"
-        );
+        $self->log(LOGERROR, "No CDB Support! Did NOT read $file, could not load CDB_File: $@");
         return +{};
     }
 
     my %h;
-    unless (tie(%h, 'CDB_File', "$configfile.cdb")) {
-        $self->log(LOGERROR, "tie of $configfile.cdb failed: $!");
+    unless (tie(%h, 'CDB_File', $file)) {
+        $self->log(LOGERROR, "tie of $file failed: $!");
         return +{};
     }
 
@@ -132,17 +129,19 @@ sub get_qmail_map {
 }
 
 sub from_file {
-    my ($self, $configfile, $config, $visited) = @_;
-    if (!-e $configfile) {
+    my ($self, $config, $file, $visited) = @_;
+    $file ||= $self->config_dir($config) . "/$config";
+
+    if (!-e $file) {
         $config_cache{$config} ||= [];
         return;
     }
 
     $visited ||= [];
-    push @$visited, $configfile;
+    push @$visited, $file;
 
-    open my $CF, '<', $configfile or do {
-        warn "$$ could not open configfile $configfile: $!";
+    open my $CF, '<', $file or do {
+        warn "$$ could not open configfile $file: $!";
         return;
     };
     my @config = <$CF>;
@@ -180,8 +179,8 @@ sub from_file {
             }
             push @{$visited}, $inclusion;
 
-            for my $inc ($self->expand_inclusion($inclusion, $configfile)) {
-                my @insertion = $self->from_file($inc, $config, $visited);
+            for my $inc ($self->expand_inclusion($inclusion, $file)) {
+                my @insertion = $self->from_file($config, $inc, $visited);
                 splice @config, $pos, 0, @insertion;    # insert the inclusion
                 $pos += @insertion;
             }

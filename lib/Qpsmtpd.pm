@@ -6,7 +6,7 @@ our $VERSION = '0.95';
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use lib 'lib';
-use base 'Qpsmtpd::Base';
+use parent 'Qpsmtpd::Base';
 use Qpsmtpd::Address;
 use Qpsmtpd::Config;
 use Qpsmtpd::Constants;
@@ -56,35 +56,24 @@ sub hooks {
 sub load_logging {
     my $self = shift;
 
-    # avoid triggering log activity
-    return if ($LOGGING_LOADED || $hooks->{'logging'});
+    return if $LOGGING_LOADED;     # already done
+    return if $hooks->{'logging'}; # avoid triggering log activity
 
-    my $configdir  = $self->config_dir("logging");
-    my $configfile = "$configdir/logging";
-    my @loggers    = $self->conf->from_file($configfile, 'logging');
-
-    $configdir  = $self->config_dir('plugin_dirs');
-    $configfile = "$configdir/plugin_dirs";
-    my @plugin_dirs = $self->conf->from_file($configfile, 'plugin_dirs');
-    unless (@plugin_dirs) {
+    my @plugin_dirs = $self->conf->from_file('plugin_dirs');
+    if (!@plugin_dirs) {
         my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
         @plugin_dirs = ("$name/plugins");
     }
 
-    my @loaded;
+    my @loggers = $self->conf->from_file('logging');
     for my $logger (@loggers) {
-        push @loaded, $self->_load_plugin($logger, @plugin_dirs);
-    }
-
-    foreach my $logger (@loaded) {
+        $self->_load_plugin($logger, @plugin_dirs);
         $self->log(LOGINFO, "Loaded $logger");
     }
 
-    $configdir  = $self->config_dir("loglevel");
-    $configfile = "$configdir/loglevel";
-    $TraceLevel = $self->conf->from_file($configfile, 'loglevel');
+    $TraceLevel = $self->conf->from_file('loglevel');
 
-    unless (defined($TraceLevel) and $TraceLevel =~ /^\d+$/) {
+    unless (defined($TraceLevel) && $TraceLevel =~ /^\d+$/) {
         $TraceLevel = LOGWARN;    # Default if no loglevel file found.
     }
 
