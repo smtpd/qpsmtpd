@@ -21,7 +21,7 @@ WriteMakefile(
 # Dev/Test modules
         'Test::More'      => 0,
         'Test::Output'    => 0,
-        'Test::More::Diag' => 0,
+        'Test::More::Diagnostic' => 0,
 # modules for specific features
         'Mail::DKIM'         => 0,
         'File::Tail'         => 0,   # log/summarize, log/watch
