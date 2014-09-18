@@ -267,11 +267,11 @@ stringification operator, so the following are equivalent:
 
 =cut
 
+my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
 sub format {
     my ($self) = @_;
-    my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
     return '<>' if !defined $self->{_user};
-    if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
+    if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/go) {
         return
           qq(<"$user")
           . (defined $self->{_host} ? '@' . $self->{_host} : '') . ">";
