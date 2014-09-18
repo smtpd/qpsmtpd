@@ -13,8 +13,8 @@ mail.indra.com. IN      AAAA ; No record!
 2.0.0.127.zen.spamhaus.org.     300     IN      TXT     "http://www.spamhaus.org/sbl/query/SBL233"
 perl.org.       3600    IN      A       207.171.7.43
 perl.org.       3600    IN      A       207.171.7.53
-perl.test.      5       IN      A       92.242.132.16
-2.0.192.in-addr.arpa.   IN      PTR ; No record!
+perl.test.              IN      A       error "NXDOMAIN"
+0.2.0.192.in-addr.arpa.   IN      PTR ; No record!
 1.2.0.192.in-addr.arpa. IN      PTR ; No record!
 165.51.128.66.in-addr.arpa.     83406   IN      CNAME   165.160/27.51.128.66.in-addr.arpa.
 165.160/27.51.128.66.in-addr.arpa.      84606   IN      PTR     mail.theartfarm.com.
