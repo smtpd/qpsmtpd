@@ -38,33 +38,34 @@ sub _parse {
     my ($self, $cmd, $line) = @_;
     $self->log(LOGDEBUG, "_parse() cmd=[$cmd], line=[$line]");
     if ($cmd eq 'mail') {
-        return DENY, "Syntax error in command" if $line !~ s/^from:\s*//i;
+        if ($line !~ s/^from:\s*//i) {
+            return DENY, "Syntax error in command";
+        };
     }
     else {    # cmd eq 'rcpt'
         return DENY, "Syntax error in command" if $line !~ s/^to:\s*//i;
     }
 
     if ($line =~ s/^(<.*>)\s*//) {
-        my $addr = $1;
-        return DENY, "No parameters allowed in " . uc($cmd)
-            if $line =~ /^\S/;
-        return OK, $addr, ();
+        return DENY, "No parameters allowed in " . uc($cmd) if $line =~ /^\S/;
+        return OK, $1;  # $1 is captured address
     }
 
     ## now, no <> are given
     $line =~ s/\s*$//;
     if ($line =~ /\@/) {
-        return DENY, "No parameters allowed in " . uc($cmd)
-          if $line =~ /\@\S+\s+\S/;
-        return OK, $line, ();
+        if ($line =~ /\@\S+\s+\S/) {
+            return DENY, "No parameters allowed in " . uc($cmd);
+        };
+        return OK, $line;
     }
 
-    if ($cmd eq "mail") {
-        return OK, "<>" if !$line;    # 'MAIL FROM:' -> 'MAIL FROM:<>'
+    if ($cmd eq 'mail') {
+        return OK, '<>' if !$line;    # 'MAIL FROM:' -> 'MAIL FROM:<>'
         return DENY, "Could not parse your MAIL FROM command";
     }
-    else {
-        return DENY, "Could not parse your RCPT TO command"
-            if $line !~ /^(postmaster|abuse)$/i;
-    }
+
+    if ($line !~ /^(postmaster|abuse)$/i) {
+        return DENY, "Could not parse your RCPT TO command";
+    };
 }

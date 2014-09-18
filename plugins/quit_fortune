@@ -1,16 +1,26 @@
 #!perl -w
+use strict;
 
-sub hook_quit {
-    my $qp = shift->qp;
+use Qpsmtpd::Constants;
 
-    # if she talks EHLO she is probably too sophisticated to enjoy the
-    # fun, so skip it.
-    return DECLINED if ($qp->connection->hello || '') eq "ehlo";
+sub register {
+    my $self = shift;
+    $self->{_fortune} = '/usr/games/fortune';
+    return if ! $self->{_fortune};
 
-    my $fortune = '/usr/games/fortune';
-    return DECLINED if !-e $fortune;
+    # if fortune not installed, don't register hook
+    $self->register_hook('quit', 'fortune');
+}
 
-    my @fortune = `$fortune -s`;
+sub fortune {
+    my $self = shift;
+    my $qp = $self->qp;
+
+    # if she talks EHLO she is probably too sophisticated to enjoy the fun
+    return DECLINED if !$qp->connection->hello;
+    return DECLINED if $qp->connection->hello eq 'ehlo';
+
+    my @fortune = `$self->{_fortune} -s`;
     @fortune = map { chop; s/^/  \/ /; $_ } @fortune;
     $qp->respond(221, $qp->config('me') . " closing connection.", @fortune);
     return DONE;
