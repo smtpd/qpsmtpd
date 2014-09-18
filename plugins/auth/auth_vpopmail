@@ -50,7 +50,7 @@ use Qpsmtpd::Constants;
 sub register {
     my ($self, $qp) = @_;
 
-    return (DECLINED) if !$self->test_vpopmail_module();
+    return DECLINED if !$self->test_vpopmail_module();
 
     $self->register_hook("auth-plain",    "auth_vpopmail");
     $self->register_hook("auth-login",    "auth_vpopmail");
@@ -67,7 +67,7 @@ sub auth_vpopmail {
 
     if (!$pw || (!$pw_clear_passwd && !$pw_passwd)) {
         $self->log(LOGINFO, "fail: invalid user $user");
-        return (DENY, "auth_vpopmail - invalid user");
+        return DENY, "auth_vpopmail - invalid user";
 
         # change DENY to DECLINED to support multiple auth plugins
     }

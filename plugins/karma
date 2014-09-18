@@ -388,7 +388,7 @@ sub rcpt_handler {
     };
 
     #  limit # of recipients if host has negative or unknown karma
-    return (DENY, "too many recipients for karma $karma (h: $history)");
+    return DENY, "too many recipients for karma $karma (h: $history)";
 }
 
 sub data_handler {
@@ -475,7 +475,7 @@ sub parse_db_record {
         $naughty          ||= 0;
         $connects         ||= 0;
     }
-    return ($penalty_start_ts, $naughty, $nice, $connects);
+    return $penalty_start_ts, $naughty, $nice, $connects;
 }
 
 sub calc_karma {
@@ -493,8 +493,8 @@ sub cleanup_and_return {
 
     untie $tied;
     close $lock;
-    return ($return_val) if defined $return_val;    # explicit override
-    return (DECLINED);
+    return $return_val if defined $return_val;    # explicit override
+    return DECLINED;
 }
 
 sub get_db_key {

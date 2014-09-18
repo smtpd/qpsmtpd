@@ -5,10 +5,10 @@ sub hook_quit {
 
     # if she talks EHLO she is probably too sophisticated to enjoy the
     # fun, so skip it.
-    return (DECLINED) if ($qp->connection->hello || '') eq "ehlo";
+    return DECLINED if ($qp->connection->hello || '') eq "ehlo";
 
     my $fortune = '/usr/games/fortune';
-    return DECLINED unless -e $fortune;
+    return DECLINED if !-e $fortune;
 
     my @fortune = `$fortune -s`;
     @fortune = map { chop; s/^/  \/ /; $_ } @fortune;

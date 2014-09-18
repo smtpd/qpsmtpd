@@ -410,7 +410,7 @@ sub block_signal {
     sigprocmask(SIG_BLOCK, $blockset, $sigset)
       or die "Could not block @signal signals: $!\n";
 
-    return ($sigset);
+    return $sigset;
 }
 
 # unblock_signal: unblock/reset and receive pending signals
@@ -531,7 +531,7 @@ sub qpsmtpd_instance {
     $qpsmtpd->spool_dir;
     $qpsmtpd->size_threshold;
 
-    return ($qpsmtpd);
+    return $qpsmtpd;
 }
 
 # shmem: tie to shared memory hash
@@ -559,7 +559,7 @@ sub shmem {
         return;
     }
 
-    return (\%shmem_hash);
+    return \%shmem_hash;
 }
 
 # shmem_opt: connect to shared memory and perform options
@@ -649,7 +649,7 @@ sub shmem_opt {
         warn("$@");
     }
 
-    return ($chld_busy);
+    return $chld_busy;
 }
 
 # info: write info

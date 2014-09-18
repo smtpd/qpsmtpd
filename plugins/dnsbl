@@ -283,7 +283,7 @@ sub return_env_message {
     $result =~ s/%IP%/$remote_ip/g;
     my $msg = $self->qp->config('dnsbl_rejectmsg');
     $self->log(LOGINFO, "fail, $msg");
-    return ($self->get_reject_type(), join(' ', $msg, $result));
+    return $self->get_reject_type(), join(' ', $msg, $result);
 }
 
 sub hook_rcpt {

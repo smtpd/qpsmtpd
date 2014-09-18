@@ -44,8 +44,7 @@ sub hook_unrecognized_command {
     }
 
     $self->log(LOGINFO, "fail, '$cmd' ($count)");
-    return (DENY_DISCONNECT,
-"Closing connection, $count unrecognized commands. Perhaps you should read RFC 2821?"
-    );
+    return DENY_DISCONNECT,
+"Closing connection, $count unrecognized commands. Perhaps you should read RFC 2821?";
 }
 

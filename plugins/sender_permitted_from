@@ -95,7 +95,7 @@ sub mail_handler {
                 scope  => 'mfrom',
                 result => 'pass',
                 } );
-        return (DECLINED);
+        return DECLINED;
     };
 
     my $format = $sender->format;
@@ -105,7 +105,7 @@ sub mail_handler {
                 scope  => 'helo',
                 result => 'none',
                 } );
-        return (DECLINED, "SPF - null sender");
+        return DECLINED, "SPF - null sender";
     }
 
     my $from      = $sender->user . '@' . lc($sender->host);
@@ -147,8 +147,8 @@ sub mail_handler {
 
     if (!$code) {
         $self->log(LOGINFO, "fail, no response");
-        return (DENYSOFT, "SPF - no response") if $reject >= 2;
-        return (DECLINED, "SPF - no response");
+        return DENYSOFT, "SPF - no response" if $reject >= 2;
+        return DECLINED, "SPF - no response";
     }
 
     $transaction->notes('dmarc_spf', {
@@ -163,12 +163,12 @@ sub mail_handler {
         $self->adjust_karma(1);
         $transaction->notes('spf_pass_host', lc $sender->host);
         $self->log(LOGINFO, "pass, $why");
-        return (DECLINED);
+        return DECLINED;
     }
 
     if (!$reject) {
         $self->log(LOGINFO, "skip, tolerated ($code: $why)");
-        return (DECLINED, "SPF - $code: $why");
+        return DECLINED, "SPF - $code: $why";
     }
 
    # SPF result codes: pass fail softfail neutral none error permerror temperror
@@ -179,27 +179,27 @@ sub mail_handler {
     if ($code eq 'neutral') {
         if ($reject >= 5 ) {
             $self->log(LOGINFO, "fail, $code, $why");
-            return (DENY, "SPF - $code: $why");
+            return DENY, "SPF - $code: $why";
         };
         $self->log(LOGINFO, "fail, tolerated, $code, $why");
-        return (DECLINED);
+        return DECLINED;
     }
     if ($code =~ /(?:permerror|error)/ ) {
         $self->log(LOGINFO, "fail, $code, $why") if $reject > 3;
-        return (DENY,     "SPF - $code: $why") if $reject >= 6;
-        return (DENYSOFT, "SPF - $code: $why") if $reject > 3;
+        return DENY,     "SPF - $code: $why" if $reject >= 6;
+        return DENYSOFT, "SPF - $code: $why" if $reject > 3;
         $self->log(LOGINFO, "fail, tolerated, $code, $why");
-        return (DECLINED);
+        return DECLINED;
     }
     if ($code eq 'temperror') {
         $self->log(LOGINFO, "fail, $code, $why");
-        return (DENYSOFT, "SPF - $code: $why") if $reject >= 2;
+        return DENYSOFT, "SPF - $code: $why" if $reject >= 2;
         $self->log(LOGINFO, "fail, tolerated, $code, $why");
-        return (DECLINED);
+        return DECLINED;
     }
 
     $self->log(LOGINFO, "SPF from $from was $code: $why");
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub handle_code_none {
@@ -207,7 +207,7 @@ sub handle_code_none {
 
     if ($reject >= 6) {
         $self->log(LOGINFO, "fail, none, $why");
-        return (DENY, "SPF - none: $why");
+        return DENY, "SPF - none: $why";
     }
 
     $self->log(LOGINFO, "skip, tolerated, none, $why");
@@ -221,8 +221,8 @@ sub handle_code_fail {
 
     if ($reject >= 2) {
         $self->log(LOGINFO, "fail, $why");
-        return (DENY, "SPF - forgery: $why") if $reject >= 3;
-        return (DENYSOFT, "SPF - fail: $why");
+        return DENY, "SPF - forgery: $why" if $reject >= 3;
+        return DENYSOFT, "SPF - fail: $why";
     }
 
     $self->log(LOGINFO, "fail, tolerated, $why");
@@ -236,8 +236,8 @@ sub handle_code_softfail {
 
     if ($reject >= 3) {
         $self->log(LOGINFO, "fail, soft, $why");
-        return (DENY,     "SPF - fail: $why") if $reject >= 4;
-        return (DENYSOFT, "SPF - fail: $why") if $reject >= 3;
+        return DENY,     "SPF - fail: $why" if $reject >= 4;
+        return DENYSOFT, "SPF - fail: $why" if $reject >= 3;
     }
 
     $self->log(LOGINFO, "fail, tolerated, soft, $why");
@@ -250,7 +250,7 @@ sub data_post_handler {
     my $result = $transaction->notes('spfquery') or return DECLINED;
 
     # if we skipped processing in mail_handler, we should skip here too
-    return (DECLINED) if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
     $self->log(LOGDEBUG, "result was $result->code");
 

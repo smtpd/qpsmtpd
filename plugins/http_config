@@ -45,8 +45,7 @@ sub hook_config {
         @config = grep { $_ and $_ !~ m/^\s*#/ and $_ =~ m/\S/ } @config;
         close CF;
 
-# $self->log(LOGNOTICE, "returning http_config for $config ",Data::Dumper->Dump([\@config], [qw(config)]));
-        return (OK, @config) if @config;
+        return OK, @config if @config;
     }
     return DECLINED;
 }

@@ -248,7 +248,7 @@ sub evaluate {
     my $v =
       (($1 & 0xff) << 24) | (($2 & 0xff) << 16) | (($3 & 0xff) << 8) |
       ($4 & 0xff);
-    return ($v & $mask);
+    return $v & $mask;
 }
 
 sub lookup_start {
@@ -502,7 +502,7 @@ sub collect_results {
 sub hook_data {
     my ($self, $transaction) = @_;
 
-    return (DECLINED) if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
     my $queries = $self->lookup_start(
         $transaction,
@@ -524,10 +524,10 @@ sub hook_data {
             $transaction->header->add('X-URIBL-Match', $_->{desc}, 0);
         }
         elsif ($_->{action} eq 'deny') {
-            return (DENY, $_->{desc});
+            return DENY, $_->{desc};
         }
         elsif ($_->{action} eq 'denysoft') {
-            return (DENYSOFT, $_->{desc});
+            return DENYSOFT, $_->{desc};
         }
     }
     return DECLINED;

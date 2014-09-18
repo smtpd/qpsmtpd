@@ -42,7 +42,7 @@ sub hook_mail {
             $transaction->notes('badmailfromto', $bad);
         }
     }
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub hook_rcpt {
@@ -50,16 +50,17 @@ sub hook_rcpt {
     my $recipient = lc($rcpt->user) . '@' . lc($rcpt->host);
     my $sender = $transaction->notes('badmailfromto') or do {
         $self->log(LOGDEBUG, "pass, sender not listed");
-        return (DECLINED);
+        return DECLINED;
     };
 
     foreach ($self->qp->config("badmailfromto")) {
         my ($from, $to) = m/^\s*(\S+)\t(\S+).*/;
-        return (DENY, "mail to $recipient not accepted here")
-          if lc($from) eq $sender && lc($to) eq $recipient;
+        if ( lc($from) eq $sender && lc($to) eq $recipient ) {
+            return DENY, "mail to $recipient not accepted here";
+        }
     }
     $self->log(LOGDEBUG, "pass, recipient not listed");
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub is_sender_immune {

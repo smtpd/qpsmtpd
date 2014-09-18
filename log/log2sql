@@ -274,7 +274,7 @@ sub check_logfile {
             print "Updating current -> $file\n";
             exec_query('UPDATE log SET name=? WHERE inode=? AND name=?',
                        [$file, $inode, 'current']);
-            return ($exists->[0]{id}, $exists->[0]{size});    # continue parsing
+            return $exists->[0]{id}, $exists->[0]{size};    # continue parsing
         }
     }
 
@@ -284,7 +284,7 @@ sub check_logfile {
         if (@$exists) {
             exec_query('UPDATE log SET size=? WHERE inode=? AND name=?',
                        [$size, $inode, 'current']);
-            return ($exists->[0]{id}, $exists->[0]{size});    # continue parsing
+            return $exists->[0]{id}, $exists->[0]{size};    # continue parsing
         }
     }
 
@@ -299,7 +299,7 @@ sub check_logfile {
         [$inode, $size, $file, stat($path)->ctime]
     );
     print "new file id: $id\n";
-    return ($id);
+    return $id;
 }
 
 sub get_log_dir {
@@ -348,64 +348,65 @@ sub parse_line {
 
     # lines seen many times per connection
     return parse_line_plugin($line) if substr($message, 0, 1) eq '(';
-    return ('dispatch', $pid, undef, undef, $message)
+    return 'dispatch', $pid, undef, undef, $message
       if substr($message, 0, 12) eq 'dispatching ';
-    return ('queue', $pid, undef, undef, $message)
+    return 'queue', $pid, undef, undef, $message
       if substr($message, 0, 11) eq '250 Queued!';
-    return ('response', $pid, undef, undef, $message)
+    return 'response', $pid, undef, undef, $message
       if $message =~ /^[2|3]\d\d/;
 
     # lines seen about once per connection
-    return ('init', $pid, undef, undef, $message)
+    return 'init', $pid, undef, undef, $message
       if substr($message, 0, 19) eq 'Accepted connection';
-    return ('connect', $pid, undef, undef, substr($message, 16))
+    return 'connect', $pid, undef, undef, substr($message, 16)
       if substr($message, 0, 15) eq 'Connection from';
-    return ('connect', $pid, undef, undef, substr($message, 16))
+    return 'connect', $pid, undef, undef, substr($message, 16)
       if substr($message, 0, 8) eq 'connect ';
-    return ('close', $pid, undef, undef, $message)
+    return 'close', $pid, undef, undef, $message
       if substr($message, 0, 6) eq 'close ';
-    return ('close', $pid, undef, undef, $message)
+    return 'close', $pid, undef, undef, $message
       if $message eq 'Connection Timed Out';
-    return ('close', $pid, undef, undef, $message)
+    return 'close', $pid, undef, undef, $message
       if substr($message, 0, 20) eq 'click, disconnecting';
     return parse_line_cleanup($line)
       if substr($message, 0, 11) eq 'cleaning up';
 
     # lines seen less than once per connection
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if $message eq 'spooling message to disk';
-    return ('reject', $pid, undef, undef, $message) if $message =~ /^[4|5]\d\d/;
-    return ('reject', $pid, undef, undef, $message)
+    return 'reject', $pid, undef, undef, $message
+      if $message =~ /^[4|5]\d\d/;
+    return 'reject', $pid, undef, undef, $message
       if substr($message, 0, 14) eq 'deny mail from';
-    return ('reject', $pid, undef, undef, $message)
+    return 'reject', $pid, undef, undef, $message
       if substr($message, 0, 18) eq 'denysoft mail from';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 15) eq 'Lost connection';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if $message eq 'auth success cleared naughty';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 15) eq 'Running as user';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 16) eq 'Loaded Qpsmtpd::';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 24) eq 'Permissions on spool_dir';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 13) eq 'Listening on ';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 18) eq 'size_threshold set';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 12) eq 'tls: ciphers';
-    return ('error', $pid, undef, undef, $message)
+    return 'error', $pid, undef, undef, $message
       if substr($message, 0, 22) eq 'of uninitialized value';
-    return ('error', $pid, undef, undef, $message)
+    return 'error', $pid, undef, undef, $message
       if substr($message, 0, 8) eq 'symbol "';
-    return ('error', $pid, undef, undef, $message)
+    return 'error', $pid, undef, undef, $message
       if substr($message, 0, 9) eq 'error at ';
-    return ('error', $pid, undef, undef, $message)
+    return 'error', $pid, undef, undef, $message
       if substr($message, 0, 15) eq 'Could not print';
 
     print "UNKNOWN LINE: $line\n";
-    return ('unknown', $pid, undef, undef, $message);
+    return 'unknown', $pid, undef, undef, $message;
 }
 
 sub parse_line_plugin {
@@ -438,7 +439,7 @@ sub parse_line_plugin {
         $message = 'pass' if $message =~ /^pass/;
     }
 
-    return ('plugin', $pid, $hook, $plugin, $message);
+    return 'plugin', $pid, $hook, $plugin, $message;
 }
 
 sub parse_line_plugin_dspam {
@@ -454,7 +455,7 @@ sub parse_line_plugin_dspam {
         $message = "fail, $1";
     }
 
-    return ('plugin', $pid, $hook, $plugin, $message);
+    return 'plugin', $pid, $hook, $plugin, $message;
 }
 
 sub parse_line_plugin_spamassassin {
@@ -470,7 +471,7 @@ sub parse_line_plugin_spamassassin {
         $message = "fail, $1";
     }
 
-    return ('plugin', $pid, $hook, $plugin, $message);
+    return 'plugin', $pid, $hook, $plugin, $message;
 }
 
 sub parse_line_plugin_p0f {
@@ -503,7 +504,7 @@ sub parse_line_plugin_p0f {
     $message = 'Cisco'          if $message =~ /^Cisco/i;
     $message = 'Netware'        if $message =~ /Netware/i;
 
-    return ('plugin', $pid, $hook, $plugin, $message);
+    return 'plugin', $pid, $hook, $plugin, $message;
 }
 
 sub parse_line_cleanup {
@@ -512,7 +513,7 @@ sub parse_line_cleanup {
     # @tai 85931 cleaning up after 3210
     my $pid = (split /\s+/, $line)[-1];
     $has_cleanup++;
-    return ('cleanup', $pid, undef, undef, $line);
+    return 'cleanup', $pid, undef, undef, $line;
 }
 
 sub get_score {

@@ -257,7 +257,9 @@ sub run_hooks {
 
 sub run_hooks_no_respond {
     my ($self, $hook) = (shift, shift);
-    return (0, '') if !$hooks->{$hook};
+    if (!$hooks->{$hook}) {
+        return 0,'';
+    }
 
     my @r;
     for my $code (@{$hooks->{$hook}}) {
@@ -425,17 +427,17 @@ sub size_threshold {
 
 sub authenticated {
     my $self = shift;
-    return (defined $self->{_auth} ? $self->{_auth} : '');
+    return defined $self->{_auth} ? $self->{_auth} : '';
 }
 
 sub auth_user {
     my $self = shift;
-    return (defined $self->{_auth_user} ? $self->{_auth_user} : '');
+    return defined $self->{_auth_user} ? $self->{_auth_user} : '';
 }
 
 sub auth_mechanism {
     my $self = shift;
-    return (defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : '');
+    return defined $self->{_auth_mechanism} ? $self->{_auth_mechanism} : '';
 }
 
 sub address {

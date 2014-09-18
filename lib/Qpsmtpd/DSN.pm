@@ -154,7 +154,7 @@ sub _dsn {
     if (defined $reason) {
         $msg = $reason;
     }
-    return ($return, "$msg (#$class.$subject.$detail)");
+    return $return, "$msg (#$class.$subject.$detail)";
 }
 
 sub unspecified { shift->_dsn(shift, shift, DENYSOFT, 0, 0); }

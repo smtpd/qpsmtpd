@@ -156,7 +156,7 @@ sub process_sockets {
 
 sub hook_rcpt {
     my ($self, $transaction, $rcpt, %param) = @_;
-    my $ip = $self->qp->connection->remote_ip or return (DECLINED);
+    my $ip = $self->qp->connection->remote_ip or return DECLINED;
     my $note = $self->process_sockets;
     if ($note) {
         $self->log(LOGNOTICE, "Host $ip is whitelisted: $note");

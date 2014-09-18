@@ -18,7 +18,7 @@ sub hook_data_post {
 
     if ($transaction->data_size > $self->{"_sophie"}->{"max_size"} * 1024) {
         $self->log(LOGNOTICE, "Declining due to data_size");
-        return (DECLINED);
+        return DECLINED;
     }
 
     # Ignore non-multipart emails
@@ -34,7 +34,7 @@ sub hook_data_post {
     my $filename = $transaction->body_filename;
     unless ($filename) {
         $self->log(LOGWARN, "Cannot process due to lack of filename");
-        return (DECLINED);    # unless $filename;
+        return DECLINED;    # unless $filename;
     }
 
     my $mode = (stat($self->spool_dir()))[2];
@@ -61,20 +61,19 @@ sub hook_data_post {
         $self->log(LOGERROR, "One or more virus(es) found: $virus");
 
         if (lc($self->{"_sophie"}->{"deny_viruses"}) eq "yes") {
-            return (DENY,
-                    "Virus" . ($virus =~ /,/ ? "es " : " ") . "Found: $virus");
+            return DENY,"Virus" . ($virus =~ /,/ ? "es " : " ") . "Found: $virus";
         }
         else {
             $transaction->header->add('X-Virus-Found',   'Yes');
             $transaction->header->add('X-Virus-Details', $virus);
-            return (DECLINED);
+            return DECLINED;
         }
     }
 
     $transaction->header->add('X-Virus-Checked',
                              "Checked by SOPHIE on " . $self->qp->config("me"));
 
-    return (DECLINED);
+    return DECLINED;
 }
 
 =head1 NAME

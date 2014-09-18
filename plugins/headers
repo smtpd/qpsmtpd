@@ -152,7 +152,7 @@ sub hook_data_post {
     };
 
     $self->log(LOGINFO, 'pass');
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub has_required_headers {

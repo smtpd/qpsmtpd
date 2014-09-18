@@ -80,7 +80,7 @@ sub hook_pre_connection {
         if ($num_conn > $max) {
             my $err_mess = "too many connections from $remote";
             $self->log(LOGINFO, "fail: $err_mess ($num_conn > $max)");
-            return (DENYSOFT, "$err_mess, try again later");
+            return DENYSOFT, "$err_mess, try again later";
         }
     }
 
@@ -88,7 +88,7 @@ sub hook_pre_connection {
     return @r if scalar @r;
 
     $self->log(LOGDEBUG, "pass");
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub in_hosts_allow {
@@ -109,7 +109,7 @@ sub in_hosts_allow {
                 $self->log(LOGINFO, "fail, $message");
             }
             $self->log(LOGDEBUG, "pass, $const, $message");
-            return ($const, $message);
+            return $const, $message;
         }
     }
 

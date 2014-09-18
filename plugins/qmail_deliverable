@@ -203,7 +203,7 @@ sub rcpt_handler {
         my $s = $transaction->sender->address;
         if (!$s || $s eq '<>') {
             $self->adjust_karma(-1);
-            return (DENY, "mailing lists do not accept null senders");
+            return DENY, "mailing lists do not accept null senders";
         };
         $self->log(LOGINFO, "pass, ezmlm list");
         $k++;

@@ -213,22 +213,24 @@ sub canonify {
     return "" if $path eq "";
 
     # bare postmaster is permissible, perl RFC-2821 (4.5.1)
-    return ("postmaster", undef) if $path =~ m/^postmaster$/i;
+    if ( $path =~ m/^postmaster$/i ) {
+        return "postmaster", undef;
+    }
 
     my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
-    return (undef) unless defined $localpart;
+    return undef if !defined $localpart;
 
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
 
         # simple case, we are done
-        return ($localpart, $domainpart);
+        return $localpart, $domainpart;
     }
     if ($localpart =~ /^"(($qtext_expr|\\$text_expr)*)"$/) {
         $localpart = $1;
         $localpart =~ s/\\($text_expr)/$1/g;
-        return ($localpart, $domainpart);
+        return $localpart, $domainpart;
     }
-    return (undef);
+    return undef;
 }
 
 =head2 parse()
@@ -374,7 +376,7 @@ sub _addr_cmp {
         ($right, $left) = ($left, $right);
     }
 
-    return ($left cmp $right);
+    return $left cmp $right;
 }
 
 =head1 COPYRIGHT

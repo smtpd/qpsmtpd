@@ -175,14 +175,14 @@ sub read_map {
 
 sub hook_rcpt {
     my ($self, $transaction, $recipient) = @_;
-    return (DECLINED)
+    return DECLINED
       unless $recipient->host && $recipient->user;
 
-    return (DECLINED)
+    return DECLINED
       unless lc($recipient->host) eq $self->{_domain};
 
     my $rcpt = lc $recipient->user . '@' . lc $recipient->host;
-    return (@{$self->{_default}})
+    return @{$self->{_default}}
       unless exists $map{$rcpt};
 
     return @{$map{$rcpt}};
