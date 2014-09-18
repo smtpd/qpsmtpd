@@ -1,0 +1,3 @@
+z.com.  3600    IN  A   5.4.3.2
+y.com.  IN  A   ; No record
+x.com.  IN  A   error "Foo error"

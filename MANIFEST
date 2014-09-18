@@ -170,6 +170,8 @@ t/config/size_threshold
 t/config/test_config_file
 t/config/users.cdb
 t/dns_cache.txt
+t/test-fakeresolver_cache.txt
+t/test-fakeresolver.t
 t/helo.t
 t/misc.t
 t/plugin_tests.t
