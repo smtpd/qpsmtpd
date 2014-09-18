@@ -118,7 +118,7 @@ sub register {
     $self->log(LOGDEBUG,
              "Using map " . $self->{_file} . " for domain " . $self->{_domain});
     %map = $self->read_map(1);
-    die "Empty map file " . $self->{_file} unless keys %map;
+    die "Empty map file " . $self->{_file} if !%map;
 }
 
 sub hook_pre_connection {
@@ -126,7 +126,7 @@ sub hook_pre_connection {
     my ($time) = (stat($self->{_file}))[9] || 0;
     if ($time > $self->{_time}) {
         my %temp = $self->read_map();
-        return DECLINED if !keys %temp;
+        return DECLINED if !%temp;
         %map = %temp;
     }
     return DECLINED;
@@ -147,9 +147,9 @@ sub read_map {
         ++$line;
         s/^\s*//;
         next if /^#/;
-        next unless $_;
+        next if !$_;
         my ($addr, $code, $msg) = split / /, $_, 3;
-        next unless $addr;
+        next if !$addr;
 
         if (!$code) {
             $self->log(LOGERROR,
@@ -172,7 +172,7 @@ sub read_map {
 sub hook_rcpt {
     my ($self, $transaction, $recipient) = @_;
 
-    return DECLINED unless $recipient->host && $recipient->user;
+    return DECLINED if !($recipient->host && $recipient->user);
     return DECLINED if lc($recipient->host) ne $self->{_domain};
 
     my $rcpt = lc $recipient->user . '@' . lc $recipient->host;
