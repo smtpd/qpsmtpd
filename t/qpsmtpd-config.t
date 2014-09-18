@@ -58,12 +58,9 @@ sub __log {
 }
 
 sub __config_dir {
-    my $dir = $config->config_dir('logging');
-    ok($dir, "config_dir, $dir");
-
-    #warn Data::Dumper::Dumper($Qpsmtpd::config_dir_memo{logging});
-    $dir = $Qpsmtpd::Config::dir_memo{logging};
-    ok($dir, "config_dir, $dir (memo)");
+    is($Qpsmtpd::Config::dir_memo{bogus}, undef, 'No config_dir cache set yet');
+    is($config->config_dir('bogus'), '/var/qmail/control', 'config_dir default value');
+    is($Qpsmtpd::Config::dir_memo{bogus}, '/var/qmail/control', 'config_dir cache set');
 }
 
 sub __clear_cache {
