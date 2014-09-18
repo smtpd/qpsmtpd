@@ -61,6 +61,7 @@ sub _populate_static_cache {
 sub send {
     my ( $self, $host, $type, $class ) = @_;
     $class ||= 'IN';
+my $before_host = $host;
     if ( ! $type ) {
         if ( Net::IP::ip_is_ipv4($host) ) {
             $type = 'PTR';
@@ -75,6 +76,9 @@ sub send {
     if ( $host !~ /\.$/ ) {
         $host .= '.';
     }
+if ( $host =~ /^2.0.192/ ) {
+    warn "\n\n\nBefore: $before_host\nAfter: $host\n";
+}
 
     my $cached_record;
     if ( exists $self->{static_dns}{"$host $class $type"} ) {
