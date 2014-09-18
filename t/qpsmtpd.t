@@ -109,11 +109,11 @@ sub __run_continuation {
 }
 
 sub __hook_responder {
-    my ($code, $msg) = $qp->hook_responder('test-hook', ['test code','test mesg']);
-    is($code, 'test code', "hook_responder, code");
+    my ($code, $msg) = $qp->hook_responder('test-hook', [DECLINED,'test mesg']);
+    is($code, DECLINED, "hook_responder, code");
     is($msg, 'test mesg', "hook_responder, test msg");
 
-    ($code, $msg) = $smtpd->hook_responder('connect', ['test code','test mesg']);
+    ($code, $msg) = $smtpd->hook_responder('connect', [DECLINED,'test mesg']);
     is($code->[0], 220, "hook_responder, code");
     ok($code->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $code->[1]);
 
