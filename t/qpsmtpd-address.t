@@ -17,8 +17,6 @@ BEGIN {
 
 stderr_is { __new() } '','No STDERR from __new()';
 
-done_testing() and exit;
-
 stderr_is { __config() } '', 'No STDERR from __config()';
 stderr_is { __parse() } '',  'No STDERR from __parse()';
 
