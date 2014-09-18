@@ -160,7 +160,7 @@ sub hook_connect {
 
     unless (_convert_to_ssl($self)) {
         $self->log(LOGINFO, "fail, unable to establish SSL");
-        return (DENY_DISCONNECT, "Cannot establish SSL session");
+        return DENY_DISCONNECT, "Cannot establish SSL session";
     }
     $self->log(LOGINFO, "pass, connect via SMTPS");
     return DECLINED;

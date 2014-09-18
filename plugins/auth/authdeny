@@ -18,6 +18,6 @@ sub hook_auth {
 
     $self->log(LOGWARN, "fail: cannot authenticate");
 
-    return (DECLINED, "$user is not free to abuse my relay");
+    return DECLINED, "$user is not free to abuse my relay";
 }
 

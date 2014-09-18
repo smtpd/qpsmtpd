@@ -180,24 +180,23 @@ sub hook_queue {
             my $stat = eval $key    # keys have the same names as the constants
               or next;
             if ($status & $stat) {
-                return (DENYSOFT, $reason || $cleanup_soft{$key});
+                return DENYSOFT, $reason || $cleanup_soft{$key};
             }
         }
         foreach my $key (keys %cleanup_hard) {
             my $stat = eval $key    # keys have the same names as the constants
               or next;
             if ($status & $stat) {
-                return (DENY, $reason || $cleanup_hard{$key});
+                return DENY, $reason || $cleanup_hard{$key};
             }
         }
 
         # we have no idea why we're here.
-        return (DECLINED,
-                $reason || "Unable to queue message ($status, $reason)");
+        return DECLINED, $reason || "Unable to queue message ($status, $reason)";
     }
 
     my $msg_id = $transaction->header->get('Message-Id') || '';
     $msg_id =~ s/[\r\n].*//s;    # don't allow newlines in the Message-Id here
-    return (OK, "Queued! $msg_id (Queue-Id: $qid)");
+    return OK, "Queued! $msg_id (Queue-Id: $qid)";
 }
 

@@ -136,7 +136,7 @@ auth method if the first one fails.
 
 Plugins may also return an optional message with the return code, e.g.
 
-  return (DENY, "If you forgot your password, contact your admin");
+  return DENY, "If you forgot your password, contact your admin";
 
 and this will be appended to whatever response is sent to the remote SMTP
 client.  There is no guarantee that the end user will see this information,

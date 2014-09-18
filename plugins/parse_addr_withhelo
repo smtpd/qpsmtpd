@@ -24,50 +24,47 @@ use Qpsmtpd::Constants;
 
 sub hook_mail_parse {
     my $self = shift;
-    return (OK, \&_parse) if ($self->qp->connection->hello eq 'helo');
-    return (DECLINED);
+    return OK, \&_parse if $self->qp->connection->hello eq 'helo';
+    return DECLINED;
 }
 
 sub hook_rcpt_parse {
     my $self = shift;
-    return (OK, \&_parse) if ($self->qp->connection->hello eq 'helo');
-    return (DECLINED);
+    return OK, \&_parse if $self->qp->connection->hello eq 'helo';
+    return DECLINED;
 }
 
 sub _parse {
     my ($self, $cmd, $line) = @_;
     $self->log(LOGDEBUG, "_parse() cmd=[$cmd], line=[$line]");
     if ($cmd eq 'mail') {
-        return (DENY, "Syntax error in command")
-          unless ($line =~ s/^from:\s*//i);
+        return DENY, "Syntax error in command" if $line !~ s/^from:\s*//i;
     }
     else {    # cmd eq 'rcpt'
-        return (DENY, "Syntax error in command")
-          unless ($line =~ s/^to:\s*//i);
+        return DENY, "Syntax error in command" if $line !~ s/^to:\s*//i;
     }
 
     if ($line =~ s/^(<.*>)\s*//) {
         my $addr = $1;
-        return (DENY, "No parameters allowed in " . uc($cmd))
-          if ($line =~ /^\S/);
-        return (OK, $addr, ());
+        return DENY, "No parameters allowed in " . uc($cmd)
+            if $line =~ /^\S/;
+        return OK, $addr, ();
     }
 
     ## now, no <> are given
     $line =~ s/\s*$//;
     if ($line =~ /\@/) {
-        return (DENY, "No parameters allowed in " . uc($cmd))
-          if ($line =~ /\@\S+\s+\S/);
-        return (OK, $line, ());
+        return DENY, "No parameters allowed in " . uc($cmd)
+          if $line =~ /\@\S+\s+\S/;
+        return OK, $line, ();
     }
 
     if ($cmd eq "mail") {
-        return (OK, "<>") unless $line;    # 'MAIL FROM:' -> 'MAIL FROM:<>'
-        return (DENY, "Could not parse your MAIL FROM command");
+        return OK, "<>" if !$line;    # 'MAIL FROM:' -> 'MAIL FROM:<>'
+        return DENY, "Could not parse your MAIL FROM command";
     }
     else {
-        return (DENY, "Could not parse your RCPT TO command")
-          unless $line =~ /^(postmaster|abuse)$/i;
+        return DENY, "Could not parse your RCPT TO command"
+            if $line !~ /^(postmaster|abuse)$/i;
     }
 }
-

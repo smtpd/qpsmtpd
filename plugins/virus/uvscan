@@ -55,7 +55,7 @@ sub register {
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
-    return (DECLINED)
+    return DECLINED
       if $transaction->data_size > 250_000;
 
     # Ignore non-multipart emails
@@ -69,7 +69,7 @@ sub hook_data_post {
     }
 
     my $filename = $transaction->body_filename;
-    return (DECLINED) unless $filename;
+    return DECLINED if !$filename;
 
     # Now do the actual scanning!
     my @cmd = (
@@ -92,28 +92,28 @@ sub hook_data_post {
         $virus = $1;
     }
     if ($output && $output =~ m/password-protected/m) {
-        return (DENY, 'We do not accept password-protected zip files!');
+        return DENY, 'We do not accept password-protected zip files!';
     }
 
     if ($signal) {
         $self->log(LOGWARN, "uvscan exited with signal: $signal");
-        return (DECLINED);
+        return DECLINED;
     }
     if ($result == 2) {
         $self->log(LOGERROR, "Integrity check for a DAT file failed.");
-        return (DECLINED);
+        return DECLINED;
     }
     elsif ($result == 6) {
         $self->log(LOGERROR, "A general problem has occurred.");
-        return (DECLINED);
+        return DECLINED;
     }
     elsif ($result == 8) {
         $self->log(LOGERROR, "The program could not find a DAT file.");
-        return (DECLINED);
+        return DECLINED;
     }
     elsif ($result == 15) {
         $self->log(LOGERROR, "The program self-check failed");
-        return (DECLINED);
+        return DECLINED;
     }
     elsif ($result) {    # all of the possible virus returns
         if ($result == 12) {
@@ -128,15 +128,15 @@ sub hook_data_post {
         }
 
         if (lc($self->{"_uvscan"}->{"deny_viruses"}) eq "yes") {
-            return (DENY, "Virus Found: $virus");
+            return DENY, "Virus Found: $virus";
         }
         $transaction->header->add('X-Virus-Found',   'Yes');
         $transaction->header->add('X-Virus-Details', $virus);
-        return (DECLINED);
+        return DECLINED;
     }
 
     $transaction->header->add('X-Virus-Checked',
                       "Checked by McAfee uvscan on " . $self->qp->config("me"));
 
-    return (DECLINED);
+    return DECLINED;
 }

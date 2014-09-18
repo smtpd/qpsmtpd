@@ -227,13 +227,13 @@ sub hook_connect {
         $self->qp->connection->relay_client(0);
         delete $ENV{RELAYCLIENT};
         $self->log(LOGINFO, "fail, disabled by norelayclients");
-        return (DECLINED);
+        return DECLINED;
     }
 
     if ($ENV{RELAYCLIENT}) {
         $self->qp->connection->relay_client(1);
         $self->log(LOGINFO, "pass, enabled by env");
-        return (DECLINED);
+        return DECLINED;
     }
 
     $self->populate_relayclients();
@@ -242,18 +242,17 @@ sub hook_connect {
 
     if ($self->is_in_cidr_block() || $self->is_octet_match()) {
         $self->qp->connection->relay_client(1);
-        return (DECLINED);
+        return DECLINED;
     }
 
     $self->log(LOGINFO, "skip, no match");
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub relay_only {
     my $self = shift;
     if ($self->qp->connection->relay_client) {
-        return (OK);
+        return OK;
     }
-    return (DENY);
+    return DENY;
 }
-

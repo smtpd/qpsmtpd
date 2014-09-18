@@ -50,7 +50,7 @@ sub auth_flat_file {
 
     if (!defined $passClear && !defined $passHash) {
         $self->log(LOGINFO, "fail: missing password");
-        return (DENY, "authflat - missing password");
+        return DENY, "authflat - missing password";
     }
 
     my ($pw_name, $pw_domain) = split /@/, lc($user);

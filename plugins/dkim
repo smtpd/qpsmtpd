@@ -302,7 +302,7 @@ sub handle_sig_temperror {
     my ($self, $dkim, $mess) = @_;
 
     $self->log(LOGINFO, "error, $mess");
-    return (DENYSOFT, "Please try again later - $dkim->result_detail");
+    return DENYSOFT, "Please try again later - $dkim->result_detail";
 }
 
 sub handle_sig_invalid {
@@ -447,7 +447,7 @@ sub get_keydir {
         $self->log(LOGINFO, "error, unable to read dkim key from $dir/private");
         return;
     }
-    return ($domain, $dir);
+    return $domain, $dir;
 }
 
 sub save_signatures_to_note {

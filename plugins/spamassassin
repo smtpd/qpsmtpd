@@ -170,22 +170,22 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    return (DECLINED) if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
     if ($transaction->data_size > 500_000) {
         $self->log(LOGINFO,
                    "skip, too large (" . $transaction->data_size . ")");
-        return (DECLINED);
+        return DECLINED;
     }
 
-    my $SPAMD    = $self->connect_to_spamd() or return (DECLINED);
+    my $SPAMD    = $self->connect_to_spamd() or return DECLINED;
     my $username = $self->select_spamd_username($transaction);
     my $message  = $self->assemble_message($transaction);
     my $length   = length $message;
 
     $self->print_to_spamd($SPAMD, $message, $length, $username);
     shutdown($SPAMD, 1);  # close our side of the socket (tell spamd we're done)
-    my $headers = $self->parse_spamd_response($SPAMD) or return (DECLINED);
+    my $headers = $self->parse_spamd_response($SPAMD) or return DECLINED;
 
     $self->insert_spam_headers($transaction, $headers, $username);
     $self->munge_subject($transaction);
@@ -430,7 +430,7 @@ sub reject {
     }
 
     $self->log(LOGINFO, "fail, $status, > $reject, $learn");
-    return ($self->get_reject_type(), "spam score exceeded threshold");
+    return $self->get_reject_type(), "spam score exceeded threshold";
 }
 
 sub munge_subject {

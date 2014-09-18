@@ -143,7 +143,7 @@ sub hook_helo {
     eval {
         $self->check_results($transaction, "HELO", $milter->send_helo($host));
     };
-    return (DENY, $@) if $@;
+    return DENY, $@ if $@;
 
     return DECLINED;
 }
@@ -159,7 +159,7 @@ sub hook_mail {
         $self->check_results($transaction, "MAIL FROM",
                              $milter->send_mail_from($address->format));
     };
-    return (DENY, $@) if $@;
+    return DENY, $@ if $@;
 
     return DECLINED;
 }
@@ -176,7 +176,7 @@ sub hook_rcpt {
         $self->check_results($transaction, "RCPT TO",
                              $milter->send_rcpt_to($address->format));
     };
-    return (DENY, $@) if $@;
+    return DENY, $@ if $@;
 
     return DECLINED;
 }
@@ -201,7 +201,7 @@ sub hook_data_post {
                 $self->check_results($transaction, "header $h",
                                      $milter->send_header($h, $val));
             };
-            return (DENY, $@) if $@;
+            return DENY, $@ if $@;
         }
     }
 
@@ -209,7 +209,7 @@ sub hook_data_post {
         $self->check_results($transaction, "end headers",
                              $milter->send_end_headers());
     };
-    return (DENY, $@) if $@;
+    return DENY, $@ if $@;
 
     $transaction->body_resetpos;
 
@@ -230,7 +230,7 @@ sub hook_data_post {
                 $self->check_results($transaction, "body",
                                      $milter->send_body($data));
             };
-            return (DENY, $@) if $@;
+            return DENY, $@ if $@;
             $data = '';
         }
     }
@@ -240,7 +240,7 @@ sub hook_data_post {
             $self->check_results($transaction, "body",
                                  $milter->send_body($data));
         };
-        return (DENY, $@) if $@;
+        return DENY, $@ if $@;
         $data = '';
     }
 
@@ -248,7 +248,7 @@ sub hook_data_post {
         $self->check_results($transaction, "end of DATA",
                              $milter->send_end_body());
     };
-    return (DENY, $@) if $@;
+    return DENY, $@ if $@;
 
     my $milter_header_changes = $transaction->notes('milter_header_changes');
 

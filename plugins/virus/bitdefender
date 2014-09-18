@@ -87,7 +87,7 @@ sub hook_data_post {
                      . $transaction->data_size . " vs "
                      . $self->{"_bitd"}->{"max_size"} . ")"
                   );
-        return (DECLINED);
+        return DECLINED;
     }
 
     # Ignore non-multipart emails
@@ -123,10 +123,10 @@ sub hook_data_post {
     if ($output) {
         $self->log(LOGINFO, "Virus(es) found: $output");
         if ($self->{"_bitd"}->{"deny_viruses"} eq "yes") {
-            return (DENY, "Virus Found: $output");
+            return DENY, "Virus Found: $output";
         }
     }
 
-    return (DECLINED);
+    return DECLINED;
 }
 

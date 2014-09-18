@@ -244,11 +244,11 @@ sub data_post_handler {
     my $self = shift;
     my $transaction = shift || $self->qp->transaction;
 
-    return (DECLINED) if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
     if ($transaction->data_size > 500_000) {
         $self->log(LOGINFO, "skip, too big (" . $transaction->data_size . ")");
-        return (DECLINED);
+        return DECLINED;
     }
 
     my $user = $self->select_username($transaction);
@@ -260,7 +260,7 @@ sub data_post_handler {
     my $response = $self->dspam_process($filtercmd, $transaction);
     if (!$response->{result}) {
         $self->log(LOGWARN, "error, no dspam response. Check logs for errors.");
-        return (DECLINED);
+        return DECLINED;
     }
 
     $transaction->notes('dspam', $response);
@@ -512,7 +512,7 @@ sub reject_agree {
             $self->adjust_karma(-2);
             $self->log(LOGINFO, "fail, agree, $status");
             my $reject = $self->get_reject_type();
-            return ($reject, 'we agree, no spam please');
+            return $reject, 'we agree, no spam please';
         }
 
         $self->log(LOGINFO, "fail, disagree, $status");

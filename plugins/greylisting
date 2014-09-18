@@ -234,7 +234,7 @@ sub mail_handler {
     return DECLINED if $status != DENYSOFT;
 
     if (!$self->{_args}{deny_late}) {
-        return (DENYSOFT, $msg);
+        return DENYSOFT, $msg;
     }
 
     $transaction->notes('greylist', $msg);
@@ -346,7 +346,7 @@ sub cleanup_and_return {
     return $return_val if defined $return_val;    # explicit override
     return DECLINED
       if defined $self->{_args}{reject} && !$self->{_args}{reject};
-    return (DENYSOFT, $DENYMSG);
+    return DENYSOFT, $DENYMSG;
 }
 
 sub get_db_key {

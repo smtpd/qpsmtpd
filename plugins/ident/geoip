@@ -310,7 +310,7 @@ sub get_my_lat_lon {
     return if !$self->{_geoip_city};
 
     if ($self->{_latitude} && $self->{_longitude}) {
-        return ($self->{_latitude}, $self->{_longitude});    # cached
+        return $self->{_latitude}, $self->{_longitude};    # cached
     }
 
     my $ip = $self->{_args}{distance} or return;
@@ -325,7 +325,7 @@ sub get_my_lat_lon {
     if (!$self->{_latitude} || !$self->{_longitude}) {
         $self->log(LOGNOTICE, "could not get my lat/lon");
     }
-    return ($self->{_latitude}, $self->{_longitude});
+    return $self->{_latitude}, $self->{_longitude};
 }
 
 sub get_sender_lat_lon {
@@ -337,6 +337,6 @@ sub get_sender_lat_lon {
         $self->log(LOGNOTICE, "could not get sender lat/lon");
         return;
     }
-    return ($lat, $lon);
+    return $lat, $lon;
 }
 

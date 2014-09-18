@@ -373,7 +373,7 @@ sub mail_parse_respond {
 
     # to support addresses without <> we now require a plugin
     # hooking "mail_pre" to
-    #   return (OK, "<$from>");
+    #   return OK, "<$from>";
     # (...or anything else parseable by Qpsmtpd::Address ;-))
     # see also comment in sub rcpt()
     $self->run_hooks("mail_pre", $from, \%param);
@@ -464,7 +464,7 @@ sub rcpt_parse_respond {
 
     # to support addresses without <> we now require a plugin
     # hooking "rcpt_pre" to
-    #   return (OK, "<$rcpt>");
+    #   return OK, "<$rcpt>";
     # (... or anything else parseable by Qpsmtpd::Address ;-))
     # this means, a plugin can decide to (pre-)accept
     # addresses like <user@example.com.> or <user@example.com >

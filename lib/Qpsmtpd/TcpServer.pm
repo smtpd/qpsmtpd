@@ -131,7 +131,7 @@ sub respond {
     if (!$self->check_socket()) {
         $self->log(LOGERROR,
                    "Lost connection to client, cannot send response.");
-        return (0);
+        return 0;
     }
 
     while (my $msg = shift @messages) {
@@ -178,7 +178,7 @@ sub lrpip {
     $nto_iaddr =~ s/::ffff://;
     $nto_laddr =~ s/::ffff://;
 
-    return ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr);
+    return $port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr;
 }
 
 sub tcpenv {
@@ -188,8 +188,8 @@ sub tcpenv {
     my $TCPREMOTEIP = $nto_iaddr;
 
     if ($no_rdns) {
-        return ($TCPLOCALIP, $TCPREMOTEIP,
-                $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]");
+        return $TCPLOCALIP, $TCPREMOTEIP,
+                $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
     }
     my $res = Net::DNS::Resolver->new( dnsrch => 0 );
     $res->tcp_timeout(3);
@@ -202,7 +202,7 @@ sub tcpenv {
             $TCPREMOTEHOST = $rr->ptrdname;
         }
     }
-    return ($TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST || 'Unknown');
+    return $TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST || 'Unknown';
 }
 
 sub check_socket() {

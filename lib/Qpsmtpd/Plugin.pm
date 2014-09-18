@@ -232,7 +232,7 @@ sub get_reject {
 
     # they asked for reject, we give them reject
     $self->log(LOGINFO, "fail" . $log_mess);
-    return ($self->get_reject_type(), $smtp_mess);
+    return $self->get_reject_type(), $smtp_mess;
 }
 
 sub get_reject_type {
@@ -264,7 +264,7 @@ sub store_deferred_reject {
         $self->connection->notes('naughty_reject_type',
                                  $self->{_args}{reject_type});
     }
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub store_auth_results {

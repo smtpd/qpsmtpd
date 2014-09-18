@@ -140,6 +140,5 @@ sub naughty {
     $self->log(LOGINFO, "disconnecting");
     my $rtype = $self->connection->notes( 'naughty_reject_type' );
     my $type = $self->get_reject_type( 'disconnect', $rtype );
-    return ($type, $naughty);
+    return $type, $naughty;
 }
-

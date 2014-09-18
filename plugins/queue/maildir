@@ -144,18 +144,18 @@ sub hook_queue {
             ($rc, @msg) = $self->deliver_user($transaction, $addr);
             unless ($rc == OK) {
                 umask $old_umask;
-                return ($rc, @msg);
+                return $rc, @msg;
             }
         }
         umask $old_umask;
-        return (OK, @msg);    # last @msg is the same like any other before...
+        return OK, @msg;    # last @msg is the same like any other before...
     }
 
     $transaction->header->add('Delivered-To', $_->address, 0)
       for $transaction->recipients;
     ($rc, @msg) = $self->write_file($transaction, $self->{_maildir});
     umask $old_umask;
-    return ($rc, @msg);
+    return $rc, @msg;
 }
 
 sub write_file {
@@ -170,7 +170,7 @@ sub write_file {
 
     open(MF, ">$maildir/tmp/$file")
       or $self->log(LOGWARN, "could not open $maildir/tmp/$file: $!"),
-      return (DECLINED, "queue error (open)");
+      return DECLINED, "queue error (open)";
 
     print MF "Return-Path: ", $transaction->sender->format, "\n";
 
@@ -184,20 +184,20 @@ sub write_file {
     }
     close MF
       or $self->log(LOGWARN, "could not close $maildir/tmp/$file: $!")
-      and return (DECLINED, "queue error (close)");
+      and return DECLINED, "queue error (close)";
 
     link "$maildir/tmp/$file",
       "$maildir/new/$file"
       or $self->log(LOGWARN,
                   "could not link $maildir/tmp/$file to $maildir/new/$file: $!")
-      and return (DECLINED, "queue error (link)");
+      and return DECLINED, "queue error (link)";
 
     unlink "$maildir/tmp/$file";
 
     my $msg_id = $transaction->header->get('Message-Id') || '';
     $msg_id =~ s/[\r\n].*//s;
 
-    return (OK, "Queued! $msg_id");
+    return OK, "Queued! $msg_id";
 }
 
 sub deliver_user {

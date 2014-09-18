@@ -74,18 +74,18 @@ sub hook_queue {
         my @rcpt = map { "T" . $_->address } $transaction->recipients;
         my $from = "F" . ($transaction->sender->address || "");
         print ENVELOPE_WRITER "$from\0", join("\0", @rcpt), "\0\0"
-          or return (DECLINED, "Could not print addresses to queue");
+          or return DECLINED, "Could not print addresses to queue";
 
         close ENVELOPE_WRITER;
         waitpid($child, 0);
         my $exit_code = $? >> 8;
         $exit_code
-          and return (DECLINED, "Unable to queue message ($exit_code)");
+          and return DECLINED, "Unable to queue message ($exit_code)";
 
         my $msg_id = $transaction->header->get('Message-Id') || '';
         $msg_id =~ s/[\r\n].*//s;  # don't allow newlines in the Message-Id here
         $msg_id = "<$msg_id>" unless $msg_id =~ /^<.*>$/;    # surround in <>'s
-        return (OK, "Queued! " . time . " qp $child $msg_id");
+        return OK, "Queued! " . time . " qp $child $msg_id";
     }
     elsif (defined $child) {
 

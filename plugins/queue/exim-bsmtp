@@ -83,14 +83,14 @@ sub hook_queue {
 
     unless ($transaction->header) {
         $self->log(LOGERROR, "No header parsed for transaction; can't enqueue");
-        return (DENY, 'Mail unqueuable');
+        return DENY, 'Mail unqueuable';
     }
     my $tmp_dir = $self->qp->config('spool_dir') || '/tmp';
     $tmp_dir = $1 if ($tmp_dir =~ /(.*)/);
     my ($tmp, $tmpfn) = tempfile("exim-bsmtp.$$.XXXXXX", DIR => $tmp_dir);
     unless ($tmp && $tmpfn) {
         $self->log(LOGERROR, "Couldn't create tempfile: $!");
-        return (DECLINED, 'Internal error enqueueing mail');
+        return DECLINED, 'Internal error enqueueing mail';
     }
 
     print $tmp "HELO ", hostname(), "\n",
@@ -112,7 +112,7 @@ sub hook_queue {
     unless ($exim) {
         $self->log(LOGERROR, "Could not execute $self->{_exim_path}: $!");
         unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
-        return (DECLINED, "Internal error enqueuing mail");
+        return DECLINED, "Internal error enqueuing mail";
     }
 
     # Normally exim produces no output in BSMTP mode; anything that
@@ -135,7 +135,7 @@ sub hook_queue {
     if ($bsmtp_error && $bsmtp_error >= 400 && $bsmtp_error < 600) {
         $self->log(LOGERROR,
                "BSMTP enqueue failed; response $bsmtp_error" . " ($bsmtp_msg)");
-        return ($bsmtp_error < 400 ? DECLINED : DENY, $bsmtp_msg);
+        return $bsmtp_error < 400 ? DECLINED : DENY, $bsmtp_msg;
     }
     elsif (($exit >> 8) != 0 || $bsmtp_error) {
         $self->log(LOGERROR,
@@ -143,10 +143,9 @@ sub hook_queue {
                      . ($exit >> 8)
                      . " from $self->{_exim_path} -bS"
                   );
-        return (DECLINED, 'Internal error enqueuing mail');
+        return DECLINED, 'Internal error enqueuing mail';
     }
 
     $self->log(LOGINFO, "Enqueued to exim via BSMTP");
-    return (OK, "Queued!");
+    return OK, "Queued!";
 }
-

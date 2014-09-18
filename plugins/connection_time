@@ -59,7 +59,7 @@ sub connect_handler {
       if ($self->hook_name eq 'connect' && defined $self->{_connection_start});
     $self->{_connection_start} = [gettimeofday];
     $self->log(LOGDEBUG, "started at " . scalar gettimeofday);
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub hook_post_connection {
@@ -67,12 +67,11 @@ sub hook_post_connection {
 
     if (!$self->{_connection_start}) {
         $self->log(LOGERROR, "Start time not set?!");
-        return (DECLINED);
+        return DECLINED;
     }
 
     my $elapsed = tv_interval($self->{_connection_start}, [gettimeofday]);
 
     $self->log(LOGINFO, sprintf "%.3f s.", $elapsed);
-    return (DECLINED);
+    return DECLINED;
 }
-
