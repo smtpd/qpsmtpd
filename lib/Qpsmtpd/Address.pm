@@ -1,4 +1,3 @@
-#!/usr/bin/perl -w
 package Qpsmtpd::Address;
 use strict;
 
@@ -21,13 +20,6 @@ stringify to a standard form, and they have an overloaded comparison
 for easy testing of values.
 
 =head1 METHODS
-
-=cut
-
-use overload (
-              '""'  => \&format,
-              'cmp' => \&_addr_cmp,
-             );
 
 =head2 new()
 
@@ -56,14 +48,19 @@ test for equality (like in badmailfrom).
 
 =cut
 
+use overload (
+              '""'  => \&format,
+              'cmp' => \&_addr_cmp,
+             );
+
 sub new {
     my ($class, $user, $host) = @_;
     my $self = {};
     if ($user =~ /^<(.*)>$/) {
         ($user, $host) = $class->canonify($user);
-        return undef unless defined $user;
+        return if !defined $user;
     }
-    elsif (not defined $host) {
+    elsif (!defined $host) {
         my $address = $user;
         ($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
     }
@@ -193,54 +190,44 @@ sub canonify {
     my ($dummy, $path) = @_;
 
     # strip delimiters
-    return undef unless ($path =~ /^<(.*)>$/);
+    return if $path !~ /^<(.*)>$/;
     $path = $1;
 
-    my $domain =
-        $domain_expr
-      ? $domain_expr
-      : "$subdomain_expr(?:\.$subdomain_expr)*";
+    my $domain = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
 
-    # it is possible for $address_literal_expr to be empty, if a site
-    # doesn't want to allow them
-    $domain = "(?:$address_literal_expr|$domain)"
-      if !$domain_expr and $address_literal_expr;
+    # $address_literal_expr may be empty, if a site doesn't allow them
+    if (!$domain_expr && $address_literal_expr) {
+        $domain = "(?:$address_literal_expr|$domain)";
+    };
 
     # strip source route
     $path =~ s/^\@$domain(?:,\@$domain)*://;
 
     # empty path is ok
-    return "" if $path eq "";
+    return '' if $path eq '';
 
     # bare postmaster is permissible, perl RFC-2821 (4.5.1)
     if ( $path =~ m/^postmaster$/i ) {
-        return "postmaster", undef;
+        return 'postmaster';
     }
 
     my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
-    return undef if !defined $localpart;
+    return if !defined $localpart;
 
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
-
-        # simple case, we are done
-        return $localpart, $domainpart;
+        return $localpart, $domainpart;  # simple case, we are done
     }
+
     if ($localpart =~ /^"(($qtext_expr|\\$text_expr)*)"$/) {
         $localpart = $1;
         $localpart =~ s/\\($text_expr)/$1/g;
         return $localpart, $domainpart;
     }
-    return undef;
+    return;
 }
 
-=head2 parse()
-
-Retained as a compatibility method, it is completely equivalent
-to new() called with a single parameter.
-
-=cut
-
-sub parse {    # retain for compatibility only
+sub parse {
+# Retained for compatibility
     return shift->new(shift);
 }
 
@@ -283,7 +270,7 @@ stringification operator, so the following are equivalent:
 sub format {
     my ($self) = @_;
     my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
-    return '<>' unless defined $self->{_user};
+    return '<>' if !defined $self->{_user};
     if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
         return
           qq(<"$user")

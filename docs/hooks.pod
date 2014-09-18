@@ -712,8 +712,9 @@ plugin didn't find the requested value
 
 requested values as C<@list>, example:
 
-  return OK, @{$config{$key}}
-    if exists $config{$key};
+  if (exists $config{$key}) {
+    return OK, @{$config{$key}}
+  };
   return DECLINED;
 
 =back
@@ -744,8 +745,9 @@ plugin didn't find the requested value
 
 requested values as C<@list>, example:
 
-  return OK, @{$config{$key}}
-    if exists $config{$key};
+  if (exists $config{$key}) {
+    return OK, @{$config{$key}}
+  };
   return DECLINED;
 
 =back
