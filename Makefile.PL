@@ -14,7 +14,7 @@ WriteMakefile(
         'Mail::Header'    => 0,
         'MIME::Base64'    => 0,
         'Net::DNS'        => 0.39,
-        'Net::IP'         => 1.23,
+        'Net::IP'         => 0,
         'Time::HiRes'     => 0,
         'IO::Socket::SSL' => 0,
         'ClamAV::Client'  => 0,      # virus/clamdscan
