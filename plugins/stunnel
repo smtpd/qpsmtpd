@@ -29,7 +29,7 @@ use Qpsmtpd::Constants;
 sub register {
     my ($self, $qp, %args) = @_;
 
-    return if uc $args{proxy} ne 'ON';
+    return if uc($args{proxy}) ne 'ON';
 
     $self->log(LOGINFO, "proxy protocol enabled");
 
@@ -39,7 +39,7 @@ sub register {
 sub stunnel {
     my ($self, $transaction, $cmd, @args) = @_;
 
-    return OK              if uc $cmd ne 'PROXY';
+    return OK              if uc($cmd) ne 'PROXY';
     return DENY_DISCONNECT if $self->connection->remote_ip() ne '127.0.0.1';
     return DENY_DISCONNECT if $self->connection->notes('proxy');
 
@@ -70,4 +70,3 @@ sub stunnel {
     }
     return DONE;
 }
-
