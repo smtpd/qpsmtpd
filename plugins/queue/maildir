@@ -91,7 +91,7 @@ sub register {
 
     if (@args > 1) {
         ($self->{_subdirs}) = ($args[1] =~ m#^(.*\%[ldu].*)$#);
-        unless ($self->{_subdirs}) {
+        if (!$self->{_subdirs}) {
             $self->log(LOGWARN,
                            "WARNING: sub directory does not contain a "
                          . "substitution parameter"
@@ -102,7 +102,7 @@ sub register {
 
     if (@args > 2) {
         ($self->{_perms}) = ($args[2] =~ /^([0-7]{3})$/);
-        unless ($self->{_perms}) {    # 000 is unfortunately true ;-)
+        if (!$self->{_perms}) {    # 000 is unfortunately true ;-)
             $self->log(LOGWARN, "WARNING: mode is not an octal number");
             return 0;
         }
@@ -111,12 +111,12 @@ sub register {
 
     $self->{_perms} ||= 0700;
 
-    unless ($self->{_maildir}) {
+    if (!$self->{_maildir}) {
         $self->log(LOGWARN, "WARNING: maildir directory not specified");
         return 0;
     }
 
-    unless ($self->{_subdirs}) {
+    if (!$self->{_subdirs}) {
 
         # mkpath is influenced by umask...
         my $old_umask = umask 000;
@@ -142,7 +142,7 @@ sub hook_queue {
     if ($self->{_subdirs}) {
         foreach my $addr ($transaction->recipients) {
             ($rc, @msg) = $self->deliver_user($transaction, $addr);
-            unless ($rc == OK) {
+            if ($rc != OK) {
                 umask $old_umask;
                 return $rc, @msg;
             }

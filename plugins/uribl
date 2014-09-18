@@ -153,19 +153,19 @@ sub init {
         chomp;
         next if !$_ or /^\s*#/;
         my @z = split(/\s+/, $_);
-        next unless $z[0];
+        next if !$z[0];
 
         my $mask = 0;
         $z[1] ||= 0x00ffffff;
         for (split /,/, $z[1]) {
-            unless (/^(-?\d+)$/) {
+            if ($_ !~ /^(-?\d+)$/) {
                 $self->log(LOGERROR, "Malformed mask $_ for $z[0]");
                 return;
             }
             $mask |= $1 >= 0 ? $1 : 0x00ffffff;
         }
         my $action = $z[2] || $self->{action};
-        unless ($action =~ /^(add-header|deny|denysoft|log)$/) {
+        if ($action !~ /^(add-header|deny|denysoft|log)$/) {
             $self->log(LOGERROR, "Unknown action $action for $z[0]");
             return;
         }
@@ -196,7 +196,7 @@ sub send_query {
                      name => $name,
                     };
 
-        next unless $z;
+        next if !$z;
         next if exists $self->{sockets}->{$z}->{$name};
         $s = $self->{resolver}->bgsend("$name.$z", 'A');
         if (defined $s) {
@@ -307,7 +307,7 @@ sub lookup_start {
             my $rev = join('.', reverse @octets);
             $self->log(LOGDEBUG,
                        "uribl: matched pure-integer ipaddr $1 ($fwd)");
-            unless (exists $pending{$rev}) {
+            if (!exists $pending{$rev}) {
                 $queries += $start_query->($self, $rev);
                 $pending{$rev} = 1;
             }
@@ -334,7 +334,7 @@ sub lookup_start {
             my $fwd = join('.', @octets);
             my $rev = join('.', reverse @octets);
             $self->log(LOGDEBUG, "uribl: matched URI ipaddr $fwd");
-            unless (exists $pending{$rev}) {
+            if (!exists $pending{$rev}) {
                 $queries += $start_query->($self, $rev);
                 $pending{$rev} = 1;
             }
@@ -372,7 +372,7 @@ sub lookup_start {
             else {
                 while (@host_domains >= $cutoff) {
                     my $subhost = join('.', @host_domains);
-                    unless (exists $pending{$subhost}) {
+                    if (!exists $pending{$subhost}) {
                         $self->log(LOGINFO,
                                    "URIBL: checking sub-host $subhost");
                         $queries += $start_query->($self, $subhost);
@@ -414,7 +414,7 @@ sub lookup_start {
             else {
                 while (@host_domains >= $cutoff) {
                     my $subhost = join('.', @host_domains);
-                    unless (exists $pending{$subhost}) {
+                    if (!exists $pending{$subhost}) {
                         $self->log(LOGINFO,
                                    "URIBL: checking sub-host $subhost");
                         $queries += $start_query->($self, $subhost);
@@ -485,7 +485,7 @@ sub collect_results {
     for my $z (keys %{$self->{sockets}}) {
         for my $n (keys %{$self->{sockets}->{$z}}) {
             my $h = $self->{sockets}->{$z}->{$n};
-            next unless $h->{match};
+            next if !$h->{match};
             push @matches,
               {
                 action => $self->{uribl_zones}->{$z}->{action},

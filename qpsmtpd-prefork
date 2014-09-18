@@ -217,7 +217,7 @@ sub run {
         die "FATAL: Failed to open socket on $addr->{addr}:$addr->{port} ($@)"
           . "\nIt may be necessary to wait 20 secs before starting daemon"
           . " again."
-          unless $s;
+          if !$s;
         $select->add($s);
     }
 
@@ -350,7 +350,7 @@ sub main_loop {
 
         # if there is no child death to process, then sleep EXPR seconds
         # or until signal (i.e. child death) is received
-        sleep $loop_sleep / ($created_children * 2 + 1) unless @children_term;
+        sleep $loop_sleep / ($created_children * 2 + 1) if !@children_term;
 
         # block CHLD signals to avoid race
         my $sigset = block_signal(SIGCHLD);
@@ -429,7 +429,7 @@ sub new_child {
 
     # daemonize away from the parent process
     my $pid;
-    die "Cannot fork child: $!\n" unless defined($pid = fork);
+    die "Cannot fork child: $!\n" if !defined($pid = fork);
     if ($pid) {
 
         # in parent
@@ -466,7 +466,7 @@ sub new_child {
             $0 = 'qpsmtpd child';    # set pretty child name in process listing
         }
         my @ready = $select->can_read();
-        next unless @ready;
+        next if !@ready;
         my $socket = $ready[0];
         my ($client, $iinfo) = $socket->accept()
           or die
@@ -702,7 +702,7 @@ sub qpsmtpd_session {
     {
         #smtp return code to reply client with (seed with soft deny)
         my $rc_reply = 451;
-        unless ($msg[0]) {
+        if (!$msg[0]) {
             if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
                 @msg = ("Sorry, try again later");
             }
@@ -757,8 +757,7 @@ sub qpsmtpd_session {
     info("disconnect from: $nto_iaddr:$port");
 
     # remove pid from shared memory
-    unless (defined(shmem_opt(undef, [$$], undef, undef))) {
-
+    if (!defined shmem_opt(undef, [$$], undef, undef)) {
         # exit because parent is down or shared memory is corrupted
         info("parent seems to be down, going to exit");
         exit 1;
