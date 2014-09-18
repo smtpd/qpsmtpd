@@ -121,6 +121,7 @@ sub run_plugin_tests {
 sub dns_resolver {
     my $self = shift;
     return Test::FakeResolver->new(@_,
+        searchlist => [ 'dc.com' ],
         static_file => './t/dns_cache.txt'
     );
 }

@@ -1,20 +1,23 @@
 mail.perl.com.  3179    IN      A       204.144.142.1
-no-such-mx.perl.com.    IN      A ; No record!
-mail.perl.com.  IN      AAAA ; No record!
-no-such-mx.perl.com.    IN      AAAA ; No record!
 perl.com.       300     IN      A       207.171.7.72
-perl.com.       IN      AAAA ; No record!
-fake-domain-name-for-test.com.  IN      A ; No record!
-fake-domain-name-for-test.com.  IN      AAAA ; No record!
 perl.com.       3600    IN      MX      0 mail.indra.com.
 mail.indra.com. 1124    IN      A       204.144.142.1
-mail.indra.com. IN      AAAA ; No record!
 2.0.0.127.zen.spamhaus.org.     300     IN      TXT     "http://www.spamhaus.org/query/bl?ip=127.0.0.2"
 2.0.0.127.zen.spamhaus.org.     300     IN      TXT     "http://www.spamhaus.org/sbl/query/SBL233"
 perl.org.       3600    IN      A       207.171.7.43
 perl.org.       3600    IN      A       207.171.7.53
 perl.test.              IN      A       error "NXDOMAIN"
-0.2.0.192.in-addr.arpa.   IN      PTR ; No record!
-1.2.0.192.in-addr.arpa. IN      PTR ; No record!
 165.51.128.66.in-addr.arpa.     83406   IN      CNAME   165.160/27.51.128.66.in-addr.arpa.
 165.160/27.51.128.66.in-addr.arpa.      84606   IN      PTR     mail.theartfarm.com.
+mail.perl.com.dc.com    IN      AAAA    error "NXDOMAIN"
+mail.perl.com.  IN      AAAA ; No record!
+no-such-mx.perl.com     IN      A       error "NXDOMAIN"
+no-such-mx.perl.com     IN      AAAA    error "NXDOMAIN"
+perl.com.       IN      AAAA ; No record!
+perl.com.dc.com IN      AAAA    error "NXDOMAIN"
+fake-domain-name-for-test.com   IN      A       error "NXDOMAIN"
+fake-domain-name-for-test.com   IN      AAAA    error "NXDOMAIN"
+mail.indra.com. IN      AAAA ; No record!
+mail.indra.com.dc.com   IN      AAAA    error "NXDOMAIN"
+0.2.0.192.in-addr.arpa  IN      PTR     error "NXDOMAIN"
+1.2.0.192.in-addr.arpa  IN      PTR     error "NXDOMAIN"
