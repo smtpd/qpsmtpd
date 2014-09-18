@@ -15,8 +15,6 @@ BEGIN {
 }
 
 __new();
-done_testing() and exit;
-
 __config();
 __parse();
 
@@ -56,17 +54,20 @@ sub __new {
     is_deeply($ao, undef, "illegal $as, deeply");
 
     $ao = Qpsmtpd::Address->new(undef);
-    is('<>', $ao, "new, user=undef, format");
+    is('<>', $ao, "new, user=undef, stringified");
+    is('<>', $ao->format, "new, user=undef, format");
     is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=undef, deeply");
 
     $ao = Qpsmtpd::Address->new('<matt@test.com>');
-    is('<matt@test.com>', $ao, 'new, user=matt@test.com, format');
+    is('<matt@test.com>', $ao, 'new, user=matt@test.com, stringified');
+    is('<matt@test.com>', $ao->format, 'new, user=matt@test.com, format');
     is_deeply(bless( { '_host' => 'test.com', '_user' => 'matt' }, 'Qpsmtpd::Address' ),
               $ao,
               'new, user=matt@test.com, deeply');
 
     $ao = Qpsmtpd::Address->new('postmaster');
-    is('<>', $ao, "new, user=postmaster, format");
+    is('<>', $ao, "new, user=postmaster, stringified");
+    is('<>', $ao->format, "new, user=postmaster, format");
     is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
 
 }
