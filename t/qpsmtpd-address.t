@@ -4,6 +4,7 @@ use warnings;
 
 use Data::Dumper;
 use Test::More;
+use Test::Output;
 
 use lib 't';
 use lib 'lib';
@@ -14,18 +15,27 @@ BEGIN {
     use_ok('Test::Qpsmtpd');
 }
 
-__new();
+stderr_is { __new() } '','No STDERR from __new()';
+
 done_testing() and exit;
 
-__config();
-__parse();
+stderr_is { __config() } '', 'No STDERR from __config()';
+stderr_is { __parse() } '',  'No STDERR from __parse()';
 
 done_testing();
+
+sub new_address {
+    my ( $input ) = @_;
+    my $address;
+    stderr_is { $address = Qpsmtpd::Address->new( $input ) } '',
+        "No STDERR instantiating address '" . (defined $input ? $input : '<undef>'). "'";
+    return $address;
+}
 
 sub __new {
     my ($as, $ao);
 
-    my @unsorted_list = map { Qpsmtpd::Address->new($_) } qw(
+    my @unsorted_list = map { new_address( $_ ) } qw(
       "musa_ibrah@caramail.comandrea.luger"@wifo.ac.at
       foo@example.com
       ask@perl.org
@@ -35,7 +45,7 @@ sub __new {
       );
 
     # NOTE that this is sorted by _host_ not by _domain_
-    my @sorted_list = map { Qpsmtpd::Address->new($_) } qw(
+    my @sorted_list = map { new_address( $_ ) } qw(
       jpeacock@cpan.org
       foo@example.com
       test@example.com
@@ -51,21 +61,21 @@ sub __new {
     # RT#38746 - non-RFC compliant address should return undef
 
     $as = '<user@example.com#>';
-    $ao = Qpsmtpd::Address->new($as);
+    $ao = new_address($as);
     is($ao, undef, "illegal $as");
     is_deeply($ao, undef, "illegal $as, deeply");
 
-    $ao = Qpsmtpd::Address->new(undef);
+    $ao = new_address(undef);
     is('<>', $ao, "new, user=undef, format");
     is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=undef, deeply");
 
-    $ao = Qpsmtpd::Address->new('<matt@test.com>');
+    $ao = new_address('<matt@test.com>');
     is('<matt@test.com>', $ao, 'new, user=matt@test.com, format');
     is_deeply(bless( { '_host' => 'test.com', '_user' => 'matt' }, 'Qpsmtpd::Address' ),
               $ao,
               'new, user=matt@test.com, deeply');
 
-    $ao = Qpsmtpd::Address->new('postmaster');
+    $ao = new_address('postmaster');
     is('<>', $ao, "new, user=postmaster, format");
     is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
 
@@ -108,17 +118,17 @@ sub __parse {
     is($ao->format, '<"foo\ bar"@example.com>', "format $as");
 
     $as = 'foo@example.com';
-    $ao = Qpsmtpd::Address->new($as);
+    $ao = new_address($as);
     ok($ao, "new $as");
     is($ao->address, $as, "address $as");
 
     $as = '<foo@example.com>';
-    $ao = Qpsmtpd::Address->new($as);
+    $ao = new_address($as);
     ok($ao, "new $as");
     is($ao->address, 'foo@example.com', "address $as");
 
     $as = '<foo@foo.x.example.com>';
-    $ao = Qpsmtpd::Address->new($as);
+    $ao = new_address($as);
     ok($ao, "new $as");
     is($ao->format, $as, "format $as");
 
@@ -131,7 +141,7 @@ sub __parse {
         'test@example.com', 'address(test@example.com)');
 
     $as = '<foo@foo.x.example.com>';
-    $ao = Qpsmtpd::Address->new($as);
+    $ao = new_address($as);
     ok($ao, "new $as");
     is($ao->format, $as, "format $as");
     is("$ao",       $as, "overloaded stringify $as");
