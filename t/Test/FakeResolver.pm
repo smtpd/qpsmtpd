@@ -66,6 +66,10 @@ my $before_host = $host;
         if ( Net::IP::ip_is_ipv4($host) ) {
             $type = 'PTR';
             $host = Net::IP::ip_reverse($host,32,4);
+            # Starting with Net::IP 1.26, ip_reverse trims leading 0s from the result
+            # but we want to add them back on
+            my $zeros = () = $host =~ /\./g;
+            $host = '0.' x (6-$zeros) . $host;
         } elsif ( Net::IP::ip_is_ipv6($host) ) {
             $type = 'PTR';
             $host = Net::IP::ip_reverse($host,128,6);

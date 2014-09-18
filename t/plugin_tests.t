@@ -2,7 +2,6 @@
 use strict;
 use lib 't';
 use Test::Qpsmtpd;
-use Test::More::Diagnostic;
 
 my $qp = Test::Qpsmtpd->new();
 
