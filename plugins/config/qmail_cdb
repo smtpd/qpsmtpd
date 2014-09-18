@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-config/cdb
+config/qmail_cdb
 
 =head1 DESCRIPTION
 
@@ -10,7 +10,7 @@ Example config plugin.  Gets configuration data from qmail-style CDB files
 
 =head1 CONFIG
 
-config/cdb reads DJB's CDB format to get config parameters - see http://cr.yp.to/cdb.html
+config/qmail_cdb reads DJB's CDB format to get config parameters - see http://cr.yp.to/cdb.html
 
 =cut
 

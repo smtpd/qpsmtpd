@@ -5,7 +5,7 @@
 # enable this to get configuration via http; see perldoc
 # plugins/config/http for details.
 #   config/http http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
-config/cdb
+config/qmail_cdb
 
 # hosts_allow does not work with the tcpserver deployment model!
 #   perldoc plugins/hosts_allow for an alternative.
