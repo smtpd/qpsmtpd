@@ -2,18 +2,16 @@
 use strict;
 use warnings;
 
-use lib 't';
-use lib 'lib';
-
 use Data::Dumper;
 use Digest::HMAC_MD5 qw(hmac_md5_hex);
 use English qw/ -no_match_vars /;
 use File::Path;
-
-use Qpsmtpd::Constants;
 use Scalar::Util qw( openhandle );
 use Test::More qw(no_plan);
 
+use lib 't';
+use lib 'lib';
+use Qpsmtpd::Constants;
 use_ok('Test::Qpsmtpd');
 use_ok('Qpsmtpd::Auth');
 
@@ -21,10 +19,6 @@ my ($smtpd, $conn) = Test::Qpsmtpd->new_conn();
 
 ok($smtpd, "get new connection ($smtpd)");
 isa_ok($conn, 'Qpsmtpd::Connection', "get new connection");
-
-#warn Dumper($smtpd) and exit;
-#my $hooks = $smtpd->hooks;
-#warn Dumper($hooks) and exit;
 
 my $r;
 my $user      = 'good@example.com';
