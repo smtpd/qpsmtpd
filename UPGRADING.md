@@ -1,22 +1,21 @@
-
-=head1 Upgrade notes
+# Upgrade notes
 
 When upgrading please review these notes for the versions you are
-upgrading I<from>.
+upgrading _from_.
 
-=head2 v0.84 or below
+## v0.84 or below
 
-=head3 CHECK_RELAY, CHECK_NORELAY, RELAY_ONLY
+### CHECK\_RELAY, CHECK\_NORELAY, RELAY\_ONLY
 
 All 3 plugins are deprecated and replaced with a new 'relay'
 plugin. The new plugin reads the same config files (see 'perldoc
 plugins/relay') as the previous plugins. To get the equivalent
-functionality of enabling 'relay_only', use the 'only' argument to the
+functionality of enabling 'relay\_only', use the 'only' argument to the
 relay plugin as documented in the RELAY ONLY section of plugins/relay.
 
-=head3 GREYLISTING plugin
+### GREYLISTING plugin
 
-'mode' config argument is deprecated. Use reject and reject_type instead.
+'mode' config argument is deprecated. Use reject and reject\_type instead.
 
 The greylisting DB format has changed to accommodate IPv6
 addresses. (The DB key has colon ':' seperated fields, and IPv6
@@ -28,19 +27,16 @@ qpsmtpd once, make one connection. A log entry will be made, telling
 how many records were upgraded. Remove the upgrade option from your
 config.
 
-=head3 SPF plugin
+### SPF plugin
 
-spf_deny setting deprecated. Use reject N setting instead, which
+spf\_deny setting deprecated. Use reject N setting instead, which
 provides administrators with more granular control over SPF. For
-backward compatibility, a spf_deny setting of 1 is mapped to 'reject
-3' and a 'spf_deny 2' is mapped to 'reject 4'.
+backward compatibility, a spf\_deny setting of 1 is mapped to 'reject
+3' and a 'spf\_deny 2' is mapped to 'reject 4'.
 
-
-=head3 P0F plugin
+### P0F plugin
 
 defaults to p0f v3 (was v2).
 
 Upgrade p0f to version 3 or add 'version 2' to your p0f line in
 config/plugins. perldoc plugins/ident/p0f for more details.
-
-
