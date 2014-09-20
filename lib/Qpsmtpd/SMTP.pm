@@ -322,7 +322,7 @@ sub auth_parse_respond {
         return $self->{_auth} = Qpsmtpd::Auth::SASL($self, $mechanism, @stuff);
     }
 
-    $self->respond(504, "Unimplemented authentification mechanism: $mechanism");
+    $self->respond(504, "Unimplemented authentication mechanism: $mechanism");
     return DENY;
 }
 
