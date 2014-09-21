@@ -190,7 +190,9 @@ sub canonify {
     my ($dummy, $path) = @_;
 
     # strip delimiters
-    return if $path !~ /^<(.*)>$/;
+    if ($path !~ /^<(.*)>$/) {
+        return undef, undef, 'missing delimiters'; ## no critic (undef)
+    };
     $path = $1;
 
     my $domain = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
@@ -204,18 +206,22 @@ sub canonify {
     $path =~ s/^\@$domain(?:,\@$domain)*://;
 
     # empty path is ok
-    return '' if $path eq '';
+    if ($path eq '') {
+        return '', undef, 'empty path';
+    };
 
     # bare postmaster is permissible, perl RFC-2821 (4.5.1)
     if ( $path =~ m/^postmaster$/i ) {
-        return 'postmaster';
+        return 'postmaster', undef, 'bare postmaster';
     }
 
     my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
-    return if !defined $localpart;
+    if (!defined $localpart) {
+        return;
+    };
 
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
-        return $localpart, $domainpart;  # simple case, we are done
+        return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
     }
 
     if ($localpart =~ /^"(($qtext_expr|\\$text_expr)*)"$/) {
@@ -223,7 +229,7 @@ sub canonify {
         $localpart =~ s/\\($text_expr)/$1/g;
         return $localpart, $domainpart;
     }
-    return;
+    return undef, undef, 'fall through';  ## no critic (undef)
 }
 
 sub parse {
