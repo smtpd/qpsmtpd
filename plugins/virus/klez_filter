@@ -18,7 +18,7 @@ sub hook_data_post {
     my $line_number         = 0;
     my $seen_klez_signature = 0;
 
-    while ($_ = $transaction->body_getline) {
+    while (local $_ = $transaction->body_getline) {
         last if $line_number++ > 40;
 
         m/^Content-type:.*(?:audio|application)/i
