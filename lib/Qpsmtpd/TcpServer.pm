@@ -108,7 +108,7 @@ sub read_input {
       || 1200;                                     # default value
 
     alarm $timeout;
-    while (<STDIN>) {
+    while (local $_ = <STDIN>) {
         alarm 0;
         $_ =~ s/\r?\n$//s;                         # advanced chomp
         $self->log(LOGINFO, "dispatching $_");

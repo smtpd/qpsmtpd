@@ -25,7 +25,7 @@ sub read_input {
 
     alarm $timeout;
     eval {
-        while (<STDIN>) {
+        while (local $_ = <STDIN>) {
             alarm 0;
             $_ =~ s/\r?\n$//s;                     # advanced chomp
             $self->log(LOGINFO, "dispatching $_");

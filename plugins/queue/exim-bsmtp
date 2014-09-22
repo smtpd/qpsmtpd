@@ -119,7 +119,7 @@ sub hook_queue {
     # does come out is an error worth logging.
     my $start = time;
     my ($bsmtp_error, $bsmtp_msg);
-    while (<$exim>) {
+    while (local $_ = <$exim>) {
         chomp;
         $self->log(LOGERROR, "exim: $_");
         if (/(\d\d\d)\s(\S.*)/) {
