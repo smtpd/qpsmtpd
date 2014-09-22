@@ -195,27 +195,27 @@ sub canonify {
     };
     $path = $1;
 
-    my $domain = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
+    my $domain_re = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
 
     # $address_literal_expr may be empty, if a site doesn't allow them
     if (!$domain_expr && $address_literal_expr) {
-        $domain = "(?:$address_literal_expr|$domain)";
+        $domain_re = "(?:$address_literal_expr|$domain_re)";
     };
 
     # strip source route
-    $path =~ s/^\@$domain(?:,\@$domain)*://;
+    $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
 
     # empty path is ok
     if ($path eq '') {
         return '', undef, 'empty path';
     };
 
-    # bare postmaster is permissible, perl RFC-2821 (4.5.1)
+    # bare postmaster is permissible, per RFC-2821 (4.5.1)
     if ( $path =~ m/^postmaster$/i ) {
         return 'postmaster', undef, 'bare postmaster';
     }
 
-    my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
+    my ($localpart, $domainpart) = $path =~ /^(.*)\@($domain_re)$/;
     if (!defined $localpart) {
         return;
     };

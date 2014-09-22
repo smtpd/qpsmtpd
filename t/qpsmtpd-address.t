@@ -207,6 +207,13 @@ sub __canonify {
     @r = Qpsmtpd::Address->canonify('<postmaster@test>');
     is_deeply(\@r, [ 'postmaster', 'test', 'local matches atom' ], 'canonify, postmaster@test');
 
+    @r = Qpsmtpd::Address->canonify('<@a:postmaster@test>');
+    is_deeply(\@r, [ 'postmaster', 'test', 'local matches atom' ], 'canonify, @a:postmaster@test (source route)');
+
     @r = Qpsmtpd::Address->canonify('<postmáster@test>');
     is_deeply(\@r, [ 'postmáster', 'test', 'local matches atom' ], 'canonify, postmáster@test, local matches atom');
+
+    @r = Qpsmtpd::Address->canonify('<@192.168.1.1>');
+    is_deeply(\@r, [ undef, undef, 'fall through' ], 'canonify, fall through, @192.168.1.1')
+        or diag Data::Dumper::Dumper(@r);
 }
