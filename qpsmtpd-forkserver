@@ -282,7 +282,7 @@ while (1) {
             next;
         }
         elsif ($rc == DENY || $rc == DENY_DISCONNECT) {
-            unless ($msg[0]) {
+            if (!$msg[0]) {
                 @msg = ("Sorry, service not available for you");
             }
             &respond_client($client, 550, @msg);
@@ -369,7 +369,7 @@ sub safe_fork {
 
     ### fork off a child
     my $pid = fork;
-    unless (defined $pid) {
+    if (!defined $pid) {
         die "Couldn't fork: [$!]\n";
     }
 

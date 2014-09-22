@@ -69,7 +69,7 @@ sub register {
 
     $self->{_exim_path} = $args{exim_path} || '/usr/sbin/rsmtp';
     $self->{_exim_path} = $1 if $self->{_exim_path} =~ /(.*)/;
-    unless (-x $self->{_exim_path}) {
+    if (!-x $self->{_exim_path}) {
         $self->log(LOGERROR,
                        "Could not find exim at $self->{_exim_path};"
                      . " please set exim_path in config/plugins"
@@ -81,14 +81,14 @@ sub register {
 sub hook_queue {
     my ($self, $transaction) = @_;
 
-    unless ($transaction->header) {
+    if (!$transaction->header) {
         $self->log(LOGERROR, "No header parsed for transaction; can't enqueue");
         return DENY, 'Mail unqueuable';
     }
     my $tmp_dir = $self->qp->config('spool_dir') || '/tmp';
     $tmp_dir = $1 if ($tmp_dir =~ /(.*)/);
     my ($tmp, $tmpfn) = tempfile("exim-bsmtp.$$.XXXXXX", DIR => $tmp_dir);
-    unless ($tmp && $tmpfn) {
+    if (!($tmp && $tmpfn)) {
         $self->log(LOGERROR, "Couldn't create tempfile: $!");
         return DECLINED, 'Internal error enqueueing mail';
     }
@@ -109,7 +109,7 @@ sub hook_queue {
     my $cmd = "$self->{_exim_path} -bS < $tmpfn";
     $self->log(LOGDEBUG, "executing cmd $cmd");
     my $exim = new IO::File "$cmd|";
-    unless ($exim) {
+    if (!$exim) {
         $self->log(LOGERROR, "Could not execute $self->{_exim_path}: $!");
         unlink $tmpfn or $self->log(LOGERROR, "unlink: $tmpfn: $!");
         return DECLINED, "Internal error enqueuing mail";
