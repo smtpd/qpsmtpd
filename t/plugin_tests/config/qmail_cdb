@@ -1,0 +1,23 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+sub register_tests {
+    my ($self) = @_;
+    $self->register_test('test_hook_config');
+}
+
+sub test_hook_config {
+    my ($self) = @_;
+    eval { require CDB_File };
+    if ($@) {
+        my ($rc, $msg) = $self->hook_config($self->transaction, 'asdf', 'map');
+        is(return_code($rc),'DECLINED','Return DECLINED when CDB_File is unavailable');
+    } else {
+        my ($rc, $msg) = $self->hook_config($self->transaction, 'users', 'map');
+        is(return_code($rc),'OK','Return OK on valid config request');
+        ok(keys %$msg, 'get_qmail_map("users.cdb")');
+        ok($msg->{'!example.com-'}, "get_qmail_map, known entry");
+    }
+}

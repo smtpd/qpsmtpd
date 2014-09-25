@@ -10,6 +10,7 @@ use parent 'Qpsmtpd::SMTP';
 
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
+use Test::Qpsmtpd::Config;
 
 sub new_conn {
     ok(my $smtpd = __PACKAGE__->new(), "new");
@@ -77,11 +78,6 @@ sub input {
         $self->respond(502, "command unrecognized: '$command'");
     }
     alarm $timeout;
-}
-
-sub config_dir {
-    return './t/config' if $ENV{QPSMTPD_DEVELOPER};
-    return './config.sample';
 }
 
 sub plugin_dirs {
