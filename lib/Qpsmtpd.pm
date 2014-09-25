@@ -60,10 +60,6 @@ sub load_logging {
     return if $hooks->{'logging'}; # avoid triggering log activity
 
     my @plugin_dirs = $self->plugin_dirs;
-    if (!@plugin_dirs) {
-        my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-        @plugin_dirs = ("$name/plugins");
-    }
 
     my @loggers = $self->conf->from_file('logging');
     for my $logger (@loggers) {
