@@ -8,9 +8,7 @@ package Qpsmtpd::Config;
 use strict;
 use warnings;
 
-#use Test::More;
-#use Qpsmtpd::Constants;
-
+no warnings qw( redefine );
 sub config_dir {
     return './t/config' if $ENV{QPSMTPD_DEVELOPER};
     return './config.sample';
