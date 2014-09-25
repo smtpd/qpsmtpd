@@ -35,7 +35,6 @@ __clear_cache();
 __default();
 __from_file();
 __get_qmail();
-__get_qmail_map();
 __expand_inclusion();
 __config_via_smtpd();
 
@@ -86,15 +85,6 @@ sub __default {
 sub __get_qmail {
     is($config->get_qmail('me'), 'host.example.org', 'get_qmail("me")');
     ok(!$config->get_qmail('not-me'), 'get_qmail("not-me")');
-}
-
-sub __get_qmail_map {
-    eval "require CDB_File";   ## no critic (StringyEval)
-    if (!$@) {
-        my $r = $config->get_qmail_map('users', 't/config/users.cdb');
-        ok(keys %$r, 'get_qmail_map("users.cdb")');
-        ok($r->{'!example.com-'}, "get_qmail_map, known entry");
-    }
 }
 
 sub __from_file {
