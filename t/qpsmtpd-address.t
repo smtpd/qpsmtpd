@@ -17,6 +17,7 @@ BEGIN {
 __new();
 __config();
 __parse();
+__canonify();
 
 done_testing();
 
@@ -185,4 +186,34 @@ sub __config {
           : undef;
         is($sender->config($_->{pref}), $_->{expected}, $_->{descr});
     }
+}
+
+sub __canonify {
+
+    my $as = 'foo@x.example.com';
+    my $ao = Qpsmtpd::Address->new($as);
+    ok( ! defined $Qpsmtpd::Address::domain_expr, "domain_expr is undef");
+    ok( $Qpsmtpd::Address::subdomain_expr, "subdomain_expr is defined, $Qpsmtpd::Address::subdomain_expr");
+
+    my @r = Qpsmtpd::Address->canonify('sample@path');
+    is_deeply(\@r, [ undef, undef, "missing delimiters" ], 'canonify, missing delimiters');
+
+    @r = Qpsmtpd::Address->canonify('');
+    is_deeply(\@r, [ undef, undef, "missing delimiters" ], 'canonify, empty path');
+
+    @r = Qpsmtpd::Address->canonify('<postmaster>');
+    is_deeply(\@r, [ 'postmaster', undef, "bare postmaster" ], 'canonify, bare postmaster');
+
+    @r = Qpsmtpd::Address->canonify('<postmaster@test>');
+    is_deeply(\@r, [ 'postmaster', 'test', 'local matches atom' ], 'canonify, postmaster@test');
+
+    @r = Qpsmtpd::Address->canonify('<@a:postmaster@test>');
+    is_deeply(\@r, [ 'postmaster', 'test', 'local matches atom' ], 'canonify, @a:postmaster@test (source route)');
+
+    @r = Qpsmtpd::Address->canonify('<postmáster@test>');
+    is_deeply(\@r, [ 'postmáster', 'test', 'local matches atom' ], 'canonify, postmáster@test, local matches atom');
+
+    @r = Qpsmtpd::Address->canonify('<@192.168.1.1>');
+    is_deeply(\@r, [ undef, undef, 'fall through' ], 'canonify, fall through, @192.168.1.1')
+        or diag Data::Dumper::Dumper(@r);
 }
