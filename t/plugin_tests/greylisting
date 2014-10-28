@@ -19,6 +19,7 @@ sub register_tests {
     $self->register_test('test_hook_data');
     $self->register_test('test_get_db_key');
     $self->register_test('test_get_db_location');
+    $self->register_test('test_exclude');
     $self->register_test("test_greylist_geoip");
     $self->register_test("test_greylist_p0f_genre");
     $self->register_test("test_greylist_p0f_distance");
@@ -87,6 +88,15 @@ sub test_get_db_location {
     ok( $db, "db location: $db");
 };
 
+sub test_exclude {
+    my ( $self ) = @_;
+
+    $self->connection->relay_client(1);
+    ok( $self->exclude(), "Relay client results in exclude() hit" );
+    $self->connection->relay_client(0);
+    ok( ! $self->exclude(), "Non-relay client results in exclude() miss" );
+};
+
 sub test_greylist_geoip {
     my $self = shift;
 
@@ -98,11 +108,13 @@ sub test_greylist_geoip {
     foreach my $cc ( @valid ) {
         $self->connection->notes('geoip_country', $cc );
         ok( $self->geoip_match(), "match + ($cc)");
+        ok( $self->exclude(),     "match + ($cc) results in exclude() hit");
     };
 
     foreach my $cc ( @invalid ) {
         $self->connection->notes('geoip_country', $cc );
         ok( ! $self->geoip_match(), "bad - ($cc)");
+        ok( ! $self->exclude(),     "miss - ($cc) results in exclude() miss");
     };
 };
 
@@ -136,10 +148,12 @@ sub test_greylist_p0f_link {
     $self->{_args}{'p0f'} = 'link,dsl';
     $self->connection->notes('p0f'=> { link=>'DSL' } );
     ok( $self->p0f_match(), 'p0f link hit');
+    ok( ! $self->exclude(), 'p0f link hit results in exclude() miss' );
 
     $self->{_args}{'p0f'} = 'link,dsl';
     $self->connection->notes('p0f'=> { link=>'Ethernet' } );
     ok( ! $self->p0f_match(), 'p0f link miss');
+    ok( $self->exclude(),     'p0f link miss results in exclude() hit' );
 }
 
 sub test_greylist_p0f_uptime {

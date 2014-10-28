@@ -285,9 +285,7 @@ sub greylist {
                         map { $_ . '=' . $config->{$_} } sort keys %$config)
               );
 
-    return DECLINED if $self->is_immune();
-    return DECLINED if !$self->p0f_match();
-    return DECLINED if $self->geoip_match();
+    return DECLINED if $self->exclude();
 
     my $db   = $self->get_db_location();
     my $lock = $self->get_db_lock($db) or return DECLINED;
@@ -505,6 +503,14 @@ sub prune_db {
     close $lock;
     $self->log(LOGINFO, "pruned $pruned of $count DB entries");
     return $self->cleanup_and_return($tied, $lock, DECLINED);
+}
+
+sub exclude {
+    my ( $self ) = @_;
+    return 1 if $self->is_immune();
+    return 1 if !$self->p0f_match();
+    return 1 if $self->geoip_match();
+    return;
 }
 
 sub p0f_match {
