@@ -2,7 +2,8 @@
  
 =head1 NAME auth_imap - Authenticate to an IMAP server 
  
-=head1 DESCRIPTION This plugin authenticates against any IMAP server you wish (it also supports SSL). You need to specify the IMAP server and port number in the plugins configuration file like so:
+=head1 DESCRIPTION This plugin authenticates against any IMAP server you wish (it also supports SSL). 
+You need to specify the IMAP server and port number in the plugins configuration file like so:
  
 auth/auth_imap 192.168.0.1 143
  
