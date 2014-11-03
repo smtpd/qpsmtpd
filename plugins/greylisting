@@ -7,10 +7,12 @@ greylisting - delay mail from unknown senders
 =head1 DESCRIPTION
 
 Plugin implementing the 'greylisting' algorithm proposed by Evan
-Harris in http://projects.puremagic.com/greylisting/. Greylisting is
-a form of denysoft filter, where unrecognised new connections are
-temporarily denied for some initial period, to foil spammers using
-fire-and-forget spamware, http_proxies, etc.
+Harris in http://projects.puremagic.com/greylisting/ and defined in
+RFC 6647: http://tools.ietf.org/html/rfc6647
+
+Greylisting is a form of denysoft filter, where unrecognised new
+connections are temporarily denied for some initial period, to foil
+spammers using fire-and-forget spamware, http_proxies, etc.
 
 Greylisting tracks incoming connections using a triplet (see TRIPLET). It
 has configurable timeout periods (black/grey/white) to control whether
