@@ -22,12 +22,11 @@ Please see the LICENSE file included with qpsmtpd for details.
 =cut 
  
 sub register { 
+    my ($self, $qp, @args) = @_;  
  
-my ($self, $qp, @args) = @_;  
- 
-if (@args > 0) {
-    if ($args[0] =~ /^([\.\w_-]+)$/) {
-      $self->{_imap_server} = $1;
+    if (@args > 0) {
+      if ($args[0] =~ /^([\.\w_-]+)$/) {
+        $self->{_imap_server} = $1;
     }
     else {
       die "Bad data in imap server: $args[0]";
@@ -36,40 +35,39 @@ if (@args > 0) {
     if (@args > 1 and $args[1] =~ /^(\d+)$/) {
       $self->{_imap_port} = $1;
     }
-    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if
-(@args > 2);
-  } else {
-    die("No IMAP server specified in plugins file.");
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 2);
+    } 
+    else {
+      die("No IMAP server specified in plugins file.");
   }
+  
  # set any values that are not already
-  $self->{_imap_server} ||= "127.0.0.1";
-  $self->{_imap_port} ||= 143;
+    $self->{_imap_server} ||= "127.0.0.1";
+    $self->{_imap_port} ||= 143;
  
-$self->register_hook( "auth-login", "auth_imap" );
-$self->register_hook( "auth-plain", "auth_imap" );  
+    $self->register_hook( "auth-login", "auth_imap" );
+    $self->register_hook( "auth-plain", "auth_imap" );  
 }
  
 sub auth_imap { 
- 
-use Net::IMAP::Simple::SSL; 
- 
-my ($self, $transaction, $mechanism, $user, $clearPassword, $hashPassword, $ticket) = @_; 
- 
-my ($imaphost, $imapport, $imapserver);
+   use Net::IMAP::Simple::SSL;  
+  
+   my ($self, $transaction, $mechanism, $user, $clearPassword, $hashPassword, $ticket) = @_; 
+   my ($imaphost, $imapport, $imapserver);
  
 # pull values in from config
-  $imaphost = $self->{_imap_server};
-  $imapport = $self->{_imap_port};
-  $imapserver = "$imaphost:$imapport";
+   $imaphost = $self->{_imap_server};
+   $imapport = $self->{_imap_port};
+   $imapserver = "$imaphost:$imapport";
  
-$self->log(LOGINFO, "Authentication via IMAP: $user"); 
+   $self->log(LOGINFO, "Authentication via IMAP: $user"); 
  
-my $server = Net::IMAP::Simple::SSL->new( 
-       #qw/$imapserver/, use_ssl => 1, debug => 1, ) 
-       qw/$imapserver/, use_ssl => 1, ) 
-          or return ( DENY, "auth_imap - could not connect to server" ); 
-       $server->login( $user, $clearPassword ) 
-          or return ( DENY, "auth_imap - invalid username or password" ); 
- 
-       return ( OK, "auth_imap/$mechanism" ); 
+   my $server = Net::IMAP::Simple::SSL->new( 
+          #qw/$imapserver/, use_ssl => 1, debug => 1, ) # switch this line for more debugging
+          qw/$imapserver/, use_ssl => 1, )              # and comment out this one
+             or if ($? != 0) {
+             return ( DENY, "auth_imap - could not connect to server:  $?" ); 
+          $server->login( $user, $clearPassword ) 
+             or return ( DENY, "auth_imap - invalid username or password" ); 
+          return ( OK, "auth_imap/$mechanism" ); 
 }
