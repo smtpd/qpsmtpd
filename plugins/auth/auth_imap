@@ -77,3 +77,6 @@ sub auth_imap {
         $self->log(LOGNOTICE, "fail, auth_imap invalid username or password: $status");
         return DECLINED;
    }
+   
+   return OK, "auth_imap/$mechanism" ; 
+}
