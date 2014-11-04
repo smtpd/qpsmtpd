@@ -6,8 +6,8 @@ geoip - provide geographic information about mail senders.
 
 =head1 SYNOPSIS
 
-Use MaxMind's GeoIP databases and the Geo::IP perl module to report geographic
-information about incoming connections.
+Use MaxMind's GeoIP databases and the GeoIP2 or Geo::IP perl modules to report
+geographic information about incoming connections.
 
 =head1 DESCRIPTION
 
@@ -110,9 +110,11 @@ http://smartech.gatech.edu/bitstream/handle/1853/25135/GT-CSE-08-02.pdf
 use strict;
 use warnings;
 
+use lib 'lib';
 use Qpsmtpd::Constants;
 
-#use Geo::IP;     # eval'ed in register()
+#use GeoIP2;      # eval'ed in register()
+#use Geo::IP;     # eval loaded if GeoIP2 doesn't
 #use Math::Trig;  # eval'ed in set_distance_gc
 
 sub register {
@@ -122,11 +124,19 @@ sub register {
     $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
-    eval 'use Geo::IP';
+    my $loaded = 0;
+
+    eval 'use GeoIP2';
     if ($@) {
-        warn "could not load Geo::IP";
-        $self->log(LOGERROR, "could not load Geo::IP");
-        return;
+        warn "could not load GeoIP2";
+        $self->log(LOGERROR, "could not load GeoIP2");
+
+        eval 'use Geo::IP';
+        if ($@) {
+            warn "could not load Geo::IP";
+            $self->log(LOGERROR, "could not load Geo::IP");
+            return;
+        }
     }
 
 # Note that opening the GeoIP DB only in register has caused problems before:
@@ -137,10 +147,10 @@ sub register {
 
     $self->init_my_country_code();
 
-    $self->register_hook('connect', 'connect_handler');
+    $self->register_hook('connect', 'geoip_lookup');
 }
 
-sub connect_handler {
+sub geoip_lookup {
     my $self = shift;
 
     # reopen the DB if Geo::IP failed due to DB update
@@ -150,7 +160,6 @@ sub connect_handler {
         $self->log(LOGINFO, "skip, no results");
         return DECLINED;
     };
-    $self->qp->connection->notes('geoip_country', $c_code);
 
     my $c_name = $self->set_country_name();
     my ($city, $continent_code, $distance) = '';
@@ -162,8 +171,9 @@ sub connect_handler {
     }
 
     my @msg_parts;
-    push @msg_parts, $continent_code
-      if $continent_code && $continent_code ne '--';
+    if ($continent_code && $continent_code ne '--') {
+        push @msg_parts, $continent_code;
+    };
     push @msg_parts, $c_code if $c_code;
 
     #push @msg_parts, $c_name          if $c_name;
@@ -211,9 +221,13 @@ sub init_my_country_code {
 
 sub set_country_code {
     my $self = shift;
-    return $self->get_country_code_gc() if $self->{_geoip_city};
     my $remote_ip = $self->qp->connection->remote_ip;
-    my $code      = $self->get_country_code();
+
+    my $code = $self->{_geoip_city}
+             ? $self->get_country_code_gc($remote_ip)
+             : $self->get_country_code($remote_ip);
+
+    return if ! $code;
     $self->qp->connection->notes('geoip_country', $code);
     return $code;
 }
@@ -221,7 +235,9 @@ sub set_country_code {
 sub get_country_code {
     my $self = shift;
     my $ip = shift || $self->qp->connection->remote_ip;
-    return $self->get_country_code_gc($ip) if $self->{_geoip_city};
+    if ($self->{_geoip_city}) {
+        return $self->get_country_code_gc($ip);
+    };
     return $self->{_geoip}->country_code_by_addr($ip);
 }
 
@@ -235,44 +251,45 @@ sub get_country_code_gc {
 
 sub set_country_name {
     my $self = shift;
-    return $self->set_country_name_gc() if $self->{_geoip_city};
     my $remote_ip = $self->qp->connection->remote_ip;
-    my $name = $self->{_geoip}->country_name_by_addr($remote_ip) or return;
+
+    my $name = $self->{_geoip_city}
+             ? $self->get_country_name_gc($remote_ip)
+             : $self->{_geoip}->country_name_by_addr($remote_ip);
+
+    return if ! $name;
     $self->qp->connection->notes('geoip_country_name', $name);
     return $name;
 }
 
-sub set_country_name_gc {
+sub get_country_name_gc {
     my $self = shift;
     return if !$self->{_geoip_record};
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $name = $self->{_geoip_record}->country_name() or return;
-    $self->qp->connection->notes('geoip_country_name', $name);
-    return $name;
+    return $self->{_geoip_record}->country_name();
 }
 
 sub set_continent {
-    my $self = shift;
-    return $self->set_continent_gc() if $self->{_geoip_city};
-    my $c_code = shift or return;
-    my $continent = $self->{_geoip}->continent_code_by_country_code($c_code)
-      or return;
+    my ($self, $country_code) = @_;
+    $country_code or return;
+
+    my $continent = $self->{_geoip_city}
+                  ? $self->get_continent_gc()
+                  : $self->{_geoip}->continent_code_by_country_code($country_code);
+
+    $continent or return;
     $self->qp->connection->notes('geoip_continent', $continent);
     return $continent;
 }
 
-sub set_continent_gc {
+sub get_continent_gc {
     my $self = shift;
     return if !$self->{_geoip_record};
-    my $continent = $self->{_geoip_record}->continent_code() or return;
-    $self->qp->connection->notes('geoip_continent', $continent);
-    return $continent;
+    return $self->{_geoip_record}->continent_code();
 }
 
 sub set_city_gc {
     my $self = shift;
     return if !$self->{_geoip_record};
-    my $remote_ip = $self->qp->connection->remote_ip;
     my $city = $self->{_geoip_record}->city() or return;
     $self->qp->connection->notes('geoip_city', $city);
     return $city;
