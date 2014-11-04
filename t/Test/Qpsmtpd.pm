@@ -103,7 +103,7 @@ sub varlog {
 # sub disconnect
 
 sub run_plugin_tests {
-    my $self = shift;
+    my ($self, $only_plugin) = @_;
     $self->{_test_mode} = 1;
     my @plugins = $self->load_plugins();
 
@@ -111,6 +111,7 @@ sub run_plugin_tests {
     my $Test = Test::Builder->new();
 
     foreach my $plugin (@plugins) {
+        next if ($only_plugin && $plugin !~ /$only_plugin/);
         $plugin->register_tests();
         $plugin->run_tests($self);
     }
