@@ -375,6 +375,9 @@ sub set_asn {
     return if ! $self->{GeoIPASNum};
 
     my $asn = $self->{GeoIPASNum}->name_by_addr($ip) or return;
+    if ('AS' eq substr($asn, 0, 2)) {
+        $asn = substr($asn, 2);
+    }
     $self->qp->connection->notes('geoip_asn', $asn);
     return $asn;
 }

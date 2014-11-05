@@ -176,10 +176,10 @@ sub test_set_asn {
 
     $self->qp->connection->remote_ip('24.24.24.24');
     $asn = $self->set_asn();
-    ok( $self->connection->notes('geoip_asn') =~ /^AS11351/, "note has: $asn");
+    ok( $self->connection->notes('geoip_asn') =~ /^11351/, "note has: $asn");
 
     $self->qp->connection->remote_ip('66.128.51.163');
     $asn = $self->set_asn();
 
-    ok( $self->connection->notes('geoip_asn') =~ /^AS7819/, "note has: $asn");
+    ok( $self->connection->notes('geoip_asn') =~ /^7819/, "note has: $asn");
 };
