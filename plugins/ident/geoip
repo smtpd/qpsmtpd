@@ -230,6 +230,8 @@ sub geoip_lookup {
         return DECLINED;
     };
 
+    $self->set_asn();
+
     my $c_name = $self->set_country_name();
     my ($city, $continent_code, $distance) = '';
 
