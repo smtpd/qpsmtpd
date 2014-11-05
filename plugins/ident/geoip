@@ -126,8 +126,6 @@ sub register {
     $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
-    my $loaded = 0;
-
     eval 'use GeoIP2::Database::Reader';
     if (!$@) {
         warn "using GeoIP2";
