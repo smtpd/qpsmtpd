@@ -64,9 +64,12 @@ sub auth_imap {
    $imapport = $self->{_imap_port};
    $imapserver = "$imaphost:$imapport";
  
-   $self->log(LOGINFO, "Authentication via IMAP: $user"); 
+   $self->log(LOGINFO, "Using IMAP server $imapserver");             
+   $self->log(LOGINFO, "Using $mechanism mechanism for IMAP auth");
+   $self->log(LOGINFO, "Authentication via IMAP for user: $user"); 
+   
    my $status = $?;
- 
+   
    my $server = Net::IMAP::Simple::SSL->new( '$imapserver', ); 
    if ($status != 0) {
         $self->log(LOGNOTICE, "fail, auth_imap could not connect to $imapserver: $status" );
