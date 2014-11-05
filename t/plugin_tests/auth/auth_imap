@@ -1,0 +1,3 @@
+# Tests need: 
+# - an IMAP server on localhost 143.
+# - an IMAP server address in the $QPSMTPD_AUTH_IMAP environment variable.
