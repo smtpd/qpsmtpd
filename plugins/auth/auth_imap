@@ -9,7 +9,8 @@ auth/auth_imap 192.168.0.1 143
  
 Without any options, it defaults to connecting to the IMAP server on localhost on port 143. 
  
-Requires the Net::IMAP::Simple::SSL CPAN module.
+Requires the Net::IMAP::Simple::SSL CPAN module.  Options from that module can be added to 
+the $server constructor in this module if needed ( e.g. debug => 1, use_ssl => 1, etc).
  
 =head1 AUTHOR Christopher Heschong 
  
@@ -66,13 +67,13 @@ sub auth_imap {
    $self->log(LOGINFO, "Authentication via IMAP: $user"); 
    my $status = $?;
  
-   my $server = Net::IMAP::Simple->new( '$imapserver', ssl_version => 'TLSv1', debug => 1,  ); 
+   my $server = Net::IMAP::Simple::SSL->new( '$imapserver', ); 
    if ($status != 0) {
         $self->log(LOGNOTICE, "fail, auth_imap could not connect to $imapserver: $status" );
         return DECLINED;
    }
 
-   $server->login( $user, $clearPassword ); 
+   $server->login( $user, $clearPassword, ); 
    if ($status != 0) {
         $self->log(LOGNOTICE, "fail, auth_imap invalid username or password: $status");
         return DECLINED;
