@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w 
+ 
+=head1 NAME auth_imap - Authenticate to an IMAP server 
+ 
+=head1 DESCRIPTION This plugin authenticates against any IMAP server you wish (it also supports SSL). 
+You need to specify the IMAP server and port number in the plugins configuration file like so:
+ 
+auth/auth_imap 192.168.0.1 143
+ 
+Without any options, it defaults to connecting to the IMAP server on localhost on port 143. 
+ 
+Requires the Net::IMAP::Simple::SSL CPAN module.  Options from that module can be added to 
+the $server constructor in this plugin if needed ( e.g. debug => 1, use_ssl => 1, etc).
+ 
+=head1 AUTHOR Christopher Heschong 
+ 
+Edits to add SSL support and updated for latest qpsmtpd version  - James Turnbull <james@lovedthanlost.net>
+ 
+=head1 COPYRIGHT AND LICENSE Copyright (c) 2004 Christopher Heschong 
+This plugin is licensed under the same terms as the qpsmtpd package itself. 
+Please see the LICENSE file included with qpsmtpd for details. 
+ 
+=cut 
+
+use Qpsmtpd::Auth;
+use Net::IMAP::Simple::SSL;  
+ 
+sub register { 
+    my ($self, $qp, @args) = @_;  
+ 
+    if (@args > 0) {
+      if ($args[0] =~ /^([\.\w_-]+)$/) {
+        $self->{_imap_server} = $1;
+    }
+    else {
+      die "Bad data in imap server: $args[0]";
+    }
+    $self->{_imap_port} = 143;
+    if (@args > 1 and $args[1] =~ /^(\d+)$/) {
+      $self->{_imap_port} = $1;
+    }
+    $self->log(LOGWARN, "WARNING: Ignoring additional arguments.") if (@args > 2);
+    } 
+    else {
+      die("No IMAP server specified in plugins file.");
+  }
+  
+# set any values that are not already
+    $self->{_imap_server} ||= "127.0.0.1";
+    $self->{_imap_port} ||= 143;
+ 
+    $self->register_hook( "auth-cram-md5", "auth_imap");
+    $self->register_hook( "auth-login", "auth_imap" );
+    $self->register_hook( "auth-plain", "auth_imap" );  
+}
+ 
+sub auth_imap { 
+  
+   my ($self, $transaction, $mechanism, $user, $clearPassword, $hashPassword, $ticket) = @_; 
+   my ($imaphost, $imapport, $imapserver);
+ 
+# pull values in from config
+   $imaphost = $self->{_imap_server};
+   $imapport = $self->{_imap_port};
+   $imapserver = "$imaphost:$imapport";
+ 
+   $self->log(LOGINFO, "Using IMAP server $imapserver");             
+   $self->log(LOGINFO, "Using $mechanism mechanism for IMAP auth");
+   $self->log(LOGINFO, "Authentication via IMAP for user: $user"); 
+   
+   my $status = $?;
+   
+   my $server = Net::IMAP::Simple::SSL->new( '$imapserver', ); 
+   if ($status != 0) {
+        $self->log(LOGNOTICE, "fail, auth_imap could not connect to $imapserver: $status" );
+        return DECLINED;
+   }
+
+   $server->login( $user, $clearPassword, ); 
+   if ($status != 0) {
+        $self->log(LOGNOTICE, "fail, auth_imap invalid username or password: $status");
+        return DECLINED;
+   }
+   
+   return OK, "auth_imap/$mechanism" ; 
+}
