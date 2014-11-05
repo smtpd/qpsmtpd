@@ -13,35 +13,37 @@ sub register_tests {
     if ( !$@ ) {
         warn "using GeoIP2\n";
         $self->register_test('test_geoip2_lookup');
-        return;
     }
 
     eval 'use Geo::IP';
-    if ( $@ ) {
-        warn "could not load Geo::IP\n";
-        return;
-    };
+    if ( !$@ ) {
+        warn "loaded Geo::IP\n";
 
-    $self->register_test('test_geoip_lookup');
-    $self->register_test('test_geoip_load_db');
-    $self->register_test('test_geoip_init_cc');
-    $self->register_test('test_set_country_code');
-    $self->register_test('test_set_country_name');
-    $self->register_test('test_set_continent');
-    $self->register_test('test_set_distance');
-    $self->register_test('test_set_isp');
+        $self->register_test('test_geoip_lookup');
+        $self->register_test('test_geoip_load_db');
+        $self->register_test('test_geoip_init_cc');
+        $self->register_test('test_set_country_code');
+        $self->register_test('test_set_country_name');
+        $self->register_test('test_set_continent');
+        $self->register_test('test_set_distance');
+        $self->register_test('test_set_asn');
+    };
 };
 
 sub test_geoip2_lookup {
     my $self = shift;
 
     $self->qp->connection->remote_ip('24.24.24.24');
-    cmp_ok( $self->geoip2_lookup(), '==', DECLINED, "exit code");
+    cmp_ok( $self->geoip2_lookup(), '==', DECLINED, "exit code DECLINED");
 
-    cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "24.24.24.24 is in the US");
-    cmp_ok( $self->connection->notes('geoip_country_name'), 'eq', 'United States', "24.24.24.24 is in the United States");
-    cmp_ok( $self->connection->notes('geoip_continent'), 'eq', 'NA', "24.24.24.24 is in NA");
-    cmp_ok( $self->connection->notes('geoip_city'), 'eq', 'Deer Park', "24.24.24.24 is in Deer Park");
+    if (!$self->load_geoip2()) {
+        warn "failed to load GeoIP2\n";
+    }
+
+    cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "24.24.24.24 is in country US");
+    cmp_ok( $self->connection->notes('geoip_country_name'), 'eq', 'United States', "24.24.24.24 is in country United States");
+    cmp_ok( $self->connection->notes('geoip_continent'), 'eq', 'NA', "24.24.24.24 is in continent NA");
+    cmp_ok( $self->connection->notes('geoip_city'), 'eq', 'Deer Park', "24.24.24.24 is in city of Deer Park");
 };
 
 sub test_geoip_lookup {
@@ -163,4 +165,21 @@ sub test_set_distance {
         ok( 1, "no distance data");
         ok( 1, "no distance data");
     }
+};
+sub test_set_asn {
+    my $self = shift;
+
+    $self->qp->connection->remote_ip('');
+    $self->set_asn();
+    my $asn = $self->set_asn();
+    ok( ! $asn, "undef") or warn "$asn\n";
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    $asn = $self->set_asn();
+    ok( $self->connection->notes('geoip_asn') =~ /^AS11351/, "note has: $asn");
+
+    $self->qp->connection->remote_ip('66.128.51.163');
+    $asn = $self->set_asn();
+
+    ok( $self->connection->notes('geoip_asn') =~ /^AS7819/, "note has: $asn");
 };

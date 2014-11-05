@@ -102,6 +102,8 @@ data source: http://software77.net/geo-ip/
 
 =head1 ACKNOWLEDGEMENTS
 
+MaxMind - the packager and distributor of the free GeoIP data
+
 Stevan Bajic, the DSPAM author, who suggested SNARE, which describes using
 geodesic distance to determine spam probability. The research paper on SNARE
 can be found here:
@@ -126,27 +128,12 @@ sub register {
     $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
-    eval 'use GeoIP2::Database::Reader';
-    if (!$@) {
-        warn "using GeoIP2";
-        $self->log(LOGINFO, "using GeoIP2");
+    $self->load_geoip2() and return;
+    $self->load_geoip1();
+}
 
-        eval {
-            $self->{_geoip2_city} = GeoIP2::Database::Reader->new(
-                file => $self->{_args}{db_dir} . '/GeoLite2-City.mmdb',
-            );
-        };
-        eval {
-            $self->{_geoip2_country} = GeoIP2::Database::Reader->new(
-                file => $self->{_args}{db_dir} . '/GeoLite2-Country.mmdb',
-            );
-        };
-        $self->register_hook('connect', 'geoip2_lookup');
-        return;
-    }
-
-     warn "could not load GeoIP2";
-     $self->log(LOGERROR, "could not load GeoIP2");
+sub load_geoip1 {
+    my $self = shift;
 
     eval 'use Geo::IP';
     if ($@) {
@@ -164,6 +151,43 @@ sub register {
     $self->init_my_country_code();
 
     $self->register_hook('connect', 'geoip_lookup');
+}
+
+sub load_geoip2 {
+    my $self = shift;
+
+    eval 'use GeoIP2::Database::Reader';
+    if ($@) {
+        $self->log(LOGERROR, "could not load GeoIP2");
+        return;
+    }
+
+    $self->log(LOGINFO, "GeoIP2 loaded");
+
+    eval {
+        $self->{_geoip2_city} = GeoIP2::Database::Reader->new(
+            file => $self->{_args}{db_dir} . '/GeoLite2-City.mmdb',
+        );
+    };
+    if ($@) {
+        $self->log(LOGERROR, "unable to load GeoLite2-City.mmdb");
+    }
+
+    eval {
+        $self->{_geoip2_country} = GeoIP2::Database::Reader->new(
+            file => $self->{_args}{db_dir} . '/GeoLite2-Country.mmdb',
+        );
+    };
+    if ($@) {
+        $self->log(LOGERROR, "unable to load GeoLite2-Country.mmdb");
+    }
+
+    if ($self->{_geoip2_city} || $self->{_geoip2_country}) {
+        $self->register_hook('connect', 'geoip2_lookup');
+        return 1;
+    }
+
+    return;
 }
 
 sub geoip2_lookup {
@@ -246,14 +270,18 @@ sub open_geoip_db {
     my $db_dir = $self->{_args}{db_dir};
     foreach my $db (qw/ GeoIPCity GeoLiteCity /) {
         next if !-f "$db_dir/$db.dat";
-        $self->log(LOGDEBUG, "using db $db");
+        $self->log(LOGINFO, "using db $db");
         $self->{_geoip_city} = Geo::IP->open("$db_dir/$db.dat");
     }
 
-    foreach my $db (qw/ GeoIPASNum GeoIPASNumv6 /) {
-        next if !-f "$db_dir/$db.dat";
-        $self->log(LOGDEBUG, "using db $db");
-        $self->{$db} = Geo::IP->open("$db_dir/$db.dat");
+    if (-f "$db_dir/GeoIPASNum.dat") {
+        $self->log(LOGINFO, "using GeoIPASNum");
+        $self->{GeoIPASNum} = Geo::IP->open("$db_dir/GeoIPASNum.dat");
+    }
+
+    if (-f "$db_dir/GeoIPASNumv6.dat") {
+        $self->log(LOGINFO, "using GeoIPASNumv6");
+        $self->{GeoIPASNumv6} = Geo::IP->open("$db_dir/GeoIPASNumv6.dat");
     }
 
     # can't think of a good reason to load country if city data is present
@@ -338,23 +366,28 @@ sub get_continent_gc {
 }
 
 sub set_asn {
-    my ($self) = @_;
-    my $remote_ip = $self->qp->connection->remote_ip;
+    my ($self, $ip) = @_;
+    $ip ||= $self->qp->connection->remote_ip;
+
+    if (Qpsmtpd::Base->is_ipv6($ip)) {
+        return $self->set_asn_ipv6($ip);
+    }
     return if ! $self->{GeoIPASNum};
 
-    my $asn = $self->{GeoIPASNum}
-            ? $self->get_asn_gc($remote_ip)
-            : $self->{_geoip}->asn_by_addr($remote_ip);
-
-    $asn or return;
+    my $asn = $self->{GeoIPASNum}->name_by_addr($ip) or return;
     $self->qp->connection->notes('geoip_asn', $asn);
     return $asn;
 }
 
-sub get_asn_gc {
-    my $self = shift;
-    return if !$self->{GeoIPASNum};
-    return $self->{GeoIPASNum}->asn_by_addr();
+sub set_asn_ipv6 {
+    my ($self, $ip) = @_;
+    $ip ||= $self->qp->connection->remote_ip;
+
+    return if ! $self->{GeoIPASNumv6};
+
+    my $asn = $self->{GeoIPASNumv6}->name_by_addr_v6($ip) or return;
+    $self->qp->connection->notes('geoip_asn', $asn);
+    return $asn;
 }
 
 sub set_city_gc {
