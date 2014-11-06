@@ -283,7 +283,7 @@ sub init_resolver {
     my $timeout = $self->{_args}{dns_timeout} || shift || 5;
     return $self->{_resolver} if $self->{_resolver};
     $self->log(LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
+    $self->{_resolver} = $self->qp->dns_resolver(dnsrch => 0);
     $self->{_resolver}->tcp_timeout($timeout);
     $self->{_resolver}->udp_timeout($timeout);
     return $self->{_resolver};

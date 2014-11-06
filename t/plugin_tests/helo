@@ -32,7 +32,6 @@ sub test_init_resolver {
     my $self = shift;
     my $net_dns = $self->init_resolver();
     ok( $net_dns, "net::dns" );
-    cmp_ok( ref $net_dns, 'eq', 'Net::DNS::Resolver', "ref ok");
 };
 
 sub test_is_in_badhelo {

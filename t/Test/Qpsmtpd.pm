@@ -10,6 +10,7 @@ use parent 'Qpsmtpd::SMTP';
 
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
+use Test::FakeResolver;
 
 sub new_conn {
     ok(my $smtpd = __PACKAGE__->new(), "new");
@@ -116,6 +117,14 @@ sub run_plugin_tests {
         $plugin->run_tests($self);
     }
     $Test->done_testing();
+}
+
+sub dns_resolver {
+    my $self = shift;
+    return Test::FakeResolver->new(@_,
+        searchlist => [ 'dc.com' ],
+        static_file => './t/dns_cache.txt'
+    );
 }
 
 1;
