@@ -64,6 +64,8 @@ sub __get_resolver {
 }
 
 sub __get_async_resolver {
+    eval 'use Net::DNS::Async';
+    return if ($@);
     my $res = $base->get_async_resolver() or return;
     isa_ok( $res, 'Net::DNS::Async', "resolver object, $res");
     isa_ok( $res->{Resolver}, 'Net::DNS::Resolver', "resolver object, $res");

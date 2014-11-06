@@ -63,16 +63,16 @@ sub get_async_resolver {
     my ( $self, %args ) = @_;
     return $self->{_async_resolver} if $self->{_async_resolver};
 
-    my $res = Net::DNS::Resolver->new(dnsrch => 0);
-    $res->tcp_timeout(0);  # Net::DNS::Async handles its own timeouts
-    $res->tcp_timeout(0);
-
     my $async_res;
     eval 'use Net::DNS::Async';
     if ($@) {
-        warn "Net::DNS::Async failed to load";
+        warn "could not load Net::DNS::Async, is it installed?";
         return;
     }
+
+    my $res = Net::DNS::Resolver->new(dnsrch => 0);
+    $res->tcp_timeout(0);  # Net::DNS::Async handles its own timeouts
+    $res->tcp_timeout(0);
 
     $self->{_async_resolver} = Net::DNS::Async->new( %args );
     $self->{_async_resolver}{Resolver} = $res;
