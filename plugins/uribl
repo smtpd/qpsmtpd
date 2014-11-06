@@ -92,9 +92,9 @@ may be used and redistributed under the same terms as qpsmtpd itself.
 use strict;
 use warnings;
 
+use lib 'lib';
 use Qpsmtpd::Constants;
 
-use Net::DNS::Resolver;
 use Time::HiRes qw(time);
 use IO::Select;
 
@@ -180,7 +180,7 @@ sub init {
     my @whitelist = $self->qp->config('uribl_whitelist_domains');
     $self->{whitelist_zones} = {(map { ($_ => 1) } @whitelist)};
 
-    $self->init_resolver;
+    $self->{resolver} = $self->get_resolver(timeout => $self->{timeout});
 }
 
 sub send_query {
@@ -533,8 +533,3 @@ sub hook_data {
     return DECLINED;
 }
 
-sub init_resolver {
-    my $self = shift;
-    $self->{resolver} = new Net::DNS::Resolver or return;
-    $self->{resolver}->udp_timeout($self->{timeout});
-}

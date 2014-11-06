@@ -92,6 +92,8 @@ sub register {
         $self->{_args}{reject} = 1;
     }
     $self->{_args}{reject_type} ||= 'soft';
+
+    $self->{resolver} = $self->get_resolver(timeout => 30);
 }
 
 sub hook_mail {
@@ -158,16 +160,14 @@ sub check_dns {
         return 1;
     }
 
-    my $res = new Net::DNS::Resolver(dnsrch => 0);
-    $res->tcp_timeout(30);
-    $res->udp_timeout(30);
+    my $res = $self->get_resolver(timeout => 30);
 
-    my $has_mx = $self->get_and_validate_mx($res, $host, $transaction);
+    my $has_mx = $self->get_and_validate_mx($host, $transaction);
     return 1 if $has_mx == 1;     # success, has MX!
     return   if $has_mx == -1;    # has invalid MX records
                                   # at this point, no MX for fh is resolvable
 
-    my @host_answers = $self->get_host_records($res, $host, $transaction);
+    my @host_answers = $self->get_host_records($host, $transaction);
     foreach my $rr (@host_answers) {
         if ($rr->type eq 'A' || $rr->type eq 'AAAA') {
             $self->log(LOGINFO, "pass, found A for $host");
@@ -198,9 +198,9 @@ sub ip_is_valid {
 }
 
 sub get_and_validate_mx {
-    my ($self, $res, $host, $transaction) = @_;
+    my ($self, $host, $transaction) = @_;
 
-    my @mx = mx($res, $host);
+    my @mx = mx($self->{resolver}, $host);
     if (!scalar @mx) {    # no mx records
         $self->adjust_karma(-1);
         $self->log(LOGINFO, "$host has no MX");
@@ -225,9 +225,10 @@ sub get_and_validate_mx {
 }
 
 sub get_host_records {
-    my ($self, $res, $host, $transaction) = @_;
+    my ($self, $host, $transaction) = @_;
 
     my @answers;
+    my $res = $self->{resolver};
     my $query = $res->search($host);
 
     if ($query) {
@@ -259,38 +260,26 @@ sub mx_address_resolves {
     my ($self, $name, $fromhost) = @_;
 
     # IP in MX
-    return $self->ip_is_valid($name) if ip_is_ipv4($name) || ip_is_ipv6($name);
+    if (ip_is_ipv4($name) || ip_is_ipv6($name)) {
+        return $self->ip_is_valid($name);
+    };
 
-    my $res = new Net::DNS::Resolver(dnsrch => 0);
-    my @mx_answers;
-    my $query = $res->search($name, 'A');
-    if ($query) {
-        foreach my $rrA ($query->answer) {
-            push(@mx_answers, $rrA);
-        }
-    }
+    my $res = $self->get_resolver();
+    my @mx_answers = $self->resolve_a($name);
+
     if ($has_ipv6) {
-        my $query = $res->search($name, 'AAAA');
-        if ($query) {
-            foreach my $rrAAAA ($query->answer) {
-                push(@mx_answers, $rrAAAA);
-            }
-        }
+        push @mx_answers, $self->resolve_aaaa($name);
     }
+
     if (!@mx_answers) {
         if ($res->errorstring eq 'NXDOMAIN') {
-            $self->log(LOGWARN, "fail, query for $fromhost, ",
-                       $res->errorstring);
+            $self->log(LOGWARN, "fail, query for $fromhost, ", $res->errorstring);
         }
         return;
     }
 
-    foreach my $rr (@mx_answers) {
-        next if ($rr->type ne 'A' && $rr->type ne 'AAAA');
-        return $self->ip_is_valid($rr->address);
-    }
-
-    return;
+    return if ! scalar @mx_answers;
+    return $self->ip_is_valid($mx_answers[0]);
 }
 
 sub populate_invalid_networks {

@@ -166,7 +166,9 @@ sub hook_connect {
     return DECLINED if $self->ip_whitelisted();
 
     my $dnsbl_zones = $self->get_dnsbl_zones() or return DECLINED;
-    my $resolv      = $self->get_resolver()    or return DECLINED;
+    my $timeout     = $self->{_args}{timeout} || 30;
+    my $resolv      = $self->{_resolver} = $self->get_resolver(timeout=>$timeout)
+        or return DECLINED;
 
     for my $dnsbl (keys %$dnsbl_zones) {
 
@@ -299,15 +301,3 @@ sub hook_rcpt {
 
     return DECLINED;
 }
-
-sub get_resolver {
-    my $self = shift;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log(LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    my $timeout = $self->{_args}{timeout} || 30;
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
-}
-

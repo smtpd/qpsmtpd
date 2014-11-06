@@ -8,7 +8,6 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_init_resolver');
     $self->register_test('test_is_in_badhelo');
     $self->register_test('test_is_regex_match');
     $self->register_test('test_invalid_localhost');
@@ -24,15 +23,7 @@ sub register_tests {
 
 sub test_helo_handler {
     my $self = shift;
-
     cmp_ok( $self->helo_handler(undef, undef), '==', DECLINED, "empty host");
-};
-
-sub test_init_resolver {
-    my $self = shift;
-    my $net_dns = $self->init_resolver();
-    ok( $net_dns, "net::dns" );
-    cmp_ok( ref $net_dns, 'eq', 'Net::DNS::Resolver', "ref ok");
 };
 
 sub test_is_in_badhelo {

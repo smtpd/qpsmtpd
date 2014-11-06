@@ -13,8 +13,8 @@ WriteMakefile(
         'File::Temp'      => 0,
         'Mail::Header'    => 0,
         'MIME::Base64'    => 0,
-        'Net::DNS'        => 0.39,
-        'Net::IP'         => 0,
+        'Net::DNS'        => 0.79,
+        'Net::IP'         => 1.26,
         'Time::HiRes'     => 0,
         'IO::Socket::SSL' => 0,
         'ClamAV::Client'  => 0,      # virus/clamdscan
@@ -22,7 +22,7 @@ WriteMakefile(
         'Test::More'      => 0,
         'Test::Output'    => 0,
 # modules for specific features
-        'Mail::DKIM'         => 0,
+        'Mail::DKIM'         => 0.40,
         'File::Tail'         => 0,   # log/summarize, log/watch
         'Time::TAI64'        => 0,   # log2sql
 #       'DBI'                => 0,   # auth_vpopmail_sql and

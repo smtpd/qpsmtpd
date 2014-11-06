@@ -2,8 +2,8 @@ package Qpsmtpd::Plugin;
 use strict;
 use warnings;
 
-use Net::DNS;
-
+use lib 'lib';
+use parent 'Qpsmtpd::Base';
 use Qpsmtpd::Constants;
 
 # more or less in the order they will fire
@@ -277,17 +277,6 @@ sub store_auth_results {
     $self->log(LOGDEBUG, "auth-results: $ar");
     $self->qp->connection->notes('authentication_results', $ar );
 };
-
-sub init_resolver {
-    my $self = shift;
-    my $timeout = $self->{_args}{dns_timeout} || shift || 5;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log(LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
-}
 
 sub is_immune {
     my $self = shift;
