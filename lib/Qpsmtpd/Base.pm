@@ -39,4 +39,10 @@ sub is_valid_ip {
     return;
 }
 
+sub is_ipv6 {
+    my ($self, $ip) = @_;
+    return if !$ip;
+    return Net::IP::ip_is_ipv6($ip);
+};
+
 1;
