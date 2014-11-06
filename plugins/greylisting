@@ -237,8 +237,8 @@ sub load_exclude_files {
 sub load_exclude_file {
     my ( $self, $filename ) = @_;
     my $fh;
-    if ( ! open $fh, $exclude_file ) {
-        warn "Couldn't open greylist exclude file $exclude_file:$!\n";
+    if ( ! open $fh, $filename ) {
+        warn "Couldn't open greylist exclude file $filename:$!\n";
         next;
     }
     while ( my $line = <$fh> ) {
@@ -259,7 +259,7 @@ sub exclude_host {
         $self->{_exclude_ip}{$pattern} = undef;
     }
     else {
-        $self->{_exclude_host}{$x} = undef;
+        $self->{_exclude_host}{$pattern} = undef;
     }
 }
 
