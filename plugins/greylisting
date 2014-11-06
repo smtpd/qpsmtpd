@@ -253,20 +253,21 @@ sub load_exclude_file {
 sub exclude_host {
     my ( $self, $pattern ) = @_;
     if ( $pattern =~ /^\/(.*)\/$/ ) {
-        push @{ $self->{_exclude_re} }, $1;
+        push @{ $self->{_exclude_re} }, qr/$1/;
     }
     elsif ( Qpsmtpd::Base->is_valid_ip($pattern) ) {
-        $self->{_exclude_ip}{$pattern} = undef;
+        $self->{_exclude_ip}{$pattern} = 1;
     }
     else {
-        $self->{_exclude_host}{$pattern} = undef;
+        $self->{_exclude_hostname}{$pattern} = 1;
     }
 }
 
 sub exclude_file_match {
     my ( $self ) = @_;
     return 1 if $self->{_exclude_ip}{   $self->connection->remote_ip   };
-    return 1 if $self->{_exclude_host}{ $self->connection->remote_host };
+    return 0 if ! $self->connection->remote_host;
+    return 1 if $self->{_exclude_hostname}{ $self->connection->remote_host };
     for my $re ( @{ $self->{_exclude_re} || [] } ) {
         return 1 if $self->connection->remote_host =~ $re;
     }
