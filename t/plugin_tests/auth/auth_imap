@@ -18,8 +18,9 @@ sub auth_imap {
 
   my $server = Net::IMAP::Simple->new($imapserver, use_ssl => 1,)
     or return ("auth_imap - could not connect to $imapserver");
+  sleep 1;
+  $server->quit;
 }
 
 
-ok(auth_imap, "auth_imap, connected to imap.gmail.com");
-
+ok(auth_imap, "auth_imap, connected to imap.gmail.com for a sec");
