@@ -244,7 +244,7 @@ sub register {
         $self->{_args}{reject} = 1;
     }
     $self->populate_tests();
-    $self->init_resolver() or return;
+    $self->get_resolver() or return;
 
     $self->register_hook('helo',      'helo_handler');
     $self->register_hook('ehlo',      'helo_handler');
@@ -402,7 +402,7 @@ sub no_forward_dns {
 
     return if $self->is_address_literal($host);
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
 
     $host = "$host." if $host !~ /\.$/;    # fully qualify name
     my $query = $res->query($host);
@@ -431,7 +431,7 @@ sub no_forward_dns {
 sub no_reverse_dns {
     my ($self, $host, $ip) = @_;
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
     $ip ||= $self->qp->connection->remote_ip;
 
     my $query = $res->query($ip) or do {

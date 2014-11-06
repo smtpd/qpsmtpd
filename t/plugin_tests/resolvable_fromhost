@@ -3,11 +3,9 @@
 use strict;
 use warnings;
 
-use Net::DNS;
 use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
 
-my $res = new Net::DNS::Resolver(dnsrch => 0);
 my $test_email = 'user@example.com';
 
 sub register_tests {
@@ -60,17 +58,17 @@ sub test_get_and_validate_mx {
     my $self = shift;
     my $transaction = $self->qp->transaction;
 
-    ok( scalar $self->get_and_validate_mx( $res, 'perl.com', $transaction ) );
+    ok( scalar $self->get_and_validate_mx( 'perl.com', $transaction ) );
 
-    ok( ! scalar $self->get_host_records( $res, 'fake-domain-name-for-test.com', $transaction ) );
+    ok( ! scalar $self->get_host_records( 'fake-domain-name-for-test.com', $transaction ) );
 };
 
 sub test_get_host_records {
     my $self = shift;
     my $transaction = $self->qp->transaction;
 
-    ok( scalar $self->get_host_records( $res, 'perl.com', $transaction ) );
-    ok( ! scalar $self->get_host_records( $res, 'fake-domain-name-for-test.com', $transaction ) );
+    ok( scalar $self->get_host_records( 'perl.com', $transaction ) );
+    ok( ! scalar $self->get_host_records( 'fake-domain-name-for-test.com', $transaction ) );
 };
 
 sub test_mx_address_resolves {

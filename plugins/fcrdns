@@ -141,8 +141,6 @@ sub register {
         $self->{_args}{reject} = 0;
     }
 
-    $self->init_resolver() or return;
-
     $self->register_hook('connect',   'connect_handler');
 }
 
@@ -205,7 +203,7 @@ sub is_not_fqdn {
 sub has_reverse_dns {
     my ($self) = @_;
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
     my $ip  = $self->qp->connection->remote_ip;
 
     my $query = $res->query($ip, 'PTR') or do {
@@ -252,7 +250,7 @@ sub has_reverse_dns {
 sub has_forward_dns {
     my ($self) = @_;
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
 
     foreach my $host (keys %{$self->{_args}{ptr_hosts}}) {
 

@@ -61,13 +61,8 @@ sub stunnel {
     $self->log(LOGINFO, "stunnel : $2:$4");
 
     # DNS reverse
-    my $res = $self->init_resolver();
-    if (my $query = $res->query($self->connection->remote_ip, 'PTR')) {
-        foreach my $rr ($query->answer) {
-            next if $rr->type ne 'PTR';
-            $self->connection->remote_host($rr->ptrdname);
-        }
-    }
+    my @ptrs = $self->resolve_ptr($self->connection->remote_ip);
+    $self->connection->remote_host($ptrs[0]);
     return DONE;
 }
 

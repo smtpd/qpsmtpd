@@ -8,7 +8,6 @@ use Carp;
 #use Data::Dumper;
 use POSIX qw(strftime);
 use Mail::Header;
-use Net::DNS;
 
 use Qpsmtpd;
 use Qpsmtpd::Connection;

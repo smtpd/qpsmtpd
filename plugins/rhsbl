@@ -67,7 +67,7 @@ sub hook_mail {
 
     my %rhsbl_zones = $self->populate_zones() or return DECLINED;
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
 
     my @hosts = $sender->host;
     for my $host (@hosts) {
