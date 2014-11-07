@@ -130,6 +130,7 @@ sub register {
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
     $self->load_geoip() or return;
+    $self->register_hook( data_post => 'add_headers' );
 }
 
 sub load_geoip {
@@ -195,6 +196,17 @@ sub load_geoip2 {
     }
 
     return;
+}
+
+sub add_headers {
+    my ( $self, $txn ) = @_;
+    for my $h (qw( Country Country-Name Continent City ASN )) {
+        my $note = lc "geoip_$h";
+        $h =~ s/-/_/;
+        next if ! $self->connection->notes($note);
+        $txn->header->delete("X-GeoIP-$h");
+        $txn->header->add( "X-GeoIP-$h", $self->connection->notes($note), 0 );
+    }
 }
 
 sub geoip2_lookup {
