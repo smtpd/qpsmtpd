@@ -226,6 +226,52 @@ sub register {
     if ($self->{_args}{upgrade}) {
         $self->convert_db();
     }
+    $self->load_exclude_files();
+}
+
+sub load_exclude_files {
+    my ( $self ) = @_;
+    $self->load_exclude_file($_) for $self->qp->config('greylist_exclude_files');
+}
+
+sub load_exclude_file {
+    my ( $self, $filename ) = @_;
+    my $fh;
+    if ( ! open $fh, $filename ) {
+        warn "Couldn't open greylist exclude file $filename:$!\n";
+        next;
+    }
+    while ( my $line = <$fh> ) {
+        chomp $line;
+        $line =~ s/#.*//;
+        $line =~ s/\s//g;
+        next if ! $line;
+        $self->exclude_host($line);
+    }
+}
+
+sub exclude_host {
+    my ( $self, $pattern ) = @_;
+    if ( $pattern =~ /^\/(.*)\/$/ ) {
+        push @{ $self->{_exclude_re} }, qr/$1/;
+    }
+    elsif ( Qpsmtpd::Base->is_valid_ip($pattern) ) {
+        $self->{_exclude_ip}{$pattern} = 1;
+    }
+    else {
+        $self->{_exclude_hostname}{$pattern} = 1;
+    }
+}
+
+sub exclude_file_match {
+    my ( $self ) = @_;
+    return 1 if $self->{_exclude_ip}{   $self->connection->remote_ip   };
+    return 0 if ! $self->connection->remote_host;
+    return 1 if $self->{_exclude_hostname}{ $self->connection->remote_host };
+    for my $re ( @{ $self->{_exclude_re} || [] } ) {
+        return 1 if $self->connection->remote_host =~ $re;
+    }
+    return 0;
 }
 
 sub mail_handler {
@@ -512,6 +558,7 @@ sub exclude {
     return 1 if $self->is_immune();
     return 1 if !$self->p0f_match();
     return 1 if $self->geoip_match();
+    return 1 if $self->exclude_file_match();
     return;
 }
 

@@ -16,6 +16,7 @@ foreach ( @greydbs ) {
 sub register_tests {
     my $self = shift;
 
+    $self->register_test("test_load_exclude_files");
     $self->register_test('test_hook_data');
     $self->register_test('test_get_db_key');
     $self->register_test('test_get_db_location');
@@ -25,6 +26,54 @@ sub register_tests {
     $self->register_test("test_greylist_p0f_distance");
     $self->register_test("test_greylist_p0f_link");
     $self->register_test("test_greylist_p0f_uptime");
+    $self->register_test('test_exclude_file_match');
+}
+
+sub test_load_exclude_files {
+    my ( $self ) = @_;
+    delete $self->{$_} for qw( _exclude_ip _exclude_hostname exclude_re );
+    $self->load_exclude_files();
+    ok( $self->{_exclude_ip}{'194.7.234.142'},
+        'Excluded IPs populated by load_exclude_files()' );
+    ok( $self->{_exclude_hostname}{'yahoo.com'},
+        'Excluded hostnames populated by load_exclude_files()' );
+    ok( ( grep { $_ eq qr/^mta[12].siol.net$/ } @{ $self->{_exclude_re} || [] } ),
+        'Excluded REs populated by load_exlude_files()' );
+}
+
+sub test_exclude_file_match {
+    my ( $self ) = @_;
+    my @test_data = (
+        {
+            ip       => 192.168.1.1,
+            hostname => 'mta1234.siol.net',
+            expected => 0,
+            descr    => 'miss',
+        },
+        {
+            ip       => '194.7.234.142',
+            hostname => 'mta1234.siol.net',
+            expected => 1,
+            descr    => 'IP match',
+        },
+        {
+            ip       => 192.168.1.1,
+            hostname => 'postini.com',
+            expected => 1,
+            descr    => 'Hostname match',
+        },
+        {
+            ip       => 192.168.1.1,
+            hostname => 'mta2.siol.net',
+            expected => 1,
+            descr    => 'Regex match',
+        },
+    );
+    for my $t ( @test_data ) {
+        $self->connection->remote_ip( $t->{ip} );
+        $self->connection->remote_host( $t->{hostname} );
+        is( $self->exclude_file_match(), $t->{expected}, "exclude_file_match(): $t->{descr}" );
+    }
 }
 
 sub test_hook_data {
