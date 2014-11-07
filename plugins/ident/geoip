@@ -129,8 +129,12 @@ sub register {
     $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
-    $self->load_geoip2() and return;
-    $self->load_geoip1();
+    $self->load_geoip() or return;
+}
+
+sub load_geoip {
+    $self->load_geoip2() and return 1;
+    $self->load_geoip1() and return 1;
 }
 
 sub load_geoip1 {
@@ -152,6 +156,7 @@ sub load_geoip1 {
     $self->init_my_country_code();
 
     $self->register_hook('connect', 'geoip_lookup');
+    return 1;
 }
 
 sub load_geoip2 {
