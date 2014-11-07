@@ -130,6 +130,7 @@ sub register {
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
     $self->load_geoip() or return;
+    return if ! $self->qp->config('add_geoip_headers');
     $self->register_hook( data_post => 'add_headers' );
 }
 
