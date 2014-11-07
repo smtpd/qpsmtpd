@@ -202,9 +202,8 @@ sub load_geoip2 {
 
 sub add_headers {
     my ( $self, $txn ) = @_;
-    for my $h (qw( Country Country-Name Continent City ASN )) {
+    for my $h (qw( Country Continent City ASN )) {
         my $note = lc "geoip_$h";
-        $h =~ s/-/_/;
         next if ! $self->connection->notes($note);
         $txn->header->delete("X-GeoIP-$h");
         $txn->header->add( "X-GeoIP-$h", $self->connection->notes($note), 0 );
