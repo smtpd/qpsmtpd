@@ -11,13 +11,14 @@ geographic information about incoming connections.
 
 =head1 DESCRIPTION
 
-This plugin saves geographic information in the following connection notes:
+Save geographic information about the sender in the following connection notes:
 
   geoip_country      - 2 char country code
   geoip_country_name - english name of country
   geoip_continent    - 2 char continent code
   geoip_city         - english name of city
   geoip_distance     - distance in kilometers
+  geoip_asn          - network number
 
 And adds entries like this to your logs:
 
@@ -150,7 +151,7 @@ sub load_geoip1 {
 # Instead, attempt to reopen upon connect if the DB connection fails.
     $self->init_my_country_code();
 
-    $self->register_hook('connect', 'geoip_lookup');
+    $self->register_hook('connect',   'geoip_lookup');
 }
 
 sub load_geoip2 {
@@ -464,4 +465,3 @@ sub get_sender_lat_lon {
     }
     return $lat, $lon;
 }
-
