@@ -33,7 +33,7 @@ sub test_apr_connect_handler {
     $self->qp->connection->notes('whitelisthost', 0);
     ($code, $mess) = $self->apr_connect_handler();
     cmp_ok( $code, '==', DECLINED, "not sure");
-};
+}
 
 sub test_apr_data_handler {
     my $self = shift;
@@ -50,7 +50,7 @@ sub test_apr_data_handler {
     $self->qp->connection->notes('whitelisthost', 0);
     ($code, $mess) = $self->apr_data_handler();
     cmp_ok( $code, '==', DECLINED, "not sure");
-};
+}
 
 sub test_connect_handler {
     my $self = shift;
@@ -67,7 +67,7 @@ sub test_connect_handler {
     $self->qp->connection->notes('whitelisthost', 0);
     ($code, $mess) = $self->connect_handler();
     cmp_ok( $code, '==', DECLINED, "not sure");
-};
+}
 
 sub test_data_handler {
     my $self = shift;
@@ -84,14 +84,14 @@ sub test_data_handler {
     $self->qp->connection->notes('whitelisthost', 0);
     ($code, $mess) = $self->data_handler();
     cmp_ok( $code, '==', DECLINED, "not sure");
-};
+}
 
 sub test_log_and_pass {
     my $self = shift;
 
     my ($code, $mess) = $self->log_and_pass();
     cmp_ok( $code, '==', DECLINED, "default");
-};
+}
 
 sub test_log_and_deny {
     my $self = shift;
@@ -108,7 +108,7 @@ sub test_log_and_deny {
     $self->{_args}{reject_type} = 'disconnect';
     ($code, $mess) = $self->log_and_deny();
     cmp_ok( $code, '==', DENY_DISCONNECT, "bad, disconnect");
-};
+}
 
 sub test_mail_handler {
     my $self = shift;
@@ -130,7 +130,7 @@ sub test_mail_handler {
     $self->{_args}{reject_type} = 'disconnect';
     ($code, $mess) = $self->mail_handler();
     cmp_ok( $code, '==', DENY_DISCONNECT, "bad, disconnect");
-};
+}
 
 sub test_reject_type {
     my $self = shift;
@@ -143,4 +143,4 @@ sub test_reject_type {
 
     $self->{_args}{reject_type} = 'disconnect';
     cmp_ok( $self->get_reject_type(), '==', DENY_DISCONNECT, "disconnect");
-};
+}

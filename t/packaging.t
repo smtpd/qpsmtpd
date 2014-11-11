@@ -16,7 +16,7 @@ sub get_qp_version {
     my ($ver_line) = grep { $_ =~ /^our \$VERSION/ } @$rvfile;
     my ($ver) = $ver_line =~ /['"]([0-9\.]+)['"]/;
     return $ver;
-};
+}
 
 sub get_rpm_version {
     my $rvfile = get_file_contents('packaging/rpm/VERSION')
@@ -33,4 +33,4 @@ sub get_file_contents {
     };
     my @r = <$fh>;
     return \@r;
-};
+}

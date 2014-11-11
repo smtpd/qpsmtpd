@@ -71,7 +71,7 @@ sub __clear_cache {
     ok(! $Qpsmtpd::Config::config_cache{foo}, "clear_cache, config_cache")
         or diag Data::Dumper::Dumper($Qpsmtpd::Config::config_cache{foo});
     ok(! $Qpsmtpd::Config::dir_memo{dir1}, "clear_cache, dir_memo")
-};
+}
 
 sub __default {
     is($config->default('me'), hostname, "default, my hostname");
@@ -94,7 +94,7 @@ sub __get_qmail_map {
         my $r = $config->get_qmail_map('users', 't/config/users.cdb');
         ok(keys %$r, 'get_qmail_map("users.cdb")');
         ok($r->{'!example.com-'}, "get_qmail_map, known entry");
-    };
+    }
 }
 
 sub __from_file {
@@ -121,4 +121,4 @@ sub __config_via_smtpd {
     '127.0.0.1,192.0.,2001:0DB8,2001:0DB8:0000:0000:0000:0000:0000:0001,2001:DB8::1,2001:DB8::1/32',
         'config("relayclients") are trimmed'
     );
-};
+}

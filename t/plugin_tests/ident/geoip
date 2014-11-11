@@ -27,8 +27,8 @@ sub register_tests {
         $self->register_test('test_set_continent');
         $self->register_test('test_set_distance');
         $self->register_test('test_set_asn');
-    };
-};
+    }
+}
 
 sub test_geoip2_lookup {
     my $self = shift;
@@ -44,7 +44,7 @@ sub test_geoip2_lookup {
     cmp_ok( $self->connection->notes('geoip_country_name'), 'eq', 'United States', "24.24.24.24 is in country United States");
     cmp_ok( $self->connection->notes('geoip_continent'), 'eq', 'NA', "24.24.24.24 is in continent NA");
     cmp_ok( $self->connection->notes('geoip_city'), 'eq', 'Deer Park', "24.24.24.24 is in city of Deer Park");
-};
+}
 
 sub test_geoip_lookup {
     my $self = shift;
@@ -53,7 +53,7 @@ sub test_geoip_lookup {
     cmp_ok( $self->geoip_lookup(), '==', DECLINED, "exit code");
 
     cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "24.24.24.24 is in the US");
-};
+}
 
 sub test_geoip_load_db {
     my $self = shift;
@@ -65,15 +65,15 @@ sub test_geoip_load_db {
     }
     else {
         ok( "no GeoIP city db" );
-    };
+    }
 
     if ( $self->{_geoip} ) {
         ok( ref $self->{_geoip}, "loaded GeoIP db" );
     }
     else {
         ok( "no GeoIP db" );
-    };
-};
+    }
+}
 
 sub test_geoip_init_cc {
     my $self = shift;
@@ -85,7 +85,7 @@ sub test_geoip_init_cc {
     $self->{_args}{distance} = $test_ip;
     $self->init_my_country_code( $test_ip );
     cmp_ok( $self->{_my_country_code}, 'eq', 'US', "country set and matches");
-};
+}
 
 sub test_set_country_code {
     my $self = shift;
@@ -100,7 +100,7 @@ sub test_set_country_code {
 
     my $note = $self->connection->notes('geoip_country');
     cmp_ok( $note, 'eq', 'US', "set_country_code set note to $cc");
-};
+}
 
 sub test_set_country_name {
     my $self = shift;
@@ -118,7 +118,7 @@ sub test_set_country_name {
 
     my $note = $self->connection->notes('geoip_country_name');
     cmp_ok( $note, 'eq', 'United States', "note has: $cn");
-};
+}
 
 sub test_set_continent {
     my $self = shift;
@@ -140,8 +140,8 @@ sub test_set_continent {
     else {
         ok(1, "no continent data" );
         ok(1, "no continent data" );
-    };
-};
+    }
+}
 
 sub test_set_distance {
     my $self = shift;
@@ -165,7 +165,8 @@ sub test_set_distance {
         ok( 1, "no distance data");
         ok( 1, "no distance data");
     }
-};
+}
+
 sub test_set_asn {
     my $self = shift;
 
@@ -184,4 +185,4 @@ sub test_set_asn {
     $asn = $self->set_asn();
 
     ok( $self->connection->notes('geoip_asn') =~ /^7819/, "note has: $asn");
-};
+}

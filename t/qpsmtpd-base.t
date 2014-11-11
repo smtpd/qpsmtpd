@@ -36,7 +36,7 @@ sub __is_valid_ip {
     foreach my $ip ( @bad ) {
         ok( !$base->is_valid_ip($ip), "is_valid_ip, neg: $ip");
     }
-};
+}
 
 sub __is_localhost {
 
@@ -47,7 +47,7 @@ sub __is_localhost {
     for my $rem_ip (qw/ 128.0.0.1 ::2 2607:f060:b008:feed::128.0.0.1 /) {
         ok( !$base->is_localhost($rem_ip), "!is_localhost, $rem_ip");
     }
-};
+}
 
 sub __tildeexp {
     my $path = $base->tildeexp('~root/foo.txt');
@@ -55,7 +55,7 @@ sub __tildeexp {
 
     $path = $base->tildeexp('no/tilde/in/path');
     cmp_ok( $path, 'eq', 'no/tilde/in/path', 'tildeexp, no expansion');
-};
+}
 
 sub __get_resolver {
     my $res = $base->get_resolver();

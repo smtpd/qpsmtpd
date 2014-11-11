@@ -12,7 +12,7 @@ sub register_tests {
     $self->register_test('test_get_v3_query');
     $self->register_test('test_store_v2_results');
     $self->register_test('test_store_v3_results');
-};
+}
 
 sub test_query_p0f_v2 {
 #TODO
@@ -25,11 +25,11 @@ sub test_query_p0f_v2 {
 #     or   c) is there a p0f test value?
 # parse and validate the response
 # using $self->test_v2_response()
-};
+}
 
 sub test_query_p0f_v3 {
 #TODO: similar to v2 ....
-};
+}
 
 sub test_get_v2_query {
     my $self = shift;
@@ -44,7 +44,7 @@ sub test_get_v2_query {
 
     my $r = $self->get_v2_query();
     ok( $r, 'r +' );
-};
+}
 
 sub test_get_v3_query {
     my $self = shift;
@@ -54,7 +54,7 @@ sub test_get_v3_query {
 
     my $r = $self->get_v3_query();
     ok( $r, 'any +' );
-};
+}
 
 sub test_store_v2_results {
     my $self = shift;
@@ -67,7 +67,7 @@ sub test_store_v2_results {
 
     ok( $r, "r: +") or return;
     ok( $r->{genre} =~ /windows/i, "genre +" );
-};
+}
 
 sub test_store_v3_results {
     my $self = shift;
@@ -79,6 +79,5 @@ sub test_store_v3_results {
 
     ok( $r, "result");
     ok( $r->{genre} =~ /windows/i, "genre" );
-};
-
+}
 
