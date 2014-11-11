@@ -169,6 +169,8 @@ sub test_set_distance {
 sub test_set_asn {
     my $self = shift;
 
+    return if !$self->{GeoIPASNum};
+
     $self->qp->connection->remote_ip('');
     $self->set_asn();
     my $asn = $self->set_asn();

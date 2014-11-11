@@ -11,13 +11,14 @@ geographic information about incoming connections.
 
 =head1 DESCRIPTION
 
-This plugin saves geographic information in the following connection notes:
+Save geographic information about the sender in the following connection notes:
 
   geoip_country      - 2 char country code
   geoip_country_name - english name of country
   geoip_continent    - 2 char continent code
   geoip_city         - english name of city
   geoip_distance     - distance in kilometers
+  geoip_asn          - network number
 
 And adds entries like this to your logs:
 
@@ -194,6 +195,7 @@ sub geoip2_lookup {
     my $self = shift;
 
     my $ip = $self->qp->connection->remote_ip;
+    return DECLINED if $self->is_localhost($ip);
 
     if ($self->{_geoip2_city}) {
         my $city_rec = $self->{_geoip2_city}->city(ip => $ip);
@@ -221,6 +223,8 @@ sub geoip2_lookup {
 
 sub geoip_lookup {
     my $self = shift;
+
+    return DECLINED if $self->is_localhost($self->qp->connection->remote_ip);
 
     # reopen the DB if Geo::IP failed due to DB update
     $self->open_geoip_db();
@@ -464,4 +468,3 @@ sub get_sender_lat_lon {
     }
     return $lat, $lon;
 }
-
