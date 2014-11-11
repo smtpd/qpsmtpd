@@ -195,6 +195,7 @@ sub geoip2_lookup {
     my $self = shift;
 
     my $ip = $self->qp->connection->remote_ip;
+    return DECLINED if $self->is_localhost($ip);
 
     if ($self->{_geoip2_city}) {
         my $city_rec = $self->{_geoip2_city}->city(ip => $ip);
@@ -222,6 +223,8 @@ sub geoip2_lookup {
 
 sub geoip_lookup {
     my $self = shift;
+
+    return DECLINED if $self->is_localhost($self->qp->connection->remote_ip);
 
     # reopen the DB if Geo::IP failed due to DB update
     $self->open_geoip_db();
