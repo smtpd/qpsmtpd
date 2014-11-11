@@ -1,5 +1,6 @@
 .gitignore
 .travis.yml
+bin/geolite-mirror-simple.pl
 bin/install_deps.pl
 Changes
 config.sample/badhelo
@@ -161,6 +162,7 @@ t/config/flat_auth_pw
 t/config/invalid_resolvable_fromhost
 t/config/norelayclients
 t/config/plugins
+t/config/postgrey_whitelist_clients
 t/config/public_suffix_list
 t/config/rcpthosts
 t/config/relayclients

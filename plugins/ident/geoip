@@ -151,7 +151,7 @@ sub load_geoip1 {
 # Instead, attempt to reopen upon connect if the DB connection fails.
     $self->init_my_country_code();
 
-    $self->register_hook('connect',   'geoip_lookup');
+    $self->register_hook('connect', 'geoip_lookup');
 }
 
 sub load_geoip2 {
