@@ -39,7 +39,7 @@ foreach my $key ( keys %defaults ) {
 }
 $opts{emailAddress} = 'postmaster@'.$opts{CN};
 
-mkdir('ssl') unless -d 'ssl';
+mkdir 'ssl' if ! -d 'ssl';
 
 my $CA_key = 'ssl/qpsmtpd-ca.key';
 my $CA_crt = 'ssl/qpsmtpd-ca.crt';

@@ -1,23 +1,20 @@
 package Qpsmtpd::TcpServer;
-use Qpsmtpd::SMTP;
-use Qpsmtpd::Constants;
-use Socket;
-
-@ISA = qw(Qpsmtpd::SMTP);
 use strict;
 
 use POSIX ();
+use Socket;
+
+use lib 'lib';
+use Qpsmtpd::Constants;
+use parent 'Qpsmtpd::SMTP';
 
 my $has_ipv6 = 0;
 if (
-    eval { require Socket6; }
-    &&
-
-    # INET6 prior to 2.01 will not work; sorry.
-    eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION("2.00"); }
+    eval { require Socket6; } &&
+    eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION('2.51'); }
    )
 {
-    Socket6->import(qw(inet_ntop));
+    Socket6->import('inet_ntop');
     $has_ipv6 = 1;
 }
 
@@ -91,7 +88,7 @@ sub run {
 # Set local client_socket to passed client object for testing socket state on writes
     $self->{__client_socket} = $client;
 
-    $self->load_plugins unless $self->{hooks};
+    $self->load_plugins if !$self->{hooks};
 
     my $rc = $self->start_conversation;
     return if $rc != DONE;
@@ -155,26 +152,24 @@ sub disconnect {
 
 # local/remote port and ip address
 sub lrpip {
-    my ($server, $client, $hisaddr) = @_;
+    my ($self, $server, $client, $hisaddr) = @_;
 
-    my ($port, $iaddr) =
-        ($server->sockdomain == AF_INET)
-      ? (sockaddr_in($hisaddr))
-      : (sockaddr_in6($hisaddr));
     my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) =
-        ($server->sockdomain == AF_INET)
-      ? (sockaddr_in($localsockaddr))
-      : (sockaddr_in6($localsockaddr));
+    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr);
 
-    my $nto_iaddr =
-        ($server->sockdomain == AF_INET)
-      ? (inet_ntoa($iaddr))
-      : (inet_ntop(AF_INET6(), $iaddr));
-    my $nto_laddr =
-        ($server->sockdomain == AF_INET)
-      ? (inet_ntoa($laddr))
-      : (inet_ntop(AF_INET6(), $laddr));
+    if ($server->sockdomain == AF_INET6) {      # IPv6
+        ($port, $iaddr) = sockaddr_in6($hisaddr);
+        ($lport, $laddr) = sockaddr_in6($localsockaddr);
+        $nto_iaddr = inet_ntop(AF_INET6(), $iaddr);
+        $nto_laddr = inet_ntop(AF_INET6(), $laddr);
+    }
+    else {                                     # IPv4
+        ($port, $iaddr) = sockaddr_in($hisaddr);
+        ($lport, $laddr) = sockaddr_in($localsockaddr);
+        $nto_iaddr = inet_ntoa($iaddr);
+        $nto_laddr = inet_ntoa($laddr);
+    }
+
     $nto_iaddr =~ s/::ffff://;
     $nto_laddr =~ s/::ffff://;
 
@@ -182,27 +177,14 @@ sub lrpip {
 }
 
 sub tcpenv {
-    my ($nto_laddr, $nto_iaddr, $no_rdns) = @_;
-
-    my $TCPLOCALIP  = $nto_laddr;
-    my $TCPREMOTEIP = $nto_iaddr;
+    my ($self, $TCPLOCALIP, $TCPREMOTEIP, $no_rdns) = @_;
 
     if ($no_rdns) {
         return $TCPLOCALIP, $TCPREMOTEIP,
-                $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
+               $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
     }
-    my $res = Net::DNS::Resolver->new( dnsrch => 0 );
-    $res->tcp_timeout(3);
-    $res->udp_timeout(3);
-    my $query = $res->query($nto_iaddr, 'PTR');
-    my $TCPREMOTEHOST;
-    if ($query) {
-        foreach my $rr ($query->answer) {
-            next if $rr->type ne 'PTR';
-            $TCPREMOTEHOST = $rr->ptrdname;
-        }
-    }
-    return $TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST || 'Unknown';
+    my ($TCPREMOTEHOST) = $self->resolve_ptr($TCPREMOTEIP) || 'Unknown';
+    return $TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST;
 }
 
 sub check_socket() {

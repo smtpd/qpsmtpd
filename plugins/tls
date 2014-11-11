@@ -99,21 +99,19 @@ sub init {
       or die "Could not create SSL context: $!";
 
     # now extract the password...
-
     $self->ssl_context($ssl_ctx);
 
     # Check for possible AUTH mechanisms
-  HOOK: foreach my $hook (keys %{$qp->hooks}) {
+    foreach my $hook (keys %{$qp->hooks}) {
         no strict 'refs';
-        if ($hook =~ m/^auth-?(.+)?$/) {
-            if (defined $1) {
-                my $hooksub = "hook_$hook";
-                $hooksub =~ s/\W/_/g;
-                *$hooksub = \&bad_ssl_hook;
-            }
-            else {    # at least one polymorphous auth provider
-                *hook_auth = \&bad_ssl_hook;
-            }
+        next if $hook !~ m/^auth-?(.+)?$/;
+        if (defined $1) {
+            my $hooksub = "hook_$hook";
+            $hooksub =~ s/\W/_/g;
+            *$hooksub = \&bad_ssl_hook;
+        }
+        else {    # at least one polymorphous auth provider
+            *hook_auth = \&bad_ssl_hook;
         }
     }
 }
@@ -135,7 +133,7 @@ sub hook_unrecognized_command {
     my ($self, $transaction, $cmd, @args) = @_;
     return DECLINED unless lc $cmd eq 'starttls';
     return DECLINED unless $transaction->notes('tls_enabled');
-    return DENY, "Syntax error (no parameters allowed)" if @args;
+    return DENY, 'Syntax error (no parameters allowed)' if @args;
 
     # OK, now we setup TLS
     $self->qp->respond(220, "Go ahead with TLS");
@@ -143,12 +141,12 @@ sub hook_unrecognized_command {
     unless (_convert_to_ssl($self)) {
 
         # SSL setup failed. Now we must respond to every command with 5XX
-        warn("TLS failed: $@\n");
+        warn "TLS failed: $@\n";
         $transaction->notes('ssl_failed', 1);
-        return DENY, "TLS Negotiation Failed";
+        return DENY, 'TLS Negotiation Failed';
     }
 
-    $self->log(LOGINFO, "TLS setup returning");
+    $self->log(LOGINFO, 'TLS setup returning');
     return DONE;
 }
 
@@ -173,12 +171,12 @@ sub hook_post_connection {
     my ($self, $transaction) = @_;
 
     my $tls_socket = $self->connection->notes('tls_socket');
-    if (defined $tls_socket && $self->connection->notes('tls_socket_is_duped'))
-    {
-        $tls_socket->close;
-        $self->connection->notes('tls_socket',          undef);
-        $self->connection->notes('tls_socked_is_duped', 0);
-    }
+    return DECLINED if !defined $tls_socket;
+    return DECLINED if !$self->connection->notes('tls_socket_is_duped');
+
+    $tls_socket->close;
+    $self->connection->notes('tls_socket',          undef);
+    $self->connection->notes('tls_socked_is_duped', 0);
 
     return DECLINED;
 }
@@ -280,26 +278,27 @@ sub new {
 sub upgrade_socket {
     my UpgradeClientSSL $self = shift;
 
-    unless ($self->{_ssl_started}) {
-        $self->{_stashed_qp}->clear_data();
-        IO::Socket::SSL->start_SSL(
-                      $self->{_stashed_qp}->{sock},
-                      {
-                       SSL_use_cert    => 1,
-                       SSL_cert_file   => $self->{_stashed_plugin}->tls_cert,
-                       SSL_key_file    => $self->{_stashed_plugin}->tls_key,
-                       SSL_ca_file     => $self->{_stashed_plugin}->tls_ca,
-                       SSL_cipher_list => $self->{_stashed_plugin}->tls_ciphers,
-                       SSL_startHandshake => 0,
-                       SSL_server         => 1,
-                       SSL_reuse_ctx => $self->{_stashed_plugin}->ssl_context,
-                      }
-          )
-          or die "Could not upgrade socket to SSL: $!";
-        $self->{_ssl_started} = 1;
+    if (!$self->{_ssl_started}) {
+        $self->event_read($self->{_stashed_qp});
+        return;
     }
 
-    $self->event_read($self->{_stashed_qp});
+    $self->{_stashed_qp}->clear_data();
+    my $sp = $self->{_stashed_plugin};
+    IO::Socket::SSL->start_SSL(
+                $self->{_stashed_qp}->{sock}, {
+                SSL_use_cert    => 1,
+                SSL_cert_file   => $sp->tls_cert,
+                SSL_key_file    => $sp->tls_key,
+                SSL_ca_file     => $sp->tls_ca,
+                SSL_cipher_list => $sp->tls_ciphers,
+                SSL_startHandshake => 0,
+                SSL_server         => 1,
+                SSL_reuse_ctx   => $sp->ssl_context,
+            }
+        )
+        or die "Could not upgrade socket to SSL: $!";
+    $self->{_ssl_started} = 1;
 }
 
 sub event_read {
