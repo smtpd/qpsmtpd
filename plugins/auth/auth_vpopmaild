@@ -81,7 +81,7 @@ sub get_response {
     };
 
     return $response;
-};
+}
 
 sub get_socket {
     my ($self) = @_;
@@ -99,7 +99,7 @@ sub get_socket {
         return;
       };
     return $socket;
-};
+}
 
 __END__
 

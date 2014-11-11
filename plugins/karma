@@ -347,11 +347,11 @@ sub from_handler {
         if ( $sender->host && ".$tld" eq substr($sender->host,-$len,$len) ) {
             $self->log(LOGINFO, "penalizing .$tld envelope sender");
             $self->adjust_karma(-$score);
-        };
-    };
+        }
+    }
 
     return DECLINED;
-};
+}
 
 sub rcpt_handler {
     my ($self,$transaction, $recipient, %args) = @_;
@@ -365,7 +365,7 @@ sub rcpt_handler {
     if ( $count > 1 ) {
         $self->log(LOGINFO, "recipients c: $count ($recipient)");
         $self->connection->notes('recipient_count', $count);
-    };
+    }
 
     return DECLINED if $self->is_immune();
 
@@ -379,13 +379,13 @@ sub rcpt_handler {
     if ( $history > 0 ) {
         $self->log(LOGINFO, "info, good history");
         return DECLINED;
-    };
+    }
 
     my $karma = $self->connection->notes('karma');
     if ( $karma > 0 ) {
         $self->log(LOGINFO, "info, good connection");
         return DECLINED;
-    };
+    }
 
     #  limit # of recipients if host has negative or unknown karma
     return DENY, "too many recipients for karma $karma (h: $history)";
@@ -401,7 +401,7 @@ sub data_handler {
     my $karma = $self->connection->notes('karma');
     if ( $karma < -4 ) {     # bad karma
         return $self->get_reject("very bad karma: $karma");
-    };
+    }
 
     return DECLINED;
 }
@@ -461,8 +461,8 @@ sub illegal_envelope_format {
     if ( uc substr($addr,0,6) ne 'FROM:<' && uc substr($addr,0,4) ne 'TO:<' ) {
         $self->log(LOGINFO, "illegal envelope address format: $addr" );
         $self->adjust_karma(-2);
-    };
-};
+    }
+}
 
 sub parse_db_record {
     my ($self, $value) = @_;

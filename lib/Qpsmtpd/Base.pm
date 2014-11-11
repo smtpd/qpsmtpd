@@ -6,7 +6,7 @@ use Net::IP;
 
 sub new {
     return bless {}, shift;
-};
+}
 
 sub tildeexp {
     my ($self, $path) = @_;
@@ -44,7 +44,7 @@ sub is_ipv6 {
     my ($self, $ip) = @_;
     return if !$ip;
     return Net::IP::ip_is_ipv6($ip);
-};
+}
 
 sub get_resolver {
     my ($self, %args) = @_;

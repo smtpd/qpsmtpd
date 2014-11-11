@@ -33,7 +33,7 @@ sub setup_test_headers {
     $self->qp->transaction->notes('whitelistsender', 0);
     $self->connection->notes('whitelisthost', 0);
     $self->connection->notes('naughty', 0);
-};
+}
 
 sub test_invalid_date_range {
     my $self = shift;
@@ -73,7 +73,7 @@ sub test_invalid_date_range {
     my $past_1   = strftime "%a %b %e %H:%M:%S %Y", localtime time -  86400; #1d
     $r = $self->invalid_date_range( $past_1 );
     ok( ! $r, "a little old +" );
-};
+}
 
 sub test_hook_data_post {
     my $self = shift;
@@ -119,4 +119,4 @@ sub test_hook_data_post {
     $self->{_args}{reject_type} = 'perm';
     ($code, $mess) = $self->hook_data_post( $transaction );
     cmp_ok( DENY, '==', $code, "deny ( $code, $mess )" );
-};
+}

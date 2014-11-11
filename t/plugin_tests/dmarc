@@ -29,7 +29,7 @@ sub setup_test_headers {
     $transaction->body_write( "test message body " );
 
     $self->qp->connection->relay_client(0);
-};
+}
 
 sub test_fetch_dmarc_record {
     my $self = shift;
@@ -37,12 +37,12 @@ sub test_fetch_dmarc_record {
     foreach ( qw/ tnpi.net nictool.com / ) {
         my @matches = $self->fetch_dmarc_record($_);
         cmp_ok( scalar @matches, '==', 1, 'fetch_dmarc_record');
-    };
+    }
     foreach ( qw/ example.com / ) {
         my @matches = $self->fetch_dmarc_record($_);
         cmp_ok( scalar @matches, '==', 0, 'fetch_dmarc_record');
-    };
-};
+    }
+}
 
 sub test_get_organizational_domain {
     my $self = shift;
@@ -53,7 +53,7 @@ sub test_get_organizational_domain {
     cmp_ok( $self->get_organizational_domain('test.www.tnpi.net'), 'eq', 'tnpi.net' );
     cmp_ok( $self->get_organizational_domain('www.example.co.uk'), 'eq', 'example.co.uk' );
     cmp_ok( $self->get_organizational_domain('plus.google.com'),   'eq', 'google.com' );
-};
+}
 
 sub test_discover_policy {
     my $self = shift;
@@ -61,4 +61,4 @@ sub test_discover_policy {
     $self->setup_test_headers();
 
     ok( $self->discover_policy( 'tnpi.net' ), 'discover_policy' );
-};
+}

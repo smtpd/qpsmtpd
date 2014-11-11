@@ -276,7 +276,7 @@ sub store_auth_results {
     my $ar = join('; ', $auths, $result);
     $self->log(LOGDEBUG, "auth-results: $ar");
     $self->qp->connection->notes('authentication_results', $ar );
-};
+}
 
 sub is_immune {
     my $self = shift;

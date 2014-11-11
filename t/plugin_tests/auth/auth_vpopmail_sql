@@ -10,7 +10,7 @@ sub register_tests {
     if ( $@ ) {
         warn "skipping auth_vpopmail_sql tests, is DBI installed?\n";
         return;
-    };
+    }
     $self->register_test("auth_vpopmail_sql");
 }
 
@@ -21,7 +21,7 @@ sub auth_vpopmail_sql {
     my $dbh = $self->get_db_handle() or do {
             foreach ( 0..2 ) {
                 ok( 1, "skipped (no DB)" );
-            };
+            }
             return;
         };
     ok( $dbh, "auth_vpopmail_sql, got a dbh" );
@@ -30,9 +30,9 @@ sub auth_vpopmail_sql {
     if ( ! $vuser || ! $vuser->{pw_passwd} ) {
         foreach ( 0..1 ) {
             ok( 1, "no example.com domain" );
-        };
+        }
         return;
-    };
+    }
     ok( ref $vuser, "found example.com domain" );
 
     ok( $self->auth_vmysql(

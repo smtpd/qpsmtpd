@@ -35,7 +35,7 @@ sub test_badmailfrom_is_immune_sender {
     $address = Qpsmtpd::Address->new( '<matt@example.com>' );
     $transaction->sender($address);
     ok( ! $self->is_immune_sender( $transaction->sender, ['bad@example.com'] ), "false");
-};
+}
 
 sub test_badmailfrom_hook_mail {
     my $self = shift;
@@ -60,7 +60,7 @@ sub test_badmailfrom_hook_mail {
     ($r, $err) = $self->hook_mail( $transaction, $address );
     cmp_ok( $r, '==', DENY, "hook_mail rc");
     cmp_ok( $err, 'eq', 'Yer a spammin bastert', "custom reason");
-};
+}
 
 sub test_badmailfrom_match {
     my $self = shift;
@@ -87,7 +87,7 @@ sub test_badmailfrom_match {
 
     ok( ! $self->is_match( 'matt@test.net', 'test.not$', 'tnpi.net' ),
         "pattern non-match");
-};
+}
 
 sub _reset_connection_flags {
     my $self = shift;
@@ -95,5 +95,5 @@ sub _reset_connection_flags {
     $self->qp->connection->notes('whitelisthost', 0);
     $self->connection->notes('naughty',0);
     $self->connection->notes('rejected', 0);
-};
+}
 

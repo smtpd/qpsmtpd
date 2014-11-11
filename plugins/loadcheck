@@ -154,5 +154,5 @@ sub get_load_method {
 
     $self->log(LOGERROR, "unable to acquire system load");
     return;
-};
+}
 

@@ -16,7 +16,7 @@ sub register_tests {
         warn "Could not load ClamAV::Client";
         $self->register_test('test_register');
         $self->register_test('test_get_clamd');
-    };
+    }
 
     $self->register_test('test_err_and_return');
     $self->register_test('test_get_filename');
@@ -40,7 +40,7 @@ sub test_register {
     ok( ! $self->{_args}{deny_viruses}, "deny_viruses 2");
     is( $self->{_args}{max_size}, 200,  "max_size 2");
     ok( !$self->{_args}{scan_all},      "scan_all 2");
-};
+}
 
 sub test_err_and_return {
     my $self = shift;

@@ -100,7 +100,7 @@ sub get_default_field_widths {
     );
 
     return %widths;
-};
+}
 
 sub handle_plugin {
     my ($message, $plugin, $pid, $line) = @_;

@@ -11,7 +11,7 @@ my $test_email = 'user@example.com';
 my @greydbs = qw( denysoft_greylist.dbm denysoft_greylist.dbm.lock );
 foreach ( @greydbs ) {
     unlink $_ if -f $_;
-};
+}
 
 sub register_tests {
     my $self = shift;
@@ -98,7 +98,7 @@ sub test_hook_data {
     $transaction->notes('whitelistrcpt', 1);
     ($code, $mess) = $self->hook_data( $transaction );
     cmp_ok( $code, '==', DECLINED, "missing recipients");
-};
+}
 
 sub test_get_db_key {
     my $self = shift;
@@ -128,14 +128,14 @@ sub test_get_db_key {
     $self->{_args}{recipient} = 1;
     $key = $self->get_db_key( $address, $address );
     cmp_ok( $key, 'eq', "3232235777:$test_email:$test_email", "db key: $key");
-};
+}
 
 sub test_get_db_location {
     my $self = shift;
 
     my $db = $self->get_db_location();
     ok( $db, "db location: $db");
-};
+}
 
 sub test_exclude {
     my ( $self ) = @_;
@@ -144,7 +144,7 @@ sub test_exclude {
     ok( $self->exclude(), "Relay client results in exclude() hit" );
     $self->connection->relay_client(0);
     ok( ! $self->exclude(), "Non-relay client results in exclude() miss" );
-};
+}
 
 sub test_greylist_geoip {
     my $self = shift;
@@ -158,14 +158,14 @@ sub test_greylist_geoip {
         $self->connection->notes('geoip_country', $cc );
         ok( $self->geoip_match(), "match + ($cc)");
         ok( $self->exclude(),     "match + ($cc) results in exclude() hit");
-    };
+    }
 
     foreach my $cc ( @invalid ) {
         $self->connection->notes('geoip_country', $cc );
         ok( ! $self->geoip_match(), "bad - ($cc)");
         ok( ! $self->exclude(),     "miss - ($cc) results in exclude() miss");
-    };
-};
+    }
+}
 
 sub test_greylist_p0f_genre {
     my $self = shift;
@@ -226,5 +226,5 @@ sub _reset_transaction {
     $self->qp->transaction->notes('tls_enabled',0);
     $self->{_args}{p0f} = undef;
     $self->{_args}{geoip} = undef;
-};
+}
 

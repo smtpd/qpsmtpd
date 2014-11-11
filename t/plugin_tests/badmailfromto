@@ -30,5 +30,5 @@ sub test_badmailfromto_is_sender_immune {
 
     $transaction->sender( Qpsmtpd::Address->new( '<matt@example.com>' ) );
     ok( ! $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "false");
-};
+}
 

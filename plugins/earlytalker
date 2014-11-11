@@ -138,7 +138,7 @@ sub wait_length {
         return $self->connection->notes('earlytalker_wait');
     }
     return $self->{_args}{wait};
-};
+}
 
 sub apr_connect_handler {
     my ($self, $transaction) = @_;
