@@ -235,7 +235,7 @@ $SIG{HUP} = sub {
     $qpsmtpd->load_plugins;
     $qpsmtpd->spool_dir;
     $qpsmtpd->size_threshold;
-}
+};
 
 while (1) {
     REAPER();
