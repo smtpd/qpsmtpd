@@ -27,6 +27,7 @@ sub register_tests {
         $self->register_test('test_set_continent');
         $self->register_test('test_set_distance');
         $self->register_test('test_set_asn');
+        $self->register_test('test_add_headers');
     }
 }
 
@@ -44,6 +45,30 @@ sub test_geoip2_lookup {
     cmp_ok( $self->connection->notes('geoip_country_name'), 'eq', 'United States', "24.24.24.24 is in country United States");
     cmp_ok( $self->connection->notes('geoip_continent'), 'eq', 'NA', "24.24.24.24 is in continent NA");
     cmp_ok( $self->connection->notes('geoip_city'), 'eq', 'Deer Park', "24.24.24.24 is in city of Deer Park");
+}
+
+sub test_add_headers {
+    my ( $self ) = @_;
+    my @notes = qw( geoip_country geoip_continent geoip_city geoip_asn );
+    $self->connection->notes( $_ => "test $_" ) for @notes;
+    my $header = $self->transaction->header( Mail::Header->new );
+    my @tags = (qw( X-GeoIP-Country X-GeoIP-Continent X-GeoIP-City X-GeoIP-ASN ));
+    $header->add( $_ => 'DELETETHIS' ) for @tags;
+    $self->add_headers($self->transaction);
+    is( $self->all_headers('X-GeoIP-Country'), 'test geoip_country',
+        'X-GeoIP-Country header added' );
+    is( $self->all_headers('X-GeoIP-Continent'), 'test geoip_continent',
+        'X-GeoIP-Continent header added' );
+    is( $self->all_headers('X-GeoIP-City'), 'test geoip_city',
+        'X-GeoIP-City header added' );
+    is( $self->all_headers('X-GeoIP-ASN'), 'test geoip_asn',
+        'X-GeoIP-ASN header added' );
+}
+
+sub all_headers {
+    # Return all instances of a given message header
+    my ( $self, $tag ) = @_;
+    return join " | ", map { chomp $_; $_ } $self->transaction->header->get($tag);
 }
 
 sub test_geoip_lookup {

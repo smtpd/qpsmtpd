@@ -73,6 +73,14 @@ The path to the GeoIP database directory.
 
 Default: /usr/local/share/GeoIP
 
+=head2 add_headers <true|false>
+
+Add message headers with GeoIP data
+
+  ident/geoip [ add_headers (true|false) ]
+
+Default: true
+
 =head1 LIMITATIONS
 
 The distance calculations are more concerned with being fast than accurate.
@@ -129,8 +137,18 @@ sub register {
     $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
-    $self->load_geoip2() and return;
-    $self->load_geoip1();
+    $self->load_geoip() or return;
+    my $enabled = $self->{_args}{add_headers};
+    $enabled = 'true' if ! defined $enabled;
+    return if $enabled =~ /false/i;
+    $self->register_hook( data_post => 'add_headers' );
+}
+
+sub load_geoip {
+    my ( $self ) = @_;
+    $self->load_geoip2() and return 1;
+    $self->load_geoip1() and return 1;
+    return 0;
 }
 
 sub load_geoip1 {
@@ -152,6 +170,7 @@ sub load_geoip1 {
     $self->init_my_country_code();
 
     $self->register_hook('connect', 'geoip_lookup');
+    return 1;
 }
 
 sub load_geoip2 {
@@ -189,6 +208,16 @@ sub load_geoip2 {
     }
 
     return;
+}
+
+sub add_headers {
+    my ( $self, $txn ) = @_;
+    for my $h (qw( Country Continent City ASN )) {
+        my $note = lc "geoip_$h";
+        next if ! $self->connection->notes($note);
+        $txn->header->delete("X-GeoIP-$h");
+        $txn->header->add( "X-GeoIP-$h", $self->connection->notes($note), 0 );
+    }
 }
 
 sub geoip2_lookup {
