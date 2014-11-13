@@ -73,6 +73,14 @@ The path to the GeoIP database directory.
 
 Default: /usr/local/share/GeoIP
 
+=head2 add_headers <true|false>
+
+Add message headers with GeoIP data
+
+  ident/geoip [ add_headers (true|false) ]
+
+Default: true
+
 =head1 LIMITATIONS
 
 The distance calculations are more concerned with being fast than accurate.
@@ -130,7 +138,7 @@ sub register {
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
     $self->load_geoip() or return;
-    return if ! $self->qp->config('add_geoip_headers');
+    return if $self->{_args}{add_headers} !~ /false/i;
     $self->register_hook( data_post => 'add_headers' );
 }
 
