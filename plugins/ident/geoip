@@ -404,7 +404,7 @@ sub set_asn {
     my ($self, $ip) = @_;
     $ip ||= $self->qp->connection->remote_ip;
 
-    if (Qpsmtpd::Base->is_ipv6($ip)) {
+    if ($self->is_ipv6($ip)) {
         return $self->set_asn_ipv6($ip);
     }
     return if ! $self->{GeoIPASNum};

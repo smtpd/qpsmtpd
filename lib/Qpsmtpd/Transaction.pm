@@ -4,7 +4,6 @@ use Qpsmtpd;
 use strict;
 use warnings;
 
-use Qpsmtpd::Base;
 use Qpsmtpd::Constants;
 
 use IO::File qw(O_RDWR O_CREAT);
