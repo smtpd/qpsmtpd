@@ -6,7 +6,7 @@ use Qpsmtpd::Constants;
 sub register {
     my $self = shift;
     $self->{_fortune} = '/usr/games/fortune';
-    return if ! $self->{_fortune};
+    return if ! -x $self->{_fortune};
 
     # if fortune not installed, don't register hook
     $self->register_hook('quit', 'fortune');
