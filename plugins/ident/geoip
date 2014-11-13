@@ -138,7 +138,7 @@ sub register {
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
     $self->load_geoip() or return;
-    return if $self->{_args}{add_headers} !~ /false/i;
+    return if defined $self->{_args}{add_headers} and $self->{_args}{add_headers} !~ /false/i;
     $self->register_hook( data_post => 'add_headers' );
 }
 
