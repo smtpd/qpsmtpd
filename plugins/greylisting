@@ -255,7 +255,7 @@ sub exclude_host {
     if ( $pattern =~ /^\/(.*)\/$/ ) {
         push @{ $self->{_exclude_re} }, qr/$1/;
     }
-    elsif ( Qpsmtpd::Base->is_valid_ip($pattern) ) {
+    elsif ( $self->is_valid_ip($pattern) ) {
         $self->{_exclude_ip}{$pattern} = 1;
     }
     else {

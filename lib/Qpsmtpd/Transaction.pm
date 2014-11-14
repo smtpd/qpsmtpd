@@ -1,10 +1,8 @@
 package Qpsmtpd::Transaction;
-use Qpsmtpd;
-@ISA = qw(Qpsmtpd);
 use strict;
 use warnings;
 
-use Qpsmtpd::Base;
+use parent 'Qpsmtpd';
 use Qpsmtpd::Constants;
 
 use IO::File qw(O_RDWR O_CREAT);

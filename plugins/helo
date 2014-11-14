@@ -229,7 +229,6 @@ use warnings;
 
 use Net::IP;
 
-use Qpsmtpd::Base;
 use Qpsmtpd::Constants;
 
 sub register {
@@ -342,7 +341,7 @@ sub is_regex_match {
 
 sub invalid_localhost {
     my ($self, $host) = @_;
-    if (Qpsmtpd::Base->is_localhost($self->qp->connection->remote_ip)) {
+    if ($self->is_localhost($self->qp->connection->remote_ip)) {
         $self->log(LOGDEBUG, "pass, is localhost");
         return;
     }
@@ -357,7 +356,7 @@ sub invalid_localhost {
 
 sub is_plain_ip {
     my ($self, $host) = @_;
-    return if !Qpsmtpd::Base->is_valid_ip($host);
+    return if ! $self->is_valid_ip($host);
 
     $self->log(LOGDEBUG, "fail, plain IP");
     return "Plain IP is invalid HELO hostname (RFC 2821)", "plain IP";
@@ -369,7 +368,7 @@ sub is_address_literal {
     my ($ip) = $host =~ /^\[(.*)\]/;  # strip off any brackets
     return if !$ip;   # no brackets, not a literal
 
-    return if !Qpsmtpd::Base->is_valid_ip($ip);
+    return if ! $self->is_valid_ip($ip);
 
     $self->log(LOGDEBUG, "fail, bracketed IP");
     return "RFC 2821 allows an address literal, but we do not","bracketed IP";
@@ -377,7 +376,7 @@ sub is_address_literal {
 
 sub is_forged_literal {
     my ($self, $host) = @_;
-    return if !Qpsmtpd::Base->is_valid_ip($host);
+    return if ! $self->is_valid_ip($host);
 
   # should we add exceptions for reserved internal IP space? (192.168,10., etc)
     $host = substr $host, 1, -1;
