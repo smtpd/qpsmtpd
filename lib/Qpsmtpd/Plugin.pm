@@ -164,7 +164,7 @@ sub isa_plugin {
     $self->compile($self->plugin_name . "_isa_$cleanParent",
                    $newPackage, "$parent_dir/$parent");
     warn "---- $newPackage\n";
-    no strict 'refs'; ## no critic (strict)
+    no strict 'refs';    ## no critic (strict)
     push @{"${currentPackage}::ISA"}, $newPackage;
 }
 
@@ -208,7 +208,7 @@ sub compile {
     $eval =~ m/(.*)/s;
     $eval = $1;
 
-    eval $eval;  ## no critic (Eval)
+    eval $eval;                             ## no critic (Eval)
     die "eval $@" if $@;
 }
 
@@ -272,10 +272,10 @@ sub store_auth_results {
     my $auths = $self->qp->connection->notes('authentication_results') or do {
         $self->qp->connection->notes('authentication_results', $result);
         return;
-        };
+    };
     my $ar = join('; ', $auths, $result);
     $self->log(LOGDEBUG, "auth-results: $ar");
-    $self->qp->connection->notes('authentication_results', $ar );
+    $self->qp->connection->notes('authentication_results', $ar);
 }
 
 sub is_immune {
@@ -306,9 +306,9 @@ sub is_naughty {
     my ($self, $setit) = @_;
 
     # see plugins/naughty
-    return $self->connection->notes('naughty') if ! defined $setit;
+    return $self->connection->notes('naughty') if !defined $setit;
 
-    $self->connection->notes('naughty', $setit);
+    $self->connection->notes('naughty',  $setit);
     $self->connection->notes('rejected', $setit);
 
     if ($self->connection->notes('naughty')) {
@@ -342,7 +342,7 @@ sub _register_standard_hooks {
         my $hooksub = "hook_$hook";
         $hooksub =~ s/\W/_/g;
         next if !$plugin->can($hooksub);
-        $plugin->register_hook($hook, $hooksub)
+        $plugin->register_hook($hook, $hooksub);
     }
 }
 
