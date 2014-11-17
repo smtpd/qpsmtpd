@@ -218,6 +218,7 @@ sub add_headers {
         $txn->header->delete("X-GeoIP-$h");
         $txn->header->add( "X-GeoIP-$h", $self->connection->notes($note), 0 );
     }
+    return DECLINED;
 }
 
 sub geoip2_lookup {
