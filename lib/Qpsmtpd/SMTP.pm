@@ -1,9 +1,8 @@
 package Qpsmtpd::SMTP;
 use strict;
 
-use base 'Qpsmtpd';
-
-use Carp;
+#use lib 'lib';
+use parent 'Qpsmtpd';
 
 #use Data::Dumper;
 use POSIX qw(strftime);
@@ -18,6 +17,9 @@ use Qpsmtpd::Auth;
 use Qpsmtpd::Command;
 
 my %auth_mechanisms = ();
+my %loaded = (
+    auth_mechanisms => 0,
+);
 
 # this is only good for forkserver
 # can't set these here, cause forkserver resets them
@@ -154,144 +156,133 @@ sub helo {
     my ($ok, $hello_host, @stuff) =
       Qpsmtpd::Command->parse('helo', $line, $msg[0]);
 
-    return $self->respond(501,
-                          "helo requires domain/address - see RFC-2821 4.1.1.1")
-      unless $hello_host;
-    my $conn = $self->connection;
-    return $self->respond(503, "but you already said HELO ...") if $conn->hello;
+    return $self->helo_no_host('helo') if !$hello_host;
+    return $self->helo_repeat_host() if $self->connection->hello;
 
-    $self->run_hooks("helo", $hello_host, @stuff);
+    $self->run_hooks('helo', $hello_host, @stuff);
+}
+
+sub helo_no_host {
+    my ($self, $cmd) = @_;
+    return $self->respond(501, "$cmd requires domain/address - see RFC-2821 4.1.1.1");
+}
+
+sub helo_repeat_host {
+    my ($self) = @_;
+    return $self->respond(503, 'but you already said HELO ...');
+}
+
+sub helo_hi_msg {
+    my $self = shift;
+    return $self->config('me') . ' Hi '
+        . $self->connection->remote_info . ' ['
+        . $self->connection->remote_ip
+        . ']';
+}
+
+sub is_deny_response {
+    my ($self, $rc, $msg) = @_;
+    $self->respond(550, @$msg) if $rc == DENY     || $rc == DENY_DISCONNECT;
+    $self->respond(450, @$msg) if $rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT;
+    if ($rc == DENY || $rc == DENYSOFT) {
+        return 1;
+    }
+    if ($rc == DENY_DISCONNECT || $rc == DENYSOFT_DISCONNECT) {
+        $self->disconnect;
+        return 1;
+    }
+    return;
 }
 
 sub helo_respond {
     my ($self, $rc, $msg, $args) = @_;
-    my ($hello_host) = @$args;
-    if ($rc == DONE) {
+    return if $rc == DONE;   # do nothing
+    
+    $self->is_deny_response($rc, $msg) and return;
+    
+    my $conn = $self->connection;
+    $conn->hello('helo');
+    $conn->hello_host($args->[0]);  # store helo hostname
+    $self->transaction;
 
-        # do nothing:
-        1;
-    }
-    elsif ($rc == DENY) {
-        $self->respond(550, @$msg);
-    }
-    elsif ($rc == DENYSOFT) {
-        $self->respond(450, @$msg);
-    }
-    elsif ($rc == DENY_DISCONNECT) {
-        $self->respond(550, @$msg);
-        $self->disconnect;
-    }
-    elsif ($rc == DENYSOFT_DISCONNECT) {
-        $self->respond(450, @$msg);
-        $self->disconnect;
-    }
-    else {
-        my $conn = $self->connection;
-        $conn->hello("helo");
-        $conn->hello_host($hello_host);
-        $self->transaction;
-        $self->respond(
-                       250,
-                       $self->config('me') . " Hi "
-                         . $conn->remote_info . " ["
-                         . $conn->remote_ip
-                         . "]; I am so happy to meet you."
-                      );
-    }
+    $self->respond( 250, $self->helo_hi_msg . '; I am so happy to meet you.');
 }
 
 sub ehlo {
     my ($self, $line) = @_;
-    my ($rc,   @msg)  = $self->run_hooks('ehlo_parse');
+    my ($rc,   @msg ) = $self->run_hooks('ehlo_parse');
     my ($ok, $hello_host, @stuff) =
       Qpsmtpd::Command->parse('ehlo', $line, $msg[0]);
-    return $self->respond(501,
-                          "ehlo requires domain/address - see RFC-2821 4.1.1.1")
-      unless $hello_host;
-    my $conn = $self->connection;
-    return $self->respond(503, "but you already said HELO ...") if $conn->hello;
 
-    $self->run_hooks("ehlo", $hello_host, @stuff);
+    return $self->helo_no_host('ehlo') if !$hello_host;
+    return $self->helo_repeat_host() if $self->connection->hello;
+
+    $self->run_hooks('ehlo', $hello_host, @stuff);
 }
 
 sub ehlo_respond {
     my ($self, $rc, $msg, $args) = @_;
-    my ($hello_host) = @$args;
-    if ($rc == DONE) {
+    
+    return if $rc == DONE;
+    $self->is_deny_response($rc, $msg) and return;
 
-        # do nothing:
-        1;
-    }
-    elsif ($rc == DENY) {
-        $self->respond(550, @$msg);
-    }
-    elsif ($rc == DENYSOFT) {
-        $self->respond(450, @$msg);
-    }
-    elsif ($rc == DENY_DISCONNECT) {
-        $self->respond(550, @$msg);
-        $self->disconnect;
-    }
-    elsif ($rc == DENYSOFT_DISCONNECT) {
-        $self->respond(450, @$msg);
-        $self->disconnect;
-    }
-    else {
-        my $conn = $self->connection;
-        $conn->hello("ehlo");
-        $conn->hello_host($hello_host);
-        $self->transaction;
+    my $conn = $self->connection;
+    $conn->hello('ehlo');
+    $conn->hello_host($args->[0]);  # store helo hostname
+    $self->transaction;
 
-        my @capabilities =
-          $self->transaction->notes('capabilities')
-          ? @{$self->transaction->notes('capabilities')}
-          : ();
-
-        # Check for possible AUTH mechanisms
-      HOOK: foreach my $hook (keys %{$self->hooks}) {
-            if ($hook =~ m/^auth-?(.+)?$/) {
-                if (defined $1) {
-                    $auth_mechanisms{uc($1)} = 1;
-                }
-                else {    # at least one polymorphous auth provider
-                    %auth_mechanisms = map { $_, 1 } qw(PLAIN CRAM-MD5 LOGIN);
-                    last HOOK;
-                }
-            }
-        }
-
-        # Check if we should only offer AUTH after TLS is completed
-        my $tls_before_auth = (
-                               $self->config('tls_before_auth')
-                               ? ($self->config('tls_before_auth'))[0]
-                                 && $self->transaction->notes('tls_enabled')
-                               : 0
-                              );
-        if (%auth_mechanisms && !$tls_before_auth) {
-            push @capabilities, 'AUTH ' . join(" ", keys(%auth_mechanisms));
-            $self->{_commands}->{'auth'} = "";
-        }
-
-        $self->respond(
-                       250,
-                       $self->config("me") . " Hi "
-                         . $conn->remote_info . " ["
-                         . $conn->remote_ip . "]",
-                       "PIPELINING",
-                       "8BITMIME",
-                       (
-                        $self->config('databytes')
-                        ? "SIZE " . ($self->config('databytes'))[0]
-                        : ()
-                       ),
-                       @capabilities,
-                      );
+    my @capabilities = ();
+    if ($self->transaction->notes('capabilities')) {
+        @capabilities = @{$self->transaction->notes('capabilities')};
     }
+
+    # Check for possible AUTH mechanisms
+    if (!$loaded{auth_mechanisms}) {
+        $self->auth_load_mechanisms();
+    }
+
+    my $offer_auth = 1;
+    if ($self->transaction->notes('tls_enabled') && ($self->config('tls_before_auth'))[0]) {
+        $offer_auth = 0;
+    }
+
+    if (%auth_mechanisms && $offer_auth) {
+        push @capabilities, 'AUTH ' . join(' ', keys(%auth_mechanisms));
+        $self->{_commands}{auth} = '';
+    }
+
+    $self->respond( 250, $self->helo_hi_msg,
+                    'PIPELINING',
+                    '8BITMIME',
+                    $self->ehlo_size(),
+                    @capabilities,
+                    );
 }
+
+sub ehlo_size {
+    my $self = shift;
+    return '' if ! $self->config('databytes');
+    return 'SIZE ' . ($self->config('databytes'))[0];
+};
 
 sub auth {
     my ($self, $line) = @_;
     $self->run_hooks('auth_parse', $line);
+}
+
+sub auth_load_mechanisms {
+    my $self = shift;
+    foreach my $hook (keys %{$self->hooks}) {
+        next if $hook !~ m/^auth-?(.+)?$/;
+        if (defined $1) {
+            $auth_mechanisms{uc($1)} = 1;
+            next;
+        }
+        # at least one polymorphous auth provider
+        %auth_mechanisms = map { $_, 1 } qw(PLAIN CRAM-MD5 LOGIN);
+        last;
+    }
+    $loaded{auth_mechanisms} = 1;
 }
 
 sub auth_parse_respond {
@@ -300,27 +291,28 @@ sub auth_parse_respond {
 
     my ($ok, $mechanism, @stuff) =
       Qpsmtpd::Command->parse('auth', $line, $msg->[0]);
-    return $self->respond(501, $mechanism || "Syntax error in command")
-      unless ($ok == OK);
 
-    $mechanism = lc($mechanism);
+    return $self->respond(501, $mechanism || "Syntax error in command")
+      if $ok != OK;
+
+    $mechanism = lc $mechanism;
 
     #they AUTH'd once already
     return $self->respond(503, "but you already said AUTH ...")
       if (defined $self->{_auth} && $self->{_auth} == OK);
 
     return $self->respond(503, "AUTH not defined for HELO")
-      if ($self->connection->hello eq "helo");
+      if $self->connection->hello eq 'helo';
 
     return $self->respond(503, "SSL/TLS required before AUTH")
       if (($self->config('tls_before_auth'))[0]
           && $self->transaction->notes('tls_enabled'));
 
-    # we don't have a plugin implementing this auth mechanism, 504
     if (exists $auth_mechanisms{uc($mechanism)}) {
         return $self->{_auth} = Qpsmtpd::Auth::SASL($self, $mechanism, @stuff);
     }
 
+    # no plugin implementing this auth mechanism
     $self->respond(504, "Unimplemented authentication mechanism: $mechanism");
     return DENY;
 }
@@ -479,7 +471,7 @@ sub rcpt_pre_respond {
     }
     $self->log(LOGDEBUG, "to email address : [$rcpt]");
     return $self->respond(501, "could not parse recipient")
-      unless $rcpt =~ /^<.*>$/;
+      if $rcpt !~ /^<.*>$/;
 
     $rcpt = $self->address($rcpt);
 
@@ -643,52 +635,50 @@ sub data {
 
 sub data_respond {
     my ($self, $rc, $msg, $args) = @_;
-    if ($rc == DONE) {
-        return 1;
-    }
-    elsif ($rc == DENY) {
+
+    return 1 if $rc == DONE;   # do nothing
+
+    if ($rc == DENY || $rc == DENY_DISCONNECT) {
         $msg->[0] ||= "Message denied";
         $self->respond(554, @$msg);
-        $self->reset_transaction;
-        return 1;
     }
-    elsif ($rc == DENYSOFT) {
+    if ($rc == DENYSOFT || $rc == DENYSOFT_DISCONNECT) {
         $msg->[0] ||= "Message denied temporarily";
         $self->respond(451, @$msg);
+    }
+
+    if ($rc == DENY || $rc == DENYSOFT) {
         $self->reset_transaction;
         return 1;
     }
-    elsif ($rc == DENY_DISCONNECT) {
-        $msg->[0] ||= "Message denied";
-        $self->respond(554, @$msg);
+
+    if ($rc == DENY_DISCONNECT || $rc == DENYSOFT_DISCONNECT) {
         $self->disconnect;
         return 1;
     }
-    elsif ($rc == DENYSOFT_DISCONNECT) {
-        $msg->[0] ||= "Message denied temporarily";
-        $self->respond(421, @$msg);
-        $self->disconnect;
+
+    if (!$self->transaction->sender) {
+        $self->respond(503, 'MAIL first');
         return 1;
-    }
-    $self->respond(503, "MAIL first"), return 1
-      unless $self->transaction->sender;
-    $self->respond(503, "RCPT first"), return 1
-      unless $self->transaction->recipients;
-    $self->respond(354, "go ahead");
+    };
+    if (! $self->transaction->recipients) {
+        $self->respond(503, 'RCPT first');
+        return 1;
+    };
+    $self->respond(354, 'go ahead');
 
     my $buffer = '';
     my $size   = 0;
     my $i      = 0;
-    my $max_size =
-      ($self->config('databytes'))[0] || 0; # this should work in scalar context
-    my $blocked = "";
+    my $max_size = ($self->config('databytes'))[0] || 0;
+    my $blocked = '';
     my %matches;
     my $in_header = 1;
     my $complete  = 0;
 
     $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
 
-    my $header = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
+    my $header = Mail::Header->new(Modify => 0, MailFrom => 'COERCE');
 
     my $timeout = $self->config('timeout');
     while (defined($_ = $self->getline($timeout))) {
@@ -698,16 +688,15 @@ sub data_respond {
         }
         $i++;
 
-    # should probably use \012 and \015 in these checks instead of \r and \n ...
-
         # Reject messages that have either bare LF or CR. rjkaes noticed a
         # lot of spam that is malformed in the header.
 
-        ($_ eq ".\n" or $_ eq ".\r")
-          and $self->respond(421, "See http://smtpd.develooper.com/barelf.html")
-          and return $self->disconnect;
+        if ($_ eq ".\n" || $_ eq ".\r") {
+            $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
+            $self->disconnect;
+            return 1;
+        }
 
-# add a transaction->blocked check back here when we have line by line plugin access...
         unless (($max_size and $size > $max_size)) {
             s/\r\n$/\n/;
             s/^\.\./\./;
@@ -715,7 +704,7 @@ sub data_respond {
                 $in_header = 0;
                 my @headers = split /^/m, $buffer;
 
-        # ... need to check that we don't reformat any of the received lines.
+        # ... don't reformat any of the received lines.
         #
         # 3.8.2 Received Lines in Gatewaying
         #   When forwarding a message into or out of the Internet environment, a
@@ -724,27 +713,26 @@ sub data_respond {
 
                 $header->extract(\@headers);
 
-#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.develooper.com/");
+#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.github.io/qpsmtpd/");
 
-                $buffer = "";
+                $buffer = '';
 
                 $self->transaction->header($header);
 
                 my ($rc, $msg) = $self->run_hooks('data_headers_end');
                 if ($rc == DENY_DISCONNECT) {
-                    $self->respond(554, $msg || "Message denied");
+                    $self->respond(554, $msg || 'Message denied');
                     $self->disconnect;
                     return 1;
                 }
                 elsif ($rc == DENYSOFT_DISCONNECT) {
-                    $self->respond(421, $msg || "Message denied temporarily");
+                    $self->respond(421, $msg || 'Message denied temporarily');
                     $self->disconnect;
                     return 1;
                 }
 
                 # Save the start of just the body itself
                 $self->transaction->set_body_start();
-
             }
 
             # grab a copy of all of the header lines
@@ -764,26 +752,24 @@ sub data_respond {
 
     $self->log(LOGDEBUG, "max_size: $max_size / size: $size");
 
-    # if we get here without seeing a terminator, the connection is
-    # probably dead.
-    unless ($complete) {
-        $self->respond(451, "Incomplete DATA");
-        $self->reset_transaction;    # clean up after ourselves
+    # if we get here without seeing a terminator, the connection is dead.
+    if (!$complete) {
+        $self->respond(451, 'Incomplete DATA');
+        $self->reset_transaction;
         return 1;
     }
 
-#$self->respond(550, $self->transaction->blocked),return 1 if ($self->transaction->blocked);
-    if ($max_size and $size > $max_size) {
+    if ($max_size && $size > $max_size) {
         $self->log(LOGALERT,
                    "Message too big: size: $size (max size: $max_size)");
-        $self->respond(552, "Message too big!");
-        $self->reset_transaction;    # clean up after ourselves
+        $self->respond(552, 'Message too big!');
+        $self->reset_transaction;
         return 1;
     }
 
     $self->authentication_results();
     $self->received_line();
-    $self->run_hooks("data_post");
+    $self->run_hooks('data_post');
 }
 
 sub authentication_results {
@@ -791,7 +777,7 @@ sub authentication_results {
 
     my @auth_list = $self->config('me');
 
-    #   $self->clean_authentication_results();
+    #$self->clean_authentication_results();
 
     if (!defined $self->{_auth}) {
         push @auth_list, 'auth=none';
@@ -822,8 +808,8 @@ sub clean_authentication_results {
 
     # http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
 
-   # On messages received from the internet, move Authentication-Results headers
-   # to Original-AR, so our downstream can trust the A-R header we insert.
+    # On messages received from the internet, move Authentication-Results headers
+    # to Original-AR, so our downstream can trust the A-R header we insert.
 
     # TODO: Do not invalidate DKIM signatures.
     #   if $self->transaction->header->get('DKIM-Signature')
