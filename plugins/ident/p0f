@@ -107,6 +107,18 @@ Example entry:
 
   ident/p0f /tmp/.p0f_socket smite_os windows
 
+=head2 add_headers <true|false>
+
+Add message headers with p0f data
+
+  ident/p0f [ add_headers (true|false) ]
+
+Example entry disabling header addition
+
+  ident/p0f /tmp/.p0f_socket add_headers false
+
+Default: true
+
 =head1 Environment requirements
 
 p0f v3 requires only the remote IP.
