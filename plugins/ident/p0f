@@ -154,6 +154,10 @@ sub register {
     foreach (keys %args) {
         $self->{_args}->{$_} = $args{$_};
     }
+    my $enabled = $self->{_args}{add_headers};
+    $enabled = 'true' if ! defined $enabled;
+    return if $enabled =~ /false/i;
+    $self->register_hook( data_post => 'add_headers' );
 }
 
 sub hook_connect {
@@ -172,6 +176,21 @@ sub hook_connect {
     }
 
     return DECLINED;
+}
+
+sub add_headers {
+    my ( $self, $txn ) = @_;
+    my $p0f = $self->connection->notes('p0f') or return DECLINED;
+    $self->add_p0f_header( 'X-P0F-Genre'     => $p0f->{genre}     );
+    $self->add_p0f_header( 'X-P0F-Link-Type' => $p0f->{link_type} );
+    return DECLINED;
+}
+
+sub add_p0f_header {
+    my ( $self, $tag, $value ) = @_;
+    return if ! $value;
+    $self->transaction->header->delete( $tag );
+    $self->transaction->header->add( $tag, $value, 0 );
 }
 
 sub get_v2_query {

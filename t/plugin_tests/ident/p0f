@@ -8,10 +8,35 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
+    $self->register_test('test_add_headers');
     $self->register_test('test_get_v2_query');
     $self->register_test('test_get_v3_query');
     $self->register_test('test_store_v2_results');
     $self->register_test('test_store_v3_results');
+}
+
+sub test_add_headers {
+    my ( $self ) = @_;
+    $self->connection->notes( 'p0f',
+        {
+            genre     => 'test genre',
+            link_type => 'test link_type',
+        }
+    );
+    my $header = $self->transaction->header( Mail::Header->new );
+    my @tags = (qw( X-P0F-Genre X-P0F-Link-Type ));
+    $header->add( $_ => 'DELETETHIS' ) for @tags;
+    $self->add_headers($self->transaction);
+    is( $self->all_headers('X-P0F-Genre'), 'test genre',
+        'X-P0F-Genre header added' );
+    is( $self->all_headers('X-P0F-Link-Type'), 'test link_type',
+        'X-P0F-Link-Type header added' );
+}
+
+sub all_headers {
+    # Return all instances of a given message header
+    my ( $self, $tag ) = @_;
+    return join " | ", map { chomp $_; $_ } $self->transaction->header->get($tag);
 }
 
 sub test_query_p0f_v2 {
