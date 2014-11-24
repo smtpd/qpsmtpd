@@ -335,10 +335,10 @@ sub greylist {
 
     return DECLINED if $self->exclude();
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock($db) or return DECLINED;
-    my $tied = $self->get_db_tie($db, $lock) or return DECLINED;
-    my $key  = $self->get_db_key($sender, $rcpt) or return DECLINED;
+    my $db   = $self->get_dbm_location();
+    my $lock = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    my $key  = $self->get_greylist_key($sender, $rcpt) or return DECLINED;
 
     my $fmt = "%s:%d:%d:%d";
 
@@ -395,7 +395,7 @@ sub cleanup_and_return {
     return DENYSOFT, $DENYMSG;
 }
 
-sub get_db_key {
+sub get_greylist_key {
     my $self   = shift;
     my $sender = shift || $self->qp->transaction->sender;
     my $rcpt   = shift || ($self->qp->transaction->recipients)[0];
@@ -415,7 +415,7 @@ sub get_db_key {
     return join ':', @key;
 }
 
-sub get_db_tie {
+sub get_dbm_tie {
     my ($self, $db, $lock) = @_;
 
     tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, oct('0600')) or do {
@@ -426,7 +426,7 @@ sub get_db_tie {
     return \%db;
 }
 
-sub get_db_location {
+sub get_dbm_location {
     my $self = shift;
 
     my $transaction = $self->qp->transaction;
@@ -461,10 +461,10 @@ sub get_db_location {
     return $db;
 }
 
-sub get_db_lock {
+sub get_dbm_lock {
     my ($self, $db) = @_;
 
-    return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
+    return $self->get_dbm_lock_nfs($db) if $self->{_args}{nfslock};
 
     # Check denysoft db
     open(my $lock, '>', "$db.lock") or do {
@@ -481,7 +481,7 @@ sub get_db_lock {
     return $lock;
 }
 
-sub get_db_lock_nfs {
+sub get_dbm_lock_nfs {
     my ($self, $db) = @_;
 
     require File::NFSLock;
@@ -509,9 +509,9 @@ sub get_db_lock_nfs {
 sub convert_db {
     my $self = shift;
 
-    my $db    = $self->get_db_location();
-    my $lock  = $self->get_db_lock($db) or return DECLINED;
-    my $tied  = $self->get_db_tie($db, $lock) or return DECLINED;
+    my $db    = $self->get_dbm_location();
+    my $lock  = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
     my $converted = 0;
@@ -534,9 +534,9 @@ sub convert_db {
 sub prune_db {
     my $self = shift;
 
-    my $db    = $self->get_db_location();
-    my $lock  = $self->get_db_lock($db) or return DECLINED;
-    my $tied  = $self->get_db_tie($db, $lock) or return DECLINED;
+    my $db    = $self->get_dbm_location();
+    my $lock  = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
     my $pruned = 0;
