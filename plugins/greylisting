@@ -436,18 +436,13 @@ sub get_dbm_location {
         $config->{db_dir} = $1;
     }
 
-    # Setup database location
-    my $dbdir;
-    if ($config->{per_recipient_db}) {
-        $dbdir = $transaction->notes('per_rcpt_configdir');
-    }
-
     my @candidate_dirs = (
-                          $dbdir, $config->{db_dir},
+                          $config->{db_dir},
                           "/var/lib/qpsmtpd/greylisting",
                           "$QPHOME/var/db", "$QPHOME/config", '.'
                          );
 
+    my $dbdir;
     for my $d (@candidate_dirs) {
         next if !$d || !-d $d;    # impossible
         $dbdir = $d;
