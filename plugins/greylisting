@@ -148,6 +148,14 @@ Prior to adding GeoIP support, I greylisted all connections from windows compute
 
 Adjust the quantity of logging for this plugin. See docs/logging.pod
 
+=head1 CHANGES
+
+The per_recipient_db configuration option has been removed.
+It relied on a note that was not set anywhere in upstream QP.
+The latest version of this plugin that supported this configuration
+option can be found here:
+
+https://github.com/smtpd/qpsmtpd/blob/ea2f1e89dd6b72f1c06191425e2bd8d98bea2ac6/plugins/greylisting
 
 =head1 AUTHOR
 
