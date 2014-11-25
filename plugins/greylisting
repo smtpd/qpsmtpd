@@ -116,12 +116,6 @@ usable directory from the following list will be used:
 
 Flag to indicate whether to use per-recipient configs.
 
-=head2 per_recipient_db <bool>
-
-Flag to indicate whether to use per-recipient greylisting
-databases (default is to use a shared database).  Per-recipient configuration
-directories, if determined, supercede I<db_dir>.
-
 =head2 nfslock <bool>
 
 Flag to indicate the database is stored on NFS.  Uses File::NFSLock
@@ -154,6 +148,14 @@ Prior to adding GeoIP support, I greylisted all connections from windows compute
 
 Adjust the quantity of logging for this plugin. See docs/logging.pod
 
+=head1 CHANGES
+
+The per_recipient_db configuration option has been removed.
+It relied on a note that was not set anywhere in upstream QP.
+The latest version of this plugin that supported this configuration
+option can be found here:
+
+https://github.com/smtpd/qpsmtpd/blob/ea2f1e89dd6b72f1c06191425e2bd8d98bea2ac6/plugins/greylisting
 
 =head1 AUTHOR
 
@@ -436,18 +438,13 @@ sub get_dbm_location {
         $config->{db_dir} = $1;
     }
 
-    # Setup database location
-    my $dbdir;
-    if ($config->{per_recipient_db}) {
-        $dbdir = $transaction->notes('per_rcpt_configdir');
-    }
-
     my @candidate_dirs = (
-                          $dbdir, $config->{db_dir},
+                          $config->{db_dir},
                           "/var/lib/qpsmtpd/greylisting",
                           "$QPHOME/var/db", "$QPHOME/config", '.'
                          );
 
+    my $dbdir;
     for my $d (@candidate_dirs) {
         next if !$d || !-d $d;    # impossible
         $dbdir = $d;
