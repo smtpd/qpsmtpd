@@ -346,4 +346,9 @@ sub _register_standard_hooks {
     }
 }
 
+sub db {
+    my ( $self, %arg ) = @_;
+    return $self->{db} ||= Qpsmtpd::DB->new(%arg);
+}
+
 1;

@@ -175,16 +175,14 @@ use warnings;
 use Net::IP;
 
 use Qpsmtpd::Constants;
+use Qpsmtpd::DB;
 
 my $VERSION = '0.12';
 
-BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 
 my $DENYMSG        = "This mail is temporarily denied";
-my ($QPHOME)       = ($0 =~ m!(.*?)/([^/]+)$!);
-my $DB             = "greylist.dbm";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
   recipient black_timeout grey_timeout white_timeout deny_late db_dir
   nfslock p0f reject loglevel geoip upgrade );
@@ -224,11 +222,31 @@ sub register {
     else {
         $self->register_hook('rcpt', 'rcpt_handler');
     }
+    $self->init_db();
     $self->prune_db();
     if ($self->{_args}{upgrade}) {
         $self->convert_db();
     }
     $self->load_exclude_files();
+}
+
+sub init_db {
+    my ( $self ) = @_;
+    $self->db( name => 'greylist' );
+    return if ! $self->db->can('path');
+    my $cdir = $self->{_args}{db_dir};
+    $cdir = $1 if $cdir and $cdir =~ m{^([-a-zA-Z0-9./_]+)$};
+    # greylisting-specific hints for where to store the greylist DB
+    my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/greylisting' );
+
+    return if $self->db->file_extension ne '.dbm';
+    $self->db->nfs_locking( $self->{_args}{nfslock} );
+    
+    # Work around old DBM filename
+    return if -f "$db_dir/greylist.dbm";
+    my $oldname = 'denysoft_greylist';
+    return if ! -f "$db_dir/$oldname.dbm";
+    $self->db->name($oldname);
 }
 
 sub load_exclude_files {
@@ -337,8 +355,9 @@ sub greylist {
 
     return DECLINED if $self->exclude();
 
-    my $db   = $self->get_dbm_location();
-    my $lock = $self->get_dbm_lock($db) or return DECLINED;
+
+    my $lock = $self->db->get_lock() or return DECLINED;
+    my $db   = $self->db->path;
     my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $key  = $self->get_greylist_key($sender, $rcpt) or return DECLINED;
 
@@ -428,86 +447,11 @@ sub get_dbm_tie {
     return \%db;
 }
 
-sub get_dbm_location {
-    my $self = shift;
-
-    my $transaction = $self->qp->transaction;
-    my $config      = $self->{_args};
-
-    if ($config->{db_dir} && $config->{db_dir} =~ m{^([-a-zA-Z0-9./_]+)$}) {
-        $config->{db_dir} = $1;
-    }
-
-    my @candidate_dirs = (
-                          $config->{db_dir},
-                          "/var/lib/qpsmtpd/greylisting",
-                          "$QPHOME/var/db", "$QPHOME/config", '.'
-                         );
-
-    my $dbdir;
-    for my $d (@candidate_dirs) {
-        next if !$d || !-d $d;    # impossible
-        $dbdir = $d;
-        last;                     # first match wins
-    }
-    my $db = "$dbdir/$DB";
-    if (!-f $db && -f "$dbdir/denysoft_greylist.dbm") {
-        $db = "$dbdir/denysoft_greylist.dbm";    # old DB name
-    }
-    $self->log(LOGDEBUG, "using $db as greylisting database");
-    return $db;
-}
-
-sub get_dbm_lock {
-    my ($self, $db) = @_;
-
-    return $self->get_dbm_lock_nfs($db) if $self->{_args}{nfslock};
-
-    # Check denysoft db
-    open(my $lock, '>', "$db.lock") or do {
-        $self->log(LOGCRIT, "opening lockfile failed: $!");
-        return;
-    };
-
-    flock($lock, LOCK_EX) or do {
-        $self->log(LOGCRIT, "flock of lockfile failed: $!");
-        close $lock;
-        return;
-    };
-
-    return $lock;
-}
-
-sub get_dbm_lock_nfs {
-    my ($self, $db) = @_;
-
-    require File::NFSLock;
-
-    ### set up a lock - lasts until object looses scope
-    my $nfslock = new File::NFSLock {
-                             file               => "$db.lock",
-                             lock_type          => LOCK_EX | LOCK_NB,
-                             blocking_timeout   => 10,                  # 10 sec
-                             stale_lock_timeout => 30 * 60,             # 30 min
-                                    }
-      or do {
-        $self->log(LOGCRIT, "nfs lockfile failed: $!");
-        return;
-      };
-
-    open(my $lock, '+<', "$db.lock") or do {
-        $self->log(LOGCRIT, "opening nfs lockfile failed: $!");
-        return;
-    };
-
-    return $lock;
-}
-
 sub convert_db {
     my $self = shift;
 
-    my $db    = $self->get_dbm_location();
-    my $lock  = $self->get_dbm_lock($db) or return DECLINED;
+    my $lock  = $self->db->get_lock() or return DECLINED;
+    my $db    = $self->db->path();
     my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
@@ -531,8 +475,8 @@ sub convert_db {
 sub prune_db {
     my $self = shift;
 
-    my $db    = $self->get_dbm_location();
-    my $lock  = $self->get_dbm_lock($db) or return DECLINED;
+    my $lock  = $self->db->get_lock() or return DECLINED;
+    my $db    = $self->db->path;
     my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
