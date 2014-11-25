@@ -18,8 +18,8 @@ sub register_tests {
 
     $self->register_test("test_load_exclude_files");
     $self->register_test('test_hook_data');
-    $self->register_test('test_get_db_key');
-    $self->register_test('test_get_db_location');
+    $self->register_test('test_get_greylist_key');
+    $self->register_test('test_get_dbm_location');
     $self->register_test('test_exclude');
     $self->register_test("test_greylist_geoip");
     $self->register_test("test_greylist_p0f_genre");
@@ -100,7 +100,7 @@ sub test_hook_data {
     cmp_ok( $code, '==', DECLINED, "missing recipients");
 }
 
-sub test_get_db_key {
+sub test_get_greylist_key {
     my $self = shift;
 
     $self->{_args}{sender}    = 0;
@@ -114,26 +114,26 @@ sub test_get_db_key {
     $self->qp->transaction->add_recipient( $address );
     $self->qp->connection->remote_ip($test_ip);
 
-    my $key = $self->get_db_key();
+    my $key = $self->get_greylist_key();
     ok( ! $key, "db key empty: -");
 
     $self->{_args}{remote_ip} = 1;
-    $key = $self->get_db_key( $address, $address );
+    $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', '3232235777', "db key: $key");
 
     $self->{_args}{sender} = 1;
-    $key = $self->get_db_key( $address, $address );
+    $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', "3232235777:$test_email", "db key: $key");
 
     $self->{_args}{recipient} = 1;
-    $key = $self->get_db_key( $address, $address );
+    $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', "3232235777:$test_email:$test_email", "db key: $key");
 }
 
-sub test_get_db_location {
+sub test_get_dbm_location {
     my $self = shift;
 
-    my $db = $self->get_db_location();
+    my $db = $self->get_dbm_location();
     ok( $db, "db location: $db");
 }
 

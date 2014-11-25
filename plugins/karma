@@ -264,10 +264,10 @@ sub hook_pre_connection {
 
     my $remote_ip = $args{remote_ip};
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock($db) or return DECLINED;
-    my $tied = $self->get_db_tie($db, $lock) or return DECLINED;
-    my $key  = $self->get_db_key($remote_ip) or do {
+    my $db   = $self->get_dbm_location();
+    my $lock = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    my $key  = $self->get_karma_key($remote_ip) or do {
         $self->log(LOGINFO, "skip, unable to get DB key");
         return DECLINED;
     };
@@ -290,10 +290,10 @@ sub connect_handler {
 
     return DECLINED if $self->is_immune();
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock($db) or return DECLINED;
-    my $tied = $self->get_db_tie($db, $lock) or return DECLINED;
-    my $key  = $self->get_db_key() or do {
+    my $db   = $self->get_dbm_location();
+    my $lock = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    my $key  = $self->get_karma_key() or do {
         $self->log(LOGINFO, "skip, unable to get DB key");
         return DECLINED;
     };
@@ -414,10 +414,10 @@ sub disconnect_handler {
         return DECLINED;
     };
 
-    my $db   = $self->get_db_location();
-    my $lock = $self->get_db_lock($db) or return DECLINED;
-    my $tied = $self->get_db_tie($db, $lock) or return DECLINED;
-    my $key  = $self->get_db_key();
+    my $db   = $self->get_dbm_location();
+    my $lock = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    my $key  = $self->get_karma_key();
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
       $self->parse_db_record($tied->{$key});
@@ -497,7 +497,7 @@ sub cleanup_and_return {
     return DECLINED;
 }
 
-sub get_db_key {
+sub get_karma_key {
     my $self = shift;
     my $ip   = shift || $self->qp->connection->remote_ip;
     my $nip  = Net::IP->new($ip) or do {
@@ -507,7 +507,7 @@ sub get_db_key {
     return $nip->intip;                             # convert IP to an int
 }
 
-sub get_db_tie {
+sub get_dbm_tie {
     my ($self, $db, $lock) = @_;
 
     tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, 0600) or do {
@@ -518,7 +518,7 @@ sub get_db_tie {
     return \%db;
 }
 
-sub get_db_location {
+sub get_dbm_location {
     my $self = shift;
 
     # Setup database location
@@ -540,10 +540,10 @@ sub get_db_location {
     return $db;
 }
 
-sub get_db_lock {
+sub get_dbm_lock {
     my ($self, $db) = @_;
 
-    return $self->get_db_lock_nfs($db) if $self->{_args}{nfslock};
+    return $self->get_dbm_lock_nfs($db) if $self->{_args}{nfslock};
 
     # Check denysoft db
     open(my $lock, ">$db.lock") or do {
@@ -560,7 +560,7 @@ sub get_db_lock {
     return $lock;
 }
 
-sub get_db_lock_nfs {
+sub get_dbm_lock_nfs {
     my ($self, $db) = @_;
 
     require File::NFSLock;
@@ -588,9 +588,9 @@ sub get_db_lock_nfs {
 sub prune_db {
     my $self = shift;
 
-    my $db    = $self->get_db_location();
-    my $lock  = $self->get_db_lock($db) or return DECLINED;
-    my $tied  = $self->get_db_tie($db, $lock) or return DECLINED;
+    my $db    = $self->get_dbm_location();
+    my $lock  = $self->get_dbm_lock($db) or return DECLINED;
+    my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $count = keys %$tied;
 
     my $pruned = 0;
