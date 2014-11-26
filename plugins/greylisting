@@ -175,12 +175,8 @@ use warnings;
 use Net::IP;
 
 use Qpsmtpd::Constants;
-use Qpsmtpd::DB;
 
 my $VERSION = '0.12';
-
-use AnyDBM_File;
-use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 
 my $DENYMSG        = "This mail is temporarily denied";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
@@ -360,6 +356,7 @@ sub greylist {
 
     my $fmt = "%s:%d:%d:%d";
 
+    $self->db->lock or return DECLINED;
     my $value = $self->db->get($key);
     if ( ! $value ) {
         # new IP or entry timed out - record new
@@ -406,6 +403,7 @@ sub greylist {
 sub cleanup_and_return {
     my ($self, $return_val) = @_;
 
+    $self->db->unlock;
     return $return_val if defined $return_val;    # explicit override
     return DECLINED
       if defined $self->{_args}{reject} && !$self->{_args}{reject};
@@ -435,7 +433,7 @@ sub get_greylist_key {
 sub convert_db {
     my $self = shift;
 
-    $self->db->lock;
+    $self->db->lock or return DECLINED;
     my $count = $self->db->size;
 
     my $converted = 0;
@@ -457,7 +455,7 @@ sub convert_db {
 sub prune_db {
     my $self = shift;
 
-    $self->db->lock;
+    $self->db->lock or return DECLINED;
     my $count = $self->db->size;
 
     my $pruned = 0;

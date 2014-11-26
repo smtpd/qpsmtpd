@@ -231,9 +231,6 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
-use AnyDBM_File;
-use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 use Net::IP;
 
 sub register {
@@ -264,23 +261,22 @@ sub hook_pre_connection {
 
     my $remote_ip = $args{remote_ip};
 
-    my $db   = $self->get_dbm_location();
-    my $lock = $self->get_dbm_lock($db) or return DECLINED;
-    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    $self->db->lock or return DECLINED;
     my $key  = $self->get_karma_key($remote_ip) or do {
         $self->log(LOGINFO, "skip, unable to get DB key");
         return DECLINED;
     };
 
-    if (!$tied->{$key}) {
+    my $value = $self->db->get($key);
+    if ( ! $value ) {
         $self->log(LOGDEBUG, "pass, no record");
-        return $self->cleanup_and_return($tied, $lock);
+        return $self->cleanup_and_return();
     }
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
-      $self->parse_db_record($tied->{$key});
+      $self->parse_db_record($value);
     $self->calc_karma($naughty, $nice);
-    return $self->cleanup_and_return($tied, $lock);
+    return $self->cleanup_and_return();
 }
 
 sub connect_handler {
@@ -290,37 +286,36 @@ sub connect_handler {
 
     return DECLINED if $self->is_immune();
 
-    my $db   = $self->get_dbm_location();
-    my $lock = $self->get_dbm_lock($db) or return DECLINED;
-    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    $self->db->lock or return DECLINED;
     my $key  = $self->get_karma_key() or do {
         $self->log(LOGINFO, "skip, unable to get DB key");
         return DECLINED;
     };
 
-    if (!$tied->{$key}) {
+    my $value = $self->db->get($key);
+    if ( ! $value) {
         $self->log(LOGINFO, "pass, no record");
-        return $self->cleanup_and_return($tied, $lock);
+        return $self->cleanup_and_return();
     }
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
-      $self->parse_db_record($tied->{$key});
+      $self->parse_db_record($value);
     my $summary = "$naughty naughty, $nice nice, $connects connects";
     my $karma = $self->calc_karma($naughty, $nice);
 
     if (!$penalty_start_ts) {
         $self->log(LOGINFO, "pass, no penalty ($summary)");
-        return $self->cleanup_and_return($tied, $lock);
+        return $self->cleanup_and_return();
     }
 
     my $days_old = (time - $penalty_start_ts) / 86400;
     if ($days_old >= $self->{_args}{penalty_days}) {
         $self->log(LOGINFO, "pass, penalty expired ($summary)");
-        return $self->cleanup_and_return($tied, $lock);
+        return $self->cleanup_and_return();
     }
 
-    $tied->{$key} = join(':', $penalty_start_ts, $naughty, $nice, ++$connects);
-    $self->cleanup_and_return($tied, $lock);
+    $self->db->set( $key, join(':', $penalty_start_ts, $naughty, $nice, ++$connects) );
+    $self->cleanup_and_return();
 
     my $left = sprintf "%.2f", $self->{_args}{penalty_days} - $days_old;
     my $mess = "You were naughty. You cannot connect for $left more days.";
@@ -414,13 +409,11 @@ sub disconnect_handler {
         return DECLINED;
     };
 
-    my $db   = $self->get_dbm_location();
-    my $lock = $self->get_dbm_lock($db) or return DECLINED;
-    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
+    $self->db->lock or return DECLINED;
     my $key  = $self->get_karma_key();
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
-      $self->parse_db_record($tied->{$key});
+      $self->parse_db_record( $self->db->get($key) );
     my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
@@ -450,8 +443,8 @@ sub disconnect_handler {
     }
     $self->log(LOGINFO, $log_mess . ", (msg: $karma, his: $history)");
 
-    $tied->{$key} = join(':', $penalty_start_ts, $naughty, $nice, ++$connects);
-    return $self->cleanup_and_return($tied, $lock);
+    $self->db->set( $key, join(':', $penalty_start_ts, $naughty, $nice, ++$connects) );
+    return $self->cleanup_and_return();
 }
 
 sub illegal_envelope_format {
@@ -489,10 +482,9 @@ sub calc_karma {
 }
 
 sub cleanup_and_return {
-    my ($self, $tied, $lock, $return_val) = @_;
+    my ( $self, $return_val ) = @_;
 
-    untie $tied;
-    close $lock;
+    $self->db->unlock;
     return $return_val if defined $return_val;    # explicit override
     return DECLINED;
 }
@@ -588,22 +580,18 @@ sub get_dbm_lock_nfs {
 sub prune_db {
     my $self = shift;
 
-    my $db    = $self->get_dbm_location();
-    my $lock  = $self->get_dbm_lock($db) or return DECLINED;
-    my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
-    my $count = keys %$tied;
+    $self->db->lock or return DECLINED;
+    my $count = $self->db->size;
 
     my $pruned = 0;
-    foreach my $key (keys %$tied) {
-        my $ts       = $tied->{$key};
+    foreach my $key ( $self->db->get_keys ) {
+        my $ts       = $self->db->get($key);
         my $days_old = (time - $ts) / 86400;
         next if $days_old < $self->{_args}{penalty_days} * 2;
-        delete $tied->{$key};
+        $self->delete($key);
         $pruned++;
     }
-    untie $tied;
-    close $lock;
     $self->log(LOGINFO, "pruned $pruned of $count DB entries");
-    return $self->cleanup_and_return($tied, $lock, DECLINED);
+    return $self->cleanup_and_return(DECLINED);
 }
 

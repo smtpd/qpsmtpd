@@ -4,6 +4,7 @@ use warnings;
 
 use lib 'lib';
 use parent 'Qpsmtpd::Base';
+use Qpsmtpd::DB;
 use Qpsmtpd::Constants;
 
 # more or less in the order they will fire

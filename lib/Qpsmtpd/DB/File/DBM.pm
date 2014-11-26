@@ -15,8 +15,12 @@ sub file_extension {
 
 sub lock {
     my ( $self ) = @_;
-    $self->nfs_locking ? $self->nfs_file_lock : $self->file_lock;
-    $self->tie_dbm;
+    if ( $self->nfs_locking ) {
+        $self->nfs_file_lock or return;
+    } else {
+        $self->file_lock or return;
+    }
+    return $self->tie_dbm;
 }
 
 sub file_lock {
@@ -71,6 +75,7 @@ sub tie_dbm {
         return;
     };
     $self->{tied} = \%db;
+    return 1;
 }
 
 sub nfs_locking {
