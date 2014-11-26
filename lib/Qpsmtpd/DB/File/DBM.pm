@@ -13,11 +13,16 @@ sub file_extension {
     return $self->{file_extension} ||= '.dbm';
 }
 
-sub get_lock {
+sub lock {
     my ( $self ) = @_;
-    my $db_file = $self->path;
-    return $self->get_nfs_lock if $self->nfs_locking;
-    open(my $lock, '>', "$db_file.lock") or do {
+    $self->nfs_locking ? $self->nfs_file_lock : $self->file_lock;
+    $self->tie_dbm;
+}
+
+sub file_lock {
+    my ( $self ) = @_;
+    my $path = $self->path;
+    open(my $lock, '>', "$path.lock") or do {
         warn "opening lockfile failed: $!\n";
         return;
     };
@@ -27,19 +32,18 @@ sub get_lock {
         close $lock;
         return;
     };
-
-    return $lock;
+    $self->{lock} = $lock;
 }
 
-sub get_nfs_lock {
+sub nfs_file_lock {
     my ( $self ) = @_;
-    my $db_file = $self->path;
+    my $path = $self->path;
 
     require File::NFSLock;
 
     ### set up a lock - lasts until object looses scope
     my $nfslock = new File::NFSLock {
-                             file               => "$db_file.lock",
+                             file               => "$path.lock",
                              lock_type          => LOCK_EX | LOCK_NB,
                              blocking_timeout   => 10,                  # 10 sec
                              stale_lock_timeout => 30 * 60,             # 30 min
@@ -49,18 +53,98 @@ sub get_nfs_lock {
         return;
       };
 
-    open(my $lock, '+<', "$db_file.lock") or do {
+    open(my $lock, '+<', "$path.lock") or do {
         warn "opening nfs lockfile failed: $!\n";
         return;
     };
 
-    return $lock;
+    $self->{lock} = $lock;
+}
+
+sub tie_dbm {
+    my ( $self ) = @_;
+    my $path = $self->path;
+
+    tie(my %db, 'AnyDBM_File', $path, O_CREAT | O_RDWR, oct('0600')) or do {
+        warn "tie to database $path failed: $!\n";
+        $self->unlock;
+        return;
+    };
+    $self->{tied} = \%db;
 }
 
 sub nfs_locking {
     my $self = shift;
     return $self->{nfs_locking} if ! @_;
     return $self->{nfs_locking} = shift;
+}
+
+sub unlock {
+    my ( $self ) = @_;
+    close $self->{lock};
+    untie $self->{tied};
+}
+
+sub get {
+    my ( $self, $key ) = @_;
+    if ( ! $key ) {
+        warn "No key provided, set() failed\n";
+        return;
+    }
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, get() failed\n";
+        return;
+    }
+    return $tied->{$key};
+}
+
+sub set {
+    my ( $self, $key, $val ) = @_;
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, set() failed\n";
+        return;
+    }
+    if ( ! $key ) {
+        warn "No key provided, set() failed\n";
+        return;
+    }
+    return $tied->{$key} = $val;
+}
+
+sub get_keys {
+    my ( $self ) = @_;
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, keys() failed\n";
+        return;
+    }
+    return keys %$tied;
+}
+
+sub size {
+    my ( $self ) = @_;
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, size() failed\n";
+        return;
+    }
+    return scalar keys %$tied;
+}
+
+sub delete {
+    my ( $self, $key ) = @_;
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, delete() failed\n";
+        return;
+    }
+    if ( ! $key ) {
+        warn "No key provided, delete() failed\n";
+        return;
+    }
+    delete $tied->{$key};
 }
 
 1;

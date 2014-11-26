@@ -356,30 +356,28 @@ sub greylist {
     return DECLINED if $self->exclude();
 
 
-    my $lock = $self->db->get_lock() or return DECLINED;
-    my $db   = $self->db->path;
-    my $tied = $self->get_dbm_tie($db, $lock) or return DECLINED;
     my $key  = $self->get_greylist_key($sender, $rcpt) or return DECLINED;
 
     my $fmt = "%s:%d:%d:%d";
 
-    # new IP or entry timed out - record new
-    if (!$tied->{$key}) {
-        $tied->{$key} = sprintf $fmt, time, 1, 0, 0;
+    my $value = $self->db->get($key);
+    if ( ! $value ) {
+        # new IP or entry timed out - record new
+        $self->db->set( $key, sprintf $fmt, time, 1, 0, 0 );
         $self->log(LOGWARN, "fail: initial DENYSOFT, unknown");
-        return $self->cleanup_and_return($tied, $lock);
+        return $self->cleanup_and_return();
     }
 
-    my ($ts, $new, $black, $white) = split /:/, $tied->{$key};
+    my ( $ts, $new, $black, $white ) = split /:/, $value;
     $self->log(LOGDEBUG, "ts: " . localtime($ts) . ", now: " . localtime);
 
     if ($white) {
 
         # white IP - accept unless timed out
         if (time - $ts < $config->{white_timeout}) {
-            $tied->{$key} = sprintf $fmt, time, $new, $black, ++$white;
+            $self->db->set( $key, sprintf $fmt, time, $new, $black, ++$white );
             $self->log(LOGINFO, "pass: white, $white deliveries");
-            return $self->cleanup_and_return($tied, $lock, DECLINED);
+            return $self->cleanup_and_return(DECLINED);
         }
         else {
             $self->log(LOGINFO, "key $key has timed out (white)");
@@ -388,28 +386,26 @@ sub greylist {
 
     # Black IP - deny, but don't update timestamp
     if (time - $ts < $config->{black_timeout}) {
-        $tied->{$key} = sprintf $fmt, $ts, $new, ++$black, 0;
+        $self->db->set( $key, sprintf $fmt, $ts, $new, ++$black, 0 );
         $self->log(LOGWARN,
                    "fail: black DENYSOFT - $black deferred connections");
-        return $self->cleanup_and_return($tied, $lock);
+        return $self->cleanup_and_return();
     }
 
     # Grey IP - accept unless timed out
     elsif (time - $ts < $config->{grey_timeout}) {
-        $tied->{$key} = sprintf $fmt, time, $new, $black, 1;
+        $self->db->set( $key, sprintf $fmt, time, $new, $black, 1 );
         $self->log(LOGWARN, "pass: updated grey->white");
-        return $self->cleanup_and_return($tied, $lock, DECLINED);
+        return $self->cleanup_and_return(DECLINED);
     }
 
     $self->log(LOGWARN, "pass: timed out (grey)");
-    return $self->cleanup_and_return($tied, $lock, DECLINED);
+    return $self->cleanup_and_return(DECLINED);
 }
 
 sub cleanup_and_return {
-    my ($self, $tied, $lock, $return_val) = @_;
+    my ($self, $return_val) = @_;
 
-    untie $tied;
-    close $lock;
     return $return_val if defined $return_val;    # explicit override
     return DECLINED
       if defined $self->{_args}{reject} && !$self->{_args}{reject};
@@ -436,62 +432,45 @@ sub get_greylist_key {
     return join ':', @key;
 }
 
-sub get_dbm_tie {
-    my ($self, $db, $lock) = @_;
-
-    tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, oct('0600')) or do {
-        $self->log(LOGCRIT, "tie to database $db failed: $!");
-        close $lock;
-        return;
-    };
-    return \%db;
-}
-
 sub convert_db {
     my $self = shift;
 
-    my $lock  = $self->db->get_lock() or return DECLINED;
-    my $db    = $self->db->path();
-    my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
-    my $count = keys %$tied;
+    $self->db->lock;
+    my $count = $self->db->size;
 
     my $converted = 0;
-    foreach my $key (keys %$tied) {
+    foreach my $key ( $self->db->get_keys ) {
         my (@parts) = split /:/, $key;
         next if $parts[0] =~ /^[\d]+$/;    # already converted
         $converted++;
         my $nip = Net::IP->new($parts[0]);
         $parts[0] = $nip->intip;           # convert IP to integer
         my $new_key = join ':', @parts;
-        $tied->{$new_key} = $tied->{$key};
-        delete $tied->{$key};
+        $self->db->set( $new_key, $self->db->get($key) );
+        $self->db->delete( $key );
     }
-    untie $tied;
-    close $lock;
+    $self->db->unlock;
     $self->log(LOGINFO, "converted $converted of $count DB entries");
-    return $self->cleanup_and_return($tied, $lock, DECLINED);
+    return $self->cleanup_and_return(DECLINED);
 }
 
 sub prune_db {
     my $self = shift;
 
-    my $lock  = $self->db->get_lock() or return DECLINED;
-    my $db    = $self->db->path;
-    my $tied  = $self->get_dbm_tie($db, $lock) or return DECLINED;
-    my $count = keys %$tied;
+    $self->db->lock;
+    my $count = $self->db->size;
 
     my $pruned = 0;
-    foreach my $key (keys %$tied) {
-        my ($ts, $new, $black, $white) = split /:/, $tied->{$key};
+    foreach my $key ( $self->db->get_keys ) {
+        my ($ts, $new, $black, $white) = split /:/, $self->db->get($key);
         my $age = time - $ts;
         next if $age < $self->{_args}{white_timeout};
         $pruned++;
-        delete $tied->{$key};
+        $self->db->delete($key);
     }
-    untie $tied;
-    close $lock;
+    $self->db->unlock;
     $self->log(LOGINFO, "pruned $pruned of $count DB entries");
-    return $self->cleanup_and_return($tied, $lock, DECLINED);
+    return $self->cleanup_and_return(DECLINED);
 }
 
 sub exclude {
