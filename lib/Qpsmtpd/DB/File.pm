@@ -1,7 +1,6 @@
 package Qpsmtpd::DB::File;
 use strict;
 use warnings;
-use lib 'lib';
 use parent 'Qpsmtpd::DB';
 
 sub dir {

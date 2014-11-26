@@ -2,7 +2,6 @@ package Qpsmtpd::DB::File::DBM;
 use strict;
 use warnings;
 
-use lib 'lib';
 use parent 'Qpsmtpd::DB::File';
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
