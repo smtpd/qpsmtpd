@@ -245,6 +245,7 @@ sub register {
         $self->{_args}{reject} = 'naughty';
     }
 
+    $self->init_db();
     #$self->prune_db();    # keep the DB compact
     $self->register_hook('connect',       'connect_handler');
     $self->register_hook('mail',          'from_handler');
@@ -252,6 +253,18 @@ sub register {
     $self->register_hook('data',          'data_handler');
     $self->register_hook('data_post',     'data_handler');
     $self->register_hook('disconnect',    'disconnect_handler');
+}
+
+sub init_db {
+    my ( $self ) = @_;
+    $self->db( name => 'karma' );
+    return if ! $self->db->can('path');
+    my $cdir = $self->{_args}{db_dir};
+    # karma-specific hints for where to store the DB
+    my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/karma' );
+
+    return if $self->db->file_extension ne '.dbm';
+    $self->db->nfs_locking( $self->{_args}{nfslock} );
 }
 
 sub hook_pre_connection {
@@ -497,84 +510,6 @@ sub get_karma_key {
         return;
     };
     return $nip->intip;                             # convert IP to an int
-}
-
-sub get_dbm_tie {
-    my ($self, $db, $lock) = @_;
-
-    tie(my %db, 'AnyDBM_File', $db, O_CREAT | O_RDWR, 0600) or do {
-        $self->log(LOGCRIT, "error, tie to database $db failed: $!");
-        close $lock;
-        return;
-    };
-    return \%db;
-}
-
-sub get_dbm_location {
-    my $self = shift;
-
-    # Setup database location
-    my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
-    my @candidate_dirs = (
-                          $self->{args}{db_dir},
-                          "/var/lib/qpsmtpd/karma", "$QPHOME/var/db",
-                          "$QPHOME/config", '.'
-                         );
-
-    my $dbdir;
-    for my $d (@candidate_dirs) {
-        next if !$d || !-d $d;    # impossible
-        $dbdir = $d;
-        last;                     # first match wins
-    }
-    my $db = "$dbdir/karma.dbm";
-    $self->log(LOGDEBUG, "using $db as karma database");
-    return $db;
-}
-
-sub get_dbm_lock {
-    my ($self, $db) = @_;
-
-    return $self->get_dbm_lock_nfs($db) if $self->{_args}{nfslock};
-
-    # Check denysoft db
-    open(my $lock, ">$db.lock") or do {
-        $self->log(LOGCRIT, "error, opening lockfile failed: $!");
-        return;
-    };
-
-    flock($lock, LOCK_EX) or do {
-        $self->log(LOGCRIT, "error, flock of lockfile failed: $!");
-        close $lock;
-        return;
-    };
-
-    return $lock;
-}
-
-sub get_dbm_lock_nfs {
-    my ($self, $db) = @_;
-
-    require File::NFSLock;
-
-    ### set up a lock - lasts until object looses scope
-    my $nfslock = new File::NFSLock {
-                             file               => "$db.lock",
-                             lock_type          => LOCK_EX | LOCK_NB,
-                             blocking_timeout   => 10,                  # 10 sec
-                             stale_lock_timeout => 30 * 60,             # 30 min
-                                    }
-      or do {
-        $self->log(LOGCRIT, "error, nfs lockfile failed: $!");
-        return;
-      };
-
-    open(my $lock, "+<$db.lock") or do {
-        $self->log(LOGCRIT, "error, opening nfs lockfile failed: $!");
-        return;
-    };
-
-    return $lock;
 }
 
 sub prune_db {
