@@ -19,7 +19,6 @@ sub register_tests {
     $self->register_test("test_load_exclude_files");
     $self->register_test('test_hook_data');
     $self->register_test('test_get_greylist_key');
-    $self->register_test('test_get_dbm_location');
     $self->register_test('test_exclude');
     $self->register_test("test_greylist_geoip");
     $self->register_test("test_greylist_p0f_genre");
@@ -128,13 +127,6 @@ sub test_get_greylist_key {
     $self->{_args}{recipient} = 1;
     $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', "3232235777:$test_email:$test_email", "db key: $key");
-}
-
-sub test_get_dbm_location {
-    my $self = shift;
-
-    my $db = $self->get_dbm_location();
-    ok( $db, "db location: $db");
 }
 
 sub test_exclude {

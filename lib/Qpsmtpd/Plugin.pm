@@ -4,6 +4,7 @@ use warnings;
 
 use lib 'lib';
 use parent 'Qpsmtpd::Base';
+use Qpsmtpd::DB;
 use Qpsmtpd::Constants;
 
 # more or less in the order they will fire
@@ -344,6 +345,11 @@ sub _register_standard_hooks {
         next if !$plugin->can($hooksub);
         $plugin->register_hook($hook, $hooksub);
     }
+}
+
+sub db {
+    my ( $self, %arg ) = @_;
+    return $self->{db} ||= Qpsmtpd::DB->new(%arg);
 }
 
 1;
