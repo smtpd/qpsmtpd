@@ -7,6 +7,7 @@ sub register_tests {
     my ( $self ) = @_;
     $self->register_test('test_content_log_file');
     $self->register_test('test_content_log_enabled');
+    $self->register_test('test_exclude');
 }
 
 sub test_content_log_file {
@@ -17,5 +18,10 @@ sub test_content_log_file {
 sub test_content_log_enabled {
     my ( $self ) = @_;
     ok( ! $self->content_log_enabled, 'content_log_enabled() returns false' );
+}
+
+sub test_exclude {
+    my ( $self ) = @_;
+    ok( ! $self->exclude, 'exclude() default method returns false' );
 }
 

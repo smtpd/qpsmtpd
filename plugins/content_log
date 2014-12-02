@@ -14,6 +14,9 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
+    return DECLINED, 'excluded from content logging'
+        if $self->exclude();
+
     open my $out, '>>',  $self->content_log_file
       or return DECLINED, "Could not open log file.. continuing anyway";
 
@@ -39,5 +42,10 @@ sub content_log_enabled {
     my $enabled = $self->qp->config('enable_content_log');
     $enabled = 'true' if ! defined $enabled;
     return 1 if lc($enabled) eq 'true';
+    return 0;
+}
+
+sub exclude {
+    # override this method to exclude some messages from content logging
     return 0;
 }
