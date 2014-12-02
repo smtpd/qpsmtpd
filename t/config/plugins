@@ -13,6 +13,7 @@
 # my $MAXCONNIP = 5; # max simultaneous connections from one IP
 # settings... without this it will NOT refuse more than $MAXCONNIP connections
 # from one IP!
+content_log
 hosts_allow
 
 # information plugins
