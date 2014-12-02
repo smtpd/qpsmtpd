@@ -5,12 +5,17 @@ use warnings;
 
 sub register_tests {
     my ( $self ) = @_;
-
     $self->register_test('test_content_log_file');
+    $self->register_test('test_content_log_enabled');
 }
 
 sub test_content_log_file {
     my ( $self ) = @_;
     ok( $self->content_log_file, 'content_log_file() returns something' );
+}
+
+sub test_content_log_enabled {
+    my ( $self ) = @_;
+    ok( ! $self->content_log_enabled, 'content_log_enabled() returns false' );
 }
 

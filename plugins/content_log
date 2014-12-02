@@ -6,10 +6,8 @@
 use POSIX qw:strftime:;
 
 sub register {
-    my ( $self, $qp ) = @_;
-    my $enabled = $qp->config('enable_content_log');
-    $enabled = 'true' if ! defined $enabled;
-    return if lc($enabled) ne 'true';
+    my ( $self ) = @_;
+    return if ! $self->content_log_enabled;
     $self->register_hook('data_post', 'data_post_handler');
 }
 
@@ -34,4 +32,12 @@ sub content_log_file {
     # as a decent default, log on a per-day-basis
     my $date = strftime("%Y%m%d", localtime(time));
     return "mail/$date";
+}
+
+sub content_log_enabled {
+    my ( $self ) = @_;
+    my $enabled = $self->qp->config('enable_content_log');
+    $enabled = 'true' if ! defined $enabled;
+    return 1 if lc($enabled) eq 'true';
+    return 0;
 }
