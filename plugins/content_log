@@ -16,7 +16,7 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    open my $out, '>>',  $self->content_log_file;
+    open my $out, '>>',  $self->content_log_file
       or return DECLINED, "Could not open log file.. continuing anyway";
 
     $transaction->header->print($out);
