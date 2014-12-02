@@ -8,9 +8,7 @@ use POSIX qw:strftime:;
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
-    # as a decent default, log on a per-day-basis
-    my $date = strftime("%Y%m%d", localtime(time));
-    open(my $out, ">>mail/$date")
+    open my $out, '>>',  $self->content_log_file;
       or return DECLINED, "Could not open log file.. continuing anyway";
 
     $transaction->header->print($out);
@@ -22,4 +20,10 @@ sub hook_data_post {
     close $out;
 
     return DECLINED, "successfully saved message.. continuing";
+}
+
+sub content_log_file {
+    # as a decent default, log on a per-day-basis
+    my $date = strftime("%Y%m%d", localtime(time));
+    return "mail/$date";
 }
