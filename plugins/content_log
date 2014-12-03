@@ -16,6 +16,16 @@ Useful for debugging other plugins or keeping an archive of things.
 Used to enable and disable content logging
 
 Default: true
+
+=head2 content_log_file <pattern>
+
+Path to the content log file.
+
+This option is passed through strftime(); see
+http://man7.org/linux/man-pages/man3/strftime.3.html
+or the appropriate documentation for your operating system)
+
+Default: mail/%Y%m%d
 =cut
 
 use POSIX qw:strftime:;
@@ -47,9 +57,11 @@ sub data_post_handler {
 }
 
 sub content_log_file {
+    my ( $self ) = @_;
     # as a decent default, log on a per-day-basis
-    my $date = strftime("%Y%m%d", localtime(time));
-    return "mail/$date";
+    my $path = $self->qp->config('content_log_file');
+    $path ||= 'mail/%Y%m%d';
+    return strftime($path, localtime(time));
 }
 
 sub content_log_enabled {
