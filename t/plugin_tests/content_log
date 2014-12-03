@@ -18,6 +18,75 @@ sub test_content_log_file {
 sub test_content_log_enabled {
     my ( $self ) = @_;
     ok( ! $self->content_log_enabled, 'content_log_enabled() returns false' );
+    my @test_data = (
+        {
+            config   => 'true',
+            expected => 1,
+        },
+        {
+            config   => undef,
+            expected => 1,
+        },
+        {
+            config   => '1',
+            expected => 1,
+        },
+        {
+            config   => 'yes',
+            expected => 1,
+        },
+        {
+            config   => 'yes    ',
+            expected => 1,
+        },
+        {
+            config   => '0',
+            expected => 0,
+        },
+        {
+            config   => 'false',
+            expected => 0,
+        },
+        {
+            config   => 'no',
+            expected => 0,
+        },
+        {
+            config   => 'asdf ',
+            expected => 0,
+        },
+    );
+    $self->save_hook;
+    for ( @test_data ) {
+        my $descr = "content_log_enabled="
+            . ( defined $_->{config } ? "'$_->{config }'" : 'undef' )
+            . ( $_->{expected} ? ' enables' : ' disables' )
+            . ' content logging';
+        $self->fake_config( $_->{config } );
+        is( $self->content_log_enabled, $_->{expected}, $descr );
+    }
+    $self->restore_hook;
+}
+
+our $oldhook;
+sub save_hook {
+    my ( $self ) = @_;
+    $oldhook = $self->qp->hooks->{config};
+}
+
+sub restore_hook {
+    my ( $self ) = @_;
+    $self->qp->hooks->{config} = $oldhook;
+}
+
+sub fake_config {
+    my ( $self, $value ) = @_;
+    $self->qp->hooks->{config} = [
+        {
+            name => 'test hook',
+            code => sub { return OK, $value },
+        },
+    ];
 }
 
 sub test_exclude {

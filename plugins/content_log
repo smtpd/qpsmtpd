@@ -41,7 +41,7 @@ sub content_log_enabled {
     my ( $self ) = @_;
     my $enabled = $self->qp->config('content_log_enabled');
     $enabled = 'true' if ! defined $enabled;
-    return 1 if lc($enabled) eq 'true';
+    return 1 if $enabled =~ /^(?:true|1|yes)\s*$/i;
     return 0;
 }
 
