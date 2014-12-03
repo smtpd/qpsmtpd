@@ -39,7 +39,7 @@ sub content_log_file {
 
 sub content_log_enabled {
     my ( $self ) = @_;
-    my $enabled = $self->qp->config('enable_content_log');
+    my $enabled = $self->qp->config('content_log_enabled');
     $enabled = 'true' if ! defined $enabled;
     return 1 if lc($enabled) eq 'true';
     return 0;
