@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use POSIX qw( strftime );
 
 sub register_tests {
     my ( $self ) = @_;
@@ -12,7 +13,15 @@ sub register_tests {
 
 sub test_content_log_file {
     my ( $self ) = @_;
-    ok( $self->content_log_file, 'content_log_file() returns something' );
+    is( $self->content_log_file,
+        strftime('mail/%Y%m%d', localtime(time)),
+        'content_log_file() returns the right default value' );
+    $self->save_hook;
+    $self->fake_config('/path/to/%Y%m%d%H%M');
+    is( $self->content_log_file,
+        strftime('/path/to/%Y%m%d%H%M', localtime(time)),
+        'content_log_file config changes content_log_file() output' );
+    $self->restore_hook;
 }
 
 sub test_content_log_enabled {
