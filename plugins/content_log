@@ -1,16 +1,38 @@
 #!perl -w
 
-# A simple example of a plugin that logs all incoming mail to a file.
-# Useful for debugging other plugins or keeping an archive of things.
+=head1 NAME
+
+content_log - record incoming mail to a file
+
+=head1 DESCRIPTION
+
+A simple example of a plugin that logs all incoming mail to a file.
+Useful for debugging other plugins or keeping an archive of things.
+
+=head1 CONFIG
+
+=head2 content_log_enabled <true|false>
+
+Used to enable and disable content logging
+
+Default: true
+=cut
 
 use POSIX qw:strftime:;
 
-sub hook_data_post {
+sub register {
+    my ( $self ) = @_;
+    return if ! $self->content_log_enabled;
+    $self->register_hook('data_post', 'data_post_handler');
+}
+
+sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    # as a decent default, log on a per-day-basis
-    my $date = strftime("%Y%m%d", localtime(time));
-    open(my $out, ">>mail/$date")
+    return DECLINED, 'excluded from content logging'
+        if $self->exclude();
+
+    open my $out, '>>',  $self->content_log_file
       or return DECLINED, "Could not open log file.. continuing anyway";
 
     $transaction->header->print($out);
@@ -22,4 +44,23 @@ sub hook_data_post {
     close $out;
 
     return DECLINED, "successfully saved message.. continuing";
+}
+
+sub content_log_file {
+    # as a decent default, log on a per-day-basis
+    my $date = strftime("%Y%m%d", localtime(time));
+    return "mail/$date";
+}
+
+sub content_log_enabled {
+    my ( $self ) = @_;
+    my $enabled = $self->qp->config('content_log_enabled');
+    $enabled = 'true' if ! defined $enabled;
+    return 1 if $enabled =~ /^(?:true|1|yes)\s*$/i;
+    return 0;
+}
+
+sub exclude {
+    # override this method to exclude some messages from content logging
+    return 0;
 }
