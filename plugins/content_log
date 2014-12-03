@@ -1,7 +1,22 @@
 #!perl -w
 
-# A simple example of a plugin that logs all incoming mail to a file.
-# Useful for debugging other plugins or keeping an archive of things.
+=head1 NAME
+
+content_log - record incoming mail to a file
+
+=head1 DESCRIPTION
+
+A simple example of a plugin that logs all incoming mail to a file.
+Useful for debugging other plugins or keeping an archive of things.
+
+=head1 CONFIG
+
+=head2 content_log_enabled <true|false>
+
+Used to enable and disable content logging
+
+Default: true
+=cut
 
 use POSIX qw:strftime:;
 
