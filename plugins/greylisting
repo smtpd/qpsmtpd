@@ -346,7 +346,7 @@ sub greylist {
     $self->log(LOGDEBUG,
                "config: "
                  . join(',',
-                        map { $_ . '=' . $config->{$_} } sort keys %$config)
+                        map { $_ . '=' . (defined $config->{$_} ? $config->{$_} : '') } sort keys %$config)
               );
 
     return DECLINED if $self->exclude();
