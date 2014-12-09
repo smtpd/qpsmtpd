@@ -3,6 +3,11 @@ use strict;
 use warnings;
 use parent 'Qpsmtpd::DB';
 
+sub new {
+    my ( $class, %arg ) = @_;
+    return bless { %arg }, $class;
+}
+
 sub dir {
     my ( $self, @candidate_dirs ) = @_;
     return $self->{dir} if $self->{dir} and ! @candidate_dirs;
