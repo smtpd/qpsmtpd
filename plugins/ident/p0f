@@ -166,6 +166,11 @@ sub register {
     foreach (keys %args) {
         $self->{_args}->{$_} = $args{$_};
     }
+    $self->register_headers();
+}
+
+sub register_headers {
+    my ( $self ) = @_;
     my $enabled = $self->{_args}{add_headers};
     $enabled = 'true' if ! defined $enabled;
     return if $enabled =~ /false/i;
