@@ -13,6 +13,64 @@ sub register_tests {
     $self->register_test('test_get_v3_query');
     $self->register_test('test_store_v2_results');
     $self->register_test('test_store_v3_results');
+
+    $self->register_test('test_register_headers');
+    $self->register_test('test_register_genre_blocking');
+    $self->register_test('test_rcpt_handler');
+    $self->register_test('test_check_genre');
+    $self->register_test('test_exclude_connection');
+    $self->register_test('test_exclude_recipient');
+}
+
+sub register_hook {
+    # Override normal register_hook() to record behavior
+    my $self = shift;
+    $self->{_lastreg} = join ',', @_;
+}
+
+sub test_register_headers {
+    my ( $self ) = @_;
+
+    # reset last_register_args
+    $self->register_hook();
+    delete $self->{_args}{add_headers};
+    $self->register_headers();
+    is( $self->{_lastreg}, 'data_post,add_headers',
+        'register_headers() registers data_post hook by default' );
+
+    $self->register_hook();
+    $self->{_args}{add_headers} = 'asdf';
+    $self->register_headers();
+    is( $self->{_lastreg}, 'data_post,add_headers',
+        'register_headers() registers data_post hook on invalid input' );
+
+    $self->register_hook();
+    $self->{_args}{add_headers} = 'true';
+    $self->register_headers();
+    is( $self->{_lastreg}, 'data_post,add_headers',
+        'register_headers() registers data_post hook when explicitly enabled' );
+    
+    $self->register_hook();
+    $self->{_args}{add_headers} = 'false';
+    $self->register_headers();
+    is( $self->{_lastreg}, '',
+        'register_headers() does not register data_post hook when disabled' );
+
+}
+
+sub test_register_genre_blocking {
+}
+
+sub test_rcpt_handler {
+}
+
+sub test_check_genre {
+}
+
+sub test_exclude_connection {
+}
+
+sub test_exclude_recipient {
 }
 
 sub test_add_headers {
