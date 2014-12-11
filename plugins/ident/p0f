@@ -119,6 +119,19 @@ Example entry disabling header addition
 
 Default: true
 
+=head1 CONFIGURATION FILES
+
+=head2 p0f_blocked_operating_systems
+
+If populated, systems that match the phrases and regular expressions in this list will be rejected.
+
+Example entries:
+
+Windows XP
+/windows/i
+
+Default: none (p0f rejections disabled)
+
 =head1 Environment requirements
 
 p0f v3 requires only the remote IP.
@@ -167,6 +180,7 @@ sub register {
         $self->{_args}->{$_} = $args{$_};
     }
     $self->register_headers();
+    $self->register_genre_blocking();
 }
 
 sub register_headers {
@@ -176,6 +190,51 @@ sub register_headers {
     return if $enabled =~ /false/i;
     $self->register_hook( data_post => 'add_headers' );
 }
+
+sub register_genre_blocking {
+    my ( $self ) = @_;
+    my @patterns = $self->qp->config('p0f_blocked_operating_systems');
+    return unless @patterns;
+    for my $pattern ( @pattern ) {
+        if ( $pattern =~ /^\/(.*)\/$/ ) {
+            push @{ $self->{os_block_re} }, qr/$1/;
+        } else {
+            push @{ $self->{os_block} }, qr/$1/;
+        }
+    }
+    $self->register_hook( rcpt => 'rcpt_handler' );
+}
+
+sub rcpt_handler {
+    my ( $self, $txn, $rcpt ) = @_;
+    return DECLINED if ! $self->check_genre($rcpt);
+    return DENY, 'OS Blocked';
+}
+
+sub check_genre {
+    my ( $self, $rcpt );
+    my $p0f = $self->connection->notes('p0f') or return 0;
+    return 0 if $self->exclude_connection();
+    return 0 if $self->exclude_recipient($rcpt);
+    for my $phrase ( @{ $self->{os_block} || [] } ) {
+        return 1 if $p0f->{genre} eq $phrase;
+    }
+    for my $re ( @{ $self->{os_block_re} || [] } ) {
+        return 1 if $p0f->{genre} =~ /$re/;
+    }
+    return 0;
+}
+
+sub exclude_connection {
+    my ( $self ) = @_;
+    my $cxn = $self->connection;
+    return $cxn->notes('p0f_exclude')   if defined $cxn->notes('p0f_exclude');
+    return $cxn->notes('p0f_exclude',1) if $self->is_immune();
+    return $cxn->notes('p0f_exclude',0);
+}
+
+# This sub exists to be overridden by plugins that inherit from this one
+sub exclude_recipient  { return 0 }
 
 sub hook_connect {
     my ($self, $qp) = @_;
