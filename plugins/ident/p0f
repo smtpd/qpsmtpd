@@ -195,7 +195,7 @@ sub register_genre_blocking {
     my ( $self ) = @_;
     my @patterns = $self->qp->config('p0f_blocked_operating_systems');
     return unless @patterns;
-    for my $pattern ( @pattern ) {
+    for my $pattern ( @patterns ) {
         if ( $pattern =~ /^\/(.*)\/$/ ) {
             push @{ $self->{os_block_re} }, qr/$1/;
         } else {
