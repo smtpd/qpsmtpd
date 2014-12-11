@@ -123,7 +123,10 @@ Default: true
 
 =head2 p0f_blocked_operating_systems
 
-If populated, systems that match the phrases and regular expressions in this list will be rejected.
+If populated, systems that match the phrases and regular expressions
+in this list will be rejected.
+
+Regular expressions are case-insensitive.
 
 Example entries:
 
@@ -197,9 +200,9 @@ sub register_genre_blocking {
     return unless @patterns;
     for my $pattern ( @patterns ) {
         if ( $pattern =~ /^\/(.*)\/$/ ) {
-            push @{ $self->{os_block_re} }, qr/$1/;
+            push @{ $self->{os_block_re} }, qr/$1/i;
         } else {
-            push @{ $self->{os_block} }, qr/$1/;
+            push @{ $self->{os_block} }, $pattern;
         }
     }
     $self->register_hook( rcpt => 'rcpt_handler' );
