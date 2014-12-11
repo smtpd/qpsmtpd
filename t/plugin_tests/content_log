@@ -16,12 +16,11 @@ sub test_content_log_file {
     is( $self->content_log_file,
         strftime('mail/%Y%m%d', localtime(time)),
         'content_log_file() returns the right default value' );
-    $self->save_hook;
-    $self->fake_config('/path/to/%Y%m%d%H%M');
+    $self->fake_config( content_log_file => '/path/to/%Y%m%d%H%M' );
     is( $self->content_log_file,
         strftime('/path/to/%Y%m%d%H%M', localtime(time)),
         'content_log_file config changes content_log_file() output' );
-    $self->restore_hook;
+    $self->unfake_config;
 }
 
 sub test_content_log_enabled {
@@ -65,36 +64,37 @@ sub test_content_log_enabled {
             expected => 0,
         },
     );
-    $self->save_hook;
     for ( @test_data ) {
         my $descr = "content_log_enabled="
             . ( defined $_->{config } ? "'$_->{config }'" : 'undef' )
             . ( $_->{expected} ? ' enables' : ' disables' )
             . ' content logging';
-        $self->fake_config( $_->{config } );
+        $self->fake_config( content_log_enabled => $_->{config } );
         is( $self->content_log_enabled, $_->{expected}, $descr );
     }
-    $self->restore_hook;
-}
-
-our $oldhook;
-sub save_hook {
-    my ( $self ) = @_;
-    $oldhook = $self->qp->hooks->{config};
-}
-
-sub restore_hook {
-    my ( $self ) = @_;
-    $self->qp->hooks->{config} = $oldhook;
+    $self->unfake_config;
 }
 
 sub fake_config {
-    my ( $self, $value ) = @_;
+    my $self = shift;
+    my $fake_config = {@_};
     $self->qp->hooks->{config} = [
         {
-            name => 'test hook',
-            code => sub { return OK, $value },
+            name => '___FakeHook___',
+            code => sub {
+                my ( $self, $txn, $conf ) = @_;
+                return DECLINED if ! exists $fake_config->{$conf};
+                return OK, $fake_config->{$conf};
+            },
         },
+    ];
+}
+
+sub unfake_config {
+    my ( $self ) = @_;
+    $self->qp->hooks->{config} = [
+        grep { $_->{name} ne '___FakeHook___' }
+        @{ $self->qp->hooks->{config} || [] }
     ];
 }
 
