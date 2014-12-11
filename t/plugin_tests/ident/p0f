@@ -90,6 +90,18 @@ sub test_register_genre_blocking {
 }
 
 sub test_rcpt_handler {
+    my ( $self ) = @_;
+
+    $self->{os_block} = ['Windows 7 or 8'];
+    my ( $r, $msg ) = $self->rcpt_handler();
+    is( return_code($r) . "/$msg", "DENY/OS Blocked",
+        'rcpt_handler rejects on p0f genre match' );
+
+    $self->{os_block} = ['Commodor 16'];
+    ( $r, $msg ) = $self->rcpt_handler();
+    $msg = 'undef' if ! defined $msg;
+    is( return_code($r) . "/$msg", "DECLINED/undef",
+        'rcpt_handler returns DECLINED on no p0f genre match' );
 }
 
 sub test_check_genre {
