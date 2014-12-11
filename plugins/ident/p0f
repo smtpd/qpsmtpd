@@ -215,7 +215,7 @@ sub rcpt_handler {
 }
 
 sub check_genre {
-    my ( $self, $rcpt );
+    my ( $self, $rcpt ) = @_;
     my $p0f = $self->connection->notes('p0f') or return 0;
     return 0 if $self->exclude_connection();
     return 0 if $self->exclude_recipient($rcpt);
