@@ -131,7 +131,7 @@ Regular expressions are case-insensitive.
 Example entries:
 
 Windows XP
-/windows/i
+/windows/
 
 Default: none (p0f rejections disabled)
 
