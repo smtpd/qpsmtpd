@@ -102,9 +102,20 @@ sub test_rcpt_handler {
     $msg = 'undef' if ! defined $msg;
     is( return_code($r) . "/$msg", "DECLINED/undef",
         'rcpt_handler returns DECLINED on no p0f genre match' );
+
+    delete $self->{os_block};
 }
 
 sub test_check_genre {
+    my ( $self ) = @_;
+
+    $self->{os_block_re} = [qr/windows/i];
+    ok( $self->check_genre, 'check_genre() returns true on OS match' );
+
+    $self->{os_block_re} = [qr/windoze/i];
+    ok( ! $self->check_genre, 'check_genre() returns false for no OS match' );
+
+    delete $self->{os_block_re};
 }
 
 sub test_exclude_connection {
