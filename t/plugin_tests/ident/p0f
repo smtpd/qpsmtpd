@@ -59,6 +59,34 @@ sub test_register_headers {
 }
 
 sub test_register_genre_blocking {
+    my ( $self ) = @_;
+
+    $self->register_hook();
+    $self->register_genre_blocking();
+    is( $self->{_lastreg}, '',
+        'rcpt_handler not registered when no blocked genres are configured' );
+
+    $self->register_hook();
+    $self->fake_config( p0f_blocked_operating_systems => 'Crapple Macintawsh' );
+    $self->register_genre_blocking();
+    is( $self->{_lastreg}, 'rcpt,rcpt_handler',
+        'rcpt_handler registered when blocked genre phrases are configured' );
+    is( join('|', @{ delete $self->{os_block}    || [] }), 'Crapple Macintawsh',
+        'blocked OS phrases processed correctly' );
+    is( join('|', @{ delete $self->{os_block_re} || [] }), '',
+        'no blocked OS regexes' );
+
+    $self->register_hook();
+    $self->fake_config( p0f_blocked_operating_systems => '/windoze/' );
+    $self->register_genre_blocking();
+    is( $self->{_lastreg}, 'rcpt,rcpt_handler',
+        'rcpt_handler registered when blocked genre regexes are configured' );
+    is( join('|', @{ delete $self->{os_block}    || [] }), '',
+        'no blocked OS phrases' );
+    is( join('|', @{ delete $self->{os_block_re} || [] }), qr/windoze/i,
+        'blocked OS regexes processed correctly' );
+
+    $self->unfake_config;
 }
 
 sub test_rcpt_handler {
