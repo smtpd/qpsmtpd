@@ -223,7 +223,7 @@ sub check_genre {
         return 1 if $p0f->{genre} eq $phrase;
     }
     for my $re ( @{ $self->{os_block_re} || [] } ) {
-        return 1 if $p0f->{genre} =~ /$re/;
+        return 1 if $p0f->{genre} =~ $re;
     }
     return 0;
 }
