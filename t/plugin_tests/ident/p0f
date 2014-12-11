@@ -13,7 +13,6 @@ sub register_tests {
     $self->register_test('test_get_v3_query');
     $self->register_test('test_store_v2_results');
     $self->register_test('test_store_v3_results');
-
     $self->register_test('test_register_headers');
     $self->register_test('test_register_genre_blocking');
     $self->register_test('test_rcpt_handler');
@@ -119,9 +118,19 @@ sub test_check_genre {
 }
 
 sub test_exclude_connection {
+    my ( $self ) = @_;
+    $self->connection->relay_client(0);
+    ok( ! $self->exclude_connection,
+        'default: exclude no connections from genre check' );
+    $self->connection->notes( p0f_exclude => undef );
+    $self->connection->relay_client(1);
+    ok( $self->exclude_connection, 'relay clients excluded from genre check' );
 }
 
 sub test_exclude_recipient {
+    my ( $self ) = @_;
+    ok( ! $self->exclude_recipient({}),
+        'default: exclude no recipients from genre check' );
 }
 
 sub test_add_headers {
