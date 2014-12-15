@@ -43,14 +43,14 @@ ok(!$passClear, "get_auth_details_plain, pass -");
 
 # PLAIN
 $r = Qpsmtpd::Auth::SASL($smtpd, 'plain', $enc_plain);
-cmp_ok(OK, '==', $r, "plain auth");
+is( return_code($r), 'OK', 'plain auth' );
 
 if ($ENV{QPSMTPD_DEVELOPER} && is_interactive()) {
 
     # same thing, but must be entered interactively
     print "answer: $enc_plain\n";
     $r = Qpsmtpd::Auth::SASL($smtpd, 'plain', '');
-    cmp_ok(OK, '==', $r, "SASL, plain");
+    is( return_code($r), 'OK', 'SASL, plain' );
 }
 
 # LOGIN
@@ -74,7 +74,7 @@ if ($ENV{QPSMTPD_DEVELOPER} && is_interactive()) {
 
     print "encoded pass: $enc_pass\n";
     $r = Qpsmtpd::Auth::SASL($smtpd, 'login', $enc_user);
-    cmp_ok(OK, '==', $r, "SASL, login");
+    is( return_code($r), 'OK', 'SASL, login' );
 }
 
 # CRAM-MD5
@@ -97,7 +97,7 @@ if ($ENV{QPSMTPD_DEVELOPER} && is_interactive()) {
 
   # this isn't going to work without bidirection communication to get the ticket
   #$r = Qpsmtpd::Auth::SASL($smtpd, 'cram-md5' );
-  #cmp_ok( OK, '==', $r, "login auth");
+  #is( return_code($r), 'OK', 'login auth' );
 }
 
 sub is_interactive {
