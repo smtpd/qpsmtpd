@@ -11,14 +11,11 @@ sub register_tests {
 
     eval 'use GeoIP2::Database::Reader';
     if ( !$@ ) {
-        warn "using GeoIP2\n";
         $self->register_test('test_geoip2_lookup');
     }
 
     eval 'use Geo::IP';
     if ( !$@ ) {
-        warn "loaded Geo::IP\n";
-
         $self->register_test('test_geoip_lookup');
         $self->register_test('test_geoip_load_db');
         $self->register_test('test_geoip_init_cc');
