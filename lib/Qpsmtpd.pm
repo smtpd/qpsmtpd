@@ -101,7 +101,7 @@ sub warn_handler {
 sub warn_level {
     my ( $self, @warnings ) = @_;
     my @levels = ( keys %Qpsmtpd::Constants::log_levels,
-                   qw( LOGWARNING LOGCRITICAL LOGEMERGENCY ) );
+                   qw[ LOGWARNING LOGCRITICAL LOGEMERGENCY ] );
     my $levels = join '|', map { s/^LOG//; $_ } @levels;
     $warnings[0] =~ s/^($levels):\s*//;
     my $prefix = $1;
