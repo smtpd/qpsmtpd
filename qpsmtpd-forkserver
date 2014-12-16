@@ -180,6 +180,7 @@ if ($PID_FILE) {
 
 # Load plugins here
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
+$SIG{__WARN__} = sub { $qpsmtpd->warn_handler(@_) };
 
 # Drop privileges
 my (undef, undef, $quid, $qgid) = getpwnam $USER

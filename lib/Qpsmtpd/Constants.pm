@@ -3,7 +3,7 @@ use strict;
 require Exporter;
 
 # log levels
-my %log_levels = (
+our %log_levels = (
                   LOGDEBUG  => 7,
                   LOGINFO   => 6,
                   LOGNOTICE => 5,
@@ -54,7 +54,7 @@ sub return_code {
 sub log_level {
     my $test = shift;
     if ($test =~ /^\d+$/) {    # need to return the textural form
-        foreach (keys %log_levels) {
+        foreach (sort keys %log_levels) {
             return $_ if $log_levels{$_} =~ /$test/;
         }
     }
