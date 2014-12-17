@@ -355,6 +355,12 @@ sub __warn_level {
     is( log_level($level), 'LOGWARN', 'Correct log level with no prefix' );
     is( $msg, 'qwerty', 'Correct message with no prefix' );
 
+    my $s = 'abc123';
+    $s =~ /(abc)/;
+    ( $level, $msg ) = $qp->warn_level('dvorak');
+    is( log_level($level), 'LOGWARN', 'Correct level after $1 assignment' );
+    is( $msg, 'dvorak', 'Correct message with no prefix after $1 assignment' );
+
     ( $level, $msg ) = $qp->warn_level('NOTICE:   asdf');
     is( log_level($level), 'LOGNOTICE', 'Correct level with NOTICE prefix' );
     is( $msg, 'asdf', 'Correct message with NOTICE prefix' );

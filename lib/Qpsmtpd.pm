@@ -103,8 +103,8 @@ sub warn_level {
     my @levels = ( keys %Qpsmtpd::Constants::log_levels,
                    qw[ LOGWARNING LOGCRITICAL LOGEMERGENCY ] );
     my $levels = join '|', map { s/^LOG//; $_ } @levels;
-    $warnings[0] =~ s/^($levels):\s*//;
-    my $prefix = $1;
+    my $prefix;
+    $prefix = $1 if $warnings[0] =~ s/^($levels):\s*//;
     $prefix = 'WARN'  if ! $prefix;
     $prefix = 'WARN'  if $prefix eq 'WARNING';
     $prefix = 'CRIT'  if $prefix eq 'CRITICAL';
