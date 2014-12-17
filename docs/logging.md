@@ -80,8 +80,8 @@ Emitting this warning in a plugin is equivalent to using log():
 `$self->log(LOGNOTICE, 'Danger Will Robinson!')`
 
 Notably, using 'warn' in a plugin will always result in that warning being
-emitted to STDERR, wheras messages sent with log() are not output to the
-terminal when running the test suite.
+emitted to STDERR when the test suite is executed, wheras messages sent with
+log() are not output to the terminal when running the test suite.
 
 ## plugin loglevel
 
