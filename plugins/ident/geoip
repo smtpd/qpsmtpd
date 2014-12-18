@@ -146,8 +146,8 @@ sub register {
 
 sub load_geoip {
     my ( $self ) = @_;
-    $self->load_geoip2() and return 1;
     $self->load_geoip1() and return 1;
+    $self->load_geoip2() and return 1;
     return 0;
 }
 
@@ -182,7 +182,8 @@ sub load_geoip2 {
         return;
     }
 
-    $self->log(LOGINFO, "GeoIP2 loaded");
+    warn "Using GeoIP2."
+       . " ASN data is not currently available using the GeoIP2 module!\n";
 
     eval {
         $self->{_geoip2_city} = GeoIP2::Database::Reader->new(
@@ -308,22 +309,27 @@ sub open_geoip_db {
         next if !-f "$db_dir/$db.dat";
         $self->log(LOGINFO, "using db $db");
         $self->{_geoip_city} = Geo::IP->open("$db_dir/$db.dat");
+        last if $self->{_geoip_city};
     }
+    warn "Missing GeoIP City data!\n" if ! $self->{_geoip_city};
 
     if (-f "$db_dir/GeoIPASNum.dat") {
         $self->log(LOGINFO, "using GeoIPASNum");
         $self->{GeoIPASNum} = Geo::IP->open("$db_dir/GeoIPASNum.dat");
     }
+    warn "Missing GeoIP ASN data!\n" if ! $self->{GeoIPASNum};
 
     if (-f "$db_dir/GeoIPASNumv6.dat") {
         $self->log(LOGINFO, "using GeoIPASNumv6");
         $self->{GeoIPASNumv6} = Geo::IP->open("$db_dir/GeoIPASNumv6.dat");
+        warn "Missing GeoIP ASN IPV6 data!\n" if ! $self->{GeoIPASNum};
     }
 
     # can't think of a good reason to load country if city data is present
     if (!$self->{_geoip_city}) {
         $self->log(LOGDEBUG, "using default db");
         $self->{_geoip} = Geo::IP->new();    # loads default Country DB
+        warn "Missing GeoIP Country data!\n" if ! $self->{_geoip};
     }
 }
 
