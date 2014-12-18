@@ -45,6 +45,8 @@ __load_logging();
 __config_dir();
 __config();
 
+__warn_level();
+
 done_testing();
 
 sub __run_hooks {
@@ -346,6 +348,30 @@ sub __config {
             $t->{expected}{global},
             "Global config: $t->{descr}");
     }
+}
+
+sub __warn_level {
+    my ( $level, $msg ) = $qp->warn_level('qwerty');
+    is( log_level($level), 'LOGWARN', 'Correct log level with no prefix' );
+    is( $msg, 'qwerty', 'Correct message with no prefix' );
+
+    my $s = 'abc123';
+    $s =~ /(abc)/;
+    ( $level, $msg ) = $qp->warn_level('dvorak');
+    is( log_level($level), 'LOGWARN', 'Correct level after $1 assignment' );
+    is( $msg, 'dvorak', 'Correct message with no prefix after $1 assignment' );
+
+    ( $level, $msg ) = $qp->warn_level('NOTICE:   asdf');
+    is( log_level($level), 'LOGNOTICE', 'Correct level with NOTICE prefix' );
+    is( $msg, 'asdf', 'Correct message with NOTICE prefix' );
+
+    ( $level, $msg ) = $qp->warn_level('EMERGENCY:foo');
+    is( log_level($level), 'LOGEMERG', 'Correct level with EMERGENCY prefix' );
+    is( $msg, 'foo', 'Correct message with EMERGENCY prefix' );
+
+    ( $level, $msg ) = $qp->warn_level('NOTICE != LOGNOTICE');
+    is( log_level($level), 'LOGWARN', 'Correct level with no colon' );
+    is( $msg, 'NOTICE != LOGNOTICE', 'Correct message with no colon' );
 }
 
 1;
