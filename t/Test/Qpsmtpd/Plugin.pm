@@ -87,7 +87,7 @@ sub validate_password {
 sub fake_config {
     my $self = shift;
     my $fake_config = {@_};
-    $self->qp->hooks->{config} = [
+    unshift @{ $self->qp->hooks->{config} ||= [] },
         {
             name => '___FakeHook___',
             code => sub {
@@ -95,8 +95,7 @@ sub fake_config {
                 return DECLINED if ! exists $fake_config->{$conf};
                 return OK, $fake_config->{$conf};
             },
-        },
-    ];
+        };
 }
 
 sub unfake_config {
