@@ -119,6 +119,8 @@ sub run_plugin_tests {
 }
 
 sub fake_hook {
+    # Used to test core code against different potential plugins
+    # it will interact with
     my ( $self, $hook, $sub ) = @_;
     unshift @{ $self->hooks->{$hook} ||= [] },
         {
@@ -136,6 +138,7 @@ sub unfake_hook {
 }
 
 sub fake_config {
+    # Used to test code against various possible configurations
     my $self = shift;
     my $fake_config = {@_};
     $self->fake_hook( 'config',
