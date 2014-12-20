@@ -2,11 +2,13 @@ package Qpsmtpd::DB;
 use strict;
 use warnings;
 use Qpsmtpd::DB::File::DBM;
+use Qpsmtpd::DB::Redis;
 
 sub new {
     my ( $class, %arg ) = @_;
     # Qpsmtpd::DB::File::DBM is the only supported class just now
     my @child_classes = qw(
+        Qpsmtpd::DB::Redis
         Qpsmtpd::DB::File::DBM
     );
     my $manual_class = delete $arg{class};
@@ -24,7 +26,8 @@ sub new {
 }
 
 # noop default method for plugins that don't require locking
-sub lock { 1 }
+sub lock   { 1 }
+sub unlock { 1 }
 
 sub name {
     my ( $self, $name ) = @_;

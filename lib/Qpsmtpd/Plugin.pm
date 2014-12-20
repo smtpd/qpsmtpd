@@ -349,6 +349,7 @@ sub _register_standard_hooks {
 
 sub db {
     my ( $self, %arg ) = @_;
+    $arg{name} ||= $self->plugin_name;
     return $self->{db} ||= Qpsmtpd::DB->new(%arg);
 }
 
