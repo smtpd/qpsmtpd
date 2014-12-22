@@ -360,7 +360,7 @@ sub greylist {
     my $value = $self->db->get($key);
     if ( ! $value ) {
         # new IP or entry timed out - record new
-        $self->db->set( $key, sprintf $fmt, time, 1, 0, 0 );
+        $self->db->set( $key, sprintf $fmt, $self->now, 1, 0, 0 );
         $self->log(LOGWARN, "fail: initial DENYSOFT, unknown");
         return $self->cleanup_and_return();
     }
@@ -371,8 +371,8 @@ sub greylist {
     if ($white) {
 
         # white IP - accept unless timed out
-        if (time - $ts < $config->{white_timeout}) {
-            $self->db->set( $key, sprintf $fmt, time, $new, $black, ++$white );
+        if ( $self->now - $ts < $config->{white_timeout} ) {
+            $self->db->set( $key, sprintf $fmt, $self->now, $new, $black, ++$white );
             $self->log(LOGINFO, "pass: white, $white deliveries");
             return $self->cleanup_and_return(DECLINED);
         }
@@ -382,7 +382,7 @@ sub greylist {
     }
 
     # Black IP - deny, but don't update timestamp
-    if (time - $ts < $config->{black_timeout}) {
+    if ( $self->now - $ts < $config->{black_timeout} ) {
         $self->db->set( $key, sprintf $fmt, $ts, $new, ++$black, 0 );
         $self->log(LOGWARN,
                    "fail: black DENYSOFT - $black deferred connections");
@@ -390,8 +390,8 @@ sub greylist {
     }
 
     # Grey IP - accept unless timed out
-    elsif (time - $ts < $config->{grey_timeout}) {
-        $self->db->set( $key, sprintf $fmt, time, $new, $black, 1 );
+    elsif ( $self->now - $ts < $config->{grey_timeout} ) {
+        $self->db->set( $key, sprintf $fmt, $self->now, $new, $black, 1 );
         $self->log(LOGWARN, "pass: updated grey->white");
         return $self->cleanup_and_return(DECLINED);
     }
@@ -399,6 +399,9 @@ sub greylist {
     $self->log(LOGWARN, "pass: timed out (grey)");
     return $self->cleanup_and_return(DECLINED);
 }
+
+# This exists purely to be overridden for testing
+sub now { time() }
 
 sub cleanup_and_return {
     my ($self, $return_val) = @_;
@@ -461,7 +464,7 @@ sub prune_db {
     my $pruned = 0;
     foreach my $key ( $self->db->get_keys ) {
         my ($ts, $new, $black, $white) = split /:/, $self->db->get($key);
-        my $age = time - $ts;
+        my $age = $self->now - $ts;
         next if $age < $self->{_args}{white_timeout};
         $pruned++;
         $self->db->delete($key);
