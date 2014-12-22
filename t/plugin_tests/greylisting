@@ -136,6 +136,16 @@ sub test_exclude {
     ok( $self->exclude(), "Relay client results in exclude() hit" );
     $self->connection->relay_client(0);
     ok( ! $self->exclude(), "Non-relay client results in exclude() miss" );
+
+    my $old_p0f = $self->connection->notes('p0f');
+    $self->connection->notes('p0f'=> { genre => 'windows' } );
+    delete $self->{_args}{p0f};
+    ok( ! $self->exclude(), 'no p0f args = no exclusion' );
+    $self->{_args}{'p0f'} = 'genre,Lindows';
+    ok(   $self->exclude(), 'p0f miss = exclusion' );
+    $self->{_args}{'p0f'} = 'genre,Windows';
+    ok( ! $self->exclude(), 'p0f hit = no exclusion' );
+    $self->connection->notes( p0f => $old_p0f );
 }
 
 sub test_greylist_geoip {

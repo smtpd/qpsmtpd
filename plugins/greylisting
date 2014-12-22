@@ -474,7 +474,7 @@ sub prune_db {
 sub exclude {
     my ( $self ) = @_;
     return 1 if $self->is_immune();
-    return 1 if !$self->p0f_match();
+    return 1 if $self->{_args}{p0f} and ! $self->p0f_match();
     return 1 if $self->geoip_match();
     return 1 if $self->exclude_file_match();
     return;
