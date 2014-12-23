@@ -12,7 +12,7 @@ our @hooks = qw(
   logging config user_config post-fork pre-connection connect ehlo_parse ehlo
   helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
   rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre
-  data data_headers_end data_post queue_pre queue queue_post vrfy noop
+  data data_headers_end data_post data_post_final queue_pre queue queue_post vrfy noop
   quit reset_transaction disconnect post-connection
   unrecognized_command deny ok received_line help
   );

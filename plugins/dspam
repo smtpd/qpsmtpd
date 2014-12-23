@@ -220,7 +220,7 @@ sub register {
 
     $self->get_dspam_bin() or return DECLINED;
 
-    $self->register_hook('data_post', 'data_post_handler');
+    $self->register_hook('data_post_final', 'data_post_handler');
 }
 
 sub get_dspam_bin {
