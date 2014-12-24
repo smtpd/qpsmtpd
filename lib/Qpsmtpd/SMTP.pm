@@ -781,10 +781,10 @@ sub data_respond {
         return 1;
     }
 
-    $self->run_hooks("data_post");
+    $self->run_hooks("data_post_headers");
     $self->authentication_results();
     $self->received_line();
-    $self->run_hooks("data_post_final");
+    $self->run_hooks("data_post");
 }
 
 sub authentication_results {
@@ -889,7 +889,7 @@ sub received_line {
     $self->transaction->header->add('Received', $header_str, 0);
 }
 
-sub data_post_final_respond {
+sub data_post_respond {
     my ($self, $rc, $msg, $args) = @_;
     if ($rc == DONE) {
         return 1;
