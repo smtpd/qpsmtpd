@@ -118,4 +118,65 @@ sub run_plugin_tests {
     $Test->done_testing();
 }
 
+sub fake_hook {
+    ###########################################################################
+    # Inserts a given subroutine into the beginning of the set of hooks already
+    # in place. Used to test code against different potential plugins it will
+    # interact with. For example, to test behavior against various results of
+    # the data_post hook:
+    #
+    # $self->fake_hook('data_post',sub { return DECLINED };
+    # ok(...);
+    # $self->fake_hook('data_post',sub { return DENYSOFT };
+    # ok(...);
+    # $self->fake_hook('data_post',sub { return DENY };
+    # ok(...);
+    # $self->fake_hook('data_post',sub { return DENY_DISCONNECT };
+    # ok(...);
+    # $self->unfake_hook('data_post');
+    ###########################################################################
+    my ( $self, $hook, $sub ) = @_;
+    unshift @{ $self->hooks->{$hook} ||= [] },
+        {
+            name => '___FakeHook___',
+            code => $sub,
+        };
+}
+
+sub unfake_hook {
+    my ( $self, $hook ) = @_;
+    $self->hooks->{$hook} = [
+        grep { $_->{name} ne '___FakeHook___' }
+        @{ $self->hooks->{$hook} || [] }
+    ];
+}
+
+sub fake_config {
+    ####################################################################
+    # Used to test code against various possible configurations
+    # For example, to test against various possible config('me') values:
+    #
+    # $self->fake_config( me => '***invalid***' );
+    # ok(...);
+    # $self->fake_config( me => 'valid-nonfqdn' );
+    # ok(...);
+    # $self->fake_config( me => 'valid-fqdn.com');
+    # ok(...);
+    # $self->unfake_config();
+    ####################################################################
+    my $self = shift;
+    my $fake_config = {@_};
+    $self->fake_hook( 'config',
+        sub {
+            my ( $self, $txn, $conf ) = @_;
+            return DECLINED if ! exists $fake_config->{$conf};
+            return OK, $fake_config->{$conf};
+    } );
+}
+
+sub unfake_config {
+    my ( $self ) = @_;
+    $self->unfake_hook('config');
+}
+
 1;

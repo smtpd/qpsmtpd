@@ -258,8 +258,8 @@ sub __config {
         {
          pref  => 'size_threshold',
          hooks => {
-                   user_config => [],
-                   config      => [],
+                   user_config => undef,
+                   config      => undef,
                   },
          expected => {
                       user   => 10000,
@@ -270,8 +270,8 @@ sub __config {
         {
          pref  => 'timeout',
          hooks => {
-                   user_config => [],
-                   config      => [],
+                   user_config => undef,
+                   config      => undef,
                   },
          expected => {
                       user   => 1200,
@@ -329,15 +329,8 @@ sub __config {
         },
     );
     for my $t (@test_data) {
-        for my $hook (qw( config user_config )) {
-            $qp->hooks->{$hook} = @{$t->{hooks}{$hook}}
-              ? [
-                {
-                 name => 'test hook',
-                 code => sub { return @{$t->{hooks}{$hook}} }
-                }
-              ]
-              : undef;
+        for my $hook ( grep { $t->{hooks}{$_} } qw( config user_config ) ) {
+            $qp->fake_hook( $hook, sub { return @{ $t->{hooks}{$hook} } } );
         }
         is(
             $qp->config($t->{pref}, $a),
@@ -348,6 +341,7 @@ sub __config {
             $t->{expected}{global},
             "Global config: $t->{descr}");
     }
+    $qp->unfake_hook($_) for qw( config user_config );
 }
 
 sub __warn_level {

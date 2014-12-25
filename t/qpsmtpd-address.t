@@ -152,13 +152,13 @@ sub __config {
     my @test_data = (
             {
              pref     => 'size_threshold',
-             result   => [],
+             result   => undef,
              expected => 10000,
              descr => 'fall back to global config when user_config is absent',
             },
             {
              pref     => 'test_config',
-             result   => [],
+             result   => undef,
              expected => undef,
              descr    => 'return nothing when no user_config plugins exist',
             },
@@ -176,16 +176,11 @@ sub __config {
             },
     );
     for (@test_data) {
-        $qp->hooks->{user_config} = @{$_->{result}}
-          ? [
-            {
-             name => 'test hook',
-             code => sub { return @{$_->{result}} }
-            }
-          ]
-          : undef;
+        $qp->fake_hook( 'user_config', sub { return @{$_->{result}} } )
+            if $_->{result};
         is($sender->config($_->{pref}), $_->{expected}, $_->{descr});
     }
+    $qp->unfake_hook('user_config');
 }
 
 sub __canonify {

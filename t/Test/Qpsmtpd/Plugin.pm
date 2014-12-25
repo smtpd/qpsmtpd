@@ -84,27 +84,9 @@ sub validate_password {
     return $deny, "$file - wrong password";
 }
 
-sub fake_config {
-    my $self = shift;
-    my $fake_config = {@_};
-    $self->qp->hooks->{config} = [
-        {
-            name => '___FakeHook___',
-            code => sub {
-                my ( $self, $txn, $conf ) = @_;
-                return DECLINED if ! exists $fake_config->{$conf};
-                return OK, $fake_config->{$conf};
-            },
-        },
-    ];
-}
-
-sub unfake_config {
-    my ( $self ) = @_;
-    $self->qp->hooks->{config} = [
-        grep { $_->{name} ne '___FakeHook___' }
-        @{ $self->qp->hooks->{config} || [] }
-    ];
-}
+sub fake_hook     { shift->qp->fake_hook(@_)     }
+sub unfake_hook   { shift->qp->unfake_hook(@_)   }
+sub fake_config   { shift->qp->fake_config(@_)   }
+sub unfake_config { shift->qp->unfake_config(@_) }
 
 1;
