@@ -8,6 +8,11 @@ BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 
+sub new {
+    my ( $class, %arg ) = @_;
+    return bless {%arg}, $class;
+}
+
 sub file_extension {
     my ( $self, $extension ) = @_;
     return $self->{file_extension} ||= '.dbm';
@@ -150,6 +155,16 @@ sub delete {
         return;
     }
     delete $tied->{$key};
+}
+
+sub flush {
+    my ( $self ) = @_;
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, flush() failed\n";
+        return;
+    }
+    delete $tied->{$_} for keys %$tied;
 }
 
 1;

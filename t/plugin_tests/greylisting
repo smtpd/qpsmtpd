@@ -8,11 +8,6 @@ use Qpsmtpd::Constants;
 
 my $test_email = 'user@example.com';
 
-my @greydbs = qw( denysoft_greylist.dbm denysoft_greylist.dbm.lock );
-foreach ( @greydbs ) {
-    unlink $_ if -f $_;
-}
-
 sub register_tests {
     my $self = shift;
 
@@ -238,24 +233,38 @@ sub test_greylist {
     $self->connection->remote_ip('1.2.3.4');
     my $sender = Qpsmtpd::Address->new( "<$test_email>" );
     my $rcpt   = Qpsmtpd::Address->new( "<$test_email>" );
-    my $start = time() - 40 * 3600 * 24; # 40 days ago
-    $mocktime = $start;
-    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
-        'DENYSOFT: This mail is temporarily denied',
-        'Initial connection attempt greylisted' );
-    $mocktime = $start + 60 * 49;
-    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
-        'DENYSOFT: This mail is temporarily denied',
-        'Greylisted 49 minutes later' );
-    $mocktime = $start + 60 * 51;
-    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
-        'DECLINED',
-        'Allowed 51 minutes later' );
-    $mocktime = $start + 60 * 52 + 36 * 3600 * 24;
-    $self->prune_db;
-    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
-        'DENYSOFT: This mail is temporarily denied',
-        're-greylisted 36 days later' );
+    for my $test_class (@Qpsmtpd::DB::child_classes) {
+        delete $self->{db};
+        eval { $self->db( class => $test_class ) };
+        if ( $@ ) {
+            warn "Unable to test greylisting against $test_class: $@";
+            next;
+        }
+        $self->db->lock;
+        $self->db->flush;
+        $self->db->unlock;
+        my $start = time() - 40 * 3600 * 24; # 40 days ago
+        $mocktime = $start;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DENYSOFT: This mail is temporarily denied',
+            'Initial connection attempt greylisted' );
+        $mocktime = $start + 60 * 49;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DENYSOFT: This mail is temporarily denied',
+            'Greylisted 49 minutes later' );
+        $mocktime = $start + 60 * 51;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DECLINED',
+            'Allowed 51 minutes later' );
+        $mocktime = $start + 60 * 52 + 36 * 3600 * 24;
+        $self->prune_db;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DENYSOFT: This mail is temporarily denied',
+            're-greylisted 36 days later' );
+        $self->db->lock;
+        $self->db->flush;
+        $self->db->unlock;
+    }
 }
 
 {

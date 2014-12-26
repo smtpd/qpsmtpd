@@ -1,20 +1,21 @@
 package Qpsmtpd::DB;
 use strict;
 use warnings;
-use Qpsmtpd::DB::File::DBM;
-use Qpsmtpd::DB::Redis;
+
+our @child_classes = qw(
+    Qpsmtpd::DB::Redis
+    Qpsmtpd::DB::File::DBM
+);
 
 sub new {
     my ( $class, %arg ) = @_;
-    # Qpsmtpd::DB::File::DBM is the only supported class just now
-    my @child_classes = qw(
-        Qpsmtpd::DB::Redis
-        Qpsmtpd::DB::File::DBM
-    );
-    my $manual_class = delete $arg{class};
-    return $manual_class->new(%arg) if $manual_class;
+    my @try_classes = @child_classes;
+    if ( my $manual_class = delete $arg{class} ) {
+        @try_classes = ( $manual_class );
+    }
     my ( $child, @errors );
-    for my $child_class ( @child_classes ) {
+    for my $child_class ( @try_classes ) {
+        eval "use $child_class";
         eval {
             $child = $child_class->new(%arg);
         };

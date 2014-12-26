@@ -107,6 +107,8 @@ sub delete {
     return $self->redis->del($key);
 }
 
+sub flush { shift->redis->flushdb }
+
 package MyRedis;
 eval "use parent 'Redis'";
 
