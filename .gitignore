@@ -27,5 +27,7 @@ MYMETA.*
 MANIFEST.bak
 nytprof.out
 
+# run time files
 run
 log/main
+ssl
