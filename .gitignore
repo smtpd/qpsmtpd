@@ -26,3 +26,6 @@ greylist.dbm.lock
 MYMETA.*
 MANIFEST.bak
 nytprof.out
+
+run
+log/main
