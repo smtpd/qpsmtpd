@@ -26,6 +26,7 @@ sub register_tests {
     $self->register_test("test_greylist_p0f_link");
     $self->register_test("test_greylist_p0f_uptime");
     $self->register_test('test_exclude_file_match');
+    $self->register_test('test_greylist');
 }
 
 sub test_load_exclude_files {
@@ -217,6 +218,56 @@ sub test_greylist_p0f_uptime {
     $self->{_args}{'p0f'} = 'uptime,100';
     $self->connection->notes('p0f'=> { uptime=>500 } );
     ok( ! $self->p0f_match(), 'p0f uptime miss');
+}
+
+my $mocktime;
+sub test_greylist {
+    my ( $self ) = @_;
+    $self->{_args} = {
+        remote_ip     => 1,
+        sender        => 0,
+        recipient     => 0,
+        reject        => 1,
+        black_timeout => 50 * 60,               # 50m
+        grey_timeout  => 3 * 3600 + 20 * 60,    # 3h:20m
+        white_timeout => 36 * 3600 * 24,        # 36 days
+        p0f           => 0,
+        geoip         => 0,
+    };
+    $self->connection->remote_host('example.com');
+    $self->connection->remote_ip('1.2.3.4');
+    my $sender = Qpsmtpd::Address->new( "<$test_email>" );
+    my $rcpt   = Qpsmtpd::Address->new( "<$test_email>" );
+    my $start = time() - 40 * 3600 * 24; # 40 days ago
+    $mocktime = $start;
+    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+        'DENYSOFT: This mail is temporarily denied',
+        'Initial connection attempt greylisted' );
+    $mocktime = $start + 60 * 49;
+    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+        'DENYSOFT: This mail is temporarily denied',
+        'Greylisted 49 minutes later' );
+    $mocktime = $start + 60 * 51;
+    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+        'DECLINED',
+        'Allowed 51 minutes later' );
+    $mocktime = $start + 60 * 52 + 36 * 3600 * 24;
+    $self->prune_db;
+    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+        'DENYSOFT: This mail is temporarily denied',
+        're-greylisted 36 days later' );
+}
+
+{
+    no warnings qw( redefine );
+    sub now { $mocktime || time() }
+}
+
+sub rc {
+    my ( $self, $r, $msg ) = @_;
+    return '' if ! defined $r;
+    return return_code($r) if ! defined $msg;
+    return return_code($r) . ": $msg";
 }
 
 sub _reset_transaction {
