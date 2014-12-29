@@ -33,9 +33,9 @@ How that works is best explained by example:
 A new connection arrives from the host shvj1.jpmchase.com. The sender is
 chase@alerts.chase.com and the recipient is londonwhale@example.com. This is
 the first connection for that triplet so the connection is deferred for
-I<black_timeout> minutes. After the timeout, but before the I<grey_timeout>
-elapses, shvj1.jpmchase.com retries and successfully delivers the mail. For
-the next I<white_timeout> days, emails for that triplet are not delayed.
+I<black_timeout> minutes. After the timeout elapses, shvj1.jpmchase.com retries
+and successfully delivers the mail. For the next I<white_timeout> days, emails
+for that triplet are not delayed.
 
 The next day, shvj1.jpmchase.com tries to deliver a new email from
 alerts@alerts.chase.com to jdimon@example.com. Since this triplet is new, it
@@ -72,14 +72,6 @@ e.g. to allow per-recipient logging. Default: 0.
 
 The initial period during which we issue DENYSOFTs for connections from an
 unknown (or timed out) 'connection triplet'. Default: 50 minutes.
-
-=head2 grey_timeout <timeout_seconds>
-
-The subsequent 'grey' period, after the initial black blocking period,
-when we will accept a delivery from a formerly-unknown connection
-triplet. If a new connection is received during this time, we will
-record a successful delivery against this IP address, which whitelists
-it for future deliveries (see following). Default: 3 hours 20 minutes.
 
 =head2 white_timeout <timeout_seconds>
 
@@ -180,8 +172,9 @@ my $VERSION = '0.12';
 
 my $DENYMSG        = "This mail is temporarily denied";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
-  recipient black_timeout grey_timeout white_timeout deny_late db_dir
+  recipient black_timeout white_timeout deny_late db_dir
   nfslock p0f reject loglevel geoip upgrade );
+$PERMITTED_ARGS{grey_timeout} = 1; # Legacy argument now ignored
 
 my %DEFAULTS = (
                 remote_ip     => 1,
@@ -189,7 +182,6 @@ my %DEFAULTS = (
                 recipient     => 0,
                 reject        => 1,
                 black_timeout => 50 * 60,               # 50m
-                grey_timeout  => 3 * 3600 + 20 * 60,    # 3h:20m
                 white_timeout => 36 * 3600 * 24,        # 36 days
                 nfslock       => 0,
                 p0f           => undef,
@@ -387,13 +379,6 @@ sub greylist {
         $self->log(LOGWARN,
                    "fail: black DENYSOFT - $black deferred connections");
         return $self->cleanup_and_return();
-    }
-
-    # Grey IP - accept unless timed out
-    elsif ( $self->now - $ts < $config->{grey_timeout} ) {
-        $self->db->set( $key, sprintf $fmt, $self->now, $new, $black, 1 );
-        $self->log(LOGWARN, "pass: updated grey->white");
-        return $self->cleanup_and_return(DECLINED);
     }
 
     $self->log(LOGWARN, "pass: timed out (grey)");

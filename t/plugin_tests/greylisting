@@ -256,18 +256,6 @@ sub test_greylist {
     is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
         'DENYSOFT: This mail is temporarily denied',
         're-greylisted 36 days later' );
-
-    $self->connection->remote_ip('4.3.2.1');
-    $mocktime = $start;
-    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
-        'DENYSOFT: This mail is temporarily denied',
-        'Initial connection attempt greylisted for new IP' );
-    $mocktime = $start + 36 * 3600 * 24 - 60;
-    is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
-#        'DENYSOFT: This mail is temporarily denied',
-#        'New IP still greylisted when greylist_timeout window is missed' );
-        'DECLINED',
-        "New IP allowed for 36 days, just like 'white' clients (huh?)" );
 }
 
 {
