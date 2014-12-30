@@ -1,7 +1,6 @@
 package Qpsmtpd::DB::Redis;
 use strict;
 use warnings;
-use Redis;
 
 use parent 'Qpsmtpd::DB';
 
@@ -16,6 +15,10 @@ sub new {
 
 sub init_redis {
     my ( $self ) = @_;
+    # Stringy eval needed to allow 'use Qpmstpd::DB::Redis' to succeed
+    # even when Redis module is unavailable; mainly for testing
+    eval 'use Redis';
+    die $@ if $@;
     my $redis = $self->{redis} = MyRedis->new( %{ $self->{redis_args} } );
     $redis->selected(0);
     return $redis;
