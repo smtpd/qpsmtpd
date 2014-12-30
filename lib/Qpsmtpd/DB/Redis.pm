@@ -1,49 +1,39 @@
 package Qpsmtpd::DB::Redis;
 use strict;
 use warnings;
+use Redis;
 
 use parent 'Qpsmtpd::DB';
 
 sub new {
     my ( $class, %args ) = @_;
     my $self = bless {}, $class;
-    eval 'use Redis';
-    die $@ if $@;
     $self->name( delete $args{name} ) if defined $args{name};
     $self->{redis_args} = {%args};
-    $self->init_internal_db() or return;
+    $self->init_db();
     return $self;
 }
 
-sub redis_zero {
-    # Internal redis db
+sub init_redis {
     my ( $self ) = @_;
-    my $redis = $self->{redis} ||= $self->new_redis;
-    $redis->select(0);
-    return $redis;
-}
-
-sub new_redis {
-    my ( $self ) = @_;
-    my $redis = $self->{redis} = MyRedis->new( %{ $self->{args} } );
+    my $redis = $self->{redis} = MyRedis->new( %{ $self->{redis_args} } );
     $redis->selected(0);
     return $redis;
 }
 
-sub init_internal_db {
+sub init_db {
     my ( $self ) = @_;
-    my $redis = $self->redis_zero;
-    return 1 if $redis->get('___smtpd_reserved___');
-    # Don't try to init a redis db already populated by something else
-    return 0 if $redis->dbsize;
+    my $redis = $self->init_redis;
+    return if $redis->get('___smtpd_reserved___');
+    die "Redis DB at index 0 is already populated!" if $redis->dbsize;
     $redis->set( ___smtpd_reserved___ => 1 );
-    return 1;
 }
 
 sub redis {
-    my ( $self ) = @_;
+    my ( $self, $index ) = @_;
     my $redis = $self->{redis} or die "redis(): redis was not initialized";
-    $redis->select( $self->index );
+    $index = $self->index if ! defined $index;
+    $redis->select( $index );
     return $redis;
 }
 
@@ -51,8 +41,8 @@ sub index {
     # Get index of database where the current plugin's data should be stored
     my ( $self ) = @_;
     return $self->{index} if $self->{index};
-    my $redis   = $self->redis_zero;
-    my %stores  = $self->redis_zero->hgetall('smtpd_stores');
+    my $redis   = $self->redis(0);
+    my %stores  = $redis->hgetall('smtpd_stores');
     return $self->{index} = $stores{ $self->name } if $stores{ $self->name };
     my %rstores = reverse %stores;
     for my $index ( 1 .. 255 ) {
@@ -65,7 +55,7 @@ sub index {
         next if $redis->dbsize;
 
         # We can populate this empty store
-        $self->redis_zero->hset( 'smtpd_stores', $self->name => $index );
+        $self->redis(0)->hset( 'smtpd_stores', $self->name => $index );
         return $self->{index} = $index;
     }
 }
@@ -88,16 +78,6 @@ sub set {
     return $self->redis->set( $key, $val );
 }
 
-sub get_keys {
-    my ( $self ) = @_;
-    return $self->redis->keys('*');
-}
-
-sub size {
-    my ( $self ) = @_;
-    return $self->redis->dbsize;
-}
-
 sub delete {
     my ( $self, $key ) = @_;
     if ( ! $key ) {
@@ -107,7 +87,9 @@ sub delete {
     return $self->redis->del($key);
 }
 
-sub flush { shift->redis->flushdb }
+sub get_keys { shift->redis->keys('*') }
+sub size     { shift->redis->dbsize    }
+sub flush    { shift->redis->flushdb   }
 
 package MyRedis;
 eval "use parent 'Redis'";
