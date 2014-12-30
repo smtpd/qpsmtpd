@@ -28,7 +28,8 @@ sub __new {
           . "Couldn't load BrokenClassTwo: fool me can't get fooled again\n",
         'Detect failure to load all child DB classes' );
     eval { $db = Qpsmtpd::DB->new( class => 'BrokenClassOne' ) };
-    is( $@, "fool me once, shame on me\n",
+    is( $@, "Couldn't load any storage modules\n"
+          . "Couldn't load BrokenClassOne: fool me once, shame on me\n",
         'Failure to load manual class' );
     @Qpsmtpd::DB::child_classes = qw( EmptyClass );
     eval { $db = Qpsmtpd::DB->new };
