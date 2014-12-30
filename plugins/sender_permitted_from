@@ -82,11 +82,11 @@ sub register {
     if (!$self->{_args}{reject} && $self->qp->config('spfbehavior')) {
         $self->{_args}{reject} = $self->qp->config('spfbehavior');
     }
-    $self->register_hook('mail',      'mail_handler');
-    $self->register_hook('data_post', 'data_post_handler');
+    $self->register_hook('mail', 'evaluate_spf');
+    $self->register_hook('data_post_headers', 'add_spf_header');
 }
 
-sub mail_handler {
+sub evaluate_spf {
     my ($self, $transaction, $sender, %param) = @_;
 
     if ( $self->is_immune() ) {
@@ -244,12 +244,12 @@ sub handle_code_softfail {
     return DECLINED;
 }
 
-sub data_post_handler {
+sub add_spf_header {
     my ($self, $transaction) = @_;
 
     my $result = $transaction->notes('spfquery') or return DECLINED;
 
-    # if we skipped processing in mail_handler, we should skip here too
+    # if we skipped processing in evaluate_spf, we should skip here too
     return DECLINED if $self->is_immune();
 
     $self->log(LOGDEBUG, "result was $result->code");
