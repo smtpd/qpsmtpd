@@ -56,7 +56,10 @@ use overload (
 sub new {
     my ($class, $user, $host) = @_;
     my $self = {};
-    if ($user =~ /^<(.*)>$/) {
+    if (! defined $user) {
+        # Do nothing
+    }
+    elsif ($user =~ /^<(.*)>$/) {
         ($user, $host) = $class->canonify($user);
         return if !defined $user;
     }
