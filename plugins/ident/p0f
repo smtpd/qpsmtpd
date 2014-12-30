@@ -278,10 +278,10 @@ sub get_v2_query {
     my $local_ip = $self->{_args}{local_ip} || $self->qp->connection->local_ip;
 
     my $src = new Net::IP($self->qp->connection->remote_ip)
-      or $self->log(LOGERROR, "skip, " . Net::IP::Error()), return;
+      or $self->log(LOGERROR, "skip p0f, " . Net::IP::Error()), return;
 
     my $dst = new Net::IP($local_ip)
-      or $self->log(LOGERROR, "skip, " . NET::IP::Error()), return;
+      or $self->log(LOGERROR, "skip p0f, " . NET::IP::Error()), return;
 
     return
       pack("L L L N N S S",
@@ -298,7 +298,7 @@ sub get_v3_query {
     my $self = shift;
 
     my $src_ip = $self->qp->connection->remote_ip or do {
-        $self->log(LOGERROR, "skip, unable to determine remote IP");
+        $self->log(LOGERROR, "skip p0f, unable to determine remote IP");
         return;
     };
 
@@ -317,29 +317,26 @@ sub query_p0f_v3 {
     my $self = shift;
 
     my $p0f_socket = $self->{_args}{p0f_socket} or do {
-        $self->log(LOGERROR, "skip, socket not defined in config.");
+        $self->log(LOGERROR, "skip p0f, socket not defined in config.");
         return;
     };
     my $query = $self->get_v3_query() or return;
 
     # Open the connection to p0f
-    my $sock;
-    eval {
-        $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM);
-    };
+    my $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM);
     if (!$sock) {
-        $self->log(LOGERROR, "skip, could not open socket: $@");
+        $self->log(LOGERROR, "skip p0f, could not open socket: $!");
         return;
     }
 
     $sock->autoflush(1);    # paranoid redundancy
     $sock->connected or do {
-        $self->log(LOGERROR, "skip, socket not connected: $!");
+        $self->log(LOGERROR, "skip p0f, socket not connected: $!");
         return;
     };
 
     my $sent = $sock->send($query, 0) or do {
-        $self->log(LOGERROR, "skip, send failed: $!");
+        $self->log(LOGERROR, "skip p0f, send failed: $!");
         return;
     };
 
@@ -364,15 +361,15 @@ sub query_p0f_v2 {
 
     # Open the connection to p0f
     socket(SOCK, PF_UNIX, SOCK_STREAM, 0)
-      or $self->log(LOGERROR, "socket: $!"), return;
+      or $self->log(LOGERROR, "p0f socket error: $!"), return;
     connect(SOCK, sockaddr_un($p0f_socket))
-      or $self->log(LOGERROR, "connect: $! ($p0f_socket)"), return;
+      or $self->log(LOGERROR, "p0f connection error: $! ($p0f_socket)"), return;
     defined syswrite SOCK, $query
-      or $self->log(LOGERROR, "write: $!"), close SOCK, return;
+      or $self->log(LOGERROR, "p0f write error: $!"), close SOCK, return;
 
     my $response;
     defined sysread SOCK, $response, 1024
-      or $self->log(LOGERROR, "read: $!"), close SOCK, return;
+      or $self->log(LOGERROR, "p0f read error: $!"), close SOCK, return;
     close SOCK;
     return $response;
 }
@@ -383,18 +380,17 @@ sub test_v2_response {
     # Extract part of the p0f response
     my ($magic, $id, $type) = unpack("L L C", $response);
 
-    # $self->log(LOGERROR, $response);
     if ($magic != $QUERY_MAGIC_V2) {
-        $self->log(LOGERROR, "skip, Bad response magic.");
+        $self->log(LOGERROR, "skip p0f, Bad response magic.");
         return;
     }
 
     if ($type == 1) {
-        $self->log(LOGERROR, "skip, p0f did not honor our query");
+        $self->log(LOGERROR, "skip p0f, p0f did not honor our query");
         return;
     }
     elsif ($type == 2) {
-        $self->log(LOGWARN, "skip, connection not in the cache");
+        $self->log(LOGWARN, "skip p0f, connection not in the cache");
         return;
     }
     return 1;
@@ -407,17 +403,17 @@ sub test_v3_response {
 
     # check the magic response value (a p0f constant)
     if ($magic != $RESP_MAGIC_V3) {
-        $self->log(LOGERROR, "skip, Bad response magic.");
+        $self->log(LOGERROR, "skip p0f, Bad response magic.");
         return;
     }
 
     # check the response status
     if ($status == $P0F_STATUS_BADQUERY) {
-        $self->log(LOGERROR, "skip, bad query");
+        $self->log(LOGERROR, "skip p0f, bad query");
         return;
     }
     elsif ($status == $P0F_STATUS_NOMATCH) {
-        $self->log(LOGINFO, "skip, no match");
+        $self->log(LOGINFO, "skip p0f, no match");
         return;
     }
     if ($status == $P0F_STATUS_OK) {
@@ -446,7 +442,6 @@ sub store_v2_results {
 
     $self->connection->notes('p0f', $p0f);
     $self->log(LOGINFO, $genre . " (" . $detail . ")");
-    $self->log(LOGERROR, "error: $@") if $@;
     return $p0f;
 }
 
@@ -478,7 +473,5 @@ sub store_v3_results {
     $self->connection->notes('p0f', \%r);
     $self->log(LOGINFO,  "$r{os_name} $r{os_flavor}");
     $self->log(LOGDEBUG, join(' ', @values));
-    $self->log(LOGERROR, "error: $@") if $@;
     return \%r;
 }
-
