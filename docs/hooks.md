@@ -341,9 +341,14 @@ __FIXME:__ check arguments
 
 ## hook\_data\_post\_headers
 
-The `data_post_headers` is called after the client sent the final `.\r\n`
-of a message. This is meant for plugins that modify headers before the message
-is processed by `data_post` phase below.
+The `data_post_headers` hook is called after the client sends the final .\r\n of
+a message and before the message is processed by `data_post`. This hook is
+primarily used by plugins that insert new headers (ex: Received-SPF) and/or
+modify headers such as appending to Authentication-Results (SPF, DKIM, DMARC).
+
+When it is desirable to have these header modifications evaluated by filtering
+software (spamassassin, dspam, etc.) running on `data_post`, this hook should be
+used instead of `data_post`.
 
 Allowed return codes are
 
@@ -359,12 +364,10 @@ Allowed return codes are
 
     as above but with disconnect
 
-Example plugin is `dkim`, `domainkeys`, `dmarc`.
-
 ## hook\_data\_post
 
 The `data_post` hook is called after all headers has been added in
-`data_post_headers` above. This is meant for plugins that expects complete
+`data_post_headers` above. This is meant for plugins that expect complete
 messages, such as content analyzing spam filters. Plugins can still add
 headers in this hook, however it is recommended only informational headers
 are added here.
