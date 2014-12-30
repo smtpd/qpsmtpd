@@ -781,6 +781,7 @@ sub data_respond {
         return 1;
     }
 
+    $self->run_hooks("data_post_headers");
     $self->authentication_results();
     $self->received_line();
     $self->run_hooks("data_post");

@@ -91,7 +91,7 @@ sub register {
     }
     else {
         $self->{_dmarc} = Mail::DMARC::PurePerl->new();
-        $self->register_hook('data_post', 'data_post_handler');
+        $self->register_hook('data_post_headers', 'data_post_handler');
     };
 }
 

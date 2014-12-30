@@ -339,10 +339,35 @@ Arguments:
 
 __FIXME:__ check arguments
 
+## hook\_data\_post\_headers
+
+The `data_post_headers` is called after the client sent the final `.\r\n`
+of a message. This is meant for plugins that modify headers before the message
+is processed by `data_post` phase below.
+
+Allowed return codes are
+
+- DENY
+
+    Return a hard failure code
+
+- DENYSOFT
+
+    Return a soft failure code
+
+- DENY\_DISCONNECT / DENYSOFT\_DISCONNECT
+
+    as above but with disconnect
+
+Example plugin is `dkim`, `domainkeys`, `dmarc`.
+
 ## hook\_data\_post
 
-The `data_post` hook is called after the client sent the final `.\r\n`
-of a message, before the mail is sent to the queue.
+The `data_post` hook is called after all headers has been added in
+`data_post_headers` above. This is meant for plugins that expects complete
+messages, such as content analyzing spam filters. Plugins can still add
+headers in this hook, however it is recommended only informational headers
+are added here.
 
 Allowed return codes are
 
@@ -372,7 +397,7 @@ Arguments:
 
     my ($self, $transaction) = @_;
 
-Example plugins: `spamassassin`, `virus/clamdscan`
+Example plugins: `spamassassin`, `virus/clamdscan`, `dspam`
 
 ## hook\_queue\_pre
 
