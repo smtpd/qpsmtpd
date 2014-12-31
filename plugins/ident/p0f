@@ -216,14 +216,14 @@ sub rcpt_handler {
 
 sub check_genre {
     my ( $self, $rcpt ) = @_;
-    my $p0f = $self->connection->notes('p0f') or return 0;
+    my $genre = ( $self->connection->notes('p0f') || {} )->{genre} or return 0;
     return 0 if $self->exclude_connection();
     return 0 if $self->exclude_recipient($rcpt);
     for my $phrase ( @{ $self->{os_block} || [] } ) {
-        return 1 if $p0f->{genre} eq $phrase;
+        return 1 if $genre eq $phrase;
     }
     for my $re ( @{ $self->{os_block_re} || [] } ) {
-        return 1 if $p0f->{genre} =~ $re;
+        return 1 if $genre =~ $re;
     }
     return 0;
 }
