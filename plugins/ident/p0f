@@ -323,12 +323,9 @@ sub query_p0f_v3 {
     my $query = $self->get_v3_query() or return;
 
     # Open the connection to p0f
-    my $sock;
-    eval {
-        $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM);
-    };
+    my $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM);
     if (!$sock) {
-        $self->log(LOGERROR, "skip, could not open socket: $@");
+        $self->log(LOGERROR, "skip, could not open socket: $!");
         return;
     }
 
