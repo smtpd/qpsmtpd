@@ -117,30 +117,57 @@ sub __helo_respond {
 }
 
 sub __data_respond {
-    is( $smtpd->data_respond(DONE), 1, 'data_respond, DONE' );
-    is( $smtpd->data_respond(DENY), 1, 'data_respond, DENY' );
-    is( $smtpd->data_respond(DENYSOFT), 1, 'data_respond, DENYSOFT' );
-    is( $smtpd->data_respond(DENY_DISCONNECT), 1, 'data_respond, DENY_DISCONNECT' );
-    is( $smtpd->data_respond(DECLINED), 1, 'data_respond, DECLINED' );
+    ( $smtpd ) = Test::Qpsmtpd->new_conn();
+    is( $smtpd->data_respond(DONE), 1, 'data_respond(DONE)' );
+    response_is( undef, 'data_respond(DONE) response' );
+    is( $smtpd->data_respond(DENY), 1, 'data_respond(DENY)' );
+    response_is( '554 - Message denied', 'data_respond(DENY) response' );
+    is( $smtpd->data_respond(DENYSOFT), 1, 'data_respond(DENYSOFT)' );
+    response_is( '451 - Message denied temporarily',
+        'data_respond(DENYSOFT) response' );
 
-    # the tests above all return 1 early due to DATA checks. Once the
-    # transaction is populated, only checks that fail early will return.
-    ($smtpd) = _new_transaction();
-    is( $smtpd->data_respond(DONE), 1, 'data_respond, DONE' );
+    $smtpd->connection->notes( disconnected => 0 );
+    is( $smtpd->data_respond(DENY_DISCONNECT), 1,
+        'data_respond(DENY_DISCONNECT)' );
+    response_is( '554 - Message denied',
+        'data_respond(DENY_DISCONNECT) response' );
+    is( $smtpd->connection->notes('disconnected'), 1,
+        'disconnect after data_respond(DENY_DISCONNECT)' );
 
-    ($smtpd) = _new_transaction();
-    is( $smtpd->data_respond(DENY), 1, 'data_respond, DENY' );
+    $smtpd->connection->notes( disconnected => 0 );
+    is( $smtpd->data_respond(DENYSOFT_DISCONNECT), 1,
+        'data_respond, DENYSOFT_DISCONNECT' );
+    response_is( '451 - Message denied temporarily',
+        'data_respond(DENYSOFT_DISCONNECT) response' );
+    is( $smtpd->connection->notes('disconnected'), 1,
+        'disconnect after data_respond(DENY_DISCONNECT)' );
 
-    ($smtpd) = _new_transaction();
-    is( $smtpd->data_respond(DENYSOFT), 1, 'data_respond, DENYSOFT' );
-
-    ($smtpd) = _new_transaction();
-    is( $smtpd->data_respond(DENY_DISCONNECT), 1, 'data_respond, DENY_DISCONNECT' );
+    is( $smtpd->data_respond(DECLINED), 1,
+        'data_respond(DECLINED) - no sender' );
+    response_is( '503 - MAIL first',
+        'data_respond(DECLINED) response - no sender' );
+    $smtpd->transaction->sender(Qpsmtpd::Address->new('sender@example.com'));
+    is( $smtpd->data_respond(DECLINED), 1,
+        'data_respond(DECLINED) - no recips' );
+    response_is( '503 - RCPT first',
+        'data_respond(DECLINED) response - no recips' );
+    $smtpd->transaction->add_recipient(Qpsmtpd::Address->new('recip@example.com'));
 
     # data_respond also runs the data_post hooks, so this will require a bit
-    # more work to get under test...
-    #($smtpd) = _new_transaction();
-    #is( $smtpd->data_respond(DECLINED, _test_message()), 1, 'data_respond, DECLINED' );
+    # more work to get under test. we also don't yet have a way to mock
+    # message data; that will probably require overriding getline()
+    #$smtpd->fake_data( _test_message() );
+    #$smtpd->fake_hook( data_post => sub { return DECLINED } );
+    #is( $smtpd->data_respond(DECLINED), 1, 'data_respond, DECLINED' );
+}
+
+sub response_is {
+    my ( $expected, $descr ) = @_;
+    my $response;
+    my @r = @{ $smtpd->{_response} || [] };
+    $response .= shift @r if @r;
+    $response .= ' - ' . join( "\n", @r ) if @r;
+    is( $response, $expected, $descr );
 }
 
 sub _new_transaction () {
