@@ -205,10 +205,10 @@ sub parse_line {
     return 'info', $pid, undef, undef, $message
       if substr($message, 0, 13) eq 'Listening on ';
 
-    return 'err', $pid, undef, undef, $message)
+    return 'err', $pid, undef, undef, $message
       if $line =~ /at [\S]+ line \d/;    # generic perl error
     print "UNKNOWN LINE: $line\n";
-    return 'unknown', $pid, undef, undef, $message);
+    return 'unknown', $pid, undef, undef, $message;
 }
 
 sub parse_line_plugin {
