@@ -74,7 +74,7 @@ sub tie_dbm {
     my ( $self ) = @_;
     my $path = $self->path;
 
-    tie(my %db, 'AnyDBM_File', $path, O_CREAT | O_RDWR, oct('0600')) or do {
+    tie(my %db, 'AnyDBM_File', $path, O_CREAT | O_RDWR, oct('0640')) or do {
         warn "tie to database $path failed: $!\n";
         $self->unlock;
         return;
