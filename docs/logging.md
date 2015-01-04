@@ -67,22 +67,6 @@ run the 'run' files in the ./ and ./log directories. Any log entries
 emitted will get handled per the instructions in log/run. The default
 location specified in log/run is log/main/current.
 
-## logging via 'warn'
-
-Any warnings emitted are sent to logging plugins with a deafult log level of
-LOGWARN.  Warnings can be sent to plugins with a different log level using a
-prefix.  For example:
-
-`warn 'NOTICE: Danger Will Robinson!'`
-
-Emitting this warning in a plugin is equivalent to using log():
-
-`$self->log(LOGNOTICE, 'Danger Will Robinson!')`
-
-Notably, using 'warn' in a plugin will always result in that warning being
-emitted to STDERR when the test suite is executed, wheras messages sent with
-log() are not output to the terminal when running the test suite.
-
 ## plugin loglevel
 
 Most plugins support a loglevel argument after their config/plugins entry.

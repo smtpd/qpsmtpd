@@ -17,7 +17,6 @@ delete $ENV{ENV};
 $ENV{PATH} = '/bin:/usr/bin:/var/qmail/bin';
 
 my $qpsmtpd = Qpsmtpd::TcpServer->new();
-$SIG{__WARN__} = sub { $qpsmtpd->warn_handler(@_) };
 $qpsmtpd->load_plugins();
 $qpsmtpd->start_connection();
 $qpsmtpd->run(\*STDIN);    # pass the "socket" like -prefork/-forkserver
