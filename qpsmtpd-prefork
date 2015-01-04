@@ -290,7 +290,6 @@ sub run {
 
     # setup qpsmtpd_instance
     $qpsmtpd = qpsmtpd_instance();
-    $SIG{__WARN__} = sub { $qpsmtpd->warn_handler(@_) };
 
     if ($detach) {
         open STDIN,  '/dev/null'  or die "/dev/null: $!";

@@ -93,25 +93,6 @@ sub log {
     $self->varlog($trace, join(" ", @log));
 }
 
-sub warn_handler {
-    my $self = shift;
-    $self->log( $self->warn_level(@_) );
-}
-
-sub warn_level {
-    my ( $self, @warnings ) = @_;
-    my @levels = ( keys %Qpsmtpd::Constants::log_levels,
-                   qw[ LOGWARNING LOGCRITICAL LOGEMERGENCY ] );
-    my $levels = join '|', map { s/^LOG//; $_ } @levels;
-    my $prefix;
-    $prefix = $1 if $warnings[0] =~ s/^($levels):\s*//;
-    $prefix = 'WARN'  if ! $prefix;
-    $prefix = 'WARN'  if $prefix eq 'WARNING';
-    $prefix = 'CRIT'  if $prefix eq 'CRITICAL';
-    $prefix = 'EMERG' if $prefix eq 'EMERGENCY';
-    return log_level("LOG$prefix"), @warnings;
-}
-
 sub varlog {
     my ($self, $trace) = (shift, shift);
     my ($hook, $plugin, @log);
