@@ -141,21 +141,19 @@ sub register {
         $self->{_args}{reject} = 0;
     }
 
-    $self->register_hook('connect',   'connect_handler');
+    $self->register_hook('connect', 'fcrdns_tests');
 }
 
-sub connect_handler {
+sub fcrdns_tests {
     my ($self) = @_;
 
     return DECLINED if $self->is_immune();
 
-    # run a couple cheap tests before the more expensive DNS tests
-    foreach my $test (qw/ is_valid_localhost is_not_fqdn /) {
+    # run cheap tests before the more expensive DNS tests
+    foreach my $test (
+        qw/ is_valid_localhost is_fqdn has_reverse_dns has_forward_dns / ) {
         $self->$test() or return DECLINED;
     }
-
-    $self->has_reverse_dns() or return DECLINED;
-    $self->has_forward_dns() or return DECLINED;
 
     $self->log(LOGINFO, "pass");
     return DECLINED;
@@ -168,35 +166,35 @@ sub is_valid_localhost {
         $self->adjust_karma(1);
         $self->log(LOGDEBUG, "pass, is localhost");
         return 1;
-    };
+    }
 
     my $rh = $self->qp->connection->remote_host;
-    if ($rh && lc $self->qp->connection->remote_host eq 'localhost') {
-        $self->log(LOGDEBUG, "pass, remote_host is localhost");
-        return 1;
-    };
+    return 0 if ! $rh;
+    return 0 if lc $self->qp->connection->remote_host ne 'localhost';
 
     $self->adjust_karma(-1);
     $self->log(LOGINFO, "fail, not localhost");
-    return;
+    return 0;
 }
 
-sub is_not_fqdn {
+sub is_fqdn {
     my ($self) = @_;
-    my $host = $self->qp->connection->remote_host or return 1;
-    return 1 if $host eq 'Unknown';    # QP assigns this to a "no DNS result"
+    my $host = $self->qp->connection->remote_host or return 0;
+    return 0 if $host eq 'Unknown';    # QP assigns this to a "no DNS result"
 
     # Since QP looked it up, perform some quick validation
     if ($host !~ /\./) {               # has no dots
         $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, not FQDN");
-        return;
+        return 0;
     }
     if ($host =~ /[^a-zA-Z0-9\-\.]/) {
         $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, invalid FQDN chars");
-        return;
+        return 0;
     }
+
+    $self->log(LOGDEBUG, "pass, is FQDN");
     return 1;
 }
 
