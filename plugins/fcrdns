@@ -165,13 +165,15 @@ sub is_valid_localhost {
 
     if ($self->is_localhost($self->qp->connection->remote_ip)) {
         $self->adjust_karma(1);
-        $self->log(LOGDEBUG, "pass, is localhost");
+        $self->log(LOGINFO, "pass, is localhost");
         return 1;
     }
 
     my $rh = $self->qp->connection->remote_host;
-    return 0 if ! $rh;
-    return 0 if lc $self->qp->connection->remote_host ne 'localhost';
+    if (! $rh || lc $self->qp->connection->remote_host ne 'localhost') {
+        $self->log(LOGDEBUG, "skip, not pretending to be localhost");
+        return 1;
+    }
 
     $self->adjust_karma(-1);
     $self->log(LOGINFO, "fail, not localhost");

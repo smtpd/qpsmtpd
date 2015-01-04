@@ -26,20 +26,18 @@ sub _is_valid_localhost {
         cmp_ok( $self->is_valid_localhost(), '==', 1, "$pass, true");
     }
 
+    $self->qp->connection->remote_host('localhost');
     foreach my $fail (@fails) {
         $self->qp->connection->remote_ip($fail);
         cmp_ok( $self->is_valid_localhost(), '==', 0, "$fail, false");
     }
 
-    $self->qp->connection->remote_host('localhost');
     cmp_ok( $self->is_valid_localhost(), '==', 0, "localhost, non-loopback IP, false");
 
     $self->qp->connection->remote_ip('127.0.0.1');
-    $self->qp->connection->remote_host('localhost');
     cmp_ok( $self->is_valid_localhost(), '==', 1, "localhost, loop IP, true");
 
     $self->qp->connection->remote_ip('::1');
-    $self->qp->connection->remote_host('localhost');
     cmp_ok( $self->is_valid_localhost(), '==', 1, "localhost, IPv6 loop, true");
 }
 
