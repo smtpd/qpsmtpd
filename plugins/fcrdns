@@ -8,7 +8,8 @@ Forward Confirmed RDNS - http://en.wikipedia.org/wiki/FCrDNS
 
 Determine if the SMTP sender has matching forward and reverse DNS.
 
-Sets the connection note fcrdns.
+Adds the 'iprev' section to the Authentication-Results header when
+there's sufficient DNS (at least rDNS) to be meaningful.
 
 =head1 WHY IT WORKS
 
