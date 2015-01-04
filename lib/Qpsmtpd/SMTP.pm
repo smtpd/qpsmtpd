@@ -197,9 +197,9 @@ sub is_deny_response {
 sub helo_respond {
     my ($self, $rc, $msg, $args) = @_;
     return if $rc == DONE;   # do nothing
-    
+
     $self->is_deny_response($rc, $msg) and return;
-    
+
     my $conn = $self->connection;
     $conn->hello('helo');
     $conn->hello_host($args->[0]);  # store helo hostname
@@ -222,7 +222,7 @@ sub ehlo {
 
 sub ehlo_respond {
     my ($self, $rc, $msg, $args) = @_;
-    
+
     return if $rc == DONE;
     $self->is_deny_response($rc, $msg) and return;
 
@@ -767,9 +767,10 @@ sub data_respond {
         return 1;
     }
 
-    $self->run_hooks("data_post_headers");
-    $self->authentication_results();
+    $self->run_hooks('data_post_headers');
+    $self->clean_authentication_results();
     $self->received_line();
+    $self->authentication_results();
     $self->run_hooks('data_post');
 }
 
@@ -777,8 +778,6 @@ sub authentication_results {
     my ($self) = @_;
 
     my @auth_list = $self->config('me');
-
-    #$self->clean_authentication_results();
 
     if (!defined $self->{_auth}) {
         push @auth_list, 'auth=none';
@@ -807,16 +806,23 @@ sub authentication_results {
 sub clean_authentication_results {
     my $self = shift;
 
-    # http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
-
     # On messages received from the internet, move Authentication-Results headers
     # to Original-AR, so our downstream can trust the A-R header we insert.
 
-    # TODO: Do not invalidate DKIM signatures.
-    #   if $self->transaction->header->get('DKIM-Signature')
-    #       Parse the DKIM signature(s)
-    #       return if A-R header is signed;
-    #   }
+    # TODO: was A-R header added by a Trusted MTA? Remove otherwise. Maybe.
+    # See Also: RFC 5451, Removing The Header Field:
+    #   http://tools.ietf.org/html/rfc5451#section-5
+    #   http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
+
+    # Do not rename A-R header if DKIM signed
+    my $dkim_sig = $self->transaction->header->get('DKIM-Signature');
+    if ($dkim_sig) {
+        my %fields = map { split /=/ } split /;\s+/, $dkim_sig;
+        # print Data::Dumper::Dumper(\%fields);
+        if ($fields{h} && $fields{h} =~ /Authentication-Results/i) {
+            return;
+        }
+    }
 
     my @ar_headers = $self->transaction->header->get('Authentication-Results');
     for (my $i = 0 ; $i < scalar @ar_headers ; $i++) {
