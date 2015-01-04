@@ -261,7 +261,7 @@ sub ehlo_respond {
 
 sub ehlo_size {
     my $self = shift;
-    return '' if ! $self->config('databytes');
+    return () if ! $self->config('databytes');
     return 'SIZE ' . ($self->config('databytes'))[0];
 };
 
