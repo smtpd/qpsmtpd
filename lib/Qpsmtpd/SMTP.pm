@@ -1,7 +1,6 @@
 package Qpsmtpd::SMTP;
 use strict;
 
-#use lib 'lib';
 use parent 'Qpsmtpd';
 
 #use Data::Dumper;

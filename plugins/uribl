@@ -92,7 +92,6 @@ may be used and redistributed under the same terms as qpsmtpd itself.
 use strict;
 use warnings;
 
-use lib 'lib';
 use Qpsmtpd::Constants;
 
 use Time::HiRes qw(time);
