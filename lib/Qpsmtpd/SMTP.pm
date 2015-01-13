@@ -843,7 +843,7 @@ sub received_line {
         $smtp .= "S" if $esmtp;    # RFC3848
         $sslheader = "("
           . $self->connection->notes('tls_socket')->get_cipher()
-          . " encrypted) ";
+          . " encrypted)";
     }
     if (defined $self->{_auth} && $self->{_auth} == OK) {
         my $mech = $self->{_auth_mechanism};
@@ -869,7 +869,7 @@ sub received_line {
           . $self->config('me')
           . " (qpsmtpd/"
           . $self->version
-          . ") with $sslheader$smtp; "
+          . ") with $smtp $sslheader; "
           . (strftime('%a, %d %b %Y %H:%M:%S %z', localtime));
     }
     $self->transaction->header->add('Received', $header_str, 0);
