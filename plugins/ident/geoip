@@ -350,8 +350,12 @@ sub set_country_code {
 sub get_country_code {
     my $self = shift;
     my $ip   = shift || $self->qp->connection->remote_ip;
-    return $self->get_country_code_gc($ip)            if $self->{_geoip_city};
-    return $self->{_geoip}->country_code_by_addr($ip) if $self->{_geoip};
+    if ( $self->{_geoip_city} ) {
+        return $self->get_country_code_gc($ip);
+    }
+    if ( $self->{_geoip} ) {
+        return $self->{_geoip}->country_code_by_addr($ip);
+    }
     return undef;
 }
 
@@ -374,8 +378,12 @@ sub set_country_name {
 sub get_country_name {
     my $self = shift;
     my $ip   = shift || $self->qp->connection->remote_ip;
-    return $self->get_country_name_gc($ip)            if $self->{_geoip_city};
-    return $self->{_geoip}->country_name_by_addr($ip) if $self->{_geoip};
+    if ( $self->{_geoip_city} ) {
+        return $self->get_country_name_gc($ip);
+    }
+    if ( $self->{_geoip} ) {
+        return $self->{_geoip}->country_name_by_addr($ip);
+    }
     return undef;
 }
 
@@ -396,9 +404,12 @@ sub set_continent {
 sub get_continent {
     my ( $self, $country_code ) = @_;
     return if ! $country_code;
-    return $self->get_continent_gc() if $self->{_geoip_city};
-    return $self->{_geoip}->continent_code_by_country_code($country_code)
-        if $self->{_geoip};
+    if ( $self->{_geoip_city} ) {
+        return $self->get_continent_gc();
+    }
+    if ( $self->{_geoip} ) {
+        return $self->{_geoip}->continent_code_by_country_code($country_code);
+    }
     return undef;
 }
 
