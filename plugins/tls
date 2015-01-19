@@ -86,6 +86,9 @@ sub init {
     local $^W;    # this bit is very noisy...
     my $ssl_ctx =
       IO::Socket::SSL::SSL_Context->new(
+                                        # Disable SSLv2 and SSLv3 to avoid POODLE attacks. This is already
+                                        # the default in sufficiently recent versions of IO::Socket::SSL
+                                        SSL_version => 'SSLv23:!SSLv3:!SSLv2',
                                         SSL_use_cert    => 1,
                                         SSL_cert_file   => $self->tls_cert,
                                         SSL_key_file    => $self->tls_key,
