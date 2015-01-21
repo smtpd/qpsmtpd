@@ -16,6 +16,7 @@ __delete();
 __get_keys();
 __size();
 __flush();
+__untie_gotcha();
 
 done_testing();
 
@@ -78,3 +79,17 @@ sub __flush {
     $db->unlock;
 }
 
+sub __untie_gotcha {
+    # Regression test for 'gotcha' with untying hash that never goes away
+    $db->lock;
+    $db->flush;
+    $db->set( cut => 'itout' );
+    $db->unlock;
+    my $db2 = Qpsmtpd::DB::File::DBM->new( name => 'testing' );
+    $db2->lock;
+    is( $db2->get('cut'), 'itout',
+        'get() in second db handle reads key set in first handle' );
+    $db2->unlock;
+    $db->flush;
+    $db2->flush;
+}
