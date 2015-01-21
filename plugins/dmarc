@@ -72,6 +72,7 @@ https://github.com/smtpd/qpsmtpd/wiki/DMARC-FAQ
 use strict;
 use warnings;
 
+use English qw/-no_match_vars/;
 use Qpsmtpd::Constants;
 
 sub register {
@@ -90,16 +91,16 @@ sub register {
     }
     else {
         $self->{_dmarc} = Mail::DMARC::PurePerl->new();
-        $self->register_hook('data_post_headers', 'data_post_handler');
+        $self->register_hook('data_post_headers', 'check_dmarc');
     };
 }
 
-sub data_post_handler {
+sub check_dmarc {
     my ($self, $transaction) = @_;
 
     if ( $self->qp->connection->relay_client() ) {
         $self->log(LOGINFO, "skip, relay client" );
-        return DECLINED;  # disable reporting to ourself
+        return DECLINED;  # don't report to ourself
     };
 
     my $dmarc = $self->{_dmarc};
@@ -117,19 +118,15 @@ sub data_post_handler {
     my @recipients = $transaction->recipients;
     eval { $dmarc->envelope_to( lc $recipients[0]->host ); }; # optional
     eval { $dmarc->envelope_from( $transaction->sender->host ); }; # may be <>
-    $dmarc->spf( $transaction->notes('dmarc_spf') );
+    eval { $dmarc->spf( $transaction->notes('dmarc_spf') ); };
     my $dkim = $self->connection->notes('dkim_verifier');
-    if ( $dkim ) {
-        eval { $dmarc->dkim( $dkim ); }
-    };
+    if ( $dkim ) { eval { $dmarc->dkim( $dkim ); }; };
     $dmarc->source_ip( $self->qp->connection->remote_ip );
     eval { $dmarc->validate(); };
-    if ( $@ ) {
+    if ( $EVAL_ERROR ) {
         $self->log(LOGERROR, $@ );
         return DECLINED if $self->is_immune;
-        $self->log(LOGINFO, "TODO: handle this validation failure");
-        return DECLINED;
-        return $self->get_reject( $@, $@ );
+        return $self->get_reject( $@ );
     };
 
 #$self->log(LOGINFO, "result: " . Dumper( $dmarc ) );
