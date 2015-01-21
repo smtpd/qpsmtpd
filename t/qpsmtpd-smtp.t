@@ -24,6 +24,8 @@ __helo_repeat_host();
 __helo_respond('helo_respond');
 __helo_respond('ehlo_respond');
 __data_respond('data_respond');
+__clean_authentication_results();
+__authentication_results();
 
 done_testing();
 
@@ -159,6 +161,76 @@ sub __data_respond {
     #$smtpd->fake_data( _test_message() );
     #$smtpd->fake_hook( data_post => sub { return DECLINED } );
     #is( $smtpd->data_respond(DECLINED), 1, 'data_respond, DECLINED' );
+}
+
+sub __clean_authentication_results {
+
+    my $smtpd = _transaction_with_headers();
+    $smtpd->transaction->header->add('Authentication-Results', _test_ar_header());
+    $smtpd->clean_authentication_results();
+    ok(!$smtpd->transaction->header->get('Authentication-Results'), "clean_authentication_results removes A-R header");
+    ok($smtpd->transaction->header->get('Original-Authentication-Results'), "clean_authentication_results adds Original-A-R header");
+
+    # A-R header is _not_ DKIM signed
+    $smtpd = _transaction_with_headers();
+    $smtpd->transaction->header->add('Authentication-Results', _test_ar_header());
+    $smtpd->transaction->header->add('DKIM-Signature', _test_dkim_header());
+    $smtpd->clean_authentication_results();
+    ok(!$smtpd->transaction->header->get('Authentication-Results'), "clean_authentication_results removes non-DKIM-signed A-R header");
+    ok($smtpd->transaction->header->get('Original-Authentication-Results'), "clean_authentication_results adds non-DKIM-signed Original-A-R header");
+
+    # A-R header _is_ DKIM signed
+    $smtpd = _transaction_with_headers();
+    $smtpd->transaction->header->add('Authentication-Results', _test_ar_header());
+    $smtpd->transaction->header->add('DKIM-Signature', _test_dkim_sig_ar_signed());
+    $smtpd->clean_authentication_results();
+    ok($smtpd->transaction->header->get('Authentication-Results'), "clean_authentication_results removes non-DKIM-signed A-R header");
+    ok(!$smtpd->transaction->header->get('Original-Authentication-Results'), "clean_authentication_results adds non-DKIM-signed Original-A-R header");
+}
+
+sub _test_ar_header {
+    return 'mail.theartfarm.com; iprev=pass; spf=pass smtp.mailfrom=ietf.org; dkim=fail (body hash did not verify) header.i=@kitterman.com; dkim=pass header.i=@ietf.org';
+}
+
+sub _test_dkim_header {
+    return <<DKIM_HEADER
+v=1; a=rsa-sha256; c=relaxed/simple; d=ietf.org; s=ietf1; t=1420404573; bh=Tq5JynLUBXNqn1f+10W+MuPhq+XAbL4oLNfT+QPVK54=; h=From:To:Date:Message-ID:In-Reply-To:References:MIME-Version:Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender; b=hsxkiq/cCNBJTOwv1wj+AA9w2ujXnpNVjpPREMSvidQQkDsnFPhASDi9hihEgEqo4LRMkbw/zHNyHBtF5TcT7WysNyItpmbnWiRksB9SuCBaqZMvqE/rNVca3goTgrb89O5SDZIWjcQ7rGvNqk/L+XL8VWCyNhOVlalnFMxKXyE=
+DKIM_HEADER
+}
+
+sub _test_dkim_sig_ar_signed {
+    return <<DKIM_AR_SIGNED_HEADER
+v=1; a=rsa-sha256; c=relaxed/simple; d=ietf.org; s=ietf1; t=1420404573; bh=Tq5JynLUBXNqn1f+10W+MuPhq+XAbL4oLNfT+QPVK54=; h=Authentication-Results:From:To:Date:Message-ID:In-Reply-To:References:MIME-Version:Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender; b=hsxkiq/cCNBJTOwv1wj+AA9w2ujXnpNVjpPREMSvidQQkDsnFPhASDi9hihEgEqo4LRMkbw/zHNyHBtF5TcT7WysNyItpmbnWiRksB9SuCBaqZMvqE/rNVca3goTgrb89O5SDZIWjcQ7rGvNqk/L+XL8VWCyNhOVlalnFMxKXyE=
+DKIM_AR_SIGNED_HEADER
+}
+
+sub _transaction_with_headers {
+    ( $smtpd ) = Test::Qpsmtpd->new_conn();
+    $smtpd->transaction->header(
+        Mail::Header->new(Modify => 0, MailFrom => 'COERCE')
+    );
+    return $smtpd;
+}
+
+sub __authentication_results {
+    my $smtpd = _transaction_with_headers();
+    $smtpd->authentication_results();
+    my $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
+    ok($ar, "added A-R header: $ar");
+
+    $smtpd->{_auth} = OK;
+    $smtpd->{_auth_mechanism} = 'test_mech';
+    $smtpd->{_auth_user} = 'test@example';
+    $smtpd->authentication_results();
+    $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
+    ok($ar =~ /auth=pass/, "added A-R header with auth: $ar");
+
+    delete $smtpd->{_auth};
+    $smtpd->connection->notes('authentication_results', 'spf=pass smtp.mailfrom=ietf.org' );
+    $smtpd->authentication_results();
+    $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
+    ok($ar =~ /spf/, "added A-R header with SPF: $ar");
+
 }
 
 sub response_is {
