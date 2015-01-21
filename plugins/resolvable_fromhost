@@ -70,7 +70,6 @@ Default: temp (temporary, aka soft, aka 4xx).
 use strict;
 use warnings;
 
-use lib 'lib';
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 use Qpsmtpd::TcpServer;

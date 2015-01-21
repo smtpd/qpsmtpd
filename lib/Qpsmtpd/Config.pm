@@ -4,7 +4,6 @@ use warnings;
 
 use Sys::Hostname;
 
-use lib 'lib';
 use parent 'Qpsmtpd::Base';
 use Qpsmtpd::Constants;
 

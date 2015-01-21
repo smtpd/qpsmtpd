@@ -200,8 +200,6 @@ ie, (Trust smtpd).
 use strict;
 use warnings;
 
-use lib 'lib';
-
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
 use IO::Handle;

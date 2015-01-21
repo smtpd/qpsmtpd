@@ -72,7 +72,6 @@ https://github.com/smtpd/qpsmtpd/wiki/DMARC-FAQ
 use strict;
 use warnings;
 
-use Data::Dumper;
 use Qpsmtpd::Constants;
 
 sub register {
@@ -85,7 +84,7 @@ sub register {
     $self->{_args}{reject_type} ||= 'perm';
     $self->{_args}{p_vals} = {map { $_ => 1 } qw/ none reject quarantine /};
 
-    eval "require Mail::DMARC::PurePerl";
+    eval 'require Mail::DMARC::PurePerl';
     if ( $@ ) {
         $self->log(LOGERROR, "failed to load Mail::DMARC::PurePerl" );
     }
@@ -120,7 +119,9 @@ sub data_post_handler {
     eval { $dmarc->envelope_from( $transaction->sender->host ); }; # may be <>
     $dmarc->spf( $transaction->notes('dmarc_spf') );
     my $dkim = $self->connection->notes('dkim_verifier');
-    if ( $dkim ) { $dmarc->dkim( $dkim ); };
+    if ( $dkim ) {
+        eval { $dmarc->dkim( $dkim ); }
+    };
     $dmarc->source_ip( $self->qp->connection->remote_ip );
     eval { $dmarc->validate(); };
     if ( $@ ) {

@@ -2,7 +2,6 @@ package Qpsmtpd::Plugin;
 use strict;
 use warnings;
 
-use lib 'lib';
 use parent 'Qpsmtpd::Base';
 use Qpsmtpd::DB;
 use Qpsmtpd::Constants;

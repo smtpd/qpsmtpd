@@ -123,7 +123,6 @@ http://smartech.gatech.edu/bitstream/handle/1853/25135/GT-CSE-08-02.pdf
 use strict;
 use warnings;
 
-use lib 'lib';
 use Qpsmtpd::Constants;
 
 #use GeoIP2;      # eval'ed in register()
