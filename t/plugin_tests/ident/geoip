@@ -117,6 +117,10 @@ sub test_set_country_code {
     ok( ! $cc, "undef");
 
     $self->qp->connection->remote_ip('24.24.24.24');
+    $self->clear_geoip_data;
+    $cc = $self->set_country_code();
+    ok( ! $cc, "set_country_code() returns nothing for no geoip data");
+    $self->restore_geoip_data;
     $cc = $self->set_country_code();
     cmp_ok( $cc, 'eq', 'US', "set_country_code result is $cc");
 
@@ -134,6 +138,11 @@ sub test_set_country_name {
     ok( ! $cn, "undef") or warn "$cn\n";
 
     $self->qp->connection->remote_ip('24.24.24.24');
+    $self->clear_geoip_data;
+    $self->set_country_code();
+    $cn = $self->set_country_name();
+    ok( ! $cn, "set_country_name() returns nothing for no geoip data");
+    $self->restore_geoip_data;
     $self->set_country_code();
     $cn = $self->set_country_name();
     cmp_ok( $cn, 'eq', 'United States', "$cn");
@@ -152,6 +161,11 @@ sub test_set_continent {
     ok( ! $cn, "undef") or warn "$cn\n";
 
     $self->qp->connection->remote_ip('24.24.24.24');
+    $self->clear_geoip_data;
+    $self->set_country_code();
+    $cn = $self->set_continent('US');
+    ok( ! $cn, 'set_continent() returns nothing for no geoip data');
+    $self->restore_geoip_data;
     $self->set_country_code();
     $cn = $self->set_continent() || '';
     my $note = $self->connection->notes('geoip_continent');
@@ -200,6 +214,10 @@ sub test_set_asn {
     ok( ! $asn, "undef") or warn "$asn\n";
 
     $self->qp->connection->remote_ip('24.24.24.24');
+    $self->clear_geoip_data;
+    $asn = $self->set_asn();
+    ok( ! $asn, 'set_asn() returns nothing for no ASN data' );
+    $self->restore_geoip_data;
     $asn = $self->set_asn();
     ok( $self->connection->notes('geoip_asn') =~ /^11351/, "note has: $asn");
 
@@ -207,4 +225,16 @@ sub test_set_asn {
     $asn = $self->set_asn();
 
     ok( $self->connection->notes('geoip_asn') =~ /^7819/, "note has: $asn");
+}
+
+my $geoip_data_bak;
+my @geoip_keys = qw( _geoip _geoip_city GeoIPASNum );
+sub clear_geoip_data {
+    my ( $self ) = @_;
+    $geoip_data_bak->{$_} = delete $self->{$_} for @geoip_keys;
+}
+
+sub restore_geoip_data {
+    my ( $self ) = @_;
+    $self->{$_} = delete $geoip_data_bak->{$_} for @geoip_keys;
 }

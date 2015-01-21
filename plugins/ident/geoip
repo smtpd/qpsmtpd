@@ -341,13 +341,8 @@ sub init_my_country_code {
 
 sub set_country_code {
     my $self = shift;
-    my $remote_ip = $self->qp->connection->remote_ip;
-
-    my $code = $self->{_geoip_city}
-             ? $self->get_country_code_gc($remote_ip)
-             : $self->get_country_code($remote_ip);
-
-    return if ! $code;
+    my $ip   = $self->qp->connection->remote_ip;
+    my $code = $self->get_country_code($ip) or return;
     $self->qp->connection->notes('geoip_country', $code);
     return $code;
 }
@@ -357,8 +352,11 @@ sub get_country_code {
     my $ip = shift || $self->qp->connection->remote_ip;
     if ($self->{_geoip_city}) {
         return $self->get_country_code_gc($ip);
-    };
-    return $self->{_geoip}->country_code_by_addr($ip);
+    }
+    if ($self->{_geoip}) {
+        return $self->{_geoip}->country_code_by_addr($ip);
+    }
+    return undef;
 }
 
 sub get_country_code_gc {
@@ -371,15 +369,22 @@ sub get_country_code_gc {
 
 sub set_country_name {
     my $self = shift;
-    my $remote_ip = $self->qp->connection->remote_ip;
-
-    my $name = $self->{_geoip_city}
-             ? $self->get_country_name_gc($remote_ip)
-             : $self->{_geoip}->country_name_by_addr($remote_ip);
-
-    return if ! $name;
+    my $ip   = $self->qp->connection->remote_ip;
+    my $name = $self->get_country_name($ip) or return;
     $self->qp->connection->notes('geoip_country_name', $name);
     return $name;
+}
+
+sub get_country_name {
+    my $self = shift;
+    my $ip = shift || $self->qp->connection->remote_ip;
+    if ($self->{_geoip_city}) {
+        return $self->get_country_name_gc($ip);
+    }
+    if ($self->{_geoip}) {
+        return $self->{_geoip}->country_name_by_addr($ip);
+    }
+    return undef;
 }
 
 sub get_country_name_gc {
@@ -390,15 +395,22 @@ sub get_country_name_gc {
 
 sub set_continent {
     my ($self, $country_code) = @_;
-    $country_code or return;
-
-    my $continent = $self->{_geoip_city}
-                  ? $self->get_continent_gc()
-                  : $self->{_geoip}->continent_code_by_country_code($country_code);
-
-    $continent or return;
+    return if !$country_code;
+    my $continent = $self->get_continent($country_code) or return;
     $self->qp->connection->notes('geoip_continent', $continent);
     return $continent;
+}
+
+sub get_continent {
+    my ($self, $country_code) = @_;
+    return if !$country_code;
+    if ($self->{_geoip_city}) {
+        return $self->get_continent_gc();
+    }
+    if ($self->{_geoip}) {
+        return $self->{_geoip}->continent_code_by_country_code($country_code);
+    }
+    return undef;
 }
 
 sub get_continent_gc {
