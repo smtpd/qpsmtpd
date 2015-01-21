@@ -93,6 +93,7 @@ sub unlock {
     my ( $self ) = @_;
     close $self->{lock};
     untie $self->{tied};
+    delete $self->{tied};
 }
 
 sub get {
