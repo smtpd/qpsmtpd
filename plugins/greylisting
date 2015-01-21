@@ -437,7 +437,7 @@ sub convert_db {
     }
     $self->db->unlock;
     $self->log(LOGINFO, "converted $converted of $count DB entries");
-    return $self->cleanup_and_return(DECLINED);
+    return DECLINED;
 }
 
 sub prune_db {
@@ -456,7 +456,7 @@ sub prune_db {
     }
     $self->db->unlock;
     $self->log(LOGINFO, "pruned $pruned of $count DB entries");
-    return $self->cleanup_and_return(DECLINED);
+    return DECLINED;
 }
 
 sub exclude {
