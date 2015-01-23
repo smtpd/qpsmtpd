@@ -279,14 +279,3 @@ sub rc {
     return return_code($r) . ": $msg";
 }
 
-sub _reset_transaction {
-    my $self = shift;
-
-    $self->qp->connection->relay_client(0);
-    $self->qp->transaction->notes('whitelistsender',0);
-    $self->connection->notes('whitelisthost',0);
-    $self->qp->transaction->notes('tls_enabled',0);
-    $self->{_args}{p0f} = undef;
-    $self->{_args}{geoip} = undef;
-}
-
