@@ -247,7 +247,7 @@ sub init_redis {
         ) or die 'Unknown error';
     };
     return 1 if ! $@;
-    $self->log(LOGERROR, "Unable to connect to redis store: $@");
+    $self->log(LOGCRIT, "Unable to connect to redis, GREYLISTING DISABLED: $@");
     return 0;
 }
 
