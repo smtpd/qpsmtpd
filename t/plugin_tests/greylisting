@@ -12,7 +12,7 @@ sub register_tests {
     my $self = shift;
 
     $self->register_test("test_load_exclude_files");
-    $self->register_test('test_hook_data');
+    $self->register_test('test_data_handler');
     $self->register_test('test_get_greylist_key');
     $self->register_test('test_exclude');
     $self->register_test("test_greylist_geoip");
@@ -22,6 +22,9 @@ sub register_tests {
     $self->register_test("test_greylist_p0f_uptime");
     $self->register_test('test_exclude_file_match');
     $self->register_test('test_greylist');
+    $self->register_test('test_init_redis');
+    $self->register_test('test_init_dbm');
+    $self->register_test('test_parse_redis_server');
 }
 
 sub test_load_exclude_files {
@@ -71,27 +74,27 @@ sub test_exclude_file_match {
     }
 }
 
-sub test_hook_data {
+sub test_data_handler {
     my $self = shift;
     my $transaction = $self->qp->transaction;
 
-    my ($code, $mess) = $self->hook_data( $transaction );
+    my ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DECLINED, "no note" );
 
     $transaction->notes('greylist', 1);
 
-    ($code, $mess) = $self->hook_data( $transaction );
+    ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DECLINED, "no recipients");
 
     my $address = Qpsmtpd::Address->new( "<$test_email>" );
     $transaction->recipients( $address );
 
     $transaction->notes('whitelistrcpt', 2);
-    ($code, $mess) = $self->hook_data( $transaction );
+    ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DENYSOFT, "missing recipients");
 
     $transaction->notes('whitelistrcpt', 1);
-    ($code, $mess) = $self->hook_data( $transaction );
+    ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DECLINED, "missing recipients");
 }
 
@@ -277,5 +280,33 @@ sub rc {
     return '' if ! defined $r;
     return return_code($r) if ! defined $msg;
     return return_code($r) . ": $msg";
+}
+
+sub test_init_redis {
+    my ($self) = @_;
+    delete $self->{db};
+    $self->{_args}{redis_server} = 'bogusserverasdfqwerty.:6379';
+    ok( ! $self->init_redis, 'init_redis() fails on bogus server' );
+    eval { Qpsmtpd::DB::Redis->new };
+    return if $@;
+    $self->{_args}{redis_server} = 'localhost';
+    ok( $self->init_redis, 'init_redis() succeeds when redis is up' );
+}
+
+sub test_init_dbm {
+    my ($self) = @_;
+    delete $self->{db};
+    delete $self->{_args}{redis_server};
+    ok( $self->init_db, 'init_db() works for DBM' );
+}
+
+sub test_parse_redis_server {
+    my ($self) = @_;
+    $self->{_args}{redis_server} = 'asdf:1234';
+    is( $self->parse_redis_server, 'asdf:1234',
+        'parse_redis_server(): leave provided port alone' );
+    $self->{_args}{redis_server} = 'qwerty';
+    is( $self->parse_redis_server, 'qwerty:6379',
+        'parse_redis_server(): add default port' );
 }
 
