@@ -104,6 +104,13 @@ usable directory from the following list will be used:
 
 =back
 
+=head2 redis <host[:port]>
+
+Location of redis server where the greylisting DB will be stored.
+
+Redis can be used as a scalable and clusterable alternative
+to a simple DBM file.  For more information, see http://redis.io
+
 =head2 per_recipient <bool>
 
 Flag to indicate whether to use per-recipient configs.
@@ -172,7 +179,7 @@ my $VERSION = '0.12';
 
 my $DENYMSG        = "This mail is temporarily denied";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
-  recipient black_timeout white_timeout deny_late db_dir
+  recipient black_timeout white_timeout deny_late db_dir redis
   nfslock p0f reject loglevel geoip upgrade );
 $PERMITTED_ARGS{grey_timeout} = 1; # Legacy argument now ignored
 
@@ -204,13 +211,8 @@ sub register {
         $config->{reject} = $config->{mode} =~ /testonly|off/i ? 0 : 1;
     }
     $self->{_args} = $config;
-    unless ($config->{recipient} || $config->{per_recipient}) {
-        $self->register_hook('mail', 'mail_handler');
-    }
-    else {
-        $self->register_hook('rcpt', 'rcpt_handler');
-    }
-    $self->init_db();
+    $self->init_db() or return;
+    $self->register_hooks();
     $self->prune_db();
     if ($self->{_args}{upgrade}) {
         $self->convert_db();
@@ -218,23 +220,64 @@ sub register {
     $self->load_exclude_files();
 }
 
+sub register_hooks {
+    my ($self) = @_;
+    $self->register_hook('data', 'data_handler');
+    if ($self->{_args}{recipient} || $self->{_args}{per_recipient}) {
+        $self->register_hook('rcpt', 'rcpt_handler');
+    }
+    else {
+        $self->register_hook('mail', 'mail_handler');
+    }
+}
+
 sub init_db {
-    my ( $self ) = @_;
-    $self->db( name => 'greylist' );
-    return if ! $self->db->can('path');
+    my ($self) = @_;
+    return $self->init_redis if $self->{_args}{redis};
+    return $self->init_dbm;
+}
+
+sub init_redis {
+    my ($self) = @_;
+    eval {
+        $self->db(
+            name   => 'greylist',
+            class  => 'Qpsmtpd::DB::Redis',
+            server => $self->parse_redis_server,
+        ) or die 'Unknown error';
+    };
+    return 1 if ! $@;
+    $self->log(LOGCRIT, "Unable to connect to redis, GREYLISTING DISABLED: $@");
+    return 0;
+}
+
+sub parse_redis_server {
+    my ($self) = @_;
+    my $server = $self->{_args}{redis};
+    return $server if $server =~ /:/;
+    return "$server:6379";
+}
+
+sub init_dbm {
+    my ($self) = @_;
+    $self->db(
+        name  => 'greylist',
+        class => 'Qpsmtpd::DB::File::DBM'
+    ) or return 0;
     my $cdir = $self->{_args}{db_dir};
     $cdir = $1 if $cdir and $cdir =~ m{^([-a-zA-Z0-9./_]+)$};
     # greylisting-specific hints for where to store the greylist DB
     my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/greylisting' );
 
-    return if $self->db->file_extension ne '.dbm';
+    return 1 if $self->db->file_extension ne '.dbm';
     $self->db->nfs_locking( $self->{_args}{nfslock} );
     
     # Work around old DBM filename
-    return if -f "$db_dir/greylist.dbm";
+    return 1 if -f "$db_dir/greylist.dbm";
     my $oldname = 'denysoft_greylist';
-    return if ! -f "$db_dir/$oldname.dbm";
+    return 1 if ! -f "$db_dir/$oldname.dbm";
     $self->db->name($oldname);
+    return 1;
 }
 
 sub load_exclude_files {
@@ -319,7 +362,7 @@ sub rcpt_handler {
     return DECLINED;
 }
 
-sub hook_data {
+sub data_handler {
     my ($self, $transaction) = @_;
     return DECLINED unless $transaction->notes('greylist');
 
