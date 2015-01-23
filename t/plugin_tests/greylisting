@@ -285,27 +285,27 @@ sub rc {
 sub test_init_redis {
     my ($self) = @_;
     delete $self->{db};
-    $self->{_args}{redis_server} = 'bogusserverasdfqwerty.:6379';
+    $self->{_args}{redis} = 'bogusserverasdfqwerty.:6379';
     ok( ! $self->init_redis, 'init_redis() fails on bogus server' );
     eval { Qpsmtpd::DB::Redis->new };
     return if $@;
-    $self->{_args}{redis_server} = 'localhost';
+    $self->{_args}{redis} = 'localhost';
     ok( $self->init_redis, 'init_redis() succeeds when redis is up' );
 }
 
 sub test_init_dbm {
     my ($self) = @_;
     delete $self->{db};
-    delete $self->{_args}{redis_server};
+    delete $self->{_args}{redis};
     ok( $self->init_db, 'init_db() works for DBM' );
 }
 
 sub test_parse_redis_server {
     my ($self) = @_;
-    $self->{_args}{redis_server} = 'asdf:1234';
+    $self->{_args}{redis} = 'asdf:1234';
     is( $self->parse_redis_server, 'asdf:1234',
         'parse_redis_server(): leave provided port alone' );
-    $self->{_args}{redis_server} = 'qwerty';
+    $self->{_args}{redis} = 'qwerty';
     is( $self->parse_redis_server, 'qwerty:6379',
         'parse_redis_server(): add default port' );
 }

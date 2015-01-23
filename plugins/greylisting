@@ -104,7 +104,7 @@ usable directory from the following list will be used:
 
 =back
 
-=head2 redis_server <host[:port]>
+=head2 redis <host[:port]>
 
 Location of redis server where the greylisting DB will be stored.
 
@@ -179,7 +179,7 @@ my $VERSION = '0.12';
 
 my $DENYMSG        = "This mail is temporarily denied";
 my %PERMITTED_ARGS = map { $_ => 1 } qw(per_recipient remote_ip sender
-  recipient black_timeout white_timeout deny_late db_dir redis_server
+  recipient black_timeout white_timeout deny_late db_dir redis
   nfslock p0f reject loglevel geoip upgrade );
 $PERMITTED_ARGS{grey_timeout} = 1; # Legacy argument now ignored
 
@@ -233,7 +233,7 @@ sub register_hooks {
 
 sub init_db {
     my ($self) = @_;
-    return $self->init_redis if $self->{_args}{redis_server};
+    return $self->init_redis if $self->{_args}{redis};
     return $self->init_dbm;
 }
 
@@ -253,7 +253,7 @@ sub init_redis {
 
 sub parse_redis_server {
     my ($self) = @_;
-    my $server = $self->{_args}{redis_server};
+    my $server = $self->{_args}{redis};
     return $server if $server =~ /:/;
     return "$server:6379";
 }
