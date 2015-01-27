@@ -159,17 +159,19 @@ sub size {
 }
 
 sub delete {
-    my ( $self, $key ) = @_;
+    my ( $self, @keys ) = @_;
     my $tied = $self->{tied};
     if ( ! $tied ) {
         warn "DBM db not yet set up, delete() failed\n";
         return;
     }
-    if ( ! $key ) {
+    if ( ! @keys ) {
         warn "No key provided, delete() failed\n";
         return;
     }
-    delete $tied->{$key};
+    @keys = grep { exists $tied->{$_} } @keys;
+    delete @$tied{@keys};
+    return scalar @keys;
 }
 
 sub flush {

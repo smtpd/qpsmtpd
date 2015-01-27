@@ -489,7 +489,7 @@ sub prune_db {
     $self->db->lock or return;
     my $count = $self->db->size;
 
-    my $pruned = 0;
+    my @to_delete;
     my $greylist = {};
     my @keys = $self->db->get_keys or return;
     @$greylist{ @keys } = ( $self->db->mget(@keys) );
@@ -497,9 +497,10 @@ sub prune_db {
         my ($ts) = split /:/, delete $greylist->{$key};
         my $age = $self->now - $ts;
         next if $age < $self->{_args}{white_timeout};
-        $pruned++;
-        $self->db->delete($key);
+        push @to_delete, $key;
     }
+    return if ! @to_delete;
+    my $pruned = $self->db->delete(@to_delete);
     $self->db->unlock;
     $self->log(LOGINFO, "pruned $pruned of $count DB entries");
 }

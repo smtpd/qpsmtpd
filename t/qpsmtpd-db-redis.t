@@ -115,8 +115,19 @@ sub __delete {
     $redis->flushdb;
     $redis->set( oink  => 1 );
     $redis->set( quack => 1 );
-    $db->delete('quack');
-    is( join( '|', $redis->keys('*') ), 'oink', 'delete() removes key' );
+    $redis->set( woof  => 1 );
+    $redis->set( moo   => 1 );
+
+    is( $db->delete('quack'), 1,
+        'delete() return value when removing a single key' );
+    is( join( '|', sort $redis->keys('*') ), 'moo|oink|woof',
+        'delete() removes a single key' );
+    is( $db->delete(qw( moo oink )), 2,
+        'delete() return value when removing a single key' );
+    is( join( '|', sort $redis->keys('*') ), 'woof',
+        'delete() removes two keys' );
+    is( $db->delete('noop'), 0,
+        'delete() return value when removing a non-existent key' );
 }
 
 sub __get_keys {
@@ -158,7 +169,14 @@ sub select   { $_[0]->{selected} = $_[1] }
 sub dbsize   { scalar keys %{ $_[0]->fakestore }   }
 sub get      { $_[0]->fakestore->{ $_[1] }         }
 sub set      { $_[0]->fakestore->{ $_[1] } = $_[2] }
-sub del      { delete $_[0]->fakestore->{ $_[1] }  }
+
+sub del {
+    my ($self,@keys) = @_;
+    my $f = $self->fakestore;
+    @keys = grep { exists $f->{$_} } @keys;
+    delete @$f{ @keys };
+    return scalar @keys;
+}
 
 sub mget {
     my ($self,@keys) = @_;

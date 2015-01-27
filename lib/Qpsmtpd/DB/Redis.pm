@@ -91,12 +91,12 @@ sub set {
 }
 
 sub delete {
-    my ( $self, $key ) = @_;
-    if ( ! $key ) {
+    my ( $self, @keys ) = @_;
+    if ( ! @keys ) {
         warn "No key provided, delete() failed\n";
         return;
     }
-    return $self->redis->del($key);
+    return $self->redis->del(@keys);
 }
 
 sub get_keys { shift->redis->keys('*') }
