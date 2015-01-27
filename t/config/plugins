@@ -46,7 +46,7 @@ badrcptto
 helo
 
 sender_permitted_from
-greylisting p0f genre,windows
+greylisting p0f genre,windows db_dir ./t/tmp
 
 #auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
 #auth/auth_vpopmail
