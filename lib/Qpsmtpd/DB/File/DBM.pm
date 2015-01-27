@@ -99,7 +99,7 @@ sub unlock {
 sub get {
     my ( $self, $key ) = @_;
     if ( ! $key ) {
-        warn "No key provided, set() failed\n";
+        warn "No key provided, get() failed\n";
         return;
     }
     my $tied = $self->{tied};
@@ -108,6 +108,20 @@ sub get {
         return;
     }
     return $tied->{$key};
+}
+
+sub mget {
+    my ( $self, @keys ) = @_;
+    if ( ! @keys ) {
+        warn "No key provided, mget() failed\n";
+        return;
+    }
+    my $tied = $self->{tied};
+    if ( ! $tied ) {
+        warn "DBM db not yet set up, mget() failed\n";
+        return;
+    }
+    return @$tied{ @keys }
 }
 
 sub set {

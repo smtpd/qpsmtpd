@@ -72,6 +72,15 @@ sub get {
     return $self->redis->get($key);
 }
 
+sub mget {
+    my ( $self, @keys ) = @_;
+    if ( ! @keys ) {
+        warn "No key provided, mget() failed\n";
+        return;
+    }
+    return $self->redis->mget(@keys);
+}
+
 sub set {
     my ( $self, $key, $val ) = @_;
     if ( ! $key ) {

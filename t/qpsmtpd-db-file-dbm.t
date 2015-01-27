@@ -11,6 +11,7 @@ use_ok('Qpsmtpd::DB::File::DBM');
 my $db = Qpsmtpd::DB::File::DBM->new( name => 'testing' );
 __new();
 __get();
+__mget();
 __set();
 __delete();
 __get_keys();
@@ -29,6 +30,16 @@ sub __get {
     $db->flush;
     $db->set( moo => 'oooo' );
     is( $db->get('moo'), 'oooo', 'get() retrieves key' );
+    $db->unlock;
+}
+
+sub __mget {
+    $db->lock;
+    $db->flush;
+    $db->set( key1 => 'val1' );
+    $db->set( key2 => 'val2' );
+    is( join('|',$db->mget(qw( key2 key1 ))), 'val2|val1',
+        'mget() retrieves multiple keys' );
     $db->unlock;
 }
 
@@ -89,7 +100,10 @@ sub __untie_gotcha {
     $db2->lock;
     is( $db2->get('cut'), 'itout',
         'get() in second db handle reads key set in first handle' );
-    $db2->unlock;
-    $db->flush;
+    # Get rid of test data
     $db2->flush;
+    $db2->unlock;
+    $db->lock;
+    $db->flush;
+    $db->unlock;
 }

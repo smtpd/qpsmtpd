@@ -25,6 +25,7 @@ else {
 __index();
 __redis();
 __get();
+__mget();
 __set();
 __delete();
 __get_keys();
@@ -93,6 +94,15 @@ sub __get {
     is( $db->get('moo'), 'oooo', 'get() retrieves key' );
 }
 
+sub __mget {
+    my $redis = $db->redis;
+    $redis->flushdb;
+    $redis->set( key1 => 'val1' );
+    $redis->set( key2 => 'val2' );
+    is( join('|',$db->mget(qw( key2 key1 ))), 'val2|val1',
+        'mget() retrieves multiple keys' );
+}
+
 sub __set {
     my $redis = $db->redis;
     $redis->flushdb;
@@ -149,6 +159,12 @@ sub dbsize   { scalar keys %{ $_[0]->fakestore }   }
 sub get      { $_[0]->fakestore->{ $_[1] }         }
 sub set      { $_[0]->fakestore->{ $_[1] } = $_[2] }
 sub del      { delete $_[0]->fakestore->{ $_[1] }  }
+
+sub mget {
+    my ($self,@keys) = @_;
+    my $f = $self->fakestore;
+    return @$f{ @keys };
+}
 
 sub hgetall  {
     my ( $self, $h ) = @_;
