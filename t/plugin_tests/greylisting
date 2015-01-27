@@ -21,6 +21,7 @@ sub register_tests {
     $self->register_test("test_greylist_p0f_link");
     $self->register_test("test_greylist_p0f_uptime");
     $self->register_test('test_exclude_file_match');
+    $self->register_test('test_prune_db');
     $self->register_test('test_greylist');
     $self->register_test('test_init_redis');
     $self->register_test('test_init_dbm');
@@ -219,6 +220,58 @@ sub test_greylist_p0f_uptime {
 }
 
 my $mocktime;
+
+{
+    no warnings qw( redefine );
+    sub now { $mocktime || time() }
+}
+
+sub test_prune_db {
+    my ($self) = @_;
+    my $start     = time() - 40 * 3600 * 24; # 40 days ago
+    my $oneday    = $start - 60 * 60 * 24;
+    my $onemonth  = $start - 60 * 60 * 24 * 30;
+    my $twomonths = $start - 60 * 60 * 24 * 60;
+    $self->{_args} = {
+        white_timeout => 36 * 3600 * 24, # 36 days
+    };
+    for my $test_class (@Qpsmtpd::DB::child_classes) {
+        delete $self->{db};
+        eval { $self->db( class => $test_class ) };
+        next if $@;
+        $self->db->lock;
+        $self->db->flush;
+        $self->db->set( startkey    => "$start:testdata"     );
+        $self->db->set( onedaykey   => "$oneday:testdata"    );
+        $self->db->set( onemonthkey => "$onemonth:testdata"  );
+        $self->db->set( twomonthkey => "$twomonths:testdata" );
+        $self->db->unlock;
+        is( $self->allkeys, 'onedaykey|onemonthkey|startkey|twomonthkey',
+            'initial prune_db() test data set correctly' );
+        $self->db->unlock;
+        $mocktime = $start;
+        $self->prune_db;
+        is( $self->allkeys, 'onedaykey|onemonthkey|startkey',
+            'prune_db() expires two-month-old data' );
+        $mocktime = $start + 60 * 60 * 24 * 7;
+        $self->prune_db;
+        is( $self->allkeys, 'onedaykey|startkey',
+            'prune_db() expires one-month-old data 7 days later' );
+        $mocktime = $start + 60 * 60 * 24 * 37;
+        $self->prune_db;
+        is( $self->allkeys, '',
+            'prune_db() expires all remaining keys 37 days later' );
+    }
+}
+
+sub allkeys {
+    my ($self) = @_;
+    $self->db->lock;
+    my $allkeys = join '|', sort $self->db->get_keys;
+    $self->db->unlock;
+    return $allkeys;
+}
+
 sub test_greylist {
     my ( $self ) = @_;
     $self->{_args} = {
@@ -268,11 +321,6 @@ sub test_greylist {
         $self->db->flush;
         $self->db->unlock;
     }
-}
-
-{
-    no warnings qw( redefine );
-    sub now { $mocktime || time() }
 }
 
 sub rc {
