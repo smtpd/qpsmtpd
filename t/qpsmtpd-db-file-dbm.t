@@ -18,6 +18,9 @@ __delete();
 __get_keys();
 __size();
 __flush();
+__qphome();
+__validate_dir();
+__dir();
 __untie_gotcha();
 
 done_testing();
@@ -99,6 +102,29 @@ sub __flush {
     $db->flush;
     is( join( '|', $db->get_keys ), '', 'flush() empties db' );
     $db->unlock;
+}
+
+sub __qphome {
+    is( $db->qphome, 't', 'qphome()' );
+}
+
+sub __validate_dir {
+    is( $db->validate_dir(),      0, 'validate_dir(): false on no input' );
+    is( $db->validate_dir(undef), 0, 'validate_dir(): false on undef' );
+    is( $db->validate_dir('invalid'), 0,
+        'validate_dir(): false for non-existent directory' );
+    is( $db->validate_dir('t/tmp'), 1,
+        'validate_dir(): true for real directory' );
+}
+
+sub __dir {
+    my $db2 = Qpsmtpd::DB::File::DBM->new( name => 'dirtest' );
+    is( $db2->dir(), 't/config', 'default directory' );
+    is( $db2->dir('_invalid','t/Test'), 't/Test', 'skip invalid candidate dirs' );
+    $db2->{dir} = '_cached';
+    is( $db2->dir(), '_cached', 'cached directory' );
+    is( $db2->dir('t/Test'), 't/Test', 'passing candidate dirs resets cache' );
+    is( $db2->dir('_invalid'), 't/config', 'invalid candidate dirs reverts to default' );
 }
 
 sub __untie_gotcha {

@@ -2,7 +2,7 @@ package Qpsmtpd::DB::File::DBM;
 use strict;
 use warnings;
 
-use parent 'Qpsmtpd::DB::File';
+use parent 'Qpsmtpd::DB';
 
 BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
 use AnyDBM_File;
@@ -11,11 +11,6 @@ use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 sub new {
     my ( $class, %arg ) = @_;
     return bless {%arg}, $class;
-}
-
-sub file_extension {
-    my ( $self, $extension ) = @_;
-    return $self->{file_extension} ||= '.dbm';
 }
 
 sub lock {
@@ -182,6 +177,34 @@ sub flush {
         return;
     }
     delete $tied->{$_} for keys %$tied;
+}
+
+sub dir {
+    my ( $self, @candidate_dirs ) = @_;
+    return $self->{dir} if $self->{dir} and ! @candidate_dirs;
+    push @candidate_dirs, ( $self->qphome . '/var/db', $self->qphome . '/config' );
+    for my $d ( @candidate_dirs ) {
+        next if ! $self->validate_dir($d);
+        return $self->{dir} = $d; # first match wins
+    }
+}
+
+sub validate_dir {
+    my ( $self, $d ) = @_;
+    return 0 if ! $d;
+    return 0 if ! -d $d;
+    return 1;
+}
+
+sub qphome {
+    my ( $self ) = @_;
+    my ($QPHOME) = ($0 =~ m!(.*?)/([^/]+)$!);
+    return $QPHOME;
+}
+
+sub path {
+    my ( $self ) = @_;
+    return $self->dir . '/' . $self->name . '.dbm';
 }
 
 1;
