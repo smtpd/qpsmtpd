@@ -1,0 +1,57 @@
+=pod
+
+=head1 SYNOPSIS
+
+This plugin removes all mail headers not matching a certain whitelist.
+This is almost certainly a bad idea for inbound mail, and may be
+undesireable for general purpose outbound mail.
+
+It is useful as a content filter:
+
+C<http://www.postfix.org/FILTER_README.html>
+
+to normalize outbound mail, probably from application servers that litter
+the headers with various forms of useless junk.
+
+=head1 CONFIG
+
+config/header_whitelist
+
+Each line is a header name without the colon. Headers not listed in the
+whitelist are removed.
+
+=head1 AUTHOR
+
+Copyright (C) 2010-2011 Chase Venters <chase.venters@gmail.com>
+
+This software is free software and may be distributed under the same
+terms as qpsmtpd itself.
+
+=cut
+
+sub hook_data_post {
+	my ($self, $transaction) = @_;
+
+	# Parse valid header tags
+	my %valid_tag;
+	my @lines = $self->qp->config("header_whitelist");
+	for my $line (@lines) {
+		chomp $line;
+		$line =~ s/\s//g;
+		next if $line eq '';
+		$valid_tag{lc($line)} = 1;
+	}
+
+	# Delete invalid header tags
+	my $header = $transaction->header;
+	my @tags = $header->tags;
+	for my $tag (@tags) {
+		if (!exists($valid_tag{lc($tag)})) {
+			$header->delete($tag);
+		}
+	}
+
+	# Continue processing
+	return (DECLINED);
+}
+
