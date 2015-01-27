@@ -6,9 +6,10 @@ use Test::More;
 use lib 'lib';    # test lib/Qpsmtpd (vs site_perl)
 use lib 't';
 
+use Test::Qpsmtpd;
 use_ok('Qpsmtpd::DB::File::DBM');
 
-my $db = Qpsmtpd::DB::File::DBM->new( name => 'testing' );
+my $db = Qpsmtpd::DB::File::DBM->new( name => 'testing', dir => 't/tmp' );
 __new();
 __get();
 __mget();
@@ -106,7 +107,7 @@ sub __untie_gotcha {
     $db->flush;
     $db->set( cut => 'itout' );
     $db->unlock;
-    my $db2 = Qpsmtpd::DB::File::DBM->new( name => 'testing' );
+    my $db2 = Qpsmtpd::DB::File::DBM->new( name => 'testing', dir => 't/tmp' );
     $db2->lock;
     is( $db2->get('cut'), 'itout',
         'get() in second db handle reads key set in first handle' );

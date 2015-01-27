@@ -11,6 +11,10 @@ use parent 'Qpsmtpd::SMTP';
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
 
+if ( ! -d 't/tmp' ) {
+    mkdir 't/tmp' or warn "Could not create temporary testing directory:$!";
+}
+
 sub new_conn {
     ok(my $smtpd = __PACKAGE__->new(), "new");
     ok(

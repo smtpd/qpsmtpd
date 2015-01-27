@@ -237,7 +237,7 @@ sub test_prune_db {
     };
     for my $test_class (@Qpsmtpd::DB::child_classes) {
         delete $self->{db};
-        eval { $self->db( class => $test_class ) };
+        eval { $self->db( class => $test_class, dir => 't/tmp' ) };
         next if $@;
         $self->db->lock;
         $self->db->flush;
@@ -291,7 +291,7 @@ sub test_greylist {
     my $rcpt   = Qpsmtpd::Address->new( "<$test_email>" );
     for my $test_class (@Qpsmtpd::DB::child_classes) {
         delete $self->{db};
-        eval { $self->db( class => $test_class ) };
+        eval { $self->db( class => $test_class, dir => 't/tmp' ) };
         if ( $@ ) {
             warn "Unable to test greylisting against $test_class: $@";
             next;
