@@ -268,8 +268,6 @@ sub init_dbm {
     $cdir = $1 if $cdir and $cdir =~ m{^([-a-zA-Z0-9./_]+)$};
     # greylisting-specific hints for where to store the greylist DB
     my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/greylisting' );
-
-    return 1 if $self->db->file_extension ne '.dbm';
     $self->db->nfs_locking( $self->{_args}{nfslock} );
     
     # Work around old DBM filename

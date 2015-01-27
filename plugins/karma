@@ -262,8 +262,6 @@ sub init_db {
     my $cdir = $self->{_args}{db_dir};
     # karma-specific hints for where to store the DB
     $self->db->dir( $cdir, '/var/lib/qpsmtpd/karma' );
-
-    return if $self->db->file_extension ne '.dbm';
     $self->db->nfs_locking( $self->{_args}{nfslock} );
 }
 
