@@ -1,64 +1,46 @@
 #!perl -w
 
 use strict;
+use English qw/-no_match_vars/;
 use POSIX qw(strftime);
 
 use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
 
+my $remote_ip = '66.128.51.165';
 my $test_email = 'matt@tnpi.net';
 
 sub register_tests {
     my $self = shift;
 
-# TODO: test against newer DMARC plugin that uses Mail::DMARC
-}
-
-sub setup_test_headers {
-    my $self = shift;
-
-    my $transaction = $self->qp->transaction;
-    my $address = Qpsmtpd::Address->new( "<$test_email>" );
-    my $header  = Mail::Header->new(Modify => 0, MailFrom => "COERCE");
-    my $now    = strftime "%a %b %e %H:%M:%S %Y", localtime time;
-
-    $transaction->sender($address);
-    $transaction->header($header);
-    $transaction->header->add('From', "<$test_email>");
-    $transaction->header->add('Date', $now );
-    $transaction->body_write( "test message body " );
-
-    $self->qp->connection->relay_client(0);
-}
-
-sub test_fetch_dmarc_record {
-    my $self = shift;
-    
-    foreach ( qw/ tnpi.net nictool.com / ) {
-        my @matches = $self->fetch_dmarc_record($_);
-        cmp_ok( scalar @matches, '==', 1, 'fetch_dmarc_record');
+    eval 'use Mail::DMARC';
+    if ($EVAL_ERROR) {
+        warn 'unable to load Mail::DMARC';
+        return;
     }
-    foreach ( qw/ example.com / ) {
-        my @matches = $self->fetch_dmarc_record($_);
-        cmp_ok( scalar @matches, '==', 0, 'fetch_dmarc_record');
-    }
+
+    $self->register_test('_check_dmarc');
 }
 
-sub test_get_organizational_domain {
+sub _check_dmarc {
     my $self = shift;
 
-    $self->setup_test_headers();
-    my $transaction = $self->qp->transaction;
+    $self->qp->connection->remote_ip($remote_ip);
+    my $t = $self->qp->transaction;
+    $t->header(Mail::Header->new(Modify => 0, MailFrom => "COERCE"));
+    $t->sender(Qpsmtpd::Address->new( "<$test_email>" ));
+    $t->header->add('Date', strftime "%a %b %e %H:%M:%S %Y", localtime time);
+    $t->body_write( "test message body " );
 
-    cmp_ok( $self->get_organizational_domain('test.www.tnpi.net'), 'eq', 'tnpi.net' );
-    cmp_ok( $self->get_organizational_domain('www.example.co.uk'), 'eq', 'example.co.uk' );
-    cmp_ok( $self->get_organizational_domain('plus.google.com'),   'eq', 'google.com' );
-}
+    # no From header, reject as invalid message
+    my ($rc, $msg) = $self->check_dmarc($t);
+    cmp_ok($rc, '==', DENY, "no From header, $msg");
 
-sub test_discover_policy {
-    my $self = shift;
 
-    $self->setup_test_headers();
+    $t->header->add('From', "<$test_email>");
+    ($rc, $msg) = $self->check_dmarc($t);
+    cmp_ok($rc, '==', DENY, "$msg");
+    cmp_ok($msg, 'eq', 'failed DMARC policy', 'check_dmarc, no SPF');
 
-    ok( $self->discover_policy( 'tnpi.net' ), 'discover_policy' );
+    #warn $self->qp->connection->notes('authentication_results');
 }
