@@ -32,23 +32,24 @@ sub register_hook {
 
     die $plugin->plugin_name . ": Invalid hook: $hook" unless $hooks{$hook};
 
-    $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, "hooking", $hook)
-      unless $hook =~ /logging/;    # can't log during load_logging()
+    if ($hook !~ /logging/) {    # can't log during load_logging()
+        $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, 'hooking', $hook);
+    }
 
     # I can't quite decide if it's better to parse this code ref or if
     # we should pass the plugin object and method name ... hmn.
     $plugin->qp->_register_hook(
         $hook,
         {
-         code => sub {
-             local $plugin->{_qp}   = shift;
-             local $plugin->{_hook} = $hook;
-             $plugin->$method(@_);
-         },
-         name => $plugin->plugin_name,
+            code => sub {
+                local $plugin->{_qp}   = shift;
+                local $plugin->{_hook} = $hook;
+                $plugin->$method(@_);
+            },
+            name => $plugin->plugin_name,
         },
         $unshift,
-                               );
+    );
 }
 
 sub _register {
