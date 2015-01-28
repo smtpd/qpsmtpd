@@ -9,8 +9,10 @@ use Net::IP qw(:PROC);
 use POSIX qw(strftime);
 
 use lib 'lib';
+use Qpsmtpd::Base;
 use Qpsmtpd::DB;
 
+my $base = Qpsmtpd::Base->new();
 my $self = bless({args => {db_dir => 'config'},}, 'Karma');
 my $command = $ARGV[0];
 
@@ -119,8 +121,7 @@ sub show_ip {
     if ($penalty_start_ts) {
         $time_human = strftime "%a %b %e %H:%M", localtime $penalty_start_ts;
     }
-    my $hostname = `dig +short -x $ip` || '';
-    chomp $hostname;
+    my $hostname = $base->resolve_ptr($ip);
     print
 "      IP Address                 Penalty        Naughty  Nice  Connects  Hostname\n";
     printf(" %-18s  %24s    %3s     %3s     %3s    %-30s\n",
@@ -164,8 +165,8 @@ sub main {
         }
         my $hostname = '';
         if ($naughty && $nice) {
-
-            #$hostname = `dig +short -x $ip`; chomp $hostname;
+            # this can be slow, waiting for each IP to resolve
+            #$hostname = $base->resolve_ptr($ip);
         }
         printf(" %-18s  %24s    %3s     %3s     %3s    %30s\n",
                $ip, $time_human, $naughty, $nice, $connects, $hostname);

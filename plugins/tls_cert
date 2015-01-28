@@ -3,15 +3,13 @@
 use strict;
 use warnings;
 
-# Very basic script to create TLS certificates for qpsmtpd
+# create TLS certificates for qpsmtpd
 use File::Temp qw/ tempfile tempdir /;
 use Getopt::Long;
+use Sys::Hostname;
 
 my %opts = ();
-chomp (my $hostname = `hostname --fqdn`);
-if ($?) {
-    chomp($hostname = `hostname`);
-}
+my $hostname = hostname();
 print "Using hostname: $hostname\n";
 my %defaults = (
     C  => 'XY',
