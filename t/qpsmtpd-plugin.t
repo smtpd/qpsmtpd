@@ -5,10 +5,12 @@ use Test::More;
 
 use lib 'lib';    # test lib/Qpsmtpd (vs site_perl)
 use lib 't';
+use Test::Qpsmtpd;
 
 use_ok('Qpsmtpd::Plugin');
 
 __db();
+__register_hook();
 
 done_testing();
 
@@ -20,12 +22,33 @@ sub __db {
     is( $db->{name}, 'testfoo', 'accepts name argument' );
     delete $plugin->{db};
     $db = $plugin->db( class => 'FakeDB' );
-    is( $db->{name}, 'testbar', 'name argument defaults to plugin name' );
+    is( $db->{name}, '___FakeHook___', 'db name defaults to plugin name' );
+}
+
+sub __register_hook {
+    eval {
+        my $plugin = FakePlugin->new;
+        $plugin->register_hook('bogus_hook');
+    };
+    ok( $@ =~ /^___FakeHook___: Invalid hook: bogus_hook/,
+      'register_hook() validates hook name' );
+    my $qp = Test::Qpsmtpd->new;
+    my $plugin = FakePlugin->new;
+    $plugin->{_qp} = $qp;
+    $plugin->register_hook('logging', sub { shift; return "arguments:@_" });
+    ok( my $registered = $qp->hooks->{logging}->[-1] );
+    is( $registered->{name}, '___FakeHook___',
+      'register_hook() sets plugin name' );
+    my $code = $registered->{code};
+    is( ref $code, 'CODE', 'register_hook() sets a coderef' );
+    is( join('',$code->(undef,qw[arg1 arg2])), 'arguments:arg1 arg2',
+      'register_hook(): coderef set correctly' );
+    $qp->unfake_hook('logging');
 }
 
 package FakePlugin;
 use parent 'Qpsmtpd::Plugin';
-sub plugin_name { 'testbar' }
+sub plugin_name { '___FakeHook___' }
 
 package FakeDB;
 sub new {
