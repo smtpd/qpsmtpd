@@ -30,7 +30,7 @@ sub hook_name {
 sub register_hook {
     my ($plugin, $hook, $method, $unshift) = @_;
 
-    die $plugin->plugin_name . " : Invalid hook: $hook" unless $hooks{$hook};
+    die $plugin->plugin_name . ": Invalid hook: $hook" unless $hooks{$hook};
 
     $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, "hooking", $hook)
       unless $hook =~ /logging/;    # can't log during load_logging()
