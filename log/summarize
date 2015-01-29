@@ -204,6 +204,8 @@ sub parse_line {
       if substr($message, 0, 24) eq 'Permissions on spool_dir';
     return 'info', $pid, undef, undef, $message
       if substr($message, 0, 13) eq 'Listening on ';
+    return 'info', $pid, undef, undef, $message
+      if substr($message, 0, 15) eq 'Loaded logging/';
 
     return 'err', $pid, undef, undef, $message
       if $line =~ /at [\S]+ line \d/;    # generic perl error
