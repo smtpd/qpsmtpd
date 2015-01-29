@@ -141,7 +141,8 @@ sub __log {
             warn @_;
         }
     };
-    ok($qp->log(LOGWARN, "test log message"), 'log');
+    $qp->log(LOGWARN, "test log message");
+    ok(-f 't/tmp/test-warn.log', 'log');
     is($warned, "$$ test log message\n", 'LOGWARN emitted correct warning');
 }
 
