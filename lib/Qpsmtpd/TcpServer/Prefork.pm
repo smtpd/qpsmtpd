@@ -1,9 +1,11 @@
 package Qpsmtpd::TcpServer::Prefork;
-use Qpsmtpd::TcpServer;
-use Qpsmtpd::SMTP::Prefork;
+use strict;
+
+use lib 'lib';
 use Qpsmtpd::Constants;
 
-@ISA = qw(Qpsmtpd::SMTP::Prefork Qpsmtpd::TcpServer);
+use parent 'Qpsmtpd::SMTP::Prefork';
+use parent 'Qpsmtpd::TcpServer';
 
 my $first_0;
 

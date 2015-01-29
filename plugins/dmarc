@@ -181,4 +181,3 @@ sub check_dmarc {
 # at what point do we reject?
     return $self->get_reject("failed DMARC policy");
 }
-
