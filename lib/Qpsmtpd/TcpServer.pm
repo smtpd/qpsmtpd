@@ -6,6 +6,7 @@ use Socket;
 
 use lib 'lib';
 use Qpsmtpd::Constants;
+use parent 'Qpsmtpd::Base';
 use parent 'Qpsmtpd::SMTP';
 
 my $has_ipv6 = 0;
@@ -24,62 +25,71 @@ sub has_ipv6 {
 
 my $first_0;
 
+sub conn_info_tcpserver {
+
+    # started from tcpserver (or some other superserver which
+    # exports the TCPREMOTE* variables.
+
+    my $r_host = $ENV{TCPREMOTEHOST} || '[' . $ENV{TCPREMOTEIP} . ']';
+    return (
+        local_ip    => $ENV{TCPLOCALIP},
+        local_host  => $ENV{TCPLOCALHOST},
+        local_port  => $ENV{TCPLOCALPORT},
+        remote_ip   => $ENV{TCPREMOTEIP},
+        remote_host => $r_host,
+        remote_info => $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$r_host" : $r_host,
+        remote_port => $ENV{TCPREMOTEPORT},
+    )
+}
+
+sub conn_info_inetd {
+    my $self = shift;
+
+    # Started from inetd or similar.
+    # get info on the remote host from the socket.
+    # ignore ident/tap/...
+
+    my $hersockaddr = getpeername(STDIN) or die "getpeername failed:" .
+        " $0 must be called from tcpserver, (x)inetd or" .
+        " a similar program which passes a socket to stdin";
+
+    my ($r_port, $iaddr) = sockaddr_in($hersockaddr);
+    my $r_ip = inet_ntoa($iaddr);
+    my ($r_host) = $self->resolve_ptr($r_ip) || "[$r_ip]";
+
+    return (
+        local_ip    => '',
+        local_host  => '',
+        local_port  => '',
+        remote_ip   => $r_ip,
+        remote_host => $r_host,
+        remote_info => $r_host,
+        remote_port => $r_port,
+    )
+}
+
 sub start_connection {
     my $self = shift;
 
-    my (
-        $remote_host, $remote_info, $remote_ip, $remote_port,
-        $local_ip,    $local_port,  $local_host
-       );
-
+    my %info;
     if ($ENV{TCPREMOTEIP}) {
-
-        # started from tcpserver (or some other superserver which
-        # exports the TCPREMOTE* variables.
-        $remote_ip = $ENV{TCPREMOTEIP};
-        $remote_host = $ENV{TCPREMOTEHOST} || "[$remote_ip]";
-        $remote_info =
-          $ENV{TCPREMOTEINFO}
-          ? "$ENV{TCPREMOTEINFO}\@$remote_host"
-          : $remote_host;
-        $remote_port = $ENV{TCPREMOTEPORT};
-        $local_ip    = $ENV{TCPLOCALIP};
-        $local_port  = $ENV{TCPLOCALPORT};
-        $local_host  = $ENV{TCPLOCALHOST};
+        %info = $self->conn_info_tcpserver();
     }
     else {
-        # Started from inetd or similar.
-        # get info on the remote host from the socket.
-        # ignore ident/tap/...
-        my $hersockaddr = getpeername(STDIN)
-          or die
-"getpeername failed: $0 must be called from tcpserver, (x)inetd or a similar program which passes a socket to stdin";
-        my ($port, $iaddr) = sockaddr_in($hersockaddr);
-        $remote_ip   = inet_ntoa($iaddr);
-        $remote_host = gethostbyaddr($iaddr, AF_INET) || "[$remote_ip]";
-        $remote_info = $remote_host;
+        %info = $self->conn_info_inetd();
     }
-    $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
+    $self->log(LOGNOTICE, "Connection from $info{remote_info} [$info{remote_ip}]");
 
     # if the local dns resolver doesn't filter it out we might get
     # ansi escape characters that could make a ps axw do "funny"
     # things. So to be safe, cut them out.
-    $remote_host =~ tr/a-zA-Z\.\-0-9\[\]//cd;
+    $info{remote_host} =~ tr/a-zA-Z\.\-0-9\[\]//cd;
 
     $first_0 = $0 unless $first_0;
     my $now = POSIX::strftime("%H:%M:%S %Y-%m-%d", localtime);
-    $0 = "$first_0 [$remote_ip : $remote_host : $now]";
+    $0 = "$first_0 [$info{remote_ip} : $info{remote_host} : $now]";
 
-    $self->SUPER::connection->start(
-                                    remote_info => $remote_info,
-                                    remote_ip   => $remote_ip,
-                                    remote_host => $remote_host,
-                                    remote_port => $remote_port,
-                                    local_ip    => $local_ip,
-                                    local_port  => $local_port,
-                                    local_host  => $local_host,
-                                    @_
-                                   );
+    $self->SUPER::connection->start(%info, @_);
 }
 
 sub run {
