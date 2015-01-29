@@ -306,20 +306,20 @@ sub open_geoip_db {
     my $db_dir = $self->{_args}{db_dir};
     foreach my $db (qw/ GeoIPCity GeoLiteCity /) {
         next if !-f "$db_dir/$db.dat";
-        $self->log(LOGINFO, "using db $db");
+        $self->log(LOGDEBUG, "using db $db");
         $self->{_geoip_city} = Geo::IP->open("$db_dir/$db.dat");
         last if $self->{_geoip_city};
     }
     warn "Missing GeoIP City data!\n" if ! $self->{_geoip_city};
 
     if (-f "$db_dir/GeoIPASNum.dat") {
-        $self->log(LOGINFO, "using GeoIPASNum");
+        $self->log(LOGDEBUG, "using GeoIPASNum");
         $self->{GeoIPASNum} = Geo::IP->open("$db_dir/GeoIPASNum.dat");
     }
     warn "Missing GeoIP ASN data!\n" if ! $self->{GeoIPASNum};
 
     if (-f "$db_dir/GeoIPASNumv6.dat") {
-        $self->log(LOGINFO, "using GeoIPASNumv6");
+        $self->log(LOGDEBUG, "using GeoIPASNumv6");
         $self->{GeoIPASNumv6} = Geo::IP->open("$db_dir/GeoIPASNumv6.dat");
         warn "Missing GeoIP ASN IPV6 data!\n" if ! $self->{GeoIPASNum};
     }
