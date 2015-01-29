@@ -85,49 +85,6 @@ L<Qmail::Deliverable>, L<qmail-deliverabled>, L<Qmail::Deliverable::Client>
 #################################
 #################################
 
-BEGIN {
-    use FindBin qw($Bin $Script);
-    if (not $INC{'Qpsmtpd.pm'}) {
-        my $dir = '$PLUGINS_DIRECTORY';
-        -d and $dir = $_ for qw(
-          /home/qpsmtpd/plugins
-          /home/smtp/qpsmtpd/plugins
-          /usr/local/qpsmtpd/plugins
-          /usr/local/share/qpsmtpd/plugins
-          /usr/share/qpsmtpd/plugins
-          );
-
-        my $file = "the 'plugins' configuration file";
-        -f and $file = $_ for qw(
-          /home/qpsmtpd/config/plugins
-          /home/smtp/qpsmtpd/config/plugins
-          /usr/local/qpsmtpd/config/plugins
-          /usr/local/etc/qpsmtpd/plugins
-          /etc/qpsmtpd/plugins
-          );
-
-        # "die" would print "BEGIN failed" garbage
-        print STDERR <<"END";
-
-This is a plugin for qpsmtpd and should not be run manually.
-
-To install the plugin:
-
-    ln -s $Bin/$Script $dir/
-
-And add "$Script server 127.0.0.1:8998" to $file, before rcpt_ok.
-For configuration instructions, read "man $Script"
-
-(Paths may vary.)
-
-END
-        exit 255;
-    }
-}
-
-#################################
-#################################
-
 use strict;
 use warnings;
 
