@@ -44,7 +44,13 @@ sub register_hook {
             code => sub {
                 local $plugin->{_qp}   = shift;
                 local $plugin->{_hook} = $hook;
-                $plugin->$method(@_);
+                my @r;
+                eval { @r = $plugin->$method(@_) };
+                my $err = $@ or return @r;
+                die $err if ! $plugin->can('error_handler');
+                $plugin->log(LOGERROR,
+                  "PLUGIN ERROR [" . $plugin->plugin_name . " hook_$hook]: $err");
+                return $plugin->error_handler( $err, $hook );
             },
             name => $plugin->plugin_name,
         },
