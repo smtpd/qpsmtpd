@@ -5,9 +5,11 @@ use POSIX ();
 use Socket;
 
 use lib 'lib';
+use Qpsmtpd::Base;
 use Qpsmtpd::Constants;
-use parent 'Qpsmtpd::Base';
 use parent 'Qpsmtpd::SMTP';
+
+my $base = Qpsmtpd::Base->new();
 
 my $has_ipv6 = 0;
 if (
@@ -55,7 +57,7 @@ sub conn_info_inetd {
 
     my ($r_port, $iaddr) = sockaddr_in($hersockaddr);
     my $r_ip = inet_ntoa($iaddr);
-    my ($r_host) = $self->resolve_ptr($r_ip) || "[$r_ip]";
+    my ($r_host) = $base->resolve_ptr($r_ip) || "[$r_ip]";
 
     return (
         local_ip    => '',
@@ -193,7 +195,9 @@ sub tcpenv {
         return $TCPLOCALIP, $TCPREMOTEIP,
                $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
     }
-    my ($TCPREMOTEHOST) = $self->resolve_ptr($TCPREMOTEIP) || 'Unknown';
+    my ($TCPREMOTEHOST) = $base->resolve_ptr($TCPREMOTEIP);
+    $TCPREMOTEHOST ||= 'Unknown';
+
     return $TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST;
 }
 
