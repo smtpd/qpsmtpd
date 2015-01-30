@@ -97,15 +97,85 @@ sub __hooks_none {
 sub __run_continuation {
     my $r;
     eval { $smtpd->run_continuation };
-    ok($@, "run_continuation w/o continuation: " . $@);
+    is( $@, "No continuation in progress\n",
+      'run_continuation dies without continuation');
+    $smtpd->{_continuation} = [];
+    eval { $smtpd->run_continuation };
+    ok( $@ =~ /^No hook in the continuation/,
+      'run_continuation dies without hook');
+    $smtpd->{_continuation} = ['connect'];
+    eval { $smtpd->run_continuation };
+    ok( $@ =~ /^No hook args in the continuation/,
+      'run_continuation dies without hook');
 
-    my @local_hooks = @{$Qpsmtpd::hooks->{'connect'}};
+
+    my @local_hooks = @{ $smtpd->hooks->{connect} };
     $smtpd->{_continuation} = ['connect', [DECLINED, "test mess"], @local_hooks];
 
     eval { $r = $smtpd->run_continuation };
     ok(!$@, "run_continuation with a continuation doesn't throw exception");
     is($r->[0], 220, "hook_responder, code");
     ok($r->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $r->[1]);
+
+    my @test_data = (
+        {
+            hooks => [[DENY, 'noway']],
+            expected_response => '550/noway',
+            disconnected => 0,
+            descr => 'DENY',
+        },
+        {
+            hooks => [[DENY_DISCONNECT, 'boo']],
+            expected_response => '550/boo',
+            disconnected => 1,
+            descr => 'DENY_DISCONNECT',
+        },
+        {
+            hooks => [[DENYSOFT, 'comeback']],
+            expected_response => '450/comeback',
+            disconnected => 0,
+            descr => 'DENYSOFT',
+        },
+        {
+            hooks => [[DENYSOFT_DISCONNECT, 'wah']],
+            expected_response => '450/wah',
+            disconnected => 1,
+            descr => 'DENYSOFT_DISCONNECT',
+        },
+        {
+            hooks => [ [DECLINED,'nm'], [DENY, 'gotcha'] ],
+            expected_response => '550/gotcha',
+            disconnected => 0,
+            descr => 'DECLINED -> DENY',
+        },
+        {
+            hooks => [ [123456,undef], [DENY, 'goaway'] ],
+            expected_response => '550/goaway',
+            disconnected => 0,
+            descr => 'INVALID -> DENY',
+        },
+    );
+    for my $t (@test_data) {
+        for my $h ( @{ $t->{hooks} } ) {
+            $smtpd->fake_hook( 'helo', sub { return @$h } );
+        }
+        $smtpd->{_continuation} = [ 'helo', ['somearg'], @{ $smtpd->hooks->{helo} } ];
+        delete $smtpd->{_response};
+        $smtpd->connection->notes( disconnected => undef );
+        $smtpd->run_continuation;
+        my $response = join '/', @{ $smtpd->{_response} || [] };
+        is( $response, $t->{expected_response},
+          "run_continuation(): Respond to $t->{descr} with $response" );
+        if ( $t->{disconnected} ) {
+            ok( $smtpd->connection->notes('disconnected'),
+              "run_continuation() disconnects on $t->{descr}" );
+        }
+        else {
+            ok( ! $smtpd->connection->notes('disconnected'),
+              "run_continuation() does not disconnect on $t->{descr}" );
+        }
+    }
+    $smtpd->unfake_hook('helo');
 }
 
 sub __hook_responder {
