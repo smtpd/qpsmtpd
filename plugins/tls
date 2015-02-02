@@ -94,7 +94,8 @@ sub init {
                                         SSL_key_file    => $self->tls_key,
                                         SSL_ca_file     => $self->tls_ca,
                                         SSL_cipher_list => $self->tls_ciphers,
-                                        SSL_server      => 1
+                                        SSL_server      => 1,
+                                        SSL_honor_cipher_order => 1
                                        )
       or die "Could not create SSL context: $!";
 
@@ -195,6 +196,7 @@ sub _convert_to_ssl {
                                        SSL_cipher_list => $self->tls_ciphers,
                                        SSL_server      => 1,
                                        SSL_reuse_ctx   => $self->ssl_context,
+                                       SSL_honor_cipher_order => 1
                                       )
           or die "Could not create SSL socket: $!";
 
@@ -295,6 +297,7 @@ sub upgrade_socket {
                 SSL_startHandshake => 0,
                 SSL_server         => 1,
                 SSL_reuse_ctx   => $sp->ssl_context,
+                SSL_honor_cipher_order => 1
             }
         )
         or die "Could not upgrade socket to SSL: $!";
