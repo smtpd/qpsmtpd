@@ -107,7 +107,7 @@ sub init {
                                         SSL_cert_file   => $self->tls_cert,
                                         SSL_key_file    => $self->tls_key,
                                         SSL_ca_file     => $self->tls_ca,
-					SSL_dh_file     => $self->tls_dhparam,
+                                        SSL_dh_file     => $self->tls_dhparam,
                                         SSL_cipher_list => $self->tls_ciphers,
                                         SSL_server      => 1,
                                         SSL_honor_cipher_order => 1
@@ -208,7 +208,7 @@ sub _convert_to_ssl {
                                        SSL_cert_file   => $self->tls_cert,
                                        SSL_key_file    => $self->tls_key,
                                        SSL_ca_file     => $self->tls_ca,
-				       SSL_dh_file     => $self->tls_dhparam,
+                                       SSL_dh_file     => $self->tls_dhparam,
                                        SSL_cipher_list => $self->tls_ciphers,
                                        SSL_server      => 1,
                                        SSL_reuse_ctx   => $self->ssl_context,
