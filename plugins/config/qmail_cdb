@@ -1,0 +1,46 @@
+#!perl -w
+
+=head1 NAME
+
+config/qmail_cdb
+
+=head1 DESCRIPTION
+
+Example config plugin.  Gets configuration data from qmail-style CDB files
+
+=head1 CONFIG
+
+config/qmail_cdb reads DJB's CDB format to get config parameters - see http://cr.yp.to/cdb.html
+
+=cut
+
+sub hook_config {
+    my ($self, $txn, $config, $type) = @_;
+    # TODO: transition to always looking for and reading CDB files if this
+    # plugin is loaded. If you don't want to read CDBs, why load the plugin?
+    # And maybe it should not be loaded by default.
+    return DECLINED unless $type and $type eq 'map';
+    my $file = $self->qp->conf->config_dir($config) . "/$config.cdb";
+
+    if (!-e $file) {
+        $self->log(LOGDEBUG, "File $file does not exist");
+        return OK, +{};
+    }
+    eval { require CDB_File };
+
+    if ($@) {
+        $self->log(LOGERROR, "No CDB Support! Did NOT read $file, could not load CDB_File: $@");
+        return OK, +{};
+    }
+
+    my %h;
+    unless (tie(%h, 'CDB_File', $file)) {
+        $self->log(LOGERROR, "tie of $file failed: $!");
+        return OK, +{};
+    }
+
+    # We explicitly don't cache cdb entries. The assumption is that
+    # the data is in a CDB file in the first place because there's
+    # lots of data and the cache hit ratio would be low.
+    return OK, \%h;
+}

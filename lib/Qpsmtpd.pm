@@ -59,11 +59,7 @@ sub load_logging {
     return if $LOGGING_LOADED;     # already done
     return if $hooks->{'logging'}; # avoid triggering log activity
 
-    my @plugin_dirs = $self->conf->from_file('plugin_dirs');
-    if (!@plugin_dirs) {
-        my ($name) = ($0 =~ m!(.*?)/([^/]+)$!);
-        @plugin_dirs = ("$name/plugins");
-    }
+    my @plugin_dirs = $self->plugin_dirs;
 
     my @loggers = $self->conf->from_file('logging');
     for my $logger (@loggers) {
@@ -139,7 +135,7 @@ sub config_dir {
 
 sub plugin_dirs {
     my $self        = shift;
-    my @plugin_dirs = $self->config('plugin_dirs');
+    my @plugin_dirs = $self->conf->from_file('plugin_dirs');
 
     unless (@plugin_dirs) {
         my ($path) = ($ENV{PROCESS} ? $ENV{PROCESS} : $0) =~ m!(.*?)/([^/]+)$!;

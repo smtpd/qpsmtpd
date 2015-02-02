@@ -93,7 +93,7 @@ plugins/headers
 plugins/helo
 plugins/help
 plugins/hosts_allow
-plugins/http_config
+plugins/config/http
 plugins/ident/geoip
 plugins/ident/p0f
 plugins/karma

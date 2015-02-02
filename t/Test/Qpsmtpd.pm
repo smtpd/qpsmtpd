@@ -10,6 +10,7 @@ use parent 'Qpsmtpd::SMTP';
 
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
+use Test::Qpsmtpd::Config;
 
 if ( ! -d 't/tmp' ) {
     mkdir 't/tmp' or warn "Could not create temporary testing directory:$!";
@@ -81,11 +82,6 @@ sub input {
         $self->respond(502, "command unrecognized: '$command'");
     }
     alarm $timeout;
-}
-
-sub config_dir {
-    return './t/config' if $ENV{QPSMTPD_DEVELOPER};
-    return './config.sample';
 }
 
 sub plugin_dirs {
