@@ -82,10 +82,10 @@ sub init {
                    "Cannot locate cert/key!  Run plugins/tls_cert to generate");
         return;
     }
-    unless (-f $dhparam) {
-        $dhparam = "";
+    unless (-f $dhparam && -s $dhparam) {
+        $dhparam = undef;
         $self->log(LOGINFO,
-                   "Cannot locate dhparam, possible DHE algorithms will be unavailable.");
+                   "dhparam is not exist or empty, possible DHE ciphers will be unavailable.");
         $self->log(LOGINFO,
                    "The encryption strength will decline due to lack of Forward Secrecy.");
     }
