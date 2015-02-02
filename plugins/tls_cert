@@ -62,7 +62,7 @@ system('openssl', 'req', '-config', $CAfilename, '-new', '-x509',
 my $SERVER_key = 'ssl/qpsmtpd-server.key';
 my $SERVER_csr = 'ssl/qpsmtpd-server.csr';
 my $SERVER_crt = 'ssl/qpsmtpd-server.crt';
-my $SERVER_dhparam = 'ssl/qpsmtpd-server.dhparam';
+my $SERVER_dhparam = 'ssl/qpsmtpd-dhparam.pem';
 
 my ($SERVER, $SERVERfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
 print ${SERVER} return_cfg($opts{OU});
