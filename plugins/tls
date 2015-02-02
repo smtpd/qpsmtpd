@@ -87,7 +87,7 @@ sub init {
         $self->log(LOGINFO,
                    "Cannot locate dhparam, possible DHE algorithms will be unavailable.");
         $self->log(LOGINFO,
-                   "The encryption strength will decline que to lack of Forward Secrecy.");
+                   "The encryption strength will decline due to lack of Forward Secrecy.");
     }
     $self->tls_cert($cert);
     $self->tls_key($key);
