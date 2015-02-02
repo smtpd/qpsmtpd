@@ -95,7 +95,7 @@ system('openssl', 'x509', '-extfile', $SIGNfilename, '-days', (365*2),
 	'-req', '-out', $SERVER_crt) == 0
     or die "Cannot sign cert: $?";
 
-system('openssl', 'dhparam', '-out', '$SERVER_dhparam', 2048) == 0
+system('openssl', 'dhparam', '-out', $SERVER_dhparam, 2048) == 0
     or die "Cannot create server dhparam: $?";
 
 exit(0);
