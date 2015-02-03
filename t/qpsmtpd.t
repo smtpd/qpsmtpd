@@ -156,7 +156,7 @@ sub __run_continuation {
         },
     );
     for my $t (@test_data) {
-        for my $h ( @{ $t->{hooks} } ) {
+        for my $h ( reverse @{ $t->{hooks} } ) {
             $smtpd->fake_hook( 'helo', sub { return @$h } );
         }
         $smtpd->{_continuation} = [ 'helo', ['somearg'], @{ $smtpd->hooks->{helo} } ];
