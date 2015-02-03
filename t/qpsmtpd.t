@@ -154,13 +154,29 @@ sub __run_continuation {
             disconnected => 0,
             descr => 'INVALID -> DENY',
         },
+        {
+            hooks => [ sub { die "dead\n" }, [DENY, 'begone'] ],
+            expected_response => '550/begone',
+            disconnected => 0,
+            logged => 'LOGCRIT:FATAL PLUGIN ERROR [___FakeHook___]: dead',
+            descr => 'fatal error -> DENY',
+        },
+        {
+            hooks => [ [undef], [DENY, 'nm'] ],
+            expected_response => '550/nm',
+            disconnected => 0,
+            logged => 'LOGERROR:Plugin ___FakeHook___, hook helo returned undef!',
+            descr => 'undef -> DENY',
+        },
     );
     for my $t (@test_data) {
         for my $h ( reverse @{ $t->{hooks} } ) {
-            $smtpd->fake_hook( 'helo', sub { return @$h } );
+            my $sub = ( ref $h eq 'ARRAY' ? sub { return @$h } : $h );
+            $smtpd->fake_hook( 'helo', $sub );
         }
         $smtpd->{_continuation} = [ 'helo', ['somearg'], @{ $smtpd->hooks->{helo} } ];
         delete $smtpd->{_response};
+        delete $smtpd->{_logged};
         $smtpd->connection->notes( disconnected => undef );
         $smtpd->run_continuation;
         my $response = join '/', @{ $smtpd->{_response} || [] };
@@ -174,8 +190,12 @@ sub __run_continuation {
             ok( ! $smtpd->connection->notes('disconnected'),
               "run_continuation() does not disconnect on $t->{descr}" );
         }
+        if ( $t->{logged} ) {
+            is( join("\n", @{ $smtpd->{_logged} || [] }), $t->{logged},
+                "run_continuation() logging on $t->{descr}" );
+        }
+        $smtpd->unfake_hook('helo');
     }
-    $smtpd->unfake_hook('helo');
 }
 
 sub __hook_responder {

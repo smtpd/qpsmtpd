@@ -292,6 +292,7 @@ sub run_continuation {
         my $tran = $self->transaction;
         eval { @r = $code->{code}->($self, $tran, @$args); };
         if ($@) {
+            chomp $@;
             $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $@);
             next;
         }

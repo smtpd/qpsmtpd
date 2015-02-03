@@ -96,7 +96,11 @@ sub log {
     my ($self, $trace, $hook, $plugin, @log) = @_;
     my $level = Qpsmtpd::TRACE_LEVEL() || 5;
     $level = $self->init_logger if !defined $level;
-    print("# " . join(' ', $$, @log) . "\n") if $trace <= $level;
+    return if $trace > $level;
+    print("# " . join(' ', $$, @log) . "\n");
+    ( undef, undef, my @record_args ) = @_;
+    push @{ $self->{_logged} }, log_level($trace) . ":"
+      . join '', grep { defined } @record_args;
 }
 
 sub varlog {
