@@ -302,6 +302,10 @@ sub run_continuation {
             $self->log(LOGERROR, $log_msg . "undef!");
             next;
         }
+        if ( !return_code($r[0]) ) {
+            $self->log(LOGERROR, $log_msg . $r[0]);
+            next;
+        }
 
         if ($tran) {
             my $tnotes = $tran->notes($name);
