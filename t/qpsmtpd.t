@@ -149,12 +149,13 @@ sub __run_continuation {
             descr => 'DECLINED -> DENY',
         },
         # TODO: ignore invalid return codes rather than treating them like OK
-        #{
-        #    hooks => [ [123456,undef], [DENY, 'goaway'] ],
-        #    expected_response => '550/goaway',
-        #    disconnected => 0,
-        #    descr => 'INVALID -> DENY',
-        #},
+        {
+            hooks => [ [123456,undef], [DENY, 'goaway'] ],
+            expected_response => '550/goaway',
+            disconnected => 0,
+            logged => 'LOGERROR:Plugin ___FakeHook___, hook helo returned 123456',
+            descr => 'INVALID -> DENY',
+        },
         {
             hooks => [ sub { die "dead\n" }, [DENY, 'begone'] ],
             expected_response => '550/begone',
@@ -182,7 +183,7 @@ sub __run_continuation {
         $smtpd->run_continuation;
         my $response = join '/', @{ $smtpd->{_response} || [] };
         is( $response, $t->{expected_response},
-          "run_continuation(): Respond to $t->{descr} with $response" );
+          "run_continuation(): Respond to $t->{descr} with $t->{expected_response}" );
         if ( $t->{disconnected} ) {
             ok( $smtpd->connection->notes('disconnected'),
               "run_continuation() disconnects on $t->{descr}" );
