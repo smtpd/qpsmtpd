@@ -183,7 +183,7 @@ sub __run_continuation {
         $smtpd->run_continuation;
         my $response = join '/', @{ $smtpd->{_response} || [] };
         is( $response, $t->{expected_response},
-          "run_continuation(): Respond to $t->{descr} with $response" );
+          "run_continuation(): Respond to $t->{descr} with $t->{expected_response}" );
         if ( $t->{disconnected} ) {
             ok( $smtpd->connection->notes('disconnected'),
               "run_continuation() disconnects on $t->{descr}" );
