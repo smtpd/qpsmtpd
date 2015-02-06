@@ -275,12 +275,13 @@ sub hook_logging {
     if (   !$self->{_f}
         || !$self->{_nosplit}
         || !$transaction
+        || !UNIVERSAL::can($transaction, 'notes')
         || !$transaction->notes('file-logged-this-session'))
     {
         unless (defined $self->maybe_reopen($transaction)) {
             return DECLINED;
         }
-        $transaction->notes('file-logged-this-session', 1) if $transaction;
+        $transaction->notes('file-logged-this-session', 1) if $transaction && UNIVERSAL::can($transaction, 'notes');
     }
 
     my $f = $self->{_f};
