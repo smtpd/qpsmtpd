@@ -34,7 +34,7 @@ sub config {
 
     # first run the user_config hooks
     my ($rc, @config);
-    if (ref $type && $type->can('address')) {
+    if (ref $type && UNIVERSAL::can($type, 'address')) {
         ($rc, @config) = $qp->run_hooks_no_respond('user_config', $type, $c);
         if (defined $rc && $rc == OK) {
             return wantarray ? @config : $config[0];
