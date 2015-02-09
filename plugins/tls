@@ -8,9 +8,9 @@ tls - plugin to support STARTTLS
 
 # in config/plugins
 
-tls [B<cert_path priv_key_path ca_path>]
+tls [B<cert_path priv_key_path ca_path dhparam_path>]
 
-=over 4
+=over 5
 
 =item B<cert_path>
 
@@ -23,6 +23,11 @@ Path to the private key file. Default: I<ssl/qpsmtpd-server.key>
 =item B<ca_path>
 
 Path to the certificate authority file. Default: I<ssl/qpsmtpd-ca.crt>
+
+=item B<dhparam_path>
+
+Path to the DH parameter file if you want Diffie-Hellman key exchange.
+Default: I<ssl/qpsmtpd-dhparam.pem>
 
 =back
 
@@ -66,19 +71,28 @@ use IO::Socket::SSL 0.98;
 use Qpsmtpd::Constants;
 
 sub init {
-    my ($self, $qp, $cert, $key, $ca) = @_;
+    my ($self, $qp, $cert, $key, $ca, $dhparam) = @_;
     my $dir = -d 'ssl' ? 'ssl' : 'config/ssl';
     $cert ||= "$dir/qpsmtpd-server.crt";
     $key  ||= "$dir/qpsmtpd-server.key";
     $ca   ||= "$dir/qpsmtpd-ca.crt";
+    $dhparam ||= "$dir/qpsmtpd-dhparam.pem";
     unless (-f $cert && -f $key && -f $ca) {
         $self->log(LOGERROR,
                    "Cannot locate cert/key!  Run plugins/tls_cert to generate");
         return;
     }
+    unless (-f $dhparam && -s $dhparam) {
+        $dhparam = undef;
+        $self->log(LOGINFO,
+                   "dhparam is not exist or empty, possible DHE ciphers will be unavailable.");
+        $self->log(LOGINFO,
+                   "The encryption strength will decline due to lack of Forward Secrecy.");
+    }
     $self->tls_cert($cert);
     $self->tls_key($key);
     $self->tls_ca($ca);
+    $self->tls_dhparam($dhparam);
     $self->tls_ciphers($self->qp->config('tls_ciphers') || 'HIGH');
 
     $self->log(LOGDEBUG, "ciphers: " . $self->tls_ciphers);
@@ -93,8 +107,10 @@ sub init {
                                         SSL_cert_file   => $self->tls_cert,
                                         SSL_key_file    => $self->tls_key,
                                         SSL_ca_file     => $self->tls_ca,
+                                        SSL_dh_file     => $self->tls_dhparam,
                                         SSL_cipher_list => $self->tls_ciphers,
-                                        SSL_server      => 1
+                                        SSL_server      => 1,
+                                        SSL_honor_cipher_order => 1
                                        )
       or die "Could not create SSL context: $!";
 
@@ -192,9 +208,11 @@ sub _convert_to_ssl {
                                        SSL_cert_file   => $self->tls_cert,
                                        SSL_key_file    => $self->tls_key,
                                        SSL_ca_file     => $self->tls_ca,
+                                       SSL_dh_file     => $self->tls_dhparam,
                                        SSL_cipher_list => $self->tls_ciphers,
                                        SSL_server      => 1,
                                        SSL_reuse_ctx   => $self->ssl_context,
+                                       SSL_honor_cipher_order => 1
                                       )
           or die "Could not create SSL socket: $!";
 
@@ -232,6 +250,12 @@ sub tls_ca {
     my $self = shift;
     @_ and $self->{_tls_ca} = shift;
     $self->{_tls_ca};
+}
+
+sub tls_dhparam {
+    my $self = shift;
+    @_ and $self->{_tls_dhparam} = shift;
+    $self->{_tls_dhparam};
 }
 
 sub tls_ciphers {
@@ -291,10 +315,12 @@ sub upgrade_socket {
                 SSL_cert_file   => $sp->tls_cert,
                 SSL_key_file    => $sp->tls_key,
                 SSL_ca_file     => $sp->tls_ca,
+                SSL_dh_file     => $self->tls_dhparam,
                 SSL_cipher_list => $sp->tls_ciphers,
                 SSL_startHandshake => 0,
                 SSL_server         => 1,
                 SSL_reuse_ctx   => $sp->ssl_context,
+                SSL_honor_cipher_order => 1
             }
         )
         or die "Could not upgrade socket to SSL: $!";
