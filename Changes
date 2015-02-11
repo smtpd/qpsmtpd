@@ -1,4 +1,43 @@
 
+0.95  Feb 11, 2015
+
+  tls: adding support of Perfect Forward Secrecy (biergaizi)
+
+  more test coverage
+
+  misc updates to tests and docs
+
+  use perl DNS methods instead of shell cmds
+
+  tidier testing (t/tmp/*) vs scattershot
+
+  greylisting plugin adds Redis support
+
+  Qpsmtpd::DB with DBM and Redis classes
+
+  Auth-Results header won't be modified if DKIM signed
+
+  ordering headers to improve SpamAssassin interaction (priyadi)
+
+  disable SSLv3
+
+  fcrdns: add tests and improved localhost detection
+
+  added data_post_headers hook (priyadi)
+
+  added preliminary support for GeoIP v2 and ASN lookups from GeoIP DBs
+
+  make content log location configurable
+
+  added script for fetching GeoIP dbs
+
+  added auth_imap plugin (Graham Todd)
+
+  improved IPv6 support
+
+  removed async everything (unsupported and stagnant)
+
+
 0.94  Sep 05, 2014
 
   Added null char in username check to auth_cvm plugin
