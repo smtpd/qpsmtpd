@@ -148,7 +148,6 @@ sub __run_continuation {
             disconnected => 0,
             descr => 'DECLINED -> DENY',
         },
-        # TODO: ignore invalid return codes rather than treating them like OK
         {
             hooks => [ [123456,undef], [DENY, 'goaway'] ],
             expected_response => '550/goaway',
@@ -170,8 +169,16 @@ sub __run_continuation {
             logged => 'LOGERROR:Plugin ___FakeHook___, hook helo returned undef!',
             descr => 'undef -> DENY',
         },
+        {
+            hooks => [ [OK, 'bemyguest'], [DENY, 'seeya'] ],
+            expected_response => '250/fqdn Hi test@localhost [127.0.0.1];'
+                               . ' I am so happy to meet you.',
+            disconnected => 0,
+            descr => 'OK -> DENY',
+        },
     );
     for my $t (@test_data) {
+        $smtpd->fake_config( me => 'fqdn' );
         for my $h ( reverse @{ $t->{hooks} } ) {
             my $sub = ( ref $h eq 'ARRAY' ? sub { return @$h } : $h );
             $smtpd->fake_hook( 'helo', $sub );
@@ -197,6 +204,7 @@ sub __run_continuation {
                 "run_continuation() logging on $t->{descr}" );
         }
         $smtpd->unfake_hook('helo');
+        $smtpd->unfake_config();
     }
 }
 
