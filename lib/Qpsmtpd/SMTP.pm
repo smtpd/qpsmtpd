@@ -816,7 +816,7 @@ sub clean_authentication_results {
     # Do not rename A-R header if DKIM signed
     my $dkim_sig = $self->transaction->header->get('DKIM-Signature');
     if ($dkim_sig) {
-        my %fields = map { split /=/ } split /;\s+/, $dkim_sig;
+        my %fields = map { split /=/, $_, 2 } split /;\s+/, $dkim_sig;
         # print Data::Dumper::Dumper(\%fields);
         if ($fields{h} && $fields{h} =~ /Authentication-Results/i) {
             return;
