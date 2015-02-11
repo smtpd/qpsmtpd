@@ -1,6 +1,5 @@
-
-![Build Status](https://travis-ci.org/smtpd/qpsmtpd.svg?branch=master "Build
-Status")
+[![Build Status][ci-img]][ci-url]
+[![Coverage Status][cov-img]][cov-url]
 
 # Qpsmtpd - qmail perl simple mail transfer protocol daemon
 
@@ -176,4 +175,10 @@ to 10 or higher will get lots of information in the logs.
 If the logfile doesn't give away the problem, then post to the
 mailinglist (subscription instructions above).  If possible, put
 the logfile on a webserver and include a reference to it in the mail.
+
+
+[cov-img]: https://coveralls.io/repos/smtpd/qpsmtpd/badge.svg
+[cov-url]: https://coveralls.io/r/smtpd/qpsmtpd
+[ci-img]: https://travis-ci.org/smtpd/qpsmtpd.svg?branch=master
+[ci-url]: https://travis-ci.org/smtpd/qpsmtpd
 
