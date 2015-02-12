@@ -158,8 +158,8 @@ sub __data_respond {
     # data_respond also runs the data_post hooks, so this will require a bit
     # more work to get under test. we also don't yet have a way to mock
     # message data; that will probably require overriding getline()
-    #$smtpd->fake_data( _test_message() );
-    #$smtpd->fake_hook( data_post => sub { return DECLINED } );
+    #$smtpd->mock_data( _test_message() );
+    #$smtpd->mock_hook( data_post => sub { return DECLINED } );
     #is( $smtpd->data_respond(DECLINED), 1, 'data_respond, DECLINED' );
 }
 

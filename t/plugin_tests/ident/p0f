@@ -66,7 +66,7 @@ sub test_register_genre_blocking {
         'rcpt_handler not registered when no blocked genres are configured' );
 
     $self->register_hook();
-    $self->fake_config( p0f_blocked_operating_systems => 'Crapple Macintawsh' );
+    $self->mock_config( p0f_blocked_operating_systems => 'Crapple Macintawsh' );
     $self->register_genre_blocking();
     is( $self->{_lastreg}, 'rcpt,rcpt_handler',
         'rcpt_handler registered when blocked genre phrases are configured' );
@@ -76,7 +76,7 @@ sub test_register_genre_blocking {
         'no blocked OS regexes' );
 
     $self->register_hook();
-    $self->fake_config( p0f_blocked_operating_systems => '/windoze/' );
+    $self->mock_config( p0f_blocked_operating_systems => '/windoze/' );
     $self->register_genre_blocking();
     is( $self->{_lastreg}, 'rcpt,rcpt_handler',
         'rcpt_handler registered when blocked genre regexes are configured' );
@@ -85,7 +85,7 @@ sub test_register_genre_blocking {
     is( join('|', @{ delete $self->{os_block_re} || [] }), qr/windoze/i,
         'blocked OS regexes processed correctly' );
 
-    $self->unfake_config;
+    $self->unmock_config;
 }
 
 sub test_rcpt_handler {

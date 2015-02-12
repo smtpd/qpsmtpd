@@ -176,11 +176,11 @@ sub __config {
             },
     );
     for (@test_data) {
-        $qp->fake_hook( 'user_config', sub { return @{$_->{result}} } )
+        $qp->mock_hook( 'user_config', sub { return @{$_->{result}} } )
             if $_->{result};
         is($sender->config($_->{pref}), $_->{expected}, $_->{descr});
     }
-    $qp->unfake_hook('user_config');
+    $qp->unmock_hook('user_config');
 }
 
 sub __canonify {

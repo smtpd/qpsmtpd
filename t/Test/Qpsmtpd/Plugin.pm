@@ -84,9 +84,9 @@ sub validate_password {
     return $deny, "$file - wrong password";
 }
 
-sub fake_hook     { shift->qp->fake_hook(@_)     }
-sub unfake_hook   { shift->qp->unfake_hook(@_)   }
-sub fake_config   { shift->qp->fake_config(@_)   }
-sub unfake_config { shift->qp->unfake_config(@_) }
+sub mock_hook     { shift->qp->mock_hook(@_)     }
+sub unmock_hook   { shift->qp->unmock_hook(@_)   }
+sub mock_config   { shift->qp->mock_config(@_)   }
+sub unmock_config { shift->qp->unmock_config(@_) }
 
 1;
