@@ -111,11 +111,13 @@ sub __run_continuation {
 
     my @local_hooks = @{ $smtpd->hooks->{connect} };
     $smtpd->{_continuation} = ['connect', [DECLINED, "test mess"], @local_hooks];
+    $smtpd->fake_config( 'smtpgreeting', 'Hello there ESMTP' );
 
     eval { $r = $smtpd->run_continuation };
     ok(!$@, "run_continuation with a continuation doesn't throw exception");
     is($r->[0], 220, "hook_responder, code");
-    ok($r->[1] =~ /ESMTP qpsmtpd/, "hook_responder, message: ". $r->[1]);
+    is($r->[1], 'Hello there ESMTP', "hook_responder, message");
+    $smtpd->unfake_config;
 
     my @test_data = (
         {
