@@ -111,13 +111,13 @@ sub __run_continuation {
 
     my @local_hooks = @{ $smtpd->hooks->{connect} };
     $smtpd->{_continuation} = ['connect', [DECLINED, "test mess"], @local_hooks];
-    $smtpd->fake_config( 'smtpgreeting', 'Hello there ESMTP' );
+    $smtpd->mock_config( 'smtpgreeting', 'Hello there ESMTP' );
 
     eval { $r = $smtpd->run_continuation };
     ok(!$@, "run_continuation with a continuation doesn't throw exception");
     is($r->[0], 220, "hook_responder, code");
     is($r->[1], 'Hello there ESMTP', "hook_responder, message");
-    $smtpd->unfake_config;
+    $smtpd->unmock_config;
 
     my @test_data = (
         {
@@ -154,21 +154,21 @@ sub __run_continuation {
             hooks => [ [123456,undef], [DENY, 'goaway'] ],
             expected_response => '550/goaway',
             disconnected => 0,
-            logged => 'LOGERROR:Plugin ___FakeHook___, hook helo returned 123456',
+            logged => 'LOGERROR:Plugin ___MockHook___, hook helo returned 123456',
             descr => 'INVALID -> DENY',
         },
         {
             hooks => [ sub { die "dead\n" }, [DENY, 'begone'] ],
             expected_response => '550/begone',
             disconnected => 0,
-            logged => 'LOGCRIT:FATAL PLUGIN ERROR [___FakeHook___]: dead',
+            logged => 'LOGCRIT:FATAL PLUGIN ERROR [___MockHook___]: dead',
             descr => 'fatal error -> DENY',
         },
         {
             hooks => [ [undef], [DENY, 'nm'] ],
             expected_response => '550/nm',
             disconnected => 0,
-            logged => 'LOGERROR:Plugin ___FakeHook___, hook helo returned undef!',
+            logged => 'LOGERROR:Plugin ___MockHook___, hook helo returned undef!',
             descr => 'undef -> DENY',
         },
         {
@@ -180,10 +180,10 @@ sub __run_continuation {
         },
     );
     for my $t (@test_data) {
-        $smtpd->fake_config( me => 'fqdn' );
+        $smtpd->mock_config( me => 'fqdn' );
         for my $h ( reverse @{ $t->{hooks} } ) {
             my $sub = ( ref $h eq 'ARRAY' ? sub { return @$h } : $h );
-            $smtpd->fake_hook( 'helo', $sub );
+            $smtpd->mock_hook( 'helo', $sub );
         }
         $smtpd->{_continuation} = [ 'helo', ['somearg'], @{ $smtpd->hooks->{helo} } ];
         delete $smtpd->{_response};
@@ -205,8 +205,8 @@ sub __run_continuation {
             is( join("\n", @{ $smtpd->{_logged} || [] }), $t->{logged},
                 "run_continuation() logging on $t->{descr}" );
         }
-        $smtpd->unfake_hook('helo');
-        $smtpd->unfake_config();
+        $smtpd->unmock_hook('helo');
+        $smtpd->unmock_config();
     }
 }
 
@@ -431,7 +431,7 @@ sub __config {
     );
     for my $t (@test_data) {
         for my $hook ( grep { $t->{hooks}{$_} } qw( config user_config ) ) {
-            $qp->fake_hook( $hook, sub { return @{ $t->{hooks}{$hook} } } );
+            $qp->mock_hook( $hook, sub { return @{ $t->{hooks}{$hook} } } );
         }
         is(
             $qp->config($t->{pref}, $a),
@@ -442,7 +442,7 @@ sub __config {
             $t->{expected}{global},
             "Global config: $t->{descr}");
     }
-    $qp->unfake_hook($_) for qw( config user_config );
+    $qp->unmock_hook($_) for qw( config user_config );
 }
 
 1;

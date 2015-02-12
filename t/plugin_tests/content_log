@@ -16,11 +16,11 @@ sub test_content_log_file {
     is( $self->content_log_file,
         strftime('mail/%Y%m%d', localtime(time)),
         'content_log_file() returns the right default value' );
-    $self->fake_config( content_log_file => '/path/to/%Y%m%d%H%M' );
+    $self->mock_config( content_log_file => '/path/to/%Y%m%d%H%M' );
     is( $self->content_log_file,
         strftime('/path/to/%Y%m%d%H%M', localtime(time)),
         'content_log_file config changes content_log_file() output' );
-    $self->unfake_config;
+    $self->unmock_config;
 }
 
 sub test_content_log_enabled {
@@ -69,10 +69,10 @@ sub test_content_log_enabled {
             . ( defined $_->{config } ? "'$_->{config }'" : 'undef' )
             . ( $_->{expected} ? ' enables' : ' disables' )
             . ' content logging';
-        $self->fake_config( content_log_enabled => $_->{config } );
+        $self->mock_config( content_log_enabled => $_->{config } );
         is( $self->content_log_enabled, $_->{expected}, $descr );
     }
-    $self->unfake_config;
+    $self->unmock_config;
 }
 
 sub test_exclude {
