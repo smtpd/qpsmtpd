@@ -333,19 +333,26 @@ sub rc {
 sub test_init_redis {
     my ($self) = @_;
     delete $self->{db};
-    $self->{_args}{redis} = 'bogusserverasdfqwerty.:6379';
-    ok( ! $self->init_redis, 'init_redis() fails on bogus server' );
-    eval { Qpsmtpd::DB::Redis->new };
-    return if $@;
-    $self->{_args}{redis} = 'localhost';
-    ok( $self->init_redis, 'init_redis() succeeds when redis is up' );
+    $self->{_args}{redis} = 'testredis';
+    $self->init_db;
+    is( keyvals($self->db_args),
+      'class=Qpsmtpd::DB::Redis;name=greylist;server=testredis:6379',
+      'init_redis() sets redis args' );
+}
+
+sub keyvals {
+    my ( %h ) = @_;
+    return join ";", map { "$_=$h{$_}" } sort keys %h;
 }
 
 sub test_init_dbm {
     my ($self) = @_;
     delete $self->{db};
     delete $self->{_args}{redis};
-    ok( $self->init_db, 'init_db() works for DBM' );
+    $self->init_db;
+    is( $self->db->name, 'greylist', 'init_dbm() sets correct db name' );
+    is( $self->db->path, 't/config/greylist.dbm', 'init_dbm() sets correct path' );
+    is( ref $self->db, 'Qpsmtpd::DB::File::DBM', 'init_dbm() gives DBM object' );
 }
 
 sub test_parse_redis_server {

@@ -9,10 +9,32 @@ use Test::Qpsmtpd;
 
 use_ok('Qpsmtpd::Plugin');
 
+__db_args();
 __db();
 __register_hook();
 
 done_testing();
+
+sub __db_args {
+    my $plugin = FakePlugin->new;
+    is( keyvals($plugin->db_args),
+      'name=___MockHook___',
+      'default db args populated' );
+    is( keyvals($plugin->db_args( arg1 => 1 )),
+      'arg1=1;name=___MockHook___',
+      'passed args in addition to defaults' );
+    is( keyvals($plugin->db_args( name => 'bob', arg2 => 2 )),
+      'arg2=2;name=bob',
+      'passed args override defaults' );
+    is( keyvals($plugin->db_args),
+      'arg2=2;name=bob',
+      'get previous args' );
+}
+
+sub keyvals {
+    my ( %h ) = @_;
+    return join ";", map { "$_=$h{$_}" } sort keys %h;
+}
 
 sub __db {
     my $plugin = FakePlugin->new;

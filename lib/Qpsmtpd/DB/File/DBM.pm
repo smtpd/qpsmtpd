@@ -180,13 +180,21 @@ sub flush {
 }
 
 sub dir {
-    my ( $self, @candidate_dirs ) = @_;
-    return $self->{dir} if $self->{dir} and ! @candidate_dirs;
-    push @candidate_dirs, ( $self->qphome . '/var/db', $self->qphome . '/config' );
-    for my $d ( @candidate_dirs ) {
+    my ( $self, @arg ) = @_;
+    return $self->{dir} if $self->{dir} and ! @arg;
+    for my $d ( $self->candidate_dirs(@arg) ) {
         next if ! $self->validate_dir($d);
         return $self->{dir} = $d; # first match wins
     }
+}
+
+sub candidate_dirs {
+    my ( $self, @arg ) = @_;
+    return @{ $self->{candidate_dirs} } if $self->{candidate_dirs} && ! @arg;
+    $self->{candidate_dirs} = \@arg if @arg;
+    push @{ $self->{candidate_dirs} },
+      $self->qphome . '/var/db', $self->qphome . '/config';
+    return @{ $self->{candidate_dirs} };
 }
 
 sub validate_dir {

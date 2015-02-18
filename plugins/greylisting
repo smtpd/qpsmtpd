@@ -211,7 +211,7 @@ sub register {
         $config->{reject} = $config->{mode} =~ /testonly|off/i ? 0 : 1;
     }
     $self->{_args} = $config;
-    $self->init_db() or return;
+    $self->init_db();
     $self->register_hooks();
     $self->prune_db();
     if ($self->{_args}{upgrade}) {
@@ -233,22 +233,20 @@ sub register_hooks {
 
 sub init_db {
     my ($self) = @_;
-    return $self->init_redis if $self->{_args}{redis};
-    return $self->init_dbm;
+    if ( $self->{_args}{redis} ) {
+        $self->init_redis;
+    } else {
+        $self->init_dbm;
+    }
 }
 
 sub init_redis {
     my ($self) = @_;
-    eval {
-        $self->db(
-            name   => 'greylist',
-            class  => 'Qpsmtpd::DB::Redis',
-            server => $self->parse_redis_server,
-        ) or die 'Unknown error';
-    };
-    return 1 if ! $@;
-    $self->log(LOGCRIT, "Unable to connect to redis, GREYLISTING DISABLED: $@");
-    return 0;
+    $self->db_args(
+        name   => 'greylist',
+        class  => 'Qpsmtpd::DB::Redis',
+        server => $self->parse_redis_server,
+    );
 }
 
 sub parse_redis_server {
@@ -263,19 +261,18 @@ sub init_dbm {
     $self->db(
         name  => 'greylist',
         class => 'Qpsmtpd::DB::File::DBM'
-    ) or return 0;
+    );
     my $cdir = $self->{_args}{db_dir};
     $cdir = $1 if $cdir and $cdir =~ m{^([-a-zA-Z0-9./_]+)$};
     # greylisting-specific hints for where to store the greylist DB
     my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/greylisting' );
     $self->db->nfs_locking( $self->{_args}{nfslock} );
-    
+
     # Work around old DBM filename
-    return 1 if -f "$db_dir/greylist.dbm";
     my $oldname = 'denysoft_greylist';
-    return 1 if ! -f "$db_dir/$oldname.dbm";
-    $self->db->name($oldname);
-    return 1;
+    if ( ! -f "$db_dir/greylist.dbm" && -f "$db_dir/$oldname.dbm" ) {
+        $self->db->name($oldname);
+    }
 }
 
 sub load_exclude_files {

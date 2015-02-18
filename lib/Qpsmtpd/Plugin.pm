@@ -347,10 +347,16 @@ sub _register_standard_hooks {
     }
 }
 
+sub db_args {
+    my ( $self, %arg ) = @_;
+    $self->{db_args} = \%arg if %arg;
+    $self->{db_args}{name} ||= $self->plugin_name;
+    return %{ $self->{db_args} };
+}
+
 sub db {
     my ( $self, %arg ) = @_;
-    $arg{name} ||= $self->plugin_name;
-    return $self->{db} ||= Qpsmtpd::DB->new(%arg);
+    return $self->{db} ||= Qpsmtpd::DB->new( $self->db_args(%arg) );
 }
 
 1;
