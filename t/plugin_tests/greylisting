@@ -26,6 +26,8 @@ sub register_tests {
     $self->register_test('test_init_redis');
     $self->register_test('test_init_dbm');
     $self->register_test('test_parse_redis_server');
+    $self->register_test('test_failcode');
+    $self->register_test('test_errcode');
 }
 
 sub test_load_exclude_files {
@@ -363,5 +365,26 @@ sub test_parse_redis_server {
     $self->{_args}{redis} = 'qwerty';
     is( $self->parse_redis_server, 'qwerty:6379',
         'parse_redis_server(): add default port' );
+}
+
+sub test_failcode {
+    my ($self) = @_;
+    $self->{_args}{reject} = 0;
+    is( $self->rc( $self->failcode() ), 'DECLINED',
+      'failcode(): reject disabled' );
+    delete $self->{_args}{reject};
+    is( $self->rc( $self->failcode() ), 'DENYSOFT: This mail is temporarily denied',
+      'failcode(): reject enabled' );
+}
+
+sub test_errcode {
+    my ($self) = @_;
+    delete $self->qp->{_logged};
+    is( $self->rc( $self->errcode('test error') ),
+      'DECLINED',
+      'errcode(): proper return code' );
+    is( join("\n", @{ $self->qp->{_logged} || [] }),
+      'LOGERROR:greylistingUNABLE TO OBTAIN GREYLIST RESULT:test error',
+      'errocode(): logged error' );
 }
 

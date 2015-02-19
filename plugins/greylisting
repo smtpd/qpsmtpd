@@ -213,7 +213,8 @@ sub register {
     $self->{_args} = $config;
     $self->init_db();
     $self->register_hooks();
-    $self->prune_db();
+    eval { $self->prune_db(); };
+    $self->log(LOGERROR, "Unable to prune greylist DB: $@") if $@;
     if ($self->{_args}{upgrade}) {
         $self->convert_db();
     }
@@ -383,16 +384,25 @@ sub greylist {
 
 
     my $key  = $self->get_greylist_key($sender, $rcpt) or return DECLINED;
+    my @result;
+    eval {
+        $self->db->lock;
+        @result = $self->greylist_result($key, $config);
+        $self->db->unlock;
+    };
+    return $self->errcode($@) if $@;
+    return @result;
+}
 
+sub greylist_result {
+    my ($self, $key, $config) = @_;
     my $fmt = "%s:%d:%d:%d";
-
-    $self->db->lock or return DECLINED;
     my $value = $self->db->get($key);
     if ( ! $value ) {
         # new IP or entry timed out - record new
         $self->db->set( $key, sprintf $fmt, $self->now, 1, 0, 0 );
         $self->log(LOGWARN, "fail: initial DENYSOFT, unknown");
-        return $self->cleanup_and_return();
+        return $self->failcode();
     }
 
     my ( $ts, $new, $black, $white ) = split /:/, $value;
@@ -404,7 +414,7 @@ sub greylist {
         if ( $self->now - $ts < $config->{white_timeout} ) {
             $self->db->set( $key, sprintf $fmt, $self->now, $new, $black, ++$white );
             $self->log(LOGINFO, "pass: white, $white deliveries");
-            return $self->cleanup_and_return(DECLINED);
+            return DECLINED;
         }
         else {
             $self->log(LOGINFO, "key $key has timed out (white)");
@@ -416,24 +426,27 @@ sub greylist {
         $self->db->set( $key, sprintf $fmt, $ts, $new, ++$black, 0 );
         $self->log(LOGWARN,
                    "fail: black DENYSOFT - $black deferred connections");
-        return $self->cleanup_and_return();
+        return $self->failcode();
     }
 
     $self->log(LOGWARN, "pass: timed out (grey)");
-    return $self->cleanup_and_return(DECLINED);
+    return DECLINED;
 }
 
 # This exists purely to be overridden for testing
 sub now { time() }
 
-sub cleanup_and_return {
-    my ($self, $return_val) = @_;
-
-    $self->db->unlock;
-    return $return_val if defined $return_val;    # explicit override
+sub failcode {
+    my ($self) = @_;
     return DECLINED
       if defined $self->{_args}{reject} && !$self->{_args}{reject};
     return DENYSOFT, $DENYMSG;
+}
+
+sub errcode {
+    my ($self, $err) = @_;
+    $self->log(LOGERROR, "UNABLE TO OBTAIN GREYLIST RESULT:$err");
+    return DECLINED;
 }
 
 sub get_greylist_key {
