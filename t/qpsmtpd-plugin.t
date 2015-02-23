@@ -9,11 +9,20 @@ use Test::Qpsmtpd;
 
 use_ok('Qpsmtpd::Plugin');
 
+__validate_db_args();
 __db_args();
 __db();
 __register_hook();
 
 done_testing();
+
+sub __validate_db_args {
+    my $plugin = FakePlugin->new;
+    eval { $plugin->validate_db_args($plugin, testkey => 1) };
+    is( $@, '', 'validate_db_args() does not die on valid data' );
+    eval { $plugin->validate_db_args($plugin, 'bogus') };
+    is( $@, "Invalid db arguments\n", 'validate_db_args() dies on invalid data' );
+}
 
 sub __db_args {
     my $plugin = FakePlugin->new;
