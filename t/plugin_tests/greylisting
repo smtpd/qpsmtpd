@@ -338,7 +338,8 @@ sub test_init_redis {
     $self->{_args}{redis} = 'testredis';
     $self->init_db;
     is( keyvals($self->db_args),
-      'class=Qpsmtpd::DB::Redis;name=greylist;server=testredis:6379',
+      'class=Qpsmtpd::DB::Redis;cnx_timeout=1;'
+      . 'name=greylist;server=testredis:6379',
       'init_redis() sets redis args' );
 }
 

@@ -111,6 +111,9 @@ Location of redis server where the greylisting DB will be stored.
 Redis can be used as a scalable and clusterable alternative
 to a simple DBM file.  For more information, see http://redis.io
 
+When Redis is in use, this plugin will wait up to 1 second to connect;
+when Redis is unavailable, clients will not be greylisted.
+
 =head2 per_recipient <bool>
 
 Flag to indicate whether to use per-recipient configs.

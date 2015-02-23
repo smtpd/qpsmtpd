@@ -27,16 +27,16 @@ sub __validate_db_args {
 sub __db_args {
     my $plugin = FakePlugin->new;
     is( keyvals($plugin->db_args),
-      'name=___MockHook___',
+      'cnx_timeout=1;name=___MockHook___',
       'default db args populated' );
     is( keyvals($plugin->db_args( arg1 => 1 )),
-      'arg1=1;name=___MockHook___',
+      'arg1=1;cnx_timeout=1;name=___MockHook___',
       'passed args in addition to defaults' );
     is( keyvals($plugin->db_args( name => 'bob', arg2 => 2 )),
-      'arg2=2;name=bob',
+      'arg2=2;cnx_timeout=1;name=bob',
       'passed args override defaults' );
     is( keyvals($plugin->db_args),
-      'arg2=2;name=bob',
+      'arg2=2;cnx_timeout=1;name=bob',
       'get previous args' );
 }
 
