@@ -111,6 +111,9 @@ Location of redis server where the greylisting DB will be stored.
 Redis can be used as a scalable and clusterable alternative
 to a simple DBM file.  For more information, see http://redis.io
 
+When Redis is in use, this plugin will wait up to 1 second to connect;
+when Redis is unavailable, clients will not be greylisted.
+
 =head2 per_recipient <bool>
 
 Flag to indicate whether to use per-recipient configs.
@@ -211,9 +214,10 @@ sub register {
         $config->{reject} = $config->{mode} =~ /testonly|off/i ? 0 : 1;
     }
     $self->{_args} = $config;
-    $self->init_db() or return;
+    $self->init_db();
     $self->register_hooks();
-    $self->prune_db();
+    eval { $self->prune_db(); };
+    $self->log(LOGERROR, "Unable to prune greylist DB: $@") if $@;
     if ($self->{_args}{upgrade}) {
         $self->convert_db();
     }
@@ -233,22 +237,20 @@ sub register_hooks {
 
 sub init_db {
     my ($self) = @_;
-    return $self->init_redis if $self->{_args}{redis};
-    return $self->init_dbm;
+    if ( $self->{_args}{redis} ) {
+        $self->init_redis;
+    } else {
+        $self->init_dbm;
+    }
 }
 
 sub init_redis {
     my ($self) = @_;
-    eval {
-        $self->db(
-            name   => 'greylist',
-            class  => 'Qpsmtpd::DB::Redis',
-            server => $self->parse_redis_server,
-        ) or die 'Unknown error';
-    };
-    return 1 if ! $@;
-    $self->log(LOGCRIT, "Unable to connect to redis, GREYLISTING DISABLED: $@");
-    return 0;
+    $self->db_args(
+        name   => 'greylist',
+        class  => 'Qpsmtpd::DB::Redis',
+        server => $self->parse_redis_server,
+    );
 }
 
 sub parse_redis_server {
@@ -263,19 +265,18 @@ sub init_dbm {
     $self->db(
         name  => 'greylist',
         class => 'Qpsmtpd::DB::File::DBM'
-    ) or return 0;
+    );
     my $cdir = $self->{_args}{db_dir};
     $cdir = $1 if $cdir and $cdir =~ m{^([-a-zA-Z0-9./_]+)$};
     # greylisting-specific hints for where to store the greylist DB
     my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/greylisting' );
     $self->db->nfs_locking( $self->{_args}{nfslock} );
-    
+
     # Work around old DBM filename
-    return 1 if -f "$db_dir/greylist.dbm";
     my $oldname = 'denysoft_greylist';
-    return 1 if ! -f "$db_dir/$oldname.dbm";
-    $self->db->name($oldname);
-    return 1;
+    if ( ! -f "$db_dir/greylist.dbm" && -f "$db_dir/$oldname.dbm" ) {
+        $self->db->name($oldname);
+    }
 }
 
 sub load_exclude_files {
@@ -386,16 +387,25 @@ sub greylist {
 
 
     my $key  = $self->get_greylist_key($sender, $rcpt) or return DECLINED;
+    my @result;
+    eval {
+        $self->db->lock;
+        @result = $self->greylist_result($key, $config);
+        $self->db->unlock;
+    };
+    return $self->errcode($@) if $@;
+    return @result;
+}
 
+sub greylist_result {
+    my ($self, $key, $config) = @_;
     my $fmt = "%s:%d:%d:%d";
-
-    $self->db->lock or return DECLINED;
     my $value = $self->db->get($key);
     if ( ! $value ) {
         # new IP or entry timed out - record new
         $self->db->set( $key, sprintf $fmt, $self->now, 1, 0, 0 );
         $self->log(LOGWARN, "fail: initial DENYSOFT, unknown");
-        return $self->cleanup_and_return();
+        return $self->failcode();
     }
 
     my ( $ts, $new, $black, $white ) = split /:/, $value;
@@ -407,7 +417,7 @@ sub greylist {
         if ( $self->now - $ts < $config->{white_timeout} ) {
             $self->db->set( $key, sprintf $fmt, $self->now, $new, $black, ++$white );
             $self->log(LOGINFO, "pass: white, $white deliveries");
-            return $self->cleanup_and_return(DECLINED);
+            return DECLINED;
         }
         else {
             $self->log(LOGINFO, "key $key has timed out (white)");
@@ -419,24 +429,27 @@ sub greylist {
         $self->db->set( $key, sprintf $fmt, $ts, $new, ++$black, 0 );
         $self->log(LOGWARN,
                    "fail: black DENYSOFT - $black deferred connections");
-        return $self->cleanup_and_return();
+        return $self->failcode();
     }
 
     $self->log(LOGWARN, "pass: timed out (grey)");
-    return $self->cleanup_and_return(DECLINED);
+    return DECLINED;
 }
 
 # This exists purely to be overridden for testing
 sub now { time() }
 
-sub cleanup_and_return {
-    my ($self, $return_val) = @_;
-
-    $self->db->unlock;
-    return $return_val if defined $return_val;    # explicit override
+sub failcode {
+    my ($self) = @_;
     return DECLINED
       if defined $self->{_args}{reject} && !$self->{_args}{reject};
     return DENYSOFT, $DENYMSG;
+}
+
+sub errcode {
+    my ($self, $err) = @_;
+    $self->log(LOGERROR, "UNABLE TO OBTAIN GREYLIST RESULT:$err");
+    return DECLINED;
 }
 
 sub get_greylist_key {

@@ -19,6 +19,7 @@ __get_keys();
 __size();
 __flush();
 __qphome();
+__candidate_dirs();
 __validate_dir();
 __dir();
 __untie_gotcha();
@@ -106,6 +107,15 @@ sub __flush {
 
 sub __qphome {
     is( $db->qphome, 't', 'qphome()' );
+}
+
+sub __candidate_dirs {
+    is( join('|', $db->candidate_dirs), 't/var/db|t/config',
+      'candidate_dirs() default ' );
+    is( join('|', $db->candidate_dirs('foo')), 'foo|t/var/db|t/config',
+      'candidate_dirs() passed args plus defaults' );
+    is( join('|', $db->candidate_dirs), 'foo|t/var/db|t/config',
+      'candidate_dirs() cached values' );
 }
 
 sub __validate_dir {

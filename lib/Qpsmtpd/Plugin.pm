@@ -347,10 +347,24 @@ sub _register_standard_hooks {
     }
 }
 
+sub db_args {
+    my ( $self, %arg ) = @_;
+    $self->validate_db_args(@_);
+    $self->{db_args} = \%arg if %arg;
+    $self->{db_args}{name} ||= $self->plugin_name;
+    $self->{db_args}{cnx_timeout} ||= 1;
+    return %{ $self->{db_args} };
+}
+
 sub db {
     my ( $self, %arg ) = @_;
-    $arg{name} ||= $self->plugin_name;
-    return $self->{db} ||= Qpsmtpd::DB->new(%arg);
+    $self->validate_db_args(@_);
+    return $self->{db} ||= Qpsmtpd::DB->new( $self->db_args(%arg) );
+}
+
+sub validate_db_args {
+    (my $self, undef, my @args) = @_;
+    die "Invalid db arguments\n" if @args % 2;
 }
 
 1;
