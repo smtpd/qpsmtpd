@@ -180,9 +180,13 @@ sub flush {
 }
 
 sub dir {
-    my ( $self, @arg ) = @_;
-    return $self->{dir} if $self->{dir} and ! @arg;
-    for my $d ( $self->candidate_dirs(@arg) ) {
+    my ( $self, $dir ) = @_;
+    if ( $dir ) {
+        die "Cannot use DB directory '$dir'\n" if !$self->validate_dir($dir);
+        return $self->{dir} = $dir;
+    }
+    return $self->{dir} if $self->{dir};
+    for my $d ( $self->candidate_dirs ) {
         next if ! $self->validate_dir($d);
         return $self->{dir} = $d; # first match wins
     }

@@ -137,11 +137,17 @@ sub __validate_dir {
 sub __dir {
     my $db2 = Qpsmtpd::DB::File::DBM->new( name => 'dirtest' );
     is( $db2->dir(), 't/config', 'default directory' );
-    is( $db2->dir('_invalid','t/Test'), 't/Test', 'skip invalid candidate dirs' );
+    delete $db2->{dir};
+    $db2->candidate_dirs('_invalid','t/Test');
+    is( $db2->dir, 't/Test', 'skip invalid candidate dirs' );
     $db2->{dir} = '_cached';
     is( $db2->dir(), '_cached', 'cached directory' );
     is( $db2->dir('t/Test'), 't/Test', 'passing candidate dirs resets cache' );
-    is( $db2->dir('_invalid'), 't/config', 'invalid candidate dirs reverts to default' );
+    delete $db2->{dir};
+    $db2->candidate_dirs('_invalid');
+    is( $db2->dir, 't/config', 'invalid candidate dirs reverts to default' );
+    eval { $db2->dir('_invalid'); };
+    is( $@, "Cannot use DB directory '_invalid'\n", 'die on invalid dir' );
 }
 
 sub __untie_gotcha {

@@ -266,11 +266,16 @@ sub init_dbm {
         name  => 'greylist',
         class => 'Qpsmtpd::DB::File::DBM'
     );
-    my $cdir = $self->{_args}{db_dir};
-    $cdir = $1 if $cdir and $cdir =~ m{^([-a-zA-Z0-9./_]+)$};
-    # greylisting-specific hints for where to store the greylist DB
-    my $db_dir = $self->db->dir( $cdir, '/var/lib/qpsmtpd/greylisting' );
     $self->db->nfs_locking( $self->{_args}{nfslock} );
+
+    # Add to the default list of possible DB directories
+    $self->db->candidate_dirs('/var/lib/qpsmtpd/greylisting');
+    if ( my $dir_arg = $self->{_args}{db_dir} ) {
+        # user-supplied db dir
+        $dir_arg = $1 if $dir_arg =~ m{^([-a-zA-Z0-9./_]+)$};
+        $self->db->dir($dir_arg);
+    }
+    my $db_dir = $self->db->dir;
 
     # Work around old DBM filename
     my $oldname = 'denysoft_greylist';
