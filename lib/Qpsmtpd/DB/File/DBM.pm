@@ -182,12 +182,16 @@ sub flush {
 sub dir {
     my ( $self, $dir ) = @_;
     if ( $dir ) {
-        die "Cannot use DB directory '$dir'\n" if !$self->validate_dir($dir);
+        $self->validate_dir($dir);
         return $self->{dir} = $dir;
     }
     return $self->{dir} if $self->{dir};
     for my $d ( $self->candidate_dirs ) {
-        next if ! $self->validate_dir($d);
+        # Ignore invalid directories for static default directories
+        my $is_valid;
+        eval { $is_valid = $self->validate_dir($d); };
+        next if $@;
+        next if !$is_valid;
         return $self->{dir} = $d; # first match wins
     }
 }
@@ -203,9 +207,9 @@ sub candidate_dirs {
 
 sub validate_dir {
     my ( $self, $d ) = @_;
-    return 0 if ! $d;
-    return 0 if ! -d $d;
-    return 0 if ! -w $d;
+    die "Empty DB directory supplied\n"        if ! $d;
+    die "DB directory '$d' does not exist\n"   if ! -d $d;
+    die "DB directory '$d' is not writeable\n" if ! -w $d;
     return 1;
 }
 

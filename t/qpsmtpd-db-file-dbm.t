@@ -119,15 +119,24 @@ sub __candidate_dirs {
 }
 
 sub __validate_dir {
-    is( $db->validate_dir(),      0, 'validate_dir(): false on no input' );
-    is( $db->validate_dir(undef), 0, 'validate_dir(): false on undef' );
-    is( $db->validate_dir('invalid'), 0,
-        'validate_dir(): false for non-existent directory' );
+    eval { $db->validate_dir(); };
+    is( $@, "Empty DB directory supplied\n",
+      'validate_dir(): die on no input' );
+    eval { $db->validate_dir(undef); };
+    is( $@, "Empty DB directory supplied\n",
+      'validate_dir(): die on undef' );
+    eval { $db->validate_dir(''); };
+    is( $@, "Empty DB directory supplied\n",
+      'validate_dir(): die on empty string' );
+    eval { $db->validate_dir('invalid'); };
+    is( $@, "DB directory 'invalid' does not exist\n",
+        'validate_dir(): die on non-existent directory' );
     is( $db->validate_dir('t/tmp'), 1,
         'validate_dir(): true for real directory' );
     mkdir 't/tmp/wtest', 0555;
-    is( $db->validate_dir('t/tmp/wtest'), 0,
-        'validate_dir(): false for non-writeable directory' );
+    eval { $db->validate_dir('t/tmp/wtest') };
+    is( $@, "DB directory 't/tmp/wtest' is not writeable\n",
+        'validate_dir(): die on non-writeable directory' );
     chmod 0777, 't/tmp/wtest';
     is( $db->validate_dir('t/tmp/wtest'), 1,
         'validate_dir(): true for writeable directory' );
@@ -147,7 +156,7 @@ sub __dir {
     $db2->candidate_dirs('_invalid');
     is( $db2->dir, 't/config', 'invalid candidate dirs reverts to default' );
     eval { $db2->dir('_invalid'); };
-    is( $@, "Cannot use DB directory '_invalid'\n", 'die on invalid dir' );
+    is( $@, "DB directory '_invalid' does not exist\n", 'die on invalid dir' );
 }
 
 sub __untie_gotcha {
