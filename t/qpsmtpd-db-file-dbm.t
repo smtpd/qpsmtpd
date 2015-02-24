@@ -125,6 +125,13 @@ sub __validate_dir {
         'validate_dir(): false for non-existent directory' );
     is( $db->validate_dir('t/tmp'), 1,
         'validate_dir(): true for real directory' );
+    mkdir 't/tmp/wtest', 0555;
+    is( $db->validate_dir('t/tmp/wtest'), 0,
+        'validate_dir(): false for non-writeable directory' );
+    chmod 0777, 't/tmp/wtest';
+    is( $db->validate_dir('t/tmp/wtest'), 1,
+        'validate_dir(): true for writeable directory' );
+    rmdir 't/tmp/wtest';
 }
 
 sub __dir {

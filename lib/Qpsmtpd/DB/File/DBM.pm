@@ -201,6 +201,7 @@ sub validate_dir {
     my ( $self, $d ) = @_;
     return 0 if ! $d;
     return 0 if ! -d $d;
+    return 0 if ! -w $d;
     return 1;
 }
 
