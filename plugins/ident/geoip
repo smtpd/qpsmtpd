@@ -327,8 +327,11 @@ sub open_geoip_db {
     # can't think of a good reason to load country if city data is present
     if (!$self->{_geoip_city}) {
         $self->log(LOGDEBUG, "using default db");
-        $self->{_geoip} = Geo::IP->new();    # loads default Country DB
-        warn "Missing GeoIP Country data!\n" if ! $self->{_geoip};
+        eval { $self->{_geoip} = Geo::IP->new(); };   # loads default Country DB
+        if (!$self->{_geoip}) {
+            my $err = $@ || 'Unknown error';
+            warn "Missing GeoIP Country data:$err\n";
+        }
     }
 }
 
