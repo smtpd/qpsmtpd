@@ -502,7 +502,7 @@ sub prune_db {
 
     my @to_delete;
     my $greylist = {};
-    my @keys = $self->db->get_keys or return;
+    my @keys = $self->db->get_keys or return $self->db->unlock;
     @$greylist{ @keys } = ( $self->db->mget(@keys) );
     for my $key ( @keys ) {
         my ($ts) = split /:/, delete $greylist->{$key};
@@ -510,7 +510,7 @@ sub prune_db {
         next if $age < $self->{_args}{white_timeout};
         push @to_delete, $key;
     }
-    return if ! @to_delete;
+    return $self->db->unlock if ! @to_delete;
     my $pruned = $self->db->delete(@to_delete);
     $self->db->unlock;
     $self->log(LOGINFO, "pruned $pruned of $count DB entries");

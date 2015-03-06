@@ -264,6 +264,12 @@ sub test_prune_db {
         is( $self->allkeys, '',
             'prune_db() expires all remaining keys 37 days later' );
     }
+    # Ensure prune_db does not leave the database locked after doing nothing
+    delete $self->{db};
+    $self->db( class => 'Qpsmtpd::DB::File::DBM', dir => 't/tmp' );
+    $self->prune_db;
+    $self->prune_db;
+    ok(1, "We won't get this far if prune_db leaves the database locked");
 }
 
 sub allkeys {
