@@ -186,14 +186,41 @@ sub dir {
         return $self->{dir} = $dir;
     }
     return $self->{dir} if $self->{dir};
+    my @err;
     for my $d ( $self->candidate_dirs ) {
         # Ignore invalid directories for static default directories
         my $is_valid;
         eval { $is_valid = $self->validate_dir($d); };
-        next if $@;
-        next if !$is_valid;
-        return $self->{dir} = $d; # first match wins
+        if ($@) {
+            push @err, $@;
+            next;
+        }
+        else {
+            $self->{dir} = $d; # first match wins
+            last;
+        }
     }
+    if ( !$self->{dir} ) {
+        my $err = join "\n",
+          "Unable to find a useable database directory!",
+          "",
+          @err;
+        die $err;
+    }
+    if (@err) {
+        my $err = join "\n",
+          "Encountered errors while selecting database directory:",
+          "",
+          @err,
+          "Selected database directory: $self->{dir}. Data is now stored in:",
+          "",
+          $self->path,
+          "",
+          "It is recommended to manually specify a useable database directory",
+          "and move any important data into this directory.\n";
+        warn $err;
+    }
+    return $self->{dir};
 }
 
 sub candidate_dirs {
