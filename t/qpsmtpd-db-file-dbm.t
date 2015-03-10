@@ -119,22 +119,79 @@ sub __candidate_dirs {
 }
 
 sub __validate_dir {
-    is( $db->validate_dir(),      0, 'validate_dir(): false on no input' );
-    is( $db->validate_dir(undef), 0, 'validate_dir(): false on undef' );
-    is( $db->validate_dir('invalid'), 0,
-        'validate_dir(): false for non-existent directory' );
+    eval { $db->validate_dir(); };
+    is( $@, "Empty DB directory supplied\n",
+      'validate_dir(): die on no input' );
+    eval { $db->validate_dir(undef); };
+    is( $@, "Empty DB directory supplied\n",
+      'validate_dir(): die on undef' );
+    eval { $db->validate_dir(''); };
+    is( $@, "Empty DB directory supplied\n",
+      'validate_dir(): die on empty string' );
+    eval { $db->validate_dir('invalid'); };
+    is( $@, "DB directory 'invalid' does not exist\n",
+        'validate_dir(): die on non-existent directory' );
     is( $db->validate_dir('t/tmp'), 1,
         'validate_dir(): true for real directory' );
+    mkdir 't/tmp/wtest', 0555;
+    eval { $db->validate_dir('t/tmp/wtest') };
+    is( $@, "DB directory 't/tmp/wtest' is not writeable\n",
+        'validate_dir(): die on non-writeable directory' );
+    chmod 0777, 't/tmp/wtest';
+    is( $db->validate_dir('t/tmp/wtest'), 1,
+        'validate_dir(): true for writeable directory' );
+    rmdir 't/tmp/wtest';
 }
 
 sub __dir {
     my $db2 = Qpsmtpd::DB::File::DBM->new( name => 'dirtest' );
-    is( $db2->dir(), 't/config', 'default directory' );
-    is( $db2->dir('_invalid','t/Test'), 't/Test', 'skip invalid candidate dirs' );
-    $db2->{dir} = '_cached';
-    is( $db2->dir(), '_cached', 'cached directory' );
-    is( $db2->dir('t/Test'), 't/Test', 'passing candidate dirs resets cache' );
-    is( $db2->dir('_invalid'), 't/config', 'invalid candidate dirs reverts to default' );
+    {
+        local $SIG{__WARN__} = sub {
+            warn @_ if $_[0] !~ /selecting database directory/;
+        };
+        is( $db2->dir(), 't/config', 'default directory' );
+        delete $db2->{dir};
+        $db2->candidate_dirs('_invalid','t/Test');
+        is( $db2->dir, 't/Test', 'skip invalid candidate dirs' );
+        $db2->{dir} = '_cached';
+        is( $db2->dir(), '_cached', 'cached directory' );
+        is( $db2->dir('t/Test'), 't/Test', 'passing candidate dirs resets cache' );
+        delete $db2->{dir};
+        $db2->candidate_dirs('_invalid');
+        is( $db2->dir, 't/config', 'invalid candidate dirs reverts to default' );
+        eval { $db2->dir('_invalid'); };
+        is( $@, "DB directory '_invalid' does not exist\n", 'die on invalid dir' );
+    }
+    {
+        delete $db2->{dir};
+        my $warned;
+        local $SIG{__WARN__} = sub {
+            warn @_ if $_[0] !~ /selecting database directory/;
+            $warned .= join '', @_;
+        };
+        $db2->candidate_dirs('_invalid2','t/Test');
+        is( $db2->dir(), 't/Test', 'default directory' );
+        my $expected_warning =
+          "Encountered errors while selecting database directory:
+
+DB directory '_invalid2' does not exist
+
+Selected database directory: t/Test. Data is now stored in:
+
+t/Test/dirtest.dbm
+
+It is recommended to manually specify a useable database directory
+and move any important data into this directory.\n";
+        is( $warned, $expected_warning, 'Emit warning on bad directories' );
+        delete $db2->{dir};
+        $db2->{candidate_dirs} = ['/___invalid___'];
+        my $expected_err =
+          "Unable to find a useable database directory!
+
+DB directory '/___invalid___' does not exist\n";
+        eval { $db2->dir() };
+        is( $@, $expected_err, 'Die on no valid directories' );
+    }
 }
 
 sub __untie_gotcha {

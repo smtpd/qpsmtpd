@@ -180,12 +180,47 @@ sub flush {
 }
 
 sub dir {
-    my ( $self, @arg ) = @_;
-    return $self->{dir} if $self->{dir} and ! @arg;
-    for my $d ( $self->candidate_dirs(@arg) ) {
-        next if ! $self->validate_dir($d);
-        return $self->{dir} = $d; # first match wins
+    my ( $self, $dir ) = @_;
+    if ( $dir ) {
+        $self->validate_dir($dir);
+        return $self->{dir} = $dir;
     }
+    return $self->{dir} if $self->{dir};
+    my @err;
+    for my $d ( $self->candidate_dirs ) {
+        # Ignore invalid directories for static default directories
+        my $is_valid;
+        eval { $is_valid = $self->validate_dir($d); };
+        if ($@) {
+            push @err, $@;
+            next;
+        }
+        else {
+            $self->{dir} = $d; # first match wins
+            last;
+        }
+    }
+    if ( !$self->{dir} ) {
+        my $err = join "\n",
+          "Unable to find a useable database directory!",
+          "",
+          @err;
+        die $err;
+    }
+    if (@err) {
+        my $err = join "\n",
+          "Encountered errors while selecting database directory:",
+          "",
+          @err,
+          "Selected database directory: $self->{dir}. Data is now stored in:",
+          "",
+          $self->path,
+          "",
+          "It is recommended to manually specify a useable database directory",
+          "and move any important data into this directory.\n";
+        warn $err;
+    }
+    return $self->{dir};
 }
 
 sub candidate_dirs {
@@ -199,8 +234,9 @@ sub candidate_dirs {
 
 sub validate_dir {
     my ( $self, $d ) = @_;
-    return 0 if ! $d;
-    return 0 if ! -d $d;
+    die "Empty DB directory supplied\n"        if ! $d;
+    die "DB directory '$d' does not exist\n"   if ! -d $d;
+    die "DB directory '$d' is not writeable\n" if ! -w $d;
     return 1;
 }
 

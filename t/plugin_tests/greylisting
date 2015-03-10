@@ -358,9 +358,10 @@ sub test_init_dbm {
     my ($self) = @_;
     delete $self->{db};
     delete $self->{_args}{redis};
+    $self->{_args}{db_dir} = 't/tmp';
     $self->init_db;
     is( $self->db->name, 'greylist', 'init_dbm() sets correct db name' );
-    is( $self->db->path, 't/config/greylist.dbm', 'init_dbm() sets correct path' );
+    is( $self->db->path, 't/tmp/greylist.dbm', 'init_dbm() sets correct path' );
     is( ref $self->db, 'Qpsmtpd::DB::File::DBM', 'init_dbm() gives DBM object' );
 }
 
