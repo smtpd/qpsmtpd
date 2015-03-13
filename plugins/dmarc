@@ -52,6 +52,14 @@ _dmarc  IN TXT "v=DMARC1; p=reject; rua=mailto:dmarc-feedback@example.com;"
 
 3. activate this plugin. (add to config/plugins, listing it after SPF & DKIM. Check that SPF and DKIM are configured to not reject mail.
 
+=head1 CONFIGURATION
+=head2 reporting [ 0 | 1 ]
+
+Default: 1
+
+0: do not save and publish aggregate reports
+
+1: publish reports (requires proper Mail::DMARC configuration)
 
 =head1 MORE INFORMATION
 
@@ -84,6 +92,8 @@ sub register {
     $self->{_args}{reject} = 1 if !defined $self->{_args}{reject};
     $self->{_args}{reject_type} ||= 'perm';
     $self->{_args}{p_vals} = {map { $_ => 1 } qw/ none reject quarantine /};
+    
+    $self->{_args}{reporting} = 1 if !defined $self->{_args}{reporting};
 
     eval 'require Mail::DMARC::PurePerl';
     if ( $@ ) {
@@ -133,7 +143,7 @@ sub check_dmarc {
 
     my $pol;
     eval { $pol = $dmarc->result->published; };
-    if ( $pol ) {
+    if ( $self->{_args}{reporting} && $pol ) {
         if ( $dmarc->has_valid_reporting_uri($pol->rua) ) {
             eval { $dmarc->save_aggregate(); };
             $self->log(LOGERROR, $@ ) if $@;
