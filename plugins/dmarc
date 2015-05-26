@@ -147,7 +147,7 @@ sub data_post_handler {
 
     my $disposition = $dmarc->result->disposition;
     my $auth_str = "dmarc=$disposition";
-       $auth_str = " (p=" . $pol->p . ")" if $pol;
+       $auth_str .= " (p=" . $pol->p . ")" if $pol;
 
     if ( $dmarc->result->result eq 'pass' ) {
         $self->log(LOGINFO, "pass");
