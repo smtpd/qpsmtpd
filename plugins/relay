@@ -230,7 +230,7 @@ sub hook_connect {
         return DECLINED;
     }
 
-    if ($ENV{RELAYCLIENT}) {
+    if (defined $ENV{RELAYCLIENT}) {
         $self->qp->connection->relay_client(1);
         $self->log(LOGINFO, "pass, enabled by env");
         return DECLINED;
