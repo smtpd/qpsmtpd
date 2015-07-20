@@ -66,12 +66,9 @@ sub hook_rcpt {
         if ($self->is_match($to, lc($bad), $host)) {
             $self->adjust_karma(-2);
             if ($reason) {
-                return DENY, "mail to $bad not accepted here";
+                return DENY, $reason;
             }
-            else {
-                return Qpsmtpd::DSN->no_such_user(
-                                              "mail to $bad not accepted here");
-            }
+            return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here");
         }
     }
     $self->log(LOGINFO, 'pass');
