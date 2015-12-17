@@ -345,7 +345,7 @@ sub invalid_localhost {
         $self->log(LOGDEBUG, "pass, is localhost");
         return;
     }
-    if ($host && lc $host eq 'localhost') {
+    if ($host && lc $host ne 'localhost') {
         $self->log(LOGDEBUG, "pass, host is localhost");
         return;
     };
