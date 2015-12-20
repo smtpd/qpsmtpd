@@ -307,7 +307,9 @@ sub is_in_badhelo {
     $host = lc $host;
     foreach my $bad ($self->qp->config('badhelo')) {
         if ($bad =~ /[\{\}\[\]\(\)\^\$\|\*\+\?\\\!]/) {    # it's a regexp
-            return $self->is_regex_match($host, $bad);
+            if ($self->is_regex_match($host, $bad)) {
+                return $error, "in badhelo";
+            }
         }
         if ($host eq lc $bad) {
             return $error, "in badhelo";
