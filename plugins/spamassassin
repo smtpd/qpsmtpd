@@ -273,7 +273,7 @@ sub insert_spam_headers {
         if ($name eq 'X-Spam-Status') {
             $self->parse_spam_header($new_headers->{$name});
         }
-        $new_headers->{$name} =~ s/\015//;    # hack for outlook
+        $new_headers->{$name} =~ s/\015//g;    # hack for outlook
         $self->_cleanup_spam_header($transaction, $name);
         $transaction->header->add($name, $new_headers->{$name}, 0);
     }
