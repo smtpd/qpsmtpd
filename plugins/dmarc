@@ -154,8 +154,9 @@ sub check_dmarc {
     };
 
     my $disposition = $dmarc->result->disposition;
-    my $auth_str = "dmarc=$disposition";
-       $auth_str = " (p=" . $pol->p . ")" if $pol;
+    my $result = $dmarc->result->result;
+    my $auth_str = "dmarc=$result";
+       $auth_str .= " (p=" . $pol->p . ")" if $pol;
 
     if ( $dmarc->result->result eq 'pass' ) {
         $self->log(LOGINFO, "pass");
