@@ -2,7 +2,7 @@ package Qpsmtpd;
 use strict;
 #use warnings;
 
-our $VERSION = '0.95';
+our $VERSION = '0.96';
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use lib 'lib';

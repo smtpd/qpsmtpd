@@ -1,4 +1,25 @@
 
+0.96  Feb 16, 2016
+
+  Fix DMARC authentication-result string (#244)
+
+  Replace all occurances of CR in X-Spam-Status (#247)
+
+  In helo, check *every* regex, not just first (#246)
+
+  badrcpt use reason, and defined-ness test (#245)
+
+  DMARC plugin: Added option to disable reporting (#242)
+
+  Add perms test to Qpsmtpd::DB::File::DBM::dir() (#234)
+
+  Skip greylisting when we can't talk to greylist DB (#233)
+
+  Change fake_{config,hook} to mock_{config,hook} (#232)
+
+  Use a fake greeting for testing run_continuation() (#231)
+
+
 0.95  Feb 11, 2015
 
   tls: adding support of Perfect Forward Secrecy (biergaizi)
