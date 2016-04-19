@@ -96,6 +96,11 @@ scores because their dynamic IP space is properly listed on DUL blocking lists.
 If the user is authenticated or coming from a trusted IP, odds are we don't
 want to be reject their messages. Especially when running qpsmtpd on port 587.
 
+=item size_limit [limit]
+
+Set the maximum email size in bytes to scan. Above this limit, no scan will be
+done by spamd. The default value is 500_000
+
 =back
 
 With both of the first options the configuration line will look like the following
@@ -172,7 +177,8 @@ sub data_post_handler {
 
     return DECLINED if $self->is_immune();
 
-    if ($transaction->data_size > 500_000) {
+    my $limit = $self->{_args}->{size_limit} || 500_000;
+    if ($transaction->data_size > $limit) {
         $self->log(LOGINFO,
                    "skip, too large (" . $transaction->data_size . ")");
         return DECLINED;
