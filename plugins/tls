@@ -62,6 +62,14 @@ ciphers at L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>,
 and put a suitable string in config/tls_ciphers (e.g. "DEFAULT" or
 "HIGH:MEDIUM")
 
+=head1 SSL/TLS protocols versions
+
+By default, SSLv2 and SSLv3 are not accepted, leaving only TLSv1,
+TLSv1.1 or TLSv1.2 enabled. You can customize this in config/tls_protocols
+For example, this will also disabled TLSv1, leaving only TLSv1.1 and TLSv1.2
+
+SSLv23:!SSLv2:!SSLv3:!TLSv1
+
 =cut
 
 use strict;
@@ -94,15 +102,14 @@ sub init {
     $self->tls_ca($ca);
     $self->tls_dhparam($dhparam);
     $self->tls_ciphers($self->qp->config('tls_ciphers') || 'HIGH');
+    $self->tls_protocols($self->qp->config('tls_protocols') || 'SSLv23:!SSLv2:!SSLv3');
 
     $self->log(LOGDEBUG, "ciphers: " . $self->tls_ciphers);
 
     local $^W;    # this bit is very noisy...
     my $ssl_ctx =
       IO::Socket::SSL::SSL_Context->new(
-                                        # Disable SSLv2 and SSLv3 to avoid POODLE attacks. This is already
-                                        # the default in sufficiently recent versions of IO::Socket::SSL
-                                        SSL_version => 'SSLv23:!SSLv3:!SSLv2',
+                                        SSL_version     => $self->tls_protocols,
                                         SSL_use_cert    => 1,
                                         SSL_cert_file   => $self->tls_cert,
                                         SSL_key_file    => $self->tls_key,
@@ -204,6 +211,7 @@ sub _convert_to_ssl {
         my $tlssocket =
           IO::Socket::SSL->new_from_fd(
                                        fileno(STDIN), '+>',
+                                       SSL_version     => $self->tls_protocols,
                                        SSL_use_cert    => 1,
                                        SSL_cert_file   => $self->tls_cert,
                                        SSL_key_file    => $self->tls_key,
@@ -262,6 +270,12 @@ sub tls_ciphers {
     my $self = shift;
     @_ and $self->{_tls_ciphers} = shift;
     $self->{_tls_ciphers};
+}
+
+sub tls_protocols {
+    my $self = shift;
+    @_ and $self->{_tls_protocols} = shift;
+    $self->{_tls_protocols};
 }
 
 sub ssl_context {
