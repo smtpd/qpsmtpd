@@ -120,7 +120,10 @@ sub read_input {
     while (<STDIN>) {
         alarm 0;
         $_ =~ s/\r?\n$//s;                         # advanced chomp
-        $self->log(LOGINFO, "dispatching $_");
+        my $log = $_;
+        $log =~ s/AUTH PLAIN (.*)/AUTH PLAIN <hidden credentials>/
+          unless ($self->config('loglevel') || '6') >= 7;
+        $self->log(LOGINFO, "dispatching $log")
         $self->connection->notes('original_string', $_);
         defined $self->dispatch(split / +/, $_, 2)
           or $self->respond(502, "command unrecognized: '$_'");
