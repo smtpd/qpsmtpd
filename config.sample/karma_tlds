@@ -1,0 +1,14 @@
+# Karma to apply depending on the tld of the envelope sender
+# Used by the karma plugin
+info:-4
+pw:-4
+tw:-3
+biz:-3
+cl:-2
+br:-2
+fr:-2
+be:-2
+jp:-2
+no:-2
+se:-2
+sg:-2
