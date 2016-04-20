@@ -50,6 +50,16 @@ With the default negative limit of one, there's a very small chance you could
 penalize a "mostly good" sender. Raising it to 2 reduces that possibility to
 improbable.
 
+=head2 strikes <integer>
+
+How many strikes are needed to consider the connection nice or naughty.
+Various plugins can adjust the karma (see USING KARMA IN OTHER PLUGINS).
+For example, with the default value of 3, if the karma of this message is 3
+or above, the connection is considered to be a nice one. If it's -3 or less,
+it's considered a naughty one. Between -2 and +2 it's neutral
+
+Default: 3
+
 =head2 penalty_days <days>
 
 The number of days a naughty sender is refused connections. Use a decimal
@@ -238,6 +248,7 @@ sub register {
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
     $self->{_args} = {@_};
     $self->{_args}{negative}     ||= 1;
+    $self->{_args}{strikes}      ||= 3;
     $self->{_args}{penalty_days} ||= 1;
     $self->{_args}{reject_type}  ||= 'disconnect';
 
@@ -428,7 +439,7 @@ sub disconnect_handler {
     my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
-    if ($karma < -2) {    # they achieved at least 2 strikes
+    if ($karma <= $self->{_args}{strikes}) {    # Enough negative strikes ?
         $history--;
         my $negative_limit = 0 - $self->{_args}{negative};
         if ($history <= $negative_limit) {
@@ -445,7 +456,7 @@ sub disconnect_handler {
             $log_mess = "negative";
         }
     }
-    elsif ($karma > 2) {
+    elsif ($karma >= $self->{_args}{strikes}) {
         $nice++;
         $log_mess = "positive";
     }
