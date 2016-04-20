@@ -498,7 +498,7 @@ sub collect_results {
     return \@matches;
 }
 
-sub hook_data {
+sub hook_data_post {
     my ($self, $transaction) = @_;
 
     return DECLINED if $self->is_immune();
