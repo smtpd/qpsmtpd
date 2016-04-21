@@ -228,7 +228,7 @@ sub get_reject {
     # the naughty plugin will reject later
     if ($reject eq 'naughty') {
         $self->log(LOGINFO, "fail, NAUGHTY" . $log_mess);
-        return $self->store_deferred_reject($smtp_mess);
+        return $self->store_deferred_reject('(' .$self->plugin_name . ') ' . $smtp_mess);
     }
 
     # they asked for reject, we give them reject
