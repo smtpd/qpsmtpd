@@ -102,6 +102,20 @@ following list will be used:
 
 Adjust the quantity of logging for this plugin. See docs/logging.pod
 
+=head1 CONFIG FILES
+
+This plugin uses the following configuration files. All are optional.
+
+=head2 karma_tlds
+
+This file can contain semicolon separated tlds and the corresponding
+karma adjustment to apply when the envelope sender match. It can be used to
+penalize "spammy" tlds, or to raise the karma from (mostly) good tlds.
+
+jp:-4
+ch:-3
+fr:+1
+
 =head1 BENEFITS
 
 Karma reduces the resources wasted by naughty mailers.  When used with
@@ -352,18 +366,14 @@ sub from_handler {
     my $full_from = $self->connection->notes('envelope_from');
     $self->illegal_envelope_format( $full_from );
 
-    my %spammy_tlds = (
-            map { $_ => 4 } qw/ info pw /,
-            map { $_ => 3 } qw/ tw biz /,
-            map { $_ => 2 } qw/ cl br fr be jp no se sg /,
-            );
-    foreach my $tld ( keys %spammy_tlds ) {
+    my $karma_tlds = $self->get_karma_tlds() or return DECLINED;
+    foreach my $tld ( keys %$karma_tlds ) {
         my $len = length $tld;
-        my $score = $spammy_tlds{$tld} or next;
+        my $score = $karma_tlds->{$tld} or next;
         $len ++;
         if ( $sender->host && ".$tld" eq substr($sender->host,-$len,$len) ) {
-            $self->log(LOGINFO, "penalizing .$tld envelope sender");
-            $self->adjust_karma(-$score);
+            $self->log(LOGINFO, "adjusting karma for .$tld envelope sender");
+            $self->adjust_karma($score);
         }
     }
 
@@ -477,6 +487,19 @@ sub illegal_envelope_format {
         $self->log(LOGINFO, "illegal envelope address format: $addr" );
         $self->adjust_karma(-2);
     }
+}
+
+sub get_karma_tlds {
+    my $self = shift;
+
+    my %karma_tlds =
+      map { (split /:/, $_, 2)[0, 1] } $self->qp->config('karma_tlds');
+    if (!%karma_tlds) {
+        $self->log(LOGDEBUG, "no specific karma for tlds defined");
+        return;
+    }
+
+    return \%karma_tlds;
 }
 
 sub parse_db_record {
