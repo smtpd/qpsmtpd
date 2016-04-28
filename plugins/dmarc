@@ -144,7 +144,7 @@ sub check_dmarc {
     my $pol;
     eval { $pol = $dmarc->result->published; };
     if ( $self->{_args}{reporting} && $pol ) {
-        if ( $dmarc->has_valid_reporting_uri($pol->rua) ) {
+        if ( $pol->rua && $dmarc->has_valid_reporting_uri($pol->rua) ) {
             eval { $dmarc->save_aggregate(); };
             $self->log(LOGERROR, $@ ) if $@;
         }
