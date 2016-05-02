@@ -102,6 +102,7 @@ sub register {
     else {
         $self->{_dmarc} = Mail::DMARC::PurePerl->new();
         $self->register_hook('data_post_headers', 'check_dmarc');
+        $self->register_hook('data_post', 'reject_dmarc');
     };
 }
 
@@ -189,6 +190,13 @@ sub check_dmarc {
     return DECLINED if $self->is_immune;
 
     $self->adjust_karma(-3);
-# at what point do we reject?
-    return $self->get_reject("failed DMARC policy");
+    # Add a mark now so the data_post hook can do the real reject
+    $self->connection->notes('reject_dmarc', '1');
+}
+
+sub reject_dmarc {
+    my ($self, $transaction) = @_;
+    return $self->get_reject("failed DMARC policy")
+        if ($self->connection->notes('reject_dmarc'));
+    return DECLINED;
 }
