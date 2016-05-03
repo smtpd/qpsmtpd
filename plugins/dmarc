@@ -154,6 +154,7 @@ sub check_dmarc {
         };
     };
 
+    $transaction->notes('dmarc_result', $dmarc->result);
     my $disposition = $dmarc->result->disposition;
     my $result = $dmarc->result->result;
     my $auth_str = "dmarc=$result";
