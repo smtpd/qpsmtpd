@@ -1,0 +1,65 @@
+#!perl -w
+
+=head1 NAME
+
+Terminate connection in case of spf hard failure, and no DMARC policy
+
+=head1 SYNOPSIS
+
+SPF Deny is a very simple plugin, which will just deny the connection if SPF failed.
+It's useful when your using DMARC, in which case you first have to run dkim and 
+sender_permitted_from plugin, but without rejection, then DMARC can do its job (including
+reporting the problem to the domain owner). But then, with this plugin, you can decide to
+reject the email if SPF returned a hard failure and no DMARC policy is published.
+
+=head1 HOW TO USE
+Just load the plugin after sender_permitted_from and dmarc
+
+=head1 CONFIGURATION
+
+=head2 reject
+
+  reject [ 0 | 1 | naughty ]
+
+  spf_deny reject 0  <- do not reject (but in this case, you'd better not load this plugin at all)
+
+  spf_deny reject 1  <- reject (default value)
+
+  spf_deny reject naughty  <-  See perldoc plugins/naughty
+
+=head2 reject_type [ temp | perm | disconnect ]
+
+Default: perm
+
+=cut
+
+sub register {
+    my ($self, $qp) = (shift, shift);
+
+    $self->{_args} = {@_};
+
+    if (!defined $self->{_args}{reject_type}) {
+        $self->{_args}{reject_type} = 'perm';
+    }
+    if (!defined $self->{_args}{reject}) {
+        $self->{_args}{reject} = 1;
+    }
+    $self->register_hook('data_post', 'handle_spf_deny');
+}
+
+sub handle_spf_deny{
+    my ($self, $transaction) = @_;
+    return DECLINED if $self->is_immune; 
+    if ($transaction->notes('spfquery') && $transaction->notes('dmarc_result')){
+        # sender_permitted_from has addded a note, lets check the result
+        my $spf_result   = $transaction->notes('spfquery')->code;
+        my $why          = $transaction->notes('spfquery')->local_explanation;
+        my $dmarc_result = $transaction->notes('dmarc_result')->result;
+        # If SPF failed, but no DMARC policy was present, reject the transaction
+        if ($spf_result eq 'fail' && $dmarc_result eq 'none'){
+            $self->log(LOGINFO, "fail, $why");
+            return $self->get_reject("SPF - $spf_result: $why")
+        }
+    }
+    return DECLINED;
+}
