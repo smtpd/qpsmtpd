@@ -66,7 +66,7 @@ Note this setting will only have effect if:
   * dmarc ran with no error
   * the sender's domain has no dmarc policy published (that means, no _dmarc DNS entry)
 
-Note that if a domain has a dmarc "p=none" policy, then this setting has no effet. Only if there's no dmarc policy at all it'll be used.
+Note that if a domain has a dmarc "p=none" policy, then this setting has no effect. Only if there's no dmarc policy at all it'll be used.
 
 =head1 SEE ALSO
 
