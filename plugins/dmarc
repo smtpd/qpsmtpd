@@ -154,6 +154,7 @@ sub check_dmarc {
         };
     };
 
+    $transaction->notes('dmarc_result', $dmarc->result);
     my $disposition = $dmarc->result->disposition;
     my $result = $dmarc->result->result;
     my $auth_str = "dmarc=$result";
@@ -191,12 +192,12 @@ sub check_dmarc {
 
     $self->adjust_karma(-3);
     # Add a mark now so the data_post hook can do the real reject
-    $self->connection->notes('reject_dmarc', '1');
+    $transaction->notes('reject_dmarc', '1');
 }
 
 sub reject_dmarc {
     my ($self, $transaction) = @_;
     return $self->get_reject("failed DMARC policy")
-        if ($self->connection->notes('reject_dmarc'));
+        if ($transaction->notes('reject_dmarc'));
     return DECLINED;
 }
