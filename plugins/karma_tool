@@ -63,7 +63,7 @@ sub db {
     my ( $self ) = @_;
     return $self->{db} if $self->{db};
     $self->{db} = Qpsmtpd::DB->new( name => 'karma' );
-    $self->{db}->dir(
+    $self->{db}->candidate_dirs(
         $self->{args}{db_dir},
         qw( /var/lib/qpsmtpd/karma ./var/db ./config . ) );
     my $path = $self->{db}->path;
