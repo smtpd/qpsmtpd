@@ -449,7 +449,7 @@ sub disconnect_handler {
     my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
-    if ($karma <= $self->{_args}{strikes}) {    # Enough negative strikes ?
+    if ($karma <= -$self->{_args}{strikes}) {    # Enough negative strikes ?
         $history--;
         my $negative_limit = 0 - $self->{_args}{negative};
         if ($history <= $negative_limit) {
