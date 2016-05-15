@@ -448,7 +448,7 @@ sub auth_mechanism {
 sub address {
     my $self = shift;
     my $addr = Qpsmtpd::Address->new(@_);
-    $addr->qp($self);
+    $addr->qp($self) if $addr;
     return $addr;
 }
 
