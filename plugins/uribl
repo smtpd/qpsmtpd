@@ -134,6 +134,11 @@ my %strict_twolevel_cctlds = (
                               'za' => 1,
                              );
 
+# A list of regex to match strings which could look like hostname, but are invalid
+my @invalid_hostname = (
+    qr{\.\.}ix
+);
+
 sub init {
     my ($self, $qp, %args) = @_;
 
@@ -351,6 +356,7 @@ sub lookup_start {
               )
         {
             my $host = lc $1;
+            next if ($host ~~ @invalid_hostname);
             my @host_domains = split /\./, $host;
             $self->log(LOGDEBUG, "uribl: matched 'www.' hostname $host");
 
@@ -396,6 +402,7 @@ sub lookup_start {
               )
         {
             my $host = lc $1;
+            next if ($host ~~ @invalid_hostname);
             my @host_domains = split /\./, $host;
             $self->log(LOGDEBUG, "uribl: matched full URI hostname $host");
 
