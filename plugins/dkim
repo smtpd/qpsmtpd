@@ -275,7 +275,9 @@ sub get_details {
     push @data, "selector: " . $dkim->signature->selector if $dkim->signature;
     push @data, "result: " . $dkim->result_detail if $dkim->result_detail;
 
-    foreach my $policy ($dkim->policies) {
+    my @policies = eval { $dkim->policies };
+
+    foreach my $policy (@policies) {
         next if !$policy;
         push @data, "policy: " . $policy->as_string;
         push @data, "name: " . $policy->name;
