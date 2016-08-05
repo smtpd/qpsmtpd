@@ -151,8 +151,8 @@ sub register {
     }
 }
 
-sub hook_connect {
-    my ($self, $transaction) = @_;
+sub hook_mail {
+    my ($self, $transaction, $sender) = @_;
 
     # perform RBLSMTPD checks to mimic DJB's rblsmtpd
     # RBLSMTPD being non-empty means it contains the failure message to return
