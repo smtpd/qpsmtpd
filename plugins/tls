@@ -329,7 +329,7 @@ sub upgrade_socket {
                 SSL_cert_file   => $sp->tls_cert,
                 SSL_key_file    => $sp->tls_key,
                 SSL_ca_file     => $sp->tls_ca,
-                SSL_dh_file     => $self->tls_dhparam,
+                SSL_dh_file     => $sp->tls_dhparam,
                 SSL_cipher_list => $sp->tls_ciphers,
                 SSL_startHandshake => 0,
                 SSL_server         => 1,
