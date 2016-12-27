@@ -120,6 +120,7 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
 	sed "s@^$RPM_BUILD_ROOT@@g"     | \
 	grep -v [Aa]sync		| \
 	grep -v packaging		| \
+  grep -v README.selinux          | \
 	grep -v /Danga                  | \
 	grep -v Qpsmtpd/PollServer.pm   | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-apache-filelist
 if [ "$(cat %{name}-%{version}-%{release}-apache-filelist)X" = "X" ] ; then
