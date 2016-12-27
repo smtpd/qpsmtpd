@@ -254,7 +254,7 @@ newer version in plugins/logging/file
 - (Thanks to Josko Plazonic for the reporting these problems and
   suggesting fixes)
 
-* Tue Nov 30 2005 <hjp@hjp.at> 0.31.1-2
+* Wed Nov 30 2005 <hjp@hjp.at> 0.31.1-2
 - Revision 170 of plugins/loggin/file_connection:
   Return DECLINED from open_log.
   Open log in write_log if it isn't already open.
