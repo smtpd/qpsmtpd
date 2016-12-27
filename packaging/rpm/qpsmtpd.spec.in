@@ -131,7 +131,7 @@ fi
 
 %files -f %{name}-%{version}-%{release}-filelist
 %defattr(-,root,root)
-%doc CREDITS Changes LICENSE README README.plugins STATUS
+%doc CREDITS Changes LICENSE README.md README.plugins.md STATUS
 %{_initrddir}/qpsmtpd-forkserver
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
