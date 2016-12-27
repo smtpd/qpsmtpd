@@ -157,6 +157,9 @@ if ! id smtpd >/dev/null 2>&1 ; then
 fi
 
 %changelog
+* Tue Dec 27 2016 <robin.bowes@yo61.com> 0.96-1
+- Fixed up spec file to build cleanly with 0.96
+
 * Fri Oct 14 2011 <richard.siddall@elirion.net> 0.84-1
 - Removed rpm/files/qpsmtpd-plugin-file_connection as there's a
 newer version in plugins/logging/file
