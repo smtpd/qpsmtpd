@@ -65,16 +65,14 @@ rm -rf $RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 eval `perl '-V:installarchlib'`
 mkdir -p $RPM_BUILD_ROOT/$installarchlib
-if grep -q DESTDIR Makefile
-then
-        make DESTDIR=$RPM_BUILD_ROOT
-        find blib/lib -name '*.pm.*' -exec rm -f {} \;
-        make DESTDIR=$RPM_BUILD_ROOT install
-
+if grep -q DESTDIR Makefile ; then
+  make DESTDIR=$RPM_BUILD_ROOT
+  find blib/lib -name '*.pm.*' -exec rm -f {} \;
+  make DESTDIR=$RPM_BUILD_ROOT install
 else
-        make PREFIX=$RPM_BUILD_ROOT/usr
-        find blib/lib -name '*.pm.*' -exec rm -f {} \;
-        make PREFIX=$RPM_BUILD_ROOT/usr install
+  make PREFIX=$RPM_BUILD_ROOT/usr
+  find blib/lib -name '*.pm.*' -exec rm -f {} \;
+  make PREFIX=$RPM_BUILD_ROOT/usr install
 fi
 mkdir -p ${RPM_BUILD_ROOT}%{_datadir}/%{name}
 rm -f ${RPM_BUILD_ROOT}%{_datadir}/%{name}/plugins/*.*
@@ -103,35 +101,34 @@ cp %{SOURCE6} $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
 
 find ${RPM_BUILD_ROOT}%{_prefix} \( -name perllocal.pod -o -name .packlist \) -exec rm {} \;
 find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
-        sed "s@^$RPM_BUILD_ROOT@@g"     | \
-        grep -v [Aa]sync                | \
-        grep -v packaging               | \
-        grep -v README.selinux          | \
-        grep -v in\\.qpsmtpd            | \
-        grep -v /Apache                 | \
-        grep -v /Danga                  | \
-        grep -v ConfigServer            | \
-        grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
+  sed "s@^$RPM_BUILD_ROOT@@g"     | \
+  grep -v [Aa]sync                | \
+  grep -v packaging               | \
+  grep -v README.selinux          | \
+  grep -v in\\.qpsmtpd            | \
+  grep -v /Apache                 | \
+  grep -v /Danga                  | \
+  grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
 if [ "$(cat %{name}-%{version}-%{release}-filelist)X" = "X" ] ; then
-    echo "ERROR: EMPTY FILE LIST"
-    exit -1
+  echo "ERROR: EMPTY FILE LIST"
+  exit -1
 fi
 
 find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
 	sed "s@^$RPM_BUILD_ROOT@@g"     | \
 	grep -v [Aa]sync		| \
 	grep -v packaging		| \
+  grep -v README.selinux          | \
 	grep -v /Danga                  | \
-        grep -v ConfigServer            | \
 	grep -v Qpsmtpd/PollServer.pm   | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-apache-filelist
 if [ "$(cat %{name}-%{version}-%{release}-apache-filelist)X" = "X" ] ; then
-    echo "ERROR: EMPTY FILE LIST"
-    exit -1
+  echo "ERROR: EMPTY FILE LIST"
+  exit -1
 fi
 
 %files -f %{name}-%{version}-%{release}-filelist
 %defattr(-,root,root)
-%doc CREDITS Changes LICENSE README README.plugins STATUS
+%doc CREDITS Changes LICENSE README.md README.plugins.md STATUS
 %{_initrddir}/qpsmtpd-forkserver
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
@@ -149,19 +146,20 @@ fi
 %{_sbindir}/in.qpsmtpd
 
 %pre
-if ! id smtpd >/dev/null 2>&1
-then
-    # need to create smtpd user.
-    if perl -e 'exit ! defined(getgrnam("postdrop"))'
-    then
-        # if postfix is installed, we will probably use
-        # queue/postfix, which will need this:
-        supp="-G postdrop"
-    fi
-    useradd -r -M -s /bin/false $supp smtpd
+if ! id smtpd >/dev/null 2>&1 ; then
+  # need to create smtpd user.
+  if perl -e 'exit ! defined(getgrnam("postdrop"))' ; then
+     # if postfix is installed, we will probably use
+     # queue/postfix, which will need this:
+     supp="-G postdrop"
+  fi
+  useradd -r -M -s /bin/false $supp smtpd
 fi
 
 %changelog
+* Tue Dec 27 2016 <robin.bowes@yo61.com> 0.96-1
+- Fixed up spec file to build cleanly with 0.96
+
 * Fri Oct 14 2011 <richard.siddall@elirion.net> 0.84-1
 - Removed rpm/files/qpsmtpd-plugin-file_connection as there's a
 newer version in plugins/logging/file
@@ -254,7 +252,7 @@ newer version in plugins/logging/file
 - (Thanks to Josko Plazonic for the reporting these problems and
   suggesting fixes)
 
-* Tue Nov 30 2005 <hjp@hjp.at> 0.31.1-2
+* Wed Nov 30 2005 <hjp@hjp.at> 0.31.1-2
 - Revision 170 of plugins/loggin/file_connection:
   Return DECLINED from open_log.
   Open log in write_log if it isn't already open.
