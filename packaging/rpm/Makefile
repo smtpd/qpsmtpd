@@ -161,7 +161,7 @@ prepclean:
 	@rm -rf ./build/$(CURRENT_PACKAGE)*
 
 clean:
-	@rm -rf ./build/* ./dist/* 2>/dev/null || :
+	@rm -rf ./build/* ./dist/* ${PACKAGE}.spec 2>/dev/null || :
 
 mrclean: clean
 
