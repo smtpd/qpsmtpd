@@ -277,13 +277,15 @@ sub lookup_start {
         chomp $l;
         last if !$l;
     }
-    while ($l = $transaction->body_getline) {
+    while ($l = $transaction->body_getline || @qp_continuations) {
         chomp $l;
 
         if ($l =~ /(.*)=$/) {
             push @qp_continuations, $1;
+            next;
         }
         elsif (@qp_continuations) {
+            $l = '' if $l eq '1';
             $l = join('', @qp_continuations, $l);
             @qp_continuations = ();
         }
