@@ -78,10 +78,14 @@ sub hook_queue {
 
     $smtp->mail($transaction->sender->address || "")
       or return DECLINED, "Unable to queue message ($!)";
+
+    # Check if recipients are accepted, deny if none is
+    my $accepted = 0;
     for ($transaction->recipients) {
-        $smtp->to($_->address)
-          or return DECLINED, "Unable to queue message ($!)";
+      $accepted += 1 if $smtp->to($_->address)
     }
+    return(DENY, "Recipient(s) not accepted ($!)") if ($accepted==0);
+
     $smtp->data() or return DECLINED, "Unable to queue message ($!)";
     $smtp->datasend($transaction->header->as_string)
       or return DECLINED, "Unable to queue message ($!)";
