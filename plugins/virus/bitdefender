@@ -112,7 +112,7 @@ sub hook_data_post {
       . " --mail --all --arc $filename";
 
     my $output;
-    while (<$bdc>) {
+    while (local $_ = <$bdc>) {
         if (/infected: (.+)$/) {
             $output = $1;
             last;

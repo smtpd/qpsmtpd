@@ -235,7 +235,7 @@ sub parse_spamd_response {
     }
 
     my (%new_headers, $last_header);
-    while (<$SPAMD>) {
+    while (local $_ = <$SPAMD>) {
         s/[\r\n]//g;
         if (m/^(X-Spam-.*?): (.*)?/) {
             $new_headers{$1} = $2 || '';

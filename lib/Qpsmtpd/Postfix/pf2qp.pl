@@ -16,14 +16,14 @@ my $src     = "$POSTFIX_SRC/src/global/cleanup_strerror.c";
 my $pf_vers = "$POSTFIX_SRC/src/global/mail_version.h";
 my $postfix_version = "";
 
-open VERS, $pf_vers
+open my $VERS, $pf_vers
   or die "Could not open $pf_vers: $!\n";
-while (<VERS>) {
+while (local $_ = <$VERS>) {
     next unless /^\s*#\s*define\s+MAIL_VERSION_NUMBER\s+"(.+)"\s*$/;
     $postfix_version = $1;
     last;
 }
-close VERS;
+close $VERS;
 $postfix_version =~ s/^(\d+\.\d+).*/$1/;
 if ($postfix_version < 2.3) {
     die "Need at least postfix v2.3";
@@ -54,12 +54,12 @@ _END
 my @export = qw(%cleanup_soft %cleanup_hard $postfix_version);
 my @out = ();
 
-open HEAD, $header
+open my $HEAD, $header
   or die "Could not open $header: $!\n";
 
-while (<HEAD>) {
+while (local $_ = <$HEAD>) {
     while (s/\\\n$//) {
-        $_ .= <HEAD>;
+        $_ .= <$HEAD>;
     }
     chomp;
     if (/^\s*#define\s/) {
@@ -77,16 +77,16 @@ while (<HEAD>) {
                .($comment ? "# $comment ": "");
     }
 }
-close HEAD;
+close $HEAD;
 
-open SRC, $src
+open $SRC, $src
   or die "Could not open $src: $!\n";
 my $data;
 { 
   local $/ = undef;
-  $data = <SRC>;
+  $data = <$SRC>;
 }
-close SRC;
+close $SRC;
 $data =~ s/.*cleanup_stat_map\[\]\s*=\s*{\s*\n//s;
 $data =~ s/};.*$//s;
 my @array = split "\n", $data;

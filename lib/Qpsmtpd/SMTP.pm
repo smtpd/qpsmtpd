@@ -680,7 +680,7 @@ sub data_respond {
     my $header = Mail::Header->new(Modify => 0, MailFrom => 'COERCE');
 
     my $timeout = $self->config('timeout');
-    while (defined($_ = $self->getline($timeout))) {
+    while (defined(local $_ = $self->getline($timeout))) {
         if ($_ eq ".\r\n") {
             $complete++;
             $_ = '';

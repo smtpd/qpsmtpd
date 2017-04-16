@@ -77,12 +77,12 @@ sub hook_data_post {
                '--mime', '--unzip', '--secure', '--noboot', $filename, '2>&1 |'
               );
     $self->log(LOGINFO, "Running: ", join(' ', @cmd));
-    open(FILE, join(' ', @cmd));    #perl 5.6 doesn't properly support the pipe
+    open(my $FILE, join(' ', @cmd));    #perl 5.6 doesn't properly support the pipe
        # mode list form of open, but this is basically the same thing. This form
        # of exec is safe(ish).
     my $output;
-    while (<FILE>) { $output .= $_; }
-    close FILE;
+    while (local $_ = <$FILE>) { $output .= $_; }
+    close $FILE;
 
     my $result = ($? >> 8);
     my $signal = ($? & 127);
