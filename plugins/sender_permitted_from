@@ -96,6 +96,7 @@ use warnings;
 
 #use Mail::SPF 2.000;   # eval'ed in ->register
 use Qpsmtpd::Constants;
+use Mail::Address;
 
 sub register {
     my ($self, $qp, %args) = @_;
@@ -115,22 +116,13 @@ sub register {
     }
     $self->{_args}{no_dmarc_policy} ||= 0;
     $self->register_hook('mail', 'evaluate_spf');
-    $self->register_hook('data_post_headers', 'add_spf_header');
+    $self->register_hook('data_post_headers', 'post_headers');
     $self->register_hook('data_post', 'no_dmarc_policy') if $self->{_args}{no_dmarc_policy} > 0;
 
 }
 
 sub evaluate_spf {
     my ($self, $transaction, $sender, %param) = @_;
-
-    if ( $self->is_immune() ) {
-        $transaction->notes('dmarc_spf', {
-                domain => $sender->host,
-                scope  => 'mfrom',
-                result => 'pass',
-                } );
-        return DECLINED;
-    };
 
     my $format = $sender->format;
     if ($format eq '<>' || !$sender->host || !$sender->user) {
@@ -160,12 +152,6 @@ sub evaluate_spf {
         $req_params{helo_identity} = $helo;
     }
 
-    $transaction->notes('dmarc_spf', {
-            domain => $scope eq 'helo' ? $helo : $sender->host,
-            scope  => $scope,
-            result => 'none',
-            } );
-
     my $spf_server = Mail::SPF::Server->new();
     my $request    = Mail::SPF::Request->new(%req_params);
     my $result     = $spf_server->process($request) or do {
@@ -184,12 +170,6 @@ sub evaluate_spf {
         return DENYSOFT, "SPF - no response" if $reject >= 2;
         return DECLINED, "SPF - no response";
     }
-
-    $transaction->notes('dmarc_spf', {
-            domain => $scope eq 'helo' ? $helo : $sender->host,
-            scope  => $scope,
-            result => $code,
-            } );
 
     $self->store_auth_results("spf=$code smtp.mailfrom=".$sender->host);
 
@@ -321,6 +301,63 @@ sub handle_code_softfail {
 
     $self->log(LOGINFO, "fail, tolerated, soft, $why");
     return DECLINED;
+}
+
+sub post_headers {
+    my ($self, $transaction) = @_;
+    $self->evaluate_spf_dmarc($transaction);
+    $self->add_spf_header($transaction);
+    return DECLINED;
+}
+
+sub evaluate_spf_dmarc {
+    my ($self, $transaction) = @_;
+
+    if ( $self->is_immune() ) {
+        $transaction->notes('dmarc_spf', {
+                domain => $transaction->sender->host,
+                scope  => 'mfrom',
+                result => 'pass',
+                } );
+        return;
+    };
+	
+    my @froms      = Mail::Address->parse($transaction->header->get('From'));
+    my $from       = $froms[0]->address();
+    my $helo      = $self->qp->connection->hello_host;
+    my $scope     = $from ? 'mfrom' : 'helo';
+    my %req_params = (
+        versions => [1, 2],    # optional
+        scope => 'mfrom',
+        ip_address => $self->qp->connection->remote_ip,
+        identity => $from,
+    );
+
+    $req_params{helo_identity} = $helo if $helo;
+
+    my $spf_server = Mail::SPF::Server->new();
+    my $request    = Mail::SPF::Request->new(%req_params);
+    my $result     = $spf_server->process($request) or do {
+        $self->log(LOGINFO, "dmarc_spf: fail, no result");
+        return;
+    };
+
+    my $code   = $result->code;
+    my $why    = $result->local_explanation;
+    my $reject = $self->{_args}{reject};
+
+    if (!$code) {
+        $self->log(LOGINFO, "dmarc_spf: fail, no response");
+        return;
+    }
+
+    $transaction->notes('dmarc_spf', {
+            domain => $froms[0]->host(),
+            scope  => 'mfrom',
+            result => $code,
+    } );
+
+    $self->log(LOGINFO, "dmarc_spf: SPF from $from was $code: $why");
 }
 
 sub add_spf_header {
