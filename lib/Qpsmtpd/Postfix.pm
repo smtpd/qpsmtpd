@@ -206,7 +206,7 @@ sub inject_mail {
 
     my $hdr = $transaction->header->as_string;
     for (split(/\r?\n/, $hdr)) {
-        print STDERR "hdr: $_\n";
+        # print STDERR "hdr: $_\n";
         $strm->print_msg_line($_);
     }
     $transaction->body_resetpos;
