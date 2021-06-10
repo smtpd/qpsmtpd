@@ -138,16 +138,23 @@ sub check_host {
     # From tcpserver
     if (exists $ENV{WHITELISTCLIENT}) {
         $self->qp->connection->notes('whitelistclient', 1);
-        $self->log(2, "pass, is whitelisted client");
+        $self->log(2, "pass, $ip is whitelisted client");
         $self->adjust_karma(5);
         return OK;
     }
 
     my $config_arg = $self->{_per_recipient} ? {rcpt => $rcpt, %MERGE} : {};
     for my $h ($self->qp->config('whitelisthosts', $config_arg)) {
+        my $ipNet = NetAddr::IP->new($ip);
+        my $hNet  = NetAddr::IP->new($h);
         if ($h eq $ip or $ip =~ /^\Q$h\E/) {
             $self->qp->connection->notes('whitelisthost', 1);
-            $self->log(2, "pass, is a whitelisted host");
+            $self->log(2, "pass, $ip is a whitelisted host");
+            $self->adjust_karma(5);
+            return OK;
+        } elsif ( $ipNet->within($hNet) ) {
+            $self->qp->connection->notes('whitelisthost', 1);
+            $self->log(2, "pass, $ip is in a whitelisted block");
             $self->adjust_karma(5);
             return OK;
         }
