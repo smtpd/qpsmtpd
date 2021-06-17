@@ -92,12 +92,12 @@ sub authcvm_plain {
 
     if ($user =~ /\x00/) {
         $self->log(LOGERROR, "deny: invalid username");
-        return (DENY, "authcvm, invalid username");
+        return DENY, "authcvm, invalid username";
     };
 
     socket(SOCK, PF_UNIX, SOCK_STREAM, 0) or do {
         $self->log(LOGERROR, "skip: socket creation attempt for: $user");
-        return (DENY, "authcvm");
+        return DENY, "authcvm";
     };
 
     # DENY, really? Should this plugin return a DENY when it cannot connect
@@ -106,7 +106,7 @@ sub authcvm_plain {
 
     connect(SOCK, sockaddr_un($self->{_cvm_socket})) or do {
         $self->log(LOGERROR, "skip: socket connection attempt for: $user");
-        return (DENY, "authcvm, connection failed");
+        return DENY, "authcvm, connection failed";
     };
 
     my $o = select(SOCK);
@@ -125,19 +125,19 @@ sub authcvm_plain {
 
     if (!defined $s) {
         $self->log(LOGERROR, "skip: no response from cvm for $user");
-        return (DECLINED);
+        return DECLINED;
     }
 
     if ($s == 0) {
         $self->log(LOGINFO, "pass: authentication for: $user");
-        return (OK, "auth success for $user");
+        return OK, "auth success for $user";
     }
 
     if ($s == 100) {
         $self->log(LOGINFO, "fail: authentication failure for: $user");
-        return (DENY, 'auth failure (100)');
+        return DENY, 'auth failure (100)';
     }
 
     $self->log(LOGERROR, "skip: unknown response from cvm for $user");
-    return (DECLINED, "unknown result code ($s)");
+    return DECLINED, "unknown result code ($s)";
 }

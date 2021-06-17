@@ -174,7 +174,7 @@ sub hook_data_post {
                      . $transaction->data_size
                      . " vs $self->{_max_size})"
                   );
-        return (DECLINED);
+        return DECLINED;
     }
 
     my $filename = $transaction->body_filename;
@@ -211,8 +211,8 @@ sub hook_data_post {
 
     if ($signal) {
         $self->log(LOGINFO, "clamscan exited with signal: $signal");
-        return (DENYSOFT) if (!$self->{_declined_on_fail});
-        return (DECLINED);
+        return DENYSOFT if !$self->{_declined_on_fail};
+        return DECLINED;
     }
     if ($result == 1) {
         $self->log(LOGINFO, "Virus(es) found: $output");
@@ -221,17 +221,17 @@ sub hook_data_post {
             $transaction->header->add('X-Virus-Details', $output);
         }
         else {
-            return (DENY, "Virus Found: $output");
+            return DENY, "Virus Found: $output";
         }
     }
     elsif ($result) {
         $self->log(LOGERROR, "ClamAV error: $cmd: $result\n");
-        return (DENYSOFT) if (!$self->{_declined_on_fail});
+        return DENYSOFT if !$self->{_declined_on_fail};
     }
     else {
         $transaction->header->add('X-Virus-Checked',
                              "Checked by ClamAV on " . $self->qp->config("me"));
     }
-    return (DECLINED);
+    return DECLINED;
 }
 

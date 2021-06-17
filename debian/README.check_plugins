@@ -1,0 +1,16 @@
+The 0.94 upstream release of qpsmtpd renamed the various 'check_' plugins
+to use names without the check_ prefix, amongst other updates.  While
+upstream believes the new versions to be interface-compatible with their
+predecessors, the actual names are changed.
+
+The check_* plugins shipped with Debian's qpsmtpd are simply transitional
+wrappers which expose the new plugins under their old names.  To update
+your configuration, simply remove that prefix from any uncommented
+lines in /etc/qpsmtpd/plugins.  The following shell snippet can do this
+for you:
+
+    cp /etc/qpsmtpd/plugins /etc/qpsmtpd/plugins.orig
+    for p in earlytalker relay spamhelo badmailfrom badrcptto loop ; do
+      perl -pi -e 's/^(# |)check_('$p')/$1$2/' /etc/qpsmtpd/plugins
+    done
+

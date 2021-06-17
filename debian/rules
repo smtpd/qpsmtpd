@@ -1,13 +1,89 @@
 #!/usr/bin/make -f
-# -*- makefile -*-
-# Sample debian/rules that uses debhelper.
-# This file was originally written by Joey Hess and Craig Small.
-# As a special exception, when this file is copied by dh-make into a
-# dh-make output file, you may use that output file without restriction.
-# This special exception was added by Craig Small in version 0.37 of dh-make.
+# $Id$
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+PERL=perl
 
-%:
-	dh $@ 
+clean:
+	dh_testdir
+	dh_testroot
+	dh_auto_clean
+	dh_clean
+
+configure:
+	dh_testdir
+	$(PERL) Makefile.PL INSTALLDIRS=vendor
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp: configure
+	dh_testdir
+	dh_prep
+	$(MAKE)
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_installdirs
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/qpsmtpd
+	# Comment out this line to omit the usual deletion of the qpsmtpd
+	# tcpserver-based toplevel script.  The standard install uses
+	# qpsmtpd-forkserver to avoid a non-free dependency on tcpserver.
+	rm -f $(CURDIR)/debian/qpsmtpd/usr/bin/qpsmtpd
+	# Comment out this line to omit the usual deletion of qpsmtpd-async,
+	# which is included in the main qpsmtpd distribution as of 0.94 but
+	# is abandoned upstream and has since been removed from upstream git.
+	rm -f $(CURDIR)/debian/qpsmtpd/usr/bin/qpsmtpd-async
+	# /var/spool/qpsmtpd will be chown'ed by postinst
+	install -m 700 -d $(CURDIR)/debian/qpsmtpd/var/spool/qpsmtpd
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/var/log/qpsmtpd
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/var/lib/qpsmtpd
+	# greylist db dir will be chown'ed by postinst
+	install -m 700 -d $(CURDIR)/debian/qpsmtpd/var/lib/qpsmtpd/greylisting
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/etc/qpsmtpd
+	# install the configuration
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/etc/qpsmtpd
+	cp -a $(CURDIR)/debian/etc/* $(CURDIR)/debian/qpsmtpd/etc/qpsmtpd/
+	# install the plugins
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/usr/share/qpsmtpd/plugins
+	cp -a $(CURDIR)/plugins/* $(CURDIR)/debian/qpsmtpd/usr/share/qpsmtpd/plugins/
+	# install lintian overrides
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/usr/share/lintian/overrides
+	install -m 644 debian/qpsmtpd.lintian $(CURDIR)/debian/qpsmtpd/usr/share/lintian/overrides/qpsmtpd
+	# install documentation Markdown
+	install -m 755 -d $(CURDIR)/debian/qpsmtpd/usr/share/doc/qpsmtpd
+	cp -a $(CURDIR)/docs/* $(CURDIR)/debian/qpsmtpd/usr/share/doc/qpsmtpd
+	cp -a $(CURDIR)/UPGRADING.md $(CURDIR)/debian/qpsmtpd/usr/share/doc/qpsmtpd
+	# remove pf2qp.pl, used to generate Constants.pm in upstream SVN
+	rm -f $(CURDIR)/debian/qpsmtpd/usr/share/perl5/Qpsmtpd/Postfix/pf2qp.pl
+
+binary-arch: build install
+# nothing arch-dependent
+
+binary-indep: build install
+	dh_testdir
+	dh_testroot
+	dh_installdocs $(CURDIR)/debian/README.check_plugins
+	dh_installman \
+		 $(CURDIR)/debian/qpsmtpd-forkserver.8 \
+		 $(CURDIR)/debian/qpsmtpd-prefork.8 
+	dh_installdebconf
+	dh_installlogrotate
+	dh_installchangelogs Changes
+	dh_installinit
+	dh_link
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_perl
+	# until qpsmtpd-async is supported
+	rm -f $(CURDIR)/debian/qpsmtpd/usr/share/man/man1/qpsmtpd-async.1p.gz
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: clean build binary-indep binary-arch binary
+
+# vi:set noexpandtab:

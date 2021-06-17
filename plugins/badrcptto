@@ -49,14 +49,14 @@ use Qpsmtpd::DSN;
 sub hook_rcpt {
     my ($self, $transaction, $recipient, %param) = @_;
 
-    return (DECLINED) if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
     my ($host, $to) = $self->get_host_and_to($recipient)
-      or return (DECLINED);
+      or return DECLINED;
 
     my @badrcptto = $self->qp->config("badrcptto") or do {
         $self->log(LOGINFO, "skip, empty config");
-        return (DECLINED);
+        return DECLINED;
     };
 
     for my $line (@badrcptto) {
@@ -66,16 +66,13 @@ sub hook_rcpt {
         if ($self->is_match($to, lc($bad), $host)) {
             $self->adjust_karma(-2);
             if ($reason) {
-                return (DENY, "mail to $bad not accepted here");
+                return DENY, $reason;
             }
-            else {
-                return Qpsmtpd::DSN->no_such_user(
-                                              "mail to $bad not accepted here");
-            }
+            return Qpsmtpd::DSN->no_such_user("mail to $bad not accepted here");
         }
     }
     $self->log(LOGINFO, 'pass');
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub is_match {
@@ -127,5 +124,5 @@ sub get_host_and_to {
     }
 
     my $host = lc $recipient->host;
-    return ($host, lc($recipient->user) . '@' . $host);
+    return $host, lc($recipient->user) . '@' . $host;
 }

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: qpsmtpd\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
-"POT-Creation-Date: 2009-12-14 01:40-0800\n"
+"POT-Creation-Date: 2019-01-11 10:02+0100\n"
 "PO-Revision-Date: 2012-04-09 13:35+0200\n"
 "Last-Translator: Beatrice Torracca <beatricet@libero.it>\n"
 "Language-Team: Italian <debian-l10n-italian@lists.debian.org>\n"
@@ -84,9 +84,10 @@ msgstr ""
 "qpsmtpd gestisce due modelli per i processi per gestire le connessioni. Il "
 "modello \"forkserver\" usa un unico processo quando inattivo e fa il fork di "
 "nuovi processi per gestire le connessioni; usa meno memoria ma riduce "
-"leggermente il flusso dati del server. Il modello \"prefork\" mantiene un pool "
-"di processi inattivi disponibili per gestire le nuove connessioni, offrendo "
-"prestazioni leggermente migliori a spese di un maggior uso di memoria."
+"leggermente il flusso dati del server. Il modello \"prefork\" mantiene un "
+"pool di processi inattivi disponibili per gestire le nuove connessioni, "
+"offrendo prestazioni leggermente migliori a spese di un maggior uso di "
+"memoria."
 
 #. Type: string
 #. Description
@@ -130,8 +131,8 @@ msgid ""
 "\"127.0.0.1:2526\"."
 msgstr ""
 "Per ciascuna interfaccia si può, opzionalmente, specificare una porta su cui "
-"restare in ascolto invece della porta 25 predefinita; per farlo aggiungere "
-":<porta> dopo l'interfaccia, come in «127.0.0.1:2526»."
+"restare in ascolto invece della porta 25 predefinita; per farlo aggiungere :"
+"<porta> dopo l'interfaccia, come in «127.0.0.1:2526»."
 
 #. Type: select
 #. Description
@@ -283,8 +284,8 @@ msgstr ""
 "qpsmtpd deve accettare la posta. Questo elenco dovrebbe includere ogni nome "
 "di host o nome di dominio per i quali si desidera accettare la consegna in "
 "locale, così come ogni dominio di destinazione per il quale si vuole fare da "
-"relay di posta. In generale, se si desidera accodare la posta ricevuta in "
-"un MTA locale, questo elenco dovrebbe essere uguale a quello usato nell'MTA "
+"relay di posta. In generale, se si desidera accodare la posta ricevuta in un "
+"MTA locale, questo elenco dovrebbe essere uguale a quello usato nell'MTA "
 "(l'installatore cercherà di estrarre quell'impostazione come predefinita)."
 
 #. Type: string
@@ -296,3 +297,19 @@ msgid ""
 msgstr ""
 "Se si preferisce gestire questo elenco a mano, lasciare il campo vuoto e "
 "modificare il file /etc/qpsmtpd/rcpthosts."
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid "Incompatible upstream naming of check_* plugins"
+msgstr ""
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid ""
+"As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which "
+"lack the check_ prefix in their names.  Wrappers re-enabling the old names "
+"are shipped in this release, but will be removed in the future; see /usr/"
+"share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
+msgstr ""

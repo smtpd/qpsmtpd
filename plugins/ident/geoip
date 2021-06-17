@@ -6,18 +6,19 @@ geoip - provide geographic information about mail senders.
 
 =head1 SYNOPSIS
 
-Use MaxMind's GeoIP databases and the Geo::IP perl module to report geographic
-information about incoming connections.
+Use MaxMind's GeoIP databases and the GeoIP2 or Geo::IP perl modules to report
+geographic information about incoming connections.
 
 =head1 DESCRIPTION
 
-This plugin saves geographic information in the following connection notes:
+Save geographic information about the sender in the following connection notes:
 
   geoip_country      - 2 char country code
   geoip_country_name - english name of country
   geoip_continent    - 2 char continent code
   geoip_city         - english name of city
   geoip_distance     - distance in kilometers
+  geoip_asn          - network number
 
 And adds entries like this to your logs:
 
@@ -72,6 +73,14 @@ The path to the GeoIP database directory.
 
 Default: /usr/local/share/GeoIP
 
+=head2 add_headers <true|false>
+
+Add message headers with GeoIP data
+
+  ident/geoip [ add_headers (true|false) ]
+
+Default: true
+
 =head1 LIMITATIONS
 
 The distance calculations are more concerned with being fast than accurate.
@@ -84,6 +93,8 @@ reality, it is not. Accuracy should be within 1%.
 This plugin does not update the GeoIP databases. You may want to.
 
 =head1 CHANGES
+
+2014-06 - Matt Simerson - added GeoIP2 support
 
 2012-06 - Matt Simerson - added GeoIP City support, continent, distance
 
@@ -100,6 +111,8 @@ data source: http://software77.net/geo-ip/
 
 =head1 ACKNOWLEDGEMENTS
 
+MaxMind - the packager and distributor of the free GeoIP data
+
 Stevan Bajic, the DSPAM author, who suggested SNARE, which describes using
 geodesic distance to determine spam probability. The research paper on SNARE
 can be found here:
@@ -112,7 +125,8 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-#use Geo::IP;     # eval'ed in register()
+#use GeoIP2;      # eval'ed in register()
+#use Geo::IP;     # eval loaded if GeoIP2 doesn't
 #use Math::Trig;  # eval'ed in set_distance_gc
 
 sub register {
@@ -122,6 +136,23 @@ sub register {
     $self->{_args} = {@args};
     $self->{_args}{db_dir} ||= '/usr/local/share/GeoIP';
 
+    $self->load_geoip() or return;
+    my $enabled = $self->{_args}{add_headers};
+    $enabled = 'true' if ! defined $enabled;
+    return if $enabled =~ /false/i;
+    $self->register_hook( data_post => 'add_headers' );
+}
+
+sub load_geoip {
+    my ( $self ) = @_;
+    $self->load_geoip1() and return 1;
+    $self->load_geoip2() and return 1;
+    return 0;
+}
+
+sub load_geoip1 {
+    my $self = shift;
+
     eval 'use Geo::IP';
     if ($@) {
         warn "could not load Geo::IP";
@@ -129,19 +160,101 @@ sub register {
         return;
     }
 
+    $self->open_geoip_db();
+
 # Note that opening the GeoIP DB only in register has caused problems before:
 # https://github.com/smtpd/qpsmtpd/commit/29ea9516806e9a8ca6519fcf987dbd684793ebdd#plugins/ident/geoip
 # Opening the DB anew for every connection is horribly inefficient.
 # Instead, attempt to reopen upon connect if the DB connection fails.
-    $self->open_geoip_db();
-
     $self->init_my_country_code();
 
-    $self->register_hook('connect', 'connect_handler');
+    $self->register_hook('connect', 'geoip_lookup');
+    return 1;
 }
 
-sub connect_handler {
+sub load_geoip2 {
     my $self = shift;
+
+    eval 'use GeoIP2::Database::Reader';
+    if ($@) {
+        $self->log(LOGERROR, "could not load GeoIP2");
+        return;
+    }
+
+    warn "Using GeoIP2."
+       . " ASN data is not currently available using the GeoIP2 module!\n";
+
+    eval {
+        $self->{_geoip2_city} = GeoIP2::Database::Reader->new(
+            file => $self->{_args}{db_dir} . '/GeoLite2-City.mmdb',
+        );
+    };
+    if ($@) {
+        $self->log(LOGERROR, "unable to load GeoLite2-City.mmdb");
+    }
+
+    eval {
+        $self->{_geoip2_country} = GeoIP2::Database::Reader->new(
+            file => $self->{_args}{db_dir} . '/GeoLite2-Country.mmdb',
+        );
+    };
+    if ($@) {
+        $self->log(LOGERROR, "unable to load GeoLite2-Country.mmdb");
+    }
+
+    if ($self->{_geoip2_city} || $self->{_geoip2_country}) {
+        $self->register_hook('connect', 'geoip2_lookup');
+        return 1;
+    }
+
+    return;
+}
+
+sub add_headers {
+    my ( $self, $txn ) = @_;
+    for my $h (qw( Country Continent City ASN )) {
+        my $note = lc "geoip_$h";
+        next if ! $self->connection->notes($note);
+        $txn->header->delete("X-GeoIP-$h");
+        $txn->header->add( "X-GeoIP-$h", $self->connection->notes($note), 0 );
+    }
+    return DECLINED;
+}
+
+sub geoip2_lookup {
+    my $self = shift;
+
+    my $ip = $self->qp->connection->remote_ip;
+    return DECLINED if $self->is_localhost($ip);
+
+    if ($self->{_geoip2_city}) {
+        my $city_rec = $self->{_geoip2_city}->city(ip => $ip);
+        if ($city_rec) {
+            $self->qp->connection->notes('geoip_country', $city_rec->country->iso_code());
+            $self->qp->connection->notes('geoip_country_name', $city_rec->country->name());
+            $self->qp->connection->notes('geoip_continent', $city_rec->continent->code());
+            $self->qp->connection->notes('geoip_city', $city_rec->city->name());
+            $self->qp->connection->notes('geoip_asn', $city_rec->traits->autonomous_system_number());
+            return DECLINED;
+        }
+    }
+
+    if ($self->{_geoip2_country}) {
+        my $country_rec = $self->{_geoip2_country}->country(ip => $ip);
+        if ($country_rec) {
+            $self->qp->connection->notes('geoip_country', $country_rec->country->iso_code());
+            $self->qp->connection->notes('geoip_country_name', $country_rec->country->name());
+            $self->qp->connection->notes('geoip_continent', $country_rec->continent->code());
+        };
+    }
+
+    return DECLINED;
+}
+
+sub geoip_lookup {
+    my $self = shift;
+
+    return DECLINED if $self->is_localhost($self->qp->connection->remote_ip);
 
     # reopen the DB if Geo::IP failed due to DB update
     $self->open_geoip_db();
@@ -150,7 +263,8 @@ sub connect_handler {
         $self->log(LOGINFO, "skip, no results");
         return DECLINED;
     };
-    $self->qp->connection->notes('geoip_country', $c_code);
+
+    $self->set_asn();
 
     my $c_name = $self->set_country_name();
     my ($city, $continent_code, $distance) = '';
@@ -162,8 +276,9 @@ sub connect_handler {
     }
 
     my @msg_parts;
-    push @msg_parts, $continent_code
-      if $continent_code && $continent_code ne '--';
+    if ($continent_code && $continent_code ne '--') {
+        push @msg_parts, $continent_code;
+    };
     push @msg_parts, $c_code if $c_code;
 
     #push @msg_parts, $c_name          if $c_name;
@@ -190,16 +305,33 @@ sub open_geoip_db {
     # save the handles in different locations
     my $db_dir = $self->{_args}{db_dir};
     foreach my $db (qw/ GeoIPCity GeoLiteCity /) {
-        if (-f "$db_dir/$db.dat") {
-            $self->log(LOGDEBUG, "using db $db");
-            $self->{_geoip_city} = Geo::IP->open("$db_dir/$db.dat");
-        }
+        next if !-f "$db_dir/$db.dat";
+        $self->log(LOGDEBUG, "using db $db");
+        $self->{_geoip_city} = Geo::IP->open("$db_dir/$db.dat");
+        last if $self->{_geoip_city};
+    }
+    warn "Missing GeoIP City data!\n" if ! $self->{_geoip_city};
+
+    if (-f "$db_dir/GeoIPASNum.dat") {
+        $self->log(LOGDEBUG, "using GeoIPASNum");
+        $self->{GeoIPASNum} = Geo::IP->open("$db_dir/GeoIPASNum.dat");
+    }
+    warn "Missing GeoIP ASN data!\n" if ! $self->{GeoIPASNum};
+
+    if (-f "$db_dir/GeoIPASNumv6.dat") {
+        $self->log(LOGDEBUG, "using GeoIPASNumv6");
+        $self->{GeoIPASNumv6} = Geo::IP->open("$db_dir/GeoIPASNumv6.dat");
+        warn "Missing GeoIP ASN IPV6 data!\n" if ! $self->{GeoIPASNum};
     }
 
     # can't think of a good reason to load country if city data is present
     if (!$self->{_geoip_city}) {
         $self->log(LOGDEBUG, "using default db");
-        $self->{_geoip} = Geo::IP->new();    # loads default Country DB
+        eval { $self->{_geoip} = Geo::IP->new(); };   # loads default Country DB
+        if (!$self->{_geoip}) {
+            my $err = $@ || 'Unknown error';
+            warn "Missing GeoIP Country data:$err\n";
+        }
     }
 }
 
@@ -211,9 +343,8 @@ sub init_my_country_code {
 
 sub set_country_code {
     my $self = shift;
-    return $self->get_country_code_gc() if $self->{_geoip_city};
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $code      = $self->get_country_code();
+    my $ip   = $self->qp->connection->remote_ip;
+    my $code = $self->get_country_code($ip) or return;
     $self->qp->connection->notes('geoip_country', $code);
     return $code;
 }
@@ -221,8 +352,13 @@ sub set_country_code {
 sub get_country_code {
     my $self = shift;
     my $ip = shift || $self->qp->connection->remote_ip;
-    return $self->get_country_code_gc($ip) if $self->{_geoip_city};
-    return $self->{_geoip}->country_code_by_addr($ip);
+    if ($self->{_geoip_city}) {
+        return $self->get_country_code_gc($ip);
+    }
+    if ($self->{_geoip}) {
+        return $self->{_geoip}->country_code_by_addr($ip);
+    }
+    return undef;
 }
 
 sub get_country_code_gc {
@@ -235,44 +371,87 @@ sub get_country_code_gc {
 
 sub set_country_name {
     my $self = shift;
-    return $self->set_country_name_gc() if $self->{_geoip_city};
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $name = $self->{_geoip}->country_name_by_addr($remote_ip) or return;
+    my $ip   = $self->qp->connection->remote_ip;
+    my $name = $self->get_country_name($ip) or return;
     $self->qp->connection->notes('geoip_country_name', $name);
     return $name;
 }
 
-sub set_country_name_gc {
+sub get_country_name {
+    my $self = shift;
+    my $ip = shift || $self->qp->connection->remote_ip;
+    if ($self->{_geoip_city}) {
+        return $self->get_country_name_gc($ip);
+    }
+    if ($self->{_geoip}) {
+        return $self->{_geoip}->country_name_by_addr($ip);
+    }
+    return undef;
+}
+
+sub get_country_name_gc {
     my $self = shift;
     return if !$self->{_geoip_record};
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $name = $self->{_geoip_record}->country_name() or return;
-    $self->qp->connection->notes('geoip_country_name', $name);
-    return $name;
+    return $self->{_geoip_record}->country_name();
 }
 
 sub set_continent {
-    my $self = shift;
-    return $self->set_continent_gc() if $self->{_geoip_city};
-    my $c_code = shift or return;
-    my $continent = $self->{_geoip}->continent_code_by_country_code($c_code)
-      or return;
+    my ($self, $country_code) = @_;
+    return if !$country_code;
+    my $continent = $self->get_continent($country_code) or return;
     $self->qp->connection->notes('geoip_continent', $continent);
     return $continent;
 }
 
-sub set_continent_gc {
+sub get_continent {
+    my ($self, $country_code) = @_;
+    return if !$country_code;
+    if ($self->{_geoip_city}) {
+        return $self->get_continent_gc();
+    }
+    if ($self->{_geoip}) {
+        return $self->{_geoip}->continent_code_by_country_code($country_code);
+    }
+    return undef;
+}
+
+sub get_continent_gc {
     my $self = shift;
     return if !$self->{_geoip_record};
-    my $continent = $self->{_geoip_record}->continent_code() or return;
-    $self->qp->connection->notes('geoip_continent', $continent);
-    return $continent;
+    return $self->{_geoip_record}->continent_code();
+}
+
+sub set_asn {
+    my ($self, $ip) = @_;
+    $ip ||= $self->qp->connection->remote_ip;
+
+    if ($self->is_ipv6($ip)) {
+        return $self->set_asn_ipv6($ip);
+    }
+    return if ! $self->{GeoIPASNum};
+
+    my $asn = $self->{GeoIPASNum}->name_by_addr($ip) or return;
+    if ('AS' eq substr($asn, 0, 2)) {
+        $asn = substr($asn, 2);
+    }
+    $self->qp->connection->notes('geoip_asn', $asn);
+    return $asn;
+}
+
+sub set_asn_ipv6 {
+    my ($self, $ip) = @_;
+    $ip ||= $self->qp->connection->remote_ip;
+
+    return if ! $self->{GeoIPASNumv6};
+
+    my $asn = $self->{GeoIPASNumv6}->name_by_addr_v6($ip) or return;
+    $self->qp->connection->notes('geoip_asn', $asn);
+    return $asn;
 }
 
 sub set_city_gc {
     my $self = shift;
     return if !$self->{_geoip_record};
-    my $remote_ip = $self->qp->connection->remote_ip;
     my $city = $self->{_geoip_record}->city() or return;
     $self->qp->connection->notes('geoip_city', $city);
     return $city;
@@ -310,7 +489,7 @@ sub get_my_lat_lon {
     return if !$self->{_geoip_city};
 
     if ($self->{_latitude} && $self->{_longitude}) {
-        return ($self->{_latitude}, $self->{_longitude});    # cached
+        return $self->{_latitude}, $self->{_longitude};    # cached
     }
 
     my $ip = $self->{_args}{distance} or return;
@@ -325,7 +504,7 @@ sub get_my_lat_lon {
     if (!$self->{_latitude} || !$self->{_longitude}) {
         $self->log(LOGNOTICE, "could not get my lat/lon");
     }
-    return ($self->{_latitude}, $self->{_longitude});
+    return $self->{_latitude}, $self->{_longitude};
 }
 
 sub get_sender_lat_lon {
@@ -337,6 +516,5 @@ sub get_sender_lat_lon {
         $self->log(LOGNOTICE, "could not get sender lat/lon");
         return;
     }
-    return ($lat, $lon);
+    return $lat, $lon;
 }
-

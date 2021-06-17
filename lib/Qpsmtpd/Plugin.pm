@@ -1,18 +1,17 @@
 package Qpsmtpd::Plugin;
-
 use strict;
 use warnings;
 
-use Net::DNS;
-
+use parent 'Qpsmtpd::Base';
+use Qpsmtpd::DB;
 use Qpsmtpd::Constants;
 
 # more or less in the order they will fire
 our @hooks = qw(
-  logging config post-fork pre-connection connect ehlo_parse ehlo
+  logging config user_config post-fork pre-connection connect ehlo_parse ehlo
   helo_parse helo auth_parse auth auth-plain auth-login auth-cram-md5
   rcpt_parse rcpt_pre rcpt mail_parse mail mail_pre
-  data data_headers_end data_post queue_pre queue queue_post vrfy noop
+  data data_headers_end data_post_headers data_post queue_pre queue queue_post vrfy noop
   quit reset_transaction disconnect post-connection
   unrecognized_command deny ok received_line help
   );
@@ -31,25 +30,26 @@ sub hook_name {
 sub register_hook {
     my ($plugin, $hook, $method, $unshift) = @_;
 
-    die $plugin->plugin_name . " : Invalid hook: $hook" unless $hooks{$hook};
+    die $plugin->plugin_name . ": Invalid hook: $hook" unless $hooks{$hook};
 
-    $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, "hooking", $hook)
-      unless $hook =~ /logging/;    # can't log during load_logging()
+    if ($hook !~ /logging/) {    # can't log during load_logging()
+        $plugin->{_qp}->log(LOGDEBUG, $plugin->plugin_name, 'hooking', $hook);
+    }
 
     # I can't quite decide if it's better to parse this code ref or if
     # we should pass the plugin object and method name ... hmn.
     $plugin->qp->_register_hook(
         $hook,
         {
-         code => sub {
-             local $plugin->{_qp}   = shift;
-             local $plugin->{_hook} = $hook;
-             $plugin->$method(@_);
-         },
-         name => $plugin->plugin_name,
+            code => sub {
+                local $plugin->{_qp}   = shift;
+                local $plugin->{_hook} = $hook;
+                $plugin->$method(@_);
+            },
+            name => $plugin->plugin_name,
         },
         $unshift,
-                               );
+    );
 }
 
 sub _register {
@@ -100,7 +100,7 @@ sub adjust_log_level {
 
 sub transaction {
 
-    # not sure if this will work in a non-forking or a threaded daemon
+    # does this work in a non-forking or a threaded daemon?
     shift->qp->transaction;
 }
 
@@ -138,7 +138,7 @@ sub temp_dir {
 # usage:
 #  sub init {
 #    my $self = shift;
-#    $self->isa_plugin("rhsbl");
+#    $self->isa_plugin('rhsbl');
 #    $self->SUPER::register(@_);
 #  }
 sub isa_plugin {
@@ -165,30 +165,29 @@ sub isa_plugin {
     $self->compile($self->plugin_name . "_isa_$cleanParent",
                    $newPackage, "$parent_dir/$parent");
     warn "---- $newPackage\n";
-    no strict 'refs';
+    no strict 'refs';    ## no critic (strict)
     push @{"${currentPackage}::ISA"}, $newPackage;
 }
 
-# why isn't compile private?  it's only called from Plugin and Qpsmtpd.
 sub compile {
     my ($class, $plugin, $package, $file, $test_mode, $orig_name) = @_;
 
     my $sub;
-    open F, $file or die "could not open $file: $!";
+    open my $F, '<', $file or die "could not open $file: $!";
     {
         local $/ = undef;
-        $sub = <F>;
+        $sub = <$F>;
     }
-    close F;
+    close $F;
 
     my $line = "\n#line 0 $file\n";
 
     if ($test_mode) {
-        if (open(F, "t/plugin_tests/$orig_name")) {
+        if (open(my $F, '<', "t/plugin_tests/$orig_name")) {
             local $/ = undef;
             $sub .= "#line 1 t/plugin_tests/$orig_name\n";
-            $sub .= <F>;
-            close F;
+            $sub .= <$F>;
+            close $F;
         }
     }
 
@@ -207,12 +206,10 @@ sub compile {
         "\n",                               # last line comment without newline?
                    );
 
-    #warn "eval: $eval";
-
     $eval =~ m/(.*)/s;
     $eval = $1;
 
-    eval $eval;
+    eval $eval;                             ## no critic (Eval)
     die "eval $@" if $@;
 }
 
@@ -236,7 +233,7 @@ sub get_reject {
 
     # they asked for reject, we give them reject
     $self->log(LOGINFO, "fail" . $log_mess);
-    return ($self->get_reject_type(), $smtp_mess);
+    return $self->get_reject_type(), $smtp_mess;
 }
 
 sub get_reject_type {
@@ -268,7 +265,7 @@ sub store_deferred_reject {
         $self->connection->notes('naughty_reject_type',
                                  $self->{_args}{reject_type});
     }
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub store_auth_results {
@@ -276,21 +273,10 @@ sub store_auth_results {
     my $auths = $self->qp->connection->notes('authentication_results') or do {
         $self->qp->connection->notes('authentication_results', $result);
         return;
-        };
+    };
     my $ar = join('; ', $auths, $result);
     $self->log(LOGDEBUG, "auth-results: $ar");
-    $self->qp->connection->notes('authentication_results', $ar );
-};
-
-sub init_resolver {
-    my $self = shift;
-    my $timeout = $self->{_args}{dns_timeout} || shift || 5;
-    return $self->{_resolver} if $self->{_resolver};
-    $self->log(LOGDEBUG, "initializing Net::DNS::Resolver");
-    $self->{_resolver} = Net::DNS::Resolver->new(dnsrch => 0);
-    $self->{_resolver}->tcp_timeout($timeout);
-    $self->{_resolver}->udp_timeout($timeout);
-    return $self->{_resolver};
+    $self->qp->connection->notes('authentication_results', $ar);
 }
 
 sub is_immune {
@@ -321,9 +307,9 @@ sub is_naughty {
     my ($self, $setit) = @_;
 
     # see plugins/naughty
-    return $self->connection->notes('naughty') if ! defined $setit;
+    return $self->connection->notes('naughty') if !defined $setit;
 
-    $self->connection->notes('naughty', $setit);
+    $self->connection->notes('naughty',  $setit);
     $self->connection->notes('rejected', $setit);
 
     if ($self->connection->notes('naughty')) {
@@ -356,9 +342,29 @@ sub _register_standard_hooks {
     for my $hook (@hooks) {
         my $hooksub = "hook_$hook";
         $hooksub =~ s/\W/_/g;
-        $plugin->register_hook($hook, $hooksub)
-          if ($plugin->can($hooksub));
+        next if !$plugin->can($hooksub);
+        $plugin->register_hook($hook, $hooksub);
     }
+}
+
+sub db_args {
+    my ( $self, %arg ) = @_;
+    $self->validate_db_args(@_);
+    $self->{db_args} = \%arg if %arg;
+    $self->{db_args}{name} ||= $self->plugin_name;
+    $self->{db_args}{cnx_timeout} ||= 1;
+    return %{ $self->{db_args} };
+}
+
+sub db {
+    my ( $self, %arg ) = @_;
+    $self->validate_db_args(@_);
+    return $self->{db} ||= Qpsmtpd::DB->new( $self->db_args(%arg) );
+}
+
+sub validate_db_args {
+    (my $self, undef, my @args) = @_;
+    die "Invalid db arguments\n" if @args % 2;
 }
 
 1;

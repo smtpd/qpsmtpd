@@ -36,10 +36,6 @@ NOTE: other 'connect' hooks will continue to fire (e.g. dnsbl), since the DNS
 queries happen in the background.  This plugin's 'rcpt_handler' retrieves
 the results of the query and sets the connection note if found.
 
-If you switch to qpsmtpd-async and to the async version of this plugin, then
-the 'whitelisthost' connection note will be available to the other 'connect'
-hooks, see the documentation of the async plugin.
-
 =head1 AUTHOR
 
 John Peacock <jpeacock@rowman.com>
@@ -72,10 +68,10 @@ sub hook_connect {
 
     my $reversed_ip = join('.', reverse(split(/\./, $remote_ip)));
 
-    # we queue these lookups in the background and just fetch the
+    # queue lookups in the background and fetch the
     # results in the first rcpt handler
 
-    my $res = new Net::DNS::Resolver;
+    my $res = $self->get_resolver();
     my $sel = IO::Select->new();
 
     for my $dnsbl (keys %whitelist_zones) {
@@ -94,7 +90,7 @@ sub process_sockets {
 
     return $conn->notes('whitelisthost') if $conn->notes('whitelisthost');
 
-    my $res = new Net::DNS::Resolver;
+    my $res = $self->get_resolver();
     my $sel = $conn->notes('whitelist_sockets') or return '';
 
     $self->log(LOGDEBUG, "waiting for whitelist dns");
@@ -160,7 +156,7 @@ sub process_sockets {
 
 sub hook_rcpt {
     my ($self, $transaction, $rcpt, %param) = @_;
-    my $ip = $self->qp->connection->remote_ip or return (DECLINED);
+    my $ip = $self->qp->connection->remote_ip or return DECLINED;
     my $note = $self->process_sockets;
     if ($note) {
         $self->log(LOGNOTICE, "Host $ip is whitelisted: $note");

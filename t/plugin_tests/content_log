@@ -1,0 +1,82 @@
+#!perl -w
+
+use strict;
+use warnings;
+use POSIX qw( strftime );
+
+sub register_tests {
+    my ( $self ) = @_;
+    $self->register_test('test_content_log_file');
+    $self->register_test('test_content_log_enabled');
+    $self->register_test('test_exclude');
+}
+
+sub test_content_log_file {
+    my ( $self ) = @_;
+    is( $self->content_log_file,
+        strftime('mail/%Y%m%d', localtime(time)),
+        'content_log_file() returns the right default value' );
+    $self->mock_config( content_log_file => '/path/to/%Y%m%d%H%M' );
+    is( $self->content_log_file,
+        strftime('/path/to/%Y%m%d%H%M', localtime(time)),
+        'content_log_file config changes content_log_file() output' );
+    $self->unmock_config;
+}
+
+sub test_content_log_enabled {
+    my ( $self ) = @_;
+    ok( ! $self->content_log_enabled, 'content_log_enabled() returns false' );
+    my @test_data = (
+        {
+            config   => 'true',
+            expected => 1,
+        },
+        {
+            config   => undef,
+            expected => 1,
+        },
+        {
+            config   => '1',
+            expected => 1,
+        },
+        {
+            config   => 'yes',
+            expected => 1,
+        },
+        {
+            config   => 'yes    ',
+            expected => 1,
+        },
+        {
+            config   => '0',
+            expected => 0,
+        },
+        {
+            config   => 'false',
+            expected => 0,
+        },
+        {
+            config   => 'no',
+            expected => 0,
+        },
+        {
+            config   => 'asdf ',
+            expected => 0,
+        },
+    );
+    for ( @test_data ) {
+        my $descr = "content_log_enabled="
+            . ( defined $_->{config } ? "'$_->{config }'" : 'undef' )
+            . ( $_->{expected} ? ' enables' : ' disables' )
+            . ' content logging';
+        $self->mock_config( content_log_enabled => $_->{config } );
+        is( $self->content_log_enabled, $_->{expected}, $descr );
+    }
+    $self->unmock_config;
+}
+
+sub test_exclude {
+    my ( $self ) = @_;
+    ok( ! $self->exclude, 'exclude() default method returns false' );
+}
+

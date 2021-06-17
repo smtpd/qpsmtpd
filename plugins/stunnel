@@ -26,71 +26,43 @@ use strict;
 use warnings;
 use Qpsmtpd::Constants;
 
-my $proxy_enabled;
-sub init {
-	my ($self, $qp, %args) = @_;
+sub register {
+    my ($self, $qp, %args) = @_;
 
-	return if ( uc $args{proxy} ne 'ON' );
+    return if uc $args{proxy} ne 'ON';
 
-	$self->log(LOGINFO, "proxy protocol enabled");
-	$proxy_enabled = 1;
+    $self->log(LOGINFO, "proxy protocol enabled");
+
+    $self->register_hook('unrecognized_command', 'stunnel');
 }
 
-sub hook_unrecognized_command {
-	my ($self, $transaction, $cmd, @args) = @_;
+sub stunnel {
+    my ($self, $transaction, $cmd, @args) = @_;
 
-	return OK if ( uc $cmd ne 'PROXY' );
-	return OK if ( !defined $proxy_enabled );
-	return DENY_DISCONNECT if ( $self->connection->remote_ip() ne '127.0.0.1' );
-	return DENY_DISCONNECT if ( $self->connection->notes('proxy') );
+    return OK              if uc $cmd ne 'PROXY';
+    return DENY_DISCONNECT if $self->connection->remote_ip() ne '127.0.0.1';
+    return DENY_DISCONNECT if $self->connection->notes('proxy');
 
-	# TCP4 192.168.41.227 10.27.11.106 50060 465
-	if ( $args[0] =~ m/^(.*?) (.*?) (.*?) (.*?) (.*?)$/ ) {
-		my $protocol = $1;
-		my $remote_ip = $2;
-		my $local_ip = $3;
-		my $remote_port = $4;
-		my $local_port = $5;
-		$self->connection->remote_ip( $remote_ip );
-		$self->connection->remote_port( $remote_port );
-		$self->connection->remote_info( "[$remote_ip]");
+    # TCP4 192.168.41.227 10.27.11.106 50060 465
+    if ($args[0] !~ m/^(.*?) (.*?) (.*?) (.*?) (.*?)$/) {
+        return DENY_DISCONNECT;
+    }
 
-		$self->connection->notes('proxy', 'YES');
-		$self->connection->notes('protocol', $protocol);
-		$self->connection->notes('remote_ip', $remote_ip);
-		$self->connection->notes('remote_port', $remote_port);
-		$self->connection->notes('local_ip', $local_ip);
-		$self->connection->notes('local_port', $local_port);
-		$self->log(LOGINFO, "stunnel : $remote_ip:$remote_port");
+    $self->connection->remote_ip($2);
+    $self->connection->remote_port($4);
+    $self->connection->remote_info("[$2]");
 
-		# DNS reverse 
-		if ( $self->isa('Qpsmtpd::PollServer') ) {
-		eval {
-			use ParaDNS;
-			ParaDNS->new(
-				finished => sub { $self->continue_read() },
-				callback => sub { $self->connection->remote_host($_[0]) },
-				host     => $remote_ip,
-		    	);
+    $self->connection->notes('proxy',       'YES');
+    $self->connection->notes('protocol',    $1);
+    $self->connection->notes('remote_ip',   $2);
+    $self->connection->notes('local_ip',    $3);
+    $self->connection->notes('remote_port', $4);
+    $self->connection->notes('local_port',  $5);
+    $self->log(LOGINFO, "stunnel : $2:$4");
 
-		};
-		}
-		else {
-		    my $res = Net::DNS::Resolver->new( dnsrch => 0 );
-		    $res->tcp_timeout(3);
-		    $res->udp_timeout(3);
-		    my $query = $res->query( $remote_ip, 'PTR' );
-		    if ($query) {
-			foreach my $rr ($query->answer) {
-			    next if $rr->type ne 'PTR';
-			    $self->connection->remote_host( $rr->ptrdname );
-			}
-		    }
-		}
-	}
-	else {
-		return DENY_DISCONNECT;
-	}
-	return DONE;
+    # DNS reverse
+    my @ptrs = $self->resolve_ptr($self->connection->remote_ip);
+    $self->connection->remote_host($ptrs[0]);
+    return DONE;
 }
 

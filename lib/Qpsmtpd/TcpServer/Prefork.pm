@@ -1,9 +1,11 @@
 package Qpsmtpd::TcpServer::Prefork;
-use Qpsmtpd::TcpServer;
-use Qpsmtpd::SMTP::Prefork;
+use strict;
+
+use lib 'lib';
 use Qpsmtpd::Constants;
 
-@ISA = qw(Qpsmtpd::SMTP::Prefork Qpsmtpd::TcpServer);
+use parent 'Qpsmtpd::SMTP::Prefork';
+use parent 'Qpsmtpd::TcpServer';
 
 my $first_0;
 
@@ -57,7 +59,7 @@ sub respond {
     if (!$self->check_socket()) {
         $self->log(LOGERROR,
                    "Lost connection to client, cannot send response.");
-        return (0);
+        return 0;
     }
 
     while (my $msg = shift @messages) {

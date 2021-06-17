@@ -1,4 +1,3 @@
-#!/usr/bin/perl -w
 package Qpsmtpd::Address;
 use strict;
 
@@ -21,13 +20,6 @@ stringify to a standard form, and they have an overloaded comparison
 for easy testing of values.
 
 =head1 METHODS
-
-=cut
-
-use overload (
-              '""'  => \&format,
-              'cmp' => \&_addr_cmp,
-             );
 
 =head2 new()
 
@@ -56,14 +48,22 @@ test for equality (like in badmailfrom).
 
 =cut
 
+use overload (
+              '""'  => \&format,
+              'cmp' => \&_addr_cmp,
+             );
+
 sub new {
     my ($class, $user, $host) = @_;
     my $self = {};
-    if ($user =~ /^<(.*)>$/) {
-        ($user, $host) = $class->canonify($user);
-        return undef unless defined $user;
+    if (! defined $user) {
+        # Do nothing
     }
-    elsif (not defined $host) {
+    elsif ($user =~ /^<(.*)>$/) {
+        ($user, $host) = $class->canonify($user);
+        return if !defined $user;
+    }
+    elsif (!defined $host) {
         my $address = $user;
         ($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
     }
@@ -193,52 +193,50 @@ sub canonify {
     my ($dummy, $path) = @_;
 
     # strip delimiters
-    return undef unless ($path =~ /^<(.*)>$/);
+    if ($path !~ /^<(.*)>$/) {
+        return undef, undef, 'missing delimiters'; ## no critic (undef)
+    };
     $path = $1;
 
-    my $domain =
-        $domain_expr
-      ? $domain_expr
-      : "$subdomain_expr(?:\.$subdomain_expr)*";
+    my $domain_re = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
 
-    # it is possible for $address_literal_expr to be empty, if a site
-    # doesn't want to allow them
-    $domain = "(?:$address_literal_expr|$domain)"
-      if !$domain_expr and $address_literal_expr;
+    # $address_literal_expr may be empty, if a site doesn't allow them
+    if (!$domain_expr && $address_literal_expr) {
+        $domain_re = "(?:$address_literal_expr|$domain_re)";
+    };
 
     # strip source route
-    $path =~ s/^\@$domain(?:,\@$domain)*://;
+    $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
 
     # empty path is ok
-    return "" if $path eq "";
+    if ($path eq '') {
+        return '', undef, 'empty path';
+    };
 
-    # bare postmaster is permissible, perl RFC-2821 (4.5.1)
-    return ("postmaster", undef) if $path =~ m/^postmaster$/i;
+    # bare postmaster is permissible, per RFC-2821 (4.5.1)
+    if ( $path =~ m/^postmaster$/i ) {
+        return 'postmaster', undef, 'bare postmaster';
+    }
 
-    my ($localpart, $domainpart) = ($path =~ /^(.*)\@($domain)$/);
-    return (undef) unless defined $localpart;
+    my ($localpart, $domainpart) = $path =~ /^(.*)\@($domain_re)$/;
+    if (!defined $localpart) {
+        return;
+    };
 
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
-
-        # simple case, we are done
-        return ($localpart, $domainpart);
+        return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
     }
+
     if ($localpart =~ /^"(($qtext_expr|\\$text_expr)*)"$/) {
         $localpart = $1;
         $localpart =~ s/\\($text_expr)/$1/g;
-        return ($localpart, $domainpart);
+        return $localpart, $domainpart;
     }
-    return (undef);
+    return undef, undef, 'fall through';  ## no critic (undef)
 }
 
-=head2 parse()
-
-Retained as a compatibility method, it is completely equivalent
-to new() called with a single parameter.
-
-=cut
-
-sub parse {    # retain for compatibility only
+sub parse {
+# Retained for compatibility
     return shift->new(shift);
 }
 
@@ -281,7 +279,7 @@ stringification operator, so the following are equivalent:
 sub format {
     my ($self) = @_;
     my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
-    return '<>' unless defined $self->{_user};
+    return '<>' if !defined $self->{_user};
     if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
         return
           qq(<"$user")
@@ -338,6 +336,25 @@ sub notes {
     return $self->{_notes}->{$key} = shift;
 }
 
+=head2 config($value)
+
+Looks up a configuration directive based on this recipient, using any plugins that utilize
+hook_user_config
+
+=cut
+
+sub qp {
+    my $self = shift;
+    $self->{qp} = $_[0] if @_;
+    return $self->{qp};
+}
+
+sub config {
+    my ($self, $key) = @_;
+    my $qp = $self->qp or return;
+    return $qp->config($key, $self);
+}
+
 sub _addr_cmp {
     require UNIVERSAL;
     my ($left, $right, $swap) = @_;
@@ -355,7 +372,7 @@ sub _addr_cmp {
         ($right, $left) = ($left, $right);
     }
 
-    return ($left cmp $right);
+    return $left cmp $right;
 }
 
 =head1 COPYRIGHT

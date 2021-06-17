@@ -110,7 +110,7 @@ sub hook_data_post {
 
     if ($signal) {
         $self->log(LOGWARN, "kavscanner exited with signal: $signal");
-        return (DECLINED);
+        return DECLINED;
     }
 
     my $description = 'clean';
@@ -187,6 +187,6 @@ sub hook_data_post {
 
     $transaction->header->add('X-Virus-Checked',
                               'Checked by ' . $self->qp->config("me"));
-    return (DECLINED);
+    return DECLINED;
 }
 

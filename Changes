@@ -1,4 +1,64 @@
 
+0.96  Feb 16, 2016
+
+  Fix DMARC authentication-result string (#244)
+
+  Replace all occurances of CR in X-Spam-Status (#247)
+
+  In helo, check *every* regex, not just first (#246)
+
+  badrcpt use reason, and defined-ness test (#245)
+
+  DMARC plugin: Added option to disable reporting (#242)
+
+  Add perms test to Qpsmtpd::DB::File::DBM::dir() (#234)
+
+  Skip greylisting when we can't talk to greylist DB (#233)
+
+  Change fake_{config,hook} to mock_{config,hook} (#232)
+
+  Use a fake greeting for testing run_continuation() (#231)
+
+
+0.95  Feb 11, 2015
+
+  tls: adding support of Perfect Forward Secrecy (biergaizi)
+
+  more test coverage
+
+  misc updates to tests and docs
+
+  use perl DNS methods instead of shell cmds
+
+  tidier testing (t/tmp/*) vs scattershot
+
+  greylisting plugin adds Redis support
+
+  Qpsmtpd::DB with DBM and Redis classes
+
+  Auth-Results header won't be modified if DKIM signed
+
+  ordering headers to improve SpamAssassin interaction (priyadi)
+
+  disable SSLv3
+
+  fcrdns: add tests and improved localhost detection
+
+  added data_post_headers hook (priyadi)
+
+  added preliminary support for GeoIP v2 and ASN lookups from GeoIP DBs
+
+  make content log location configurable
+
+  added script for fetching GeoIP dbs
+
+  added auth_imap plugin (Graham Todd)
+
+  improved IPv6 support
+
+  removed async everything (unsupported and stagnant)
+
+
 0.94  Sep 05, 2014
 
   Added null char in username check to auth_cvm plugin

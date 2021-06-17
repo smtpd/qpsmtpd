@@ -1,0 +1,51 @@
+.TH qpsmtpd-forkserver 8
+
+.SH NAME
+qpsmtpd\-forkserver \- Fork\-on\-demand server for qpsmtpd
+
+.SH SYNOPSIS
+.na
+.B qpsmtpd\-forkserver
+.RI [ options ]
+.ad
+
+.SH DESCRIPTION
+.LP
+\fBqpsmtpd\-forkserver\fR is the qpsmtpd frontend script which binds to the SMTP TCP socket and forks as clients connect.
+
+.SH OPTIONS
+.TP
+.BR \-\-port\ \fIport\fR,\ \-p\ \fIport\fR
+Binds to a specific \fIport\fR, instead of the default 2525.
+
+.TP
+.BR \-\-user\ \fIuser\fR,\ \-u\ \fIuser\fR
+On startup, switch to run as \fIuser\fR instead of the starting user.  Applies only when started as root (as is normal when listening on port 25).
+
+.TP
+.BR \-\-limit\-connections\ \fIlimit\fR,\ \-c\ \fIlimit\fR
+Accept at most \fIlimit\fR simultaneous connections.  Inbound connections beyondthis limit will be deferred or refused.
+
+.TP
+.BR \-\-max\-from\-ip\ \fIlimit\fR,\ \-m\ \fIlimit\fR
+Accept at most \fIlimit\fR simultaneous connections from any given IP address; does not override \fB\-\-limit\-connections\fR, if set.
+
+.TP
+.BR \-\-listen\-address\ \fIaddr\fR,\ \-l\ \fIaddr\fR
+Bind to the local address \fIaddr\fR, instead of the default behavior of binding to all interfaces.  Can be specified multiple times to bind to more than one interface or local address.
+
+.TP
+.BR \-\-detach,\ \-d
+Detach from the controlling terminal at startup, to run as a standalone daemon.  See also \fB--pid-file\fR.
+
+.TP
+.BR \-\-pid-file\ \fIfilename\fR
+Upon startup, and after daemonizing if applicable, write the process ID to \fIfilename\fR, for use by sysvinit control scripts or similar utilities.
+
+.SH AUTHOR
+.LP
+Ask Bjorn Hansen <ask@develooper.com>
+.br
+http://smtpd.develooper.com/
+
+

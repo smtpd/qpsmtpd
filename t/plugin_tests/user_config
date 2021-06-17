@@ -1,0 +1,55 @@
+#!perl -w
+
+use strict;
+use warnings;
+use File::Path;
+use Qpsmtpd::Constants;
+
+BEGIN {    # need this to happen before anything else
+    my $cwd = `pwd`;
+    chomp($cwd);
+    open my $spooldir, '>', "./config.sample/spool_dir";
+    print $spooldir "$cwd/t/tmp";
+    close $spooldir;
+}
+
+sub register_tests {
+    my ($self) = @_;
+    $self->register_test('test_hook_user_config');
+}
+
+sub test_hook_user_config {
+    my ($self) = @_;
+    my $dirname = $self->qp->temp_dir;
+    $self->{pattern} = $dirname . '/%u_%h_%a';
+    $dirname .= '/testuser_testhost_testaddress';
+    -d $dirname
+      or mkdir($dirname, 0700)
+      or die "Could not create $dirname: $!";
+    open my $fh, '>', "$dirname/testfield";
+    print $fh "testdata";
+    close $fh;
+    my $a = FakeAddress->new(
+                             user    => 'testuser',
+                             host    => 'testhost',
+                             address => 'testaddress'
+                            );
+    my ($r, $value) =
+      $self->hook_user_config($self->qp->transaction, $a, 'testfield');
+    is($r, OK, 'hook_user_config returned OK when config file present');
+    is($value, 'testdata', 'hook_user_config returned the correct value');
+    ($r, $value) =
+      $self->hook_user_config($self->qp->transaction, $a, 'noconfig');
+    is($r, DECLINED,
+        'hook_user_config returned DECLINED when no config file present');
+    is($value, undef,
+        'hook_user_config returned no value when no config file present');
+    rmtree($dirname);
+}
+
+package FakeAddress;
+
+sub new     { return bless {@_}, shift; }
+sub address { return shift->{address} }
+sub user    { return shift->{user} }
+sub host    { return shift->{host} }

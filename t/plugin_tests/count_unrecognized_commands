@@ -8,8 +8,8 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_hook_unrecognized_command', 4);
-};
+    $self->register_test('test_hook_unrecognized_command');
+}
 
 sub test_hook_unrecognized_command {
     my $self = shift;
@@ -28,4 +28,4 @@ sub test_hook_unrecognized_command {
     cmp_ok( $code, '==', DENY_DISCONNECT, "over limit" );
 
     cmp_ok( $self->connection->notes( 'unrec_cmd_count'), '==', 4, "correct increment" );
-};
+}

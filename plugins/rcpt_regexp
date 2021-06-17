@@ -45,7 +45,7 @@ use Qpsmtpd::Constants;
 
 sub hook_rcpt {
     my ($self, $transaction, $recipient) = @_;
-    return (DECLINED)
+    return DECLINED
       unless $recipient->host && $recipient->user;
 
     my $rcpt = lc $recipient->user . '@' . $recipient->host;
@@ -93,7 +93,7 @@ sub hook_rcpt {
             $self->log(LOGDEBUG, "RE $re matched $rcpt, returning $ok");
         }
 
-        return ($const, $comment);
+        return $const, $comment;
     }
-    return (DECLINED);
+    return DECLINED;
 }

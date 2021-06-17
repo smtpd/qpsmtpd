@@ -1,10 +1,8 @@
 package Qpsmtpd::Transaction;
-use Qpsmtpd;
-@ISA = qw(Qpsmtpd);
 use strict;
 use warnings;
 
-use Qpsmtpd::Utils;
+use parent 'Qpsmtpd';
 use Qpsmtpd::Constants;
 
 use IO::File qw(O_RDWR O_CREAT);
@@ -162,10 +160,10 @@ sub body_write {
     }
 }
 
-sub body_size {    # depreceated, use data_size() instead
+sub body_size {    # deprecated, use data_size() instead
     my $self = shift;
     $self->log(LOGWARN,
-               "WARNING: body_size() is depreceated, use data_size() instead");
+               "WARNING: body_size() is deprecated, use data_size() instead");
     $self->{_body_size} || 0;
 }
 

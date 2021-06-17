@@ -227,6 +227,8 @@ additional check ideas from Haraka helo plugin
 use strict;
 use warnings;
 
+use Net::IP;
+
 use Qpsmtpd::Constants;
 
 sub register {
@@ -241,7 +243,7 @@ sub register {
         $self->{_args}{reject} = 1;
     }
     $self->populate_tests();
-    $self->init_resolver() or return;
+    $self->get_resolver() or return;
 
     $self->register_hook('helo',      'helo_handler');
     $self->register_hook('ehlo',      'helo_handler');
@@ -277,7 +279,7 @@ sub data_post_handler {
     $transaction->header->delete('X-HELO');
     $transaction->header->add('X-HELO', $self->qp->connection->hello_host, 0);
 
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub populate_tests {
@@ -305,10 +307,12 @@ sub is_in_badhelo {
     $host = lc $host;
     foreach my $bad ($self->qp->config('badhelo')) {
         if ($bad =~ /[\{\}\[\]\(\)\^\$\|\*\+\?\\\!]/) {    # it's a regexp
-            return $self->is_regex_match($host, $bad);
+            if ($self->is_regex_match($host, $bad)) {
+                return $error, "in badhelo";
+            }
         }
         if ($host eq lc $bad) {
-            return ($error, "in badhelo");
+            return $error, "in badhelo";
         }
     }
     return;
@@ -325,67 +329,71 @@ sub is_regex_match {
         if ($host !~ /$pattern/) {
 
             #$self->log( LOGDEBUG, "matched ($pattern)");
-            return ($error, "badhelo pattern match ($pattern)");
+            return $error, "badhelo pattern match ($pattern)";
         }
         return;
     }
     if ($host =~ /$pattern/) {
 
         #$self->log( LOGDEBUG, "matched ($pattern)");
-        return ($error, "badhelo pattern match ($pattern)");
+        return $error, "badhelo pattern match ($pattern)";
     }
     return;
 }
 
 sub invalid_localhost {
     my ($self, $host) = @_;
-    return if lc $host ne 'localhost';
-    if ($self->qp->connection->remote_ip ne '127.0.0.1') {
-
-        #$self->log( LOGINFO, "fail, not localhost" );
-        return ("You are not localhost", "invalid localhost");
+    if ($self->is_localhost($self->qp->connection->remote_ip)) {
+        $self->log(LOGDEBUG, "pass, is localhost");
+        return;
     }
-    $self->log(LOGDEBUG, "pass, is localhost");
-    return;
+    if ($host && lc $host ne 'localhost') {
+        $self->log(LOGDEBUG, "pass, host is localhost");
+        return;
+    };
+
+    #$self->log( LOGINFO, "fail, not localhost" );
+    return "You are not localhost", "invalid localhost";
 }
 
 sub is_plain_ip {
     my ($self, $host) = @_;
-    return if $host =~ /[^\d\.]+/;    # has chars other than digits and a dot
-    return if $host !~ m/^(\d{1,3}\.){3}\d{1,3}$/;
+    return if ! $self->is_valid_ip($host);
 
     $self->log(LOGDEBUG, "fail, plain IP");
-    return ("Plain IP is invalid HELO hostname (RFC 2821)", "plain IP");
+    return "Plain IP is invalid HELO hostname (RFC 2821)", "plain IP";
 }
 
 sub is_address_literal {
     my ($self, $host) = @_;
-    return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+
+    my ($ip) = $host =~ /^\[(.*)\]/;  # strip off any brackets
+    return if !$ip;   # no brackets, not a literal
+
+    return if ! $self->is_valid_ip($ip);
 
     $self->log(LOGDEBUG, "fail, bracketed IP");
-    return ("RFC 2821 allows an address literal, but we do not",
-            "bracketed IP");
+    return "RFC 2821 allows an address literal, but we do not","bracketed IP";
 }
 
 sub is_forged_literal {
     my ($self, $host) = @_;
-    return if $host !~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;
+    return if ! $self->is_valid_ip($host);
 
-  # should we add exceptions for reserved internal IP space? (192.168,10., etc?)
+  # should we add exceptions for reserved internal IP space? (192.168,10., etc)
     $host = substr $host, 1, -1;
     return if $host eq $self->qp->connection->remote_ip;
-    return ("Forged IPs not accepted here", "forged IP literal");
+    return "Forged IPs not accepted here", "forged IP literal";
 }
 
 sub is_not_fqdn {
     my ($self, $host) = @_;
     return if $host =~ m/^\[(\d{1,3}\.){3}\d{1,3}\]$/;   # address literal, skip
     if ($host !~ /\./) {                                 # has no dots
-        return ("HELO name is not fully qualified. Read RFC 2821", "not FQDN");
+        return "HELO name is not fully qualified. Read RFC 2821", "not FQDN";
     }
     if ($host =~ /[^a-zA-Z0-9\-\.]/) {
-        return ("HELO name contains invalid FQDN characters. Read RFC 1035",
-                "invalid FQDN chars");
+        return "HELO name contains invalid FQDN characters. Read RFC 1035","invalid FQDN chars";
     }
     return;
 }
@@ -395,14 +403,14 @@ sub no_forward_dns {
 
     return if $self->is_address_literal($host);
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
 
     $host = "$host." if $host !~ /\.$/;    # fully qualify name
-    my $query = $res->search($host);
+    my $query = $res->query($host);
 
     if (!$query) {
         if ($res->errorstring eq 'NXDOMAIN') {
-            return ("HELO hostname does not exist", "no such host");
+            return "HELO hostname does not exist", "no such host";
         }
         $self->log(LOGERROR, "skip, query failed (", $res->errorstring, ")");
         return;
@@ -418,22 +426,21 @@ sub no_forward_dns {
         $self->log(LOGDEBUG, "pass, forward DNS") if $hits;
         return;
     }
-    return ("HELO hostname did not resolve", "no forward DNS");
+    return "HELO hostname did not resolve", "no forward DNS";
 }
 
 sub no_reverse_dns {
     my ($self, $host, $ip) = @_;
 
-    my $res = $self->init_resolver();
+    my $res = $self->get_resolver();
     $ip ||= $self->qp->connection->remote_ip;
 
     my $query = $res->query($ip) or do {
         if ($res->errorstring eq 'NXDOMAIN') {
-            return ("no rDNS for $ip", "no rDNS");
+            return "no rDNS for $ip", "no rDNS";
         }
         $self->log(LOGINFO, $res->errorstring);
-        return ("error getting reverse DNS for $ip",
-                "rDNS " . $res->errorstring);
+        return "error getting reverse DNS for $ip", "rDNS " . $res->errorstring;
     };
 
     my $hits = 0;
@@ -447,7 +454,7 @@ sub no_reverse_dns {
         $self->log(LOGDEBUG, "has rDNS");
         return;
     }
-    return ("no reverse DNS for $ip", "no rDNS");
+    return "no reverse DNS for $ip", "no rDNS";
 }
 
 sub no_matching_dns {
@@ -476,22 +483,32 @@ sub no_matching_dns {
     }
 
     $self->log(LOGINFO, "fail, no forward or reverse DNS match");
-    return ("That HELO hostname fails FCrDNS", "no matching DNS");
+    return "That HELO hostname fails FCrDNS", "no matching DNS";
 }
 
 sub check_ip_match {
     my $self = shift;
     my $ip = shift or return;
 
-    if ($ip eq $self->qp->connection->remote_ip) {
+    my $rip = $self->qp->connection->remote_ip;
+    if ($ip eq $rip) {
         $self->log(LOGDEBUG, "forward ip match");
         $self->connection->notes('helo_forward_match', 1);
         return;
     }
 
-    my $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
-    my $rem_net =
-      join('.', (split(/\./, $self->qp->connection->remote_ip))[0, 1, 2]);
+    my ($dns_net, $rem_net);
+    if ($ip =~ /:/) {
+        if ($ip  =~ /::/) { $ip  = Net::IP::ip_expand_address($ip,  6); }
+        if ($rip =~ /::/) { $rip = Net::IP::ip_expand_address($rip, 6); }
+
+        $dns_net = join(':', (split(/:/, $ip ))[0, 1, 2, 3, 4, 5]);
+        $rem_net = join(':', (split(/:/, $rip))[0, 1, 2, 3, 4, 5]);
+    }
+    else {
+        $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
+        $rem_net = join('.', (split(/\./, $rip))[0, 1, 2]);
+    }
 
     if ($dns_net eq $rem_net) {
         $self->log(LOGNOTICE, "forward network match");

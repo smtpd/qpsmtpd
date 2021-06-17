@@ -1,12 +1,19 @@
 package Test::Qpsmtpd;
 use strict;
+
+use Carp qw(croak);
+use Test::More;
+
 use lib 't';
 use lib 'lib';
-use Carp qw(croak);
-use base qw(Qpsmtpd::SMTP);
-use Test::More;
+use parent 'Qpsmtpd::SMTP';
+
 use Qpsmtpd::Constants;
 use Test::Qpsmtpd::Plugin;
+
+if ( ! -d 't/tmp' ) {
+    mkdir 't/tmp' or warn "Could not create temporary testing directory:$!";
+}
 
 sub new_conn {
     ok(my $smtpd = __PACKAGE__->new(), "new");
@@ -63,33 +70,37 @@ sub command {
 }
 
 sub input {
-    my $self    = shift;
-    my $command = shift;
+    my ($self, $command) = @_;
 
     my $timeout = $self->config('timeout');
     alarm $timeout;
 
     $command =~ s/\r?\n$//s;    # advanced chomp
     $self->log(LOGDEBUG, "dispatching $command");
-    defined $self->dispatch(split / +/, $command, 2)
-      or $self->respond(502, "command unrecognized: '$command'");
+    if (!defined $self->dispatch(split / +/, $command, 2)) {
+        $self->respond(502, "command unrecognized: '$command'");
+    }
     alarm $timeout;
 }
 
 sub config_dir {
     return './t/config' if $ENV{QPSMTPD_DEVELOPER};
-    './config.sample';
+    return './config.sample';
 }
 
 sub plugin_dirs {
-    ('./plugins', './plugins/ident', './plugins/async');
+    ('./plugins', './plugins/ident');
 }
 
 sub log {
     my ($self, $trace, $hook, $plugin, @log) = @_;
     my $level = Qpsmtpd::TRACE_LEVEL() || 5;
-    $level = $self->init_logger unless defined $level;
-    print("# " . join(" ", $$, @log) . "\n") if $trace <= $level;
+    $level = $self->init_logger if !defined $level;
+    return if $trace > $level;
+    print("# " . join(' ', $$, @log) . "\n");
+    ( undef, undef, my @record_args ) = @_;
+    push @{ $self->{_logged} }, log_level($trace) . ":"
+      . join '', grep { defined } @record_args;
 }
 
 sub varlog {
@@ -100,28 +111,80 @@ sub varlog {
 # sub disconnect
 
 sub run_plugin_tests {
-    my $self = shift;
+    my ($self, $only_plugin) = @_;
     $self->{_test_mode} = 1;
     my @plugins = $self->load_plugins();
-
-    # First count test number
-    my $num_tests = 0;
-    foreach my $plugin (@plugins) {
-        $plugin->register_tests();
-        $num_tests += $plugin->total_tests();
-    }
 
     require Test::Builder;
     my $Test = Test::Builder->new();
 
-    $Test->plan(tests => $num_tests);
-
-    # Now run them
-
     foreach my $plugin (@plugins) {
+        next if ($only_plugin && $plugin !~ /$only_plugin/);
+        $plugin->register_tests();
         $plugin->run_tests($self);
     }
+    $Test->done_testing();
+}
+
+sub mock_hook {
+    ###########################################################################
+    # Inserts a given subroutine into the beginning of the set of hooks already
+    # in place. Used to test code against different potential plugins it will
+    # interact with. For example, to test behavior against various results of
+    # the data_post hook:
+    #
+    # $self->mock_hook('data_post',sub { return DECLINED };
+    # ok(...);
+    # $self->mock_hook('data_post',sub { return DENYSOFT };
+    # ok(...);
+    # $self->mock_hook('data_post',sub { return DENY };
+    # ok(...);
+    # $self->mock_hook('data_post',sub { return DENY_DISCONNECT };
+    # ok(...);
+    # $self->unmock_hook('data_post');
+    ###########################################################################
+    my ( $self, $hook, $sub ) = @_;
+    unshift @{ $self->hooks->{$hook} ||= [] },
+        {
+            name => '___MockHook___',
+            code => $sub,
+        };
+}
+
+sub unmock_hook {
+    my ( $self, $hook ) = @_;
+    $self->hooks->{$hook} = [
+        grep { $_->{name} ne '___MockHook___' }
+        @{ $self->hooks->{$hook} || [] }
+    ];
+}
+
+sub mock_config {
+    ####################################################################
+    # Used to test code against various possible configurations
+    # For example, to test against various possible config('me') values:
+    #
+    # $self->mock_config( me => '***invalid***' );
+    # ok(...);
+    # $self->mock_config( me => 'valid-nonfqdn' );
+    # ok(...);
+    # $self->mock_config( me => 'valid-fqdn.com');
+    # ok(...);
+    # $self->unmock_config();
+    ####################################################################
+    my $self = shift;
+    my $mock_config = {@_};
+    $self->mock_hook( 'config',
+        sub {
+            my ( $self, $txn, $conf ) = @_;
+            return DECLINED if ! exists $mock_config->{$conf};
+            return OK, $mock_config->{$conf};
+    } );
+}
+
+sub unmock_config {
+    my ( $self ) = @_;
+    $self->unmock_hook('config');
 }
 
 1;
-

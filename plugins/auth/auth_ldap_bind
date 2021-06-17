@@ -135,7 +135,7 @@ sub authldap {
  # log error here and DECLINE if no baseDN, because a custom baseDN is required:
     unless ($ldbase) {
         $self->log(LOGERROR, "skip: please configure ldap_base");
-        return (DECLINED, "authldap - temporary auth error");
+        return DECLINED, "authldap - temporary auth error";
     }
     $ldwait  = $self->{"ldconf"}->{'ldap_timeout'};
     $ldmattr = $self->{"ldconf"}->{'ldap_auth_filter_attr'};
@@ -145,7 +145,7 @@ sub authldap {
     # find dn of user matching supplied username
     $ldh = Net::LDAP->new($ldhost, port => $ldport, timeout => $ldwait) or do {
         $self->log(LOGALERT, "skip: error in initial conn");
-        return (DECLINED, "authldap - temporary auth error");
+        return DECLINED, "authldap - temporary auth error";
     };
 
     # find the user's DN
@@ -159,14 +159,14 @@ sub authldap {
                         )
       or do {
         $self->log(LOGALERT, "skip: err in search for user");
-        return (DECLINED, "authldap - temporary auth error");
+        return DECLINED, "authldap - temporary auth error";
       };
 
     # deal with errors if they exist
     if ($mesg->code) {
         $self->log(LOGALERT,
                    "skip: err " . $mesg->code . " in search for user");
-        return (DECLINED, "authldap - temporary auth error");
+        return DECLINED, "authldap - temporary auth error";
     }
 
     # unbind, so as to allow a rebind below
@@ -175,12 +175,12 @@ sub authldap {
     # bind against directory as user with password supplied
     if (!$mesg->count || $lduserdn = $mesg->entry->dn) {
         $self->log(LOGALERT, "fail: user not found");
-        return (DECLINED, "authldap - wrong username or password");
+        return DECLINED, "authldap - wrong username or password";
     }
 
     $ldh = Net::LDAP->new($ldhost, port => $ldport, timeout => $ldwait) or do {
         $self->log(LOGALERT, "skip: err in user conn");
-        return (DECLINED, "authldap - temporary auth error");
+        return DECLINED, "authldap - temporary auth error";
     };
 
     # here's the whole reason for the script
@@ -190,11 +190,10 @@ sub authldap {
     # deal with errors if they exist, or allow success
     if ($mesg->code) {
         $self->log(LOGALERT, "fail: error in user bind");
-        return (DECLINED, "authldap - wrong username or password");
+        return DECLINED, "authldap - wrong username or password";
     }
 
     $self->log(LOGINFO,  "pass: $user auth success");
     $self->log(LOGDEBUG, "user: $user, pass: $passClear");
-    return (OK, "authldap");
+    return OK, "authldap";
 }
-

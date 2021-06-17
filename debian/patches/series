@@ -1,0 +1,3 @@
+pod2man-utf8.patch
+auth_ldap_bind-syntax.patch
+pre0.94-checkplugins.patch

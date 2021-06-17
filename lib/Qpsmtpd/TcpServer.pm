@@ -1,23 +1,23 @@
 package Qpsmtpd::TcpServer;
-use Qpsmtpd::SMTP;
-use Qpsmtpd::Constants;
-use Socket;
-
-@ISA = qw(Qpsmtpd::SMTP);
 use strict;
 
 use POSIX ();
+use Socket;
+
+use lib 'lib';
+use Qpsmtpd::Base;
+use Qpsmtpd::Constants;
+use parent 'Qpsmtpd::SMTP';
+
+my $base = Qpsmtpd::Base->new();
 
 my $has_ipv6 = 0;
 if (
-    eval { require Socket6; }
-    &&
-
-    # INET6 prior to 2.01 will not work; sorry.
-    eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION("2.00"); }
+    eval { require Socket6; } &&
+    eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION('2.51'); }
    )
 {
-    Socket6->import(qw(inet_ntop));
+    Socket6->import('inet_ntop');
     $has_ipv6 = 1;
 }
 
@@ -27,62 +27,71 @@ sub has_ipv6 {
 
 my $first_0;
 
+sub conn_info_tcpserver {
+
+    # started from tcpserver (or some other superserver which
+    # exports the TCPREMOTE* variables.
+
+    my $r_host = $ENV{TCPREMOTEHOST} || '[' . $ENV{TCPREMOTEIP} . ']';
+    return (
+        local_ip    => $ENV{TCPLOCALIP},
+        local_host  => $ENV{TCPLOCALHOST},
+        local_port  => $ENV{TCPLOCALPORT},
+        remote_ip   => $ENV{TCPREMOTEIP},
+        remote_host => $r_host,
+        remote_info => $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$r_host" : $r_host,
+        remote_port => $ENV{TCPREMOTEPORT},
+    )
+}
+
+sub conn_info_inetd {
+    my $self = shift;
+
+    # Started from inetd or similar.
+    # get info on the remote host from the socket.
+    # ignore ident/tap/...
+
+    my $hersockaddr = getpeername(STDIN) or die "getpeername failed:" .
+        " $0 must be called from tcpserver, (x)inetd or" .
+        " a similar program which passes a socket to stdin";
+
+    my ($r_port, $iaddr) = sockaddr_in($hersockaddr);
+    my $r_ip = inet_ntoa($iaddr);
+    my ($r_host) = $base->resolve_ptr($r_ip) || "[$r_ip]";
+
+    return (
+        local_ip    => '',
+        local_host  => '',
+        local_port  => '',
+        remote_ip   => $r_ip,
+        remote_host => $r_host,
+        remote_info => $r_host,
+        remote_port => $r_port,
+    )
+}
+
 sub start_connection {
     my $self = shift;
 
-    my (
-        $remote_host, $remote_info, $remote_ip, $remote_port,
-        $local_ip,    $local_port,  $local_host
-       );
-
+    my %info;
     if ($ENV{TCPREMOTEIP}) {
-
-        # started from tcpserver (or some other superserver which
-        # exports the TCPREMOTE* variables.
-        $remote_ip = $ENV{TCPREMOTEIP};
-        $remote_host = $ENV{TCPREMOTEHOST} || "[$remote_ip]";
-        $remote_info =
-          $ENV{TCPREMOTEINFO}
-          ? "$ENV{TCPREMOTEINFO}\@$remote_host"
-          : $remote_host;
-        $remote_port = $ENV{TCPREMOTEPORT};
-        $local_ip    = $ENV{TCPLOCALIP};
-        $local_port  = $ENV{TCPLOCALPORT};
-        $local_host  = $ENV{TCPLOCALHOST};
+        %info = $self->conn_info_tcpserver();
     }
     else {
-        # Started from inetd or similar.
-        # get info on the remote host from the socket.
-        # ignore ident/tap/...
-        my $hersockaddr = getpeername(STDIN)
-          or die
-"getpeername failed: $0 must be called from tcpserver, (x)inetd or a similar program which passes a socket to stdin";
-        my ($port, $iaddr) = sockaddr_in($hersockaddr);
-        $remote_ip   = inet_ntoa($iaddr);
-        $remote_host = gethostbyaddr($iaddr, AF_INET) || "[$remote_ip]";
-        $remote_info = $remote_host;
+        %info = $self->conn_info_inetd();
     }
-    $self->log(LOGNOTICE, "Connection from $remote_info [$remote_ip]");
+    $self->log(LOGNOTICE, "Connection from $info{remote_info} [$info{remote_ip}]");
 
     # if the local dns resolver doesn't filter it out we might get
     # ansi escape characters that could make a ps axw do "funny"
     # things. So to be safe, cut them out.
-    $remote_host =~ tr/a-zA-Z\.\-0-9\[\]//cd;
+    $info{remote_host} =~ tr/a-zA-Z\.\-0-9\[\]//cd;
 
     $first_0 = $0 unless $first_0;
     my $now = POSIX::strftime("%H:%M:%S %Y-%m-%d", localtime);
-    $0 = "$first_0 [$remote_ip : $remote_host : $now]";
+    $0 = "$first_0 [$info{remote_ip} : $info{remote_host} : $now]";
 
-    $self->SUPER::connection->start(
-                                    remote_info => $remote_info,
-                                    remote_ip   => $remote_ip,
-                                    remote_host => $remote_host,
-                                    remote_port => $remote_port,
-                                    local_ip    => $local_ip,
-                                    local_port  => $local_port,
-                                    local_host  => $local_host,
-                                    @_
-                                   );
+    $self->SUPER::connection->start(%info, @_);
 }
 
 sub run {
@@ -91,7 +100,7 @@ sub run {
 # Set local client_socket to passed client object for testing socket state on writes
     $self->{__client_socket} = $client;
 
-    $self->load_plugins unless $self->{hooks};
+    $self->load_plugins if !$self->{hooks};
 
     my $rc = $self->start_conversation;
     return if $rc != DONE;
@@ -131,7 +140,7 @@ sub respond {
     if (!$self->check_socket()) {
         $self->log(LOGERROR,
                    "Lost connection to client, cannot send response.");
-        return (0);
+        return 0;
     }
 
     while (my $msg = shift @messages) {
@@ -155,54 +164,41 @@ sub disconnect {
 
 # local/remote port and ip address
 sub lrpip {
-    my ($server, $client, $hisaddr) = @_;
+    my ($self, $server, $client, $hisaddr) = @_;
 
-    my ($port, $iaddr) =
-        ($server->sockdomain == AF_INET)
-      ? (sockaddr_in($hisaddr))
-      : (sockaddr_in6($hisaddr));
     my $localsockaddr = getsockname($client);
-    my ($lport, $laddr) =
-        ($server->sockdomain == AF_INET)
-      ? (sockaddr_in($localsockaddr))
-      : (sockaddr_in6($localsockaddr));
+    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr);
 
-    my $nto_iaddr =
-        ($server->sockdomain == AF_INET)
-      ? (inet_ntoa($iaddr))
-      : (inet_ntop(AF_INET6(), $iaddr));
-    my $nto_laddr =
-        ($server->sockdomain == AF_INET)
-      ? (inet_ntoa($laddr))
-      : (inet_ntop(AF_INET6(), $laddr));
+    if ($server->sockdomain == AF_INET6) {      # IPv6
+        ($port, $iaddr) = sockaddr_in6($hisaddr);
+        ($lport, $laddr) = sockaddr_in6($localsockaddr);
+        $nto_iaddr = inet_ntop(AF_INET6(), $iaddr);
+        $nto_laddr = inet_ntop(AF_INET6(), $laddr);
+    }
+    else {                                     # IPv4
+        ($port, $iaddr) = sockaddr_in($hisaddr);
+        ($lport, $laddr) = sockaddr_in($localsockaddr);
+        $nto_iaddr = inet_ntoa($iaddr);
+        $nto_laddr = inet_ntoa($laddr);
+    }
+
     $nto_iaddr =~ s/::ffff://;
     $nto_laddr =~ s/::ffff://;
 
-    return ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr);
+    return $port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr;
 }
 
 sub tcpenv {
-    my ($nto_laddr, $nto_iaddr, $no_rdns) = @_;
-
-    my $TCPLOCALIP  = $nto_laddr;
-    my $TCPREMOTEIP = $nto_iaddr;
+    my ($self, $TCPLOCALIP, $TCPREMOTEIP, $no_rdns) = @_;
 
     if ($no_rdns) {
-        return ($TCPLOCALIP, $TCPREMOTEIP,
-                $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]");
+        return $TCPLOCALIP, $TCPREMOTEIP,
+               $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
     }
-    my $res = Net::DNS::Resolver->new( dnsrch => 0 );
-    $res->tcp_timeout(3);
-    $res->udp_timeout(3);
-    my $query = $res->query($nto_iaddr, 'PTR');
-    my $TCPREMOTEHOST;
-    if ($query) {
-        foreach my $rr ($query->answer) {
-            next if $rr->type ne 'PTR';
-            $TCPREMOTEHOST = $rr->ptrdname;
-        }
-    }
-    return ($TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST || 'Unknown');
+    my ($TCPREMOTEHOST) = $base->resolve_ptr($TCPREMOTEIP);
+    $TCPREMOTEHOST ||= 'Unknown';
+
+    return $TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST;
 }
 
 sub check_socket() {

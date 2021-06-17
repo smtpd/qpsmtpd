@@ -77,27 +77,27 @@ sub hook_queue {
     return(DECLINED, $xcret) if defined $xcret;
 
     $smtp->mail($transaction->sender->address || "")
-      or return (DECLINED, "Unable to queue message ($!)");
+      or return DECLINED, "Unable to queue message ($!)";
     for ($transaction->recipients) {
         $smtp->to($_->address)
-          or return (DECLINED, "Unable to queue message ($!)");
+          or return DECLINED, "Unable to queue message ($!)";
     }
-    $smtp->data() or return (DECLINED, "Unable to queue message ($!)");
+    $smtp->data() or return DECLINED, "Unable to queue message ($!)";
     $smtp->datasend($transaction->header->as_string)
-      or return (DECLINED, "Unable to queue message ($!)");
+      or return DECLINED, "Unable to queue message ($!)";
     $transaction->body_resetpos;
     while (my $line = $transaction->body_getline) {
         $smtp->datasend($line)
-          or return (DECLINED, "Unable to queue message ($!)");
+          or return DECLINED, "Unable to queue message ($!)";
     }
-    $smtp->dataend() or return (DECLINED, "Unable to queue message ($!)");
+    $smtp->dataend() or return DECLINED, "Unable to queue message ($!)";
     my $qid = $smtp->message();
     my @list = split(' ', $qid);
     $qid = pop(@list);
 
-    $smtp->quit()    or return (DECLINED, "Unable to queue message ($!)");
+    $smtp->quit()    or return DECLINED, "Unable to queue message ($!)";
     $self->log(LOGINFO, "finished queueing");
-    return (OK, "queued as $qid");
+    return OK, "queued as $qid";
 }
 
 sub xclient {

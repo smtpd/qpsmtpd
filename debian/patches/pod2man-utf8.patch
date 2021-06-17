@@ -1,0 +1,12 @@
+diff -aru qpsmtpd-0.94.orig/lib/Qpsmtpd.pm qpsmtpd-0.94/lib/Qpsmtpd.pm
+--- qpsmtpd-0.94.orig/lib/Qpsmtpd.pm	2014-09-05 20:14:28.000000000 -0700
++++ qpsmtpd-0.94/lib/Qpsmtpd.pm	2014-09-16 23:56:24.783290009 -0700
+@@ -674,6 +674,8 @@
+ 
+ __END__
+ 
++=encoding UTF-8
++
+ =head1 NAME
+ 
+ Qpsmtpd - base class for the qpsmtpd mail server

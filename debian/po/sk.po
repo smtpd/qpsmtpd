@@ -9,14 +9,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: qpsmtpd 0.84-8\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
-"POT-Creation-Date: 2009-12-14 01:40-0800\n"
+"POT-Creation-Date: 2019-01-11 10:02+0100\n"
 "PO-Revision-Date: 2012-08-29 11:10+0200\n"
 "Last-Translator: Slavko <linux@slavino.sk>\n"
 "Language-Team: slovenčina <debian-l10n-slovak@lists.debian.org>\n"
+"Language: sk\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Language: sk\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 "X-POFile-SpellExtra: okamžiku 4xx share dávate spamtrap Debiane\n"
 "X-POFile-SpellExtra: doménových plugins rcpthosts forkuje 2526 Maildir\n"
@@ -300,3 +300,19 @@ msgid ""
 msgstr ""
 "Ak dávate prednosť spravovaniu tohoto zoznamu manuálne, nechajte túto "
 "položku prázdnu a upravte súbor /etc/qpsmtpd/rcpthosts."
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid "Incompatible upstream naming of check_* plugins"
+msgstr ""
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid ""
+"As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which "
+"lack the check_ prefix in their names.  Wrappers re-enabling the old names "
+"are shipped in this release, but will be removed in the future; see /usr/"
+"share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
+msgstr ""

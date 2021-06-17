@@ -1,17 +1,18 @@
-# French translation of qpsmtp debconf templates
-# Copyright (C) 2009 Debian French l10n Team <debian-l10n-french@lists.debian.org>
+# Translation of qpsmtp debconf templates to French
+# Copyright (C) 2015
 # This file is distributed under the same license as the qpsmtp package.
 # Translator:
 # Steve Petruzzello <dlist@bluewin.ch>
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: qpsmtpd_0.83-1\n"
+"Project-Id-Version: qpsmtpd_0.94-2\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
-"POT-Creation-Date: 2009-12-14 01:40-0800\n"
-"PO-Revision-Date: 2006-07-19 12:33+0100\n"
+"POT-Creation-Date: 2019-01-11 10:02+0100\n"
+"PO-Revision-Date: 2019-01-11 10:05+0100\n"
 "Last-Translator: Steve Petruzzello <dlist@bluewin.ch>\n"
 "Language-Team: French <debian-l10n-french@lists.debian.org>\n"
+"Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -67,7 +68,7 @@ msgstr ""
 #. Description
 #: ../qpsmtpd.templates:2001
 msgid "Qpsmtpd server type:"
-msgstr "Type de serveur qpsmtpd :"
+msgstr "Type de serveur qpsmtpd :"
 
 #. Type: select
 #. Description
@@ -80,9 +81,9 @@ msgid ""
 "handle new connections, offering slightly better performance at the cost of "
 "more memory."
 msgstr ""
-"Le démon qsmtpd propose deux méthodes différentes de gestion des connexions. "
-"Avec la méthode « forkserver », un seul processus est actif en permanence et "
-"de nouveaux processus sont créés pour gérer les connexions entrantes. Cette "
+"Le démon qsmtpd propose deux méthodes de gestion des connexions. Avec la "
+"méthode « forkserver », un seul processus est actif en permanence et de "
+"nouveaux processus sont créés pour gérer les connexions entrantes. Cette "
 "méthode utilise moins de mémoire et réduit légèrement la charge du serveur. "
 "La méthode « prefork » garde plusieurs processus inactifs disponibles pour "
 "gérer les nouvelles connexions, offrant de meilleures performances au prix "
@@ -130,7 +131,7 @@ msgid ""
 "\"127.0.0.1:2526\"."
 msgstr ""
 "Pour chaque interface, le port d'écoute (25 par défaut) peut être modifié en "
-"ajoutant :<port> au nom de l'interface. Exemple : « 127.0.0.1:2526 »."
+"ajoutant :<port> au nom de l'interface. Exemple : « 127.0.0.1:2526 »."
 
 #. Type: select
 #. Description
@@ -170,9 +171,9 @@ msgid ""
 "Select \"maildir\" to have qpsmtpd deliver into a local maildir-format spool "
 "instead of queueing it for delivery (e.g. if you're setting up a spamtrap.)"
 msgstr ""
-"Veuillez choisir « maildir » pour que qpsmtpd place le courrier dans une file "
-"d'attente locale au format maildir, plutôt que de le mettre en attente (p. "
-"ex. si vous installez un piège à pourriel)."
+"Veuillez choisir « maildir » pour que qpsmtpd place le courrier dans une "
+"file d'attente locale au format maildir, plutôt que de le mettre en attente "
+"(par exemple si vous installez un piège à pourriel)."
 
 #. Type: select
 #. Description
@@ -301,3 +302,24 @@ msgid ""
 msgstr ""
 "Si vous préférez gérer cette liste vous-même, laissez-la vide et modifiez le "
 "fichier /etc/qpsmtpd/rcpthosts."
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid "Incompatible upstream naming of check_* plugins"
+msgstr "Nommage en amont incompatible pour les greffons check_*"
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid ""
+"As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which "
+"lack the check_ prefix in their names.  Wrappers re-enabling the old names "
+"are shipped in this release, but will be removed in the future; see /usr/"
+"share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
+msgstr ""
+"À partir de la version 0.94, les greffons qpsmtpd auxquels il manquait le "
+"prefix check_ ont été renommés. Des scripts d'encapsulation (« wrappers ») "
+"qui réactivent les anciens noms sont intégrés à cette version mais seront "
+"supprimés dans le futur ; pour des instructions de mise à niveau, veuillez "
+"vous référer à /usr/share/doc/qpsmtpd/plugins/README.check_plugins."

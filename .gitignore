@@ -13,15 +13,18 @@ packaging/rpm/build/
 
 *~
 *.bak
-denysoft_greylist.dbm
-denysoft_greylist.dbm.lock
-greylist.dbm
-greylist.dbm.lock
+t/tmp
 
 /cover_db/
 .last_cover_stats
 
 *.tar.gz
 
+MYMETA.*
 MANIFEST.bak
 nytprof.out
+
+# run time files
+run
+log/main
+ssl

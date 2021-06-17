@@ -1,10 +1,16 @@
 #
-#  Example configuration file for plugins
+#  Test configuration file for plugins
 #
 
 # enable this to get configuration via http; see perldoc
 # plugins/http_config for details.
 #   http_config http://localhost/~smtpd/config/  http://www.example.com/smtp.pl?config=
+
+logging/syslog
+logging/warn
+logging/file t/tmp/test-warn.log
+
+content_log
 
 # hosts_allow does not work with the tcpserver deployment model!
 #   perldoc plugins/hosts_allow for an alternative.
@@ -19,6 +25,7 @@ hosts_allow
 ident/geoip
 ident/p0f /tmp/.p0f_socket version 3
 connection_time
+fcrdns
 
 # enable to accept MAIL FROM:/RCPT TO: addresses without surrounding <>
 dont_require_anglebrackets
@@ -44,12 +51,12 @@ badrcptto
 helo
 
 sender_permitted_from
-greylisting p0f genre,windows
+greylisting p0f genre,windows db_dir ./t/tmp
 
-auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
-auth/auth_vpopmail
+#auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
+#auth/auth_vpopmail
 auth/auth_vpopmaild
-auth/auth_vpopmail_sql
+#auth/auth_vpopmail_sql
 auth/auth_flat_file
 auth/authdeny
 
@@ -57,7 +64,7 @@ auth/authdeny
 rcpt_ok
 
 headers days 5 reject_type temp require From,Date
-domainkeys
+#domainkeys
 dkim
 dmarc
 

@@ -1,0 +1,55 @@
+#!perl
+use strict;
+use warnings;
+
+=head1 NAME
+
+user_config - basic plugin for storing per-user configuration directives
+
+=head1 SYNOPSIS
+
+# in config/plugins
+
+user_config [B<filename pattern>]
+
+=over 4
+
+=item B<config file search pattern>
+
+Pattern to use when searching for user config directory
+Substitute %u for username, %h for host, or %a for full addressn.
+Default: I</home/%u/.qpsmtpd/>
+
+=back
+
+=head1 DESCRIPTION
+
+This plugin implements very basic support for storing user configuration
+in separate directories similar to the global qpsmtpd config directory.
+
+=cut
+
+sub init {
+    my ($self, $qp, $pattern) = @_;
+    $self->{pattern} = $pattern || '/home/%u/.qpsmtpd';
+}
+
+sub hook_user_config {
+    my ($self, $txn, $addr, $conf) = @_;
+    my $path = $self->{pattern} or return DECLINED;
+    my ($user, $host, $address) = ($addr->user, $addr->host, $addr->address);
+    $path =~ s/%u/$user/g;
+    $path =~ s/%h/$host/g;
+    $path =~ s/%a/$address/g;
+    my $filename = "$path/$conf";
+    return DECLINED unless -f $filename;
+    my $fh;
+
+    unless (open $fh, $filename) {
+        $self->log(LOGNOTICE, "Couldn't open $filename:$!");
+        return DECLINED;
+    }
+    my @return = <$fh>;
+    chomp @return;
+    return OK, @return;
+}

@@ -32,5 +32,47 @@ format for the dates in the "Received" headers.
 Gergely Risko <risko@risko.hu>: Fixed timeout bug when the client sent
 DATA and then stopped before sending the next line.
 
-... and many many others per the Changes file and version control logs and
-    mailing list archives.  Thanks everyone!
+Contributors listed with: git shortlog -sn | cut -c8- | grep -v 'no author'
+Updated: Sep 8, 2014 (Update via a PR are welcome)
+----------------------
+Matt Simerson
+Ask Bjørn Hansen
+Matt Sergeant
+John Peacock
+Hanno Hecker
+Robert Spier
+Devin Carraway
+Robert
+Radu Greab
+Peter J. Holzer
+Richard Siddall
+Jared Johnson
+jaredj
+Robin Bowes
+Priyadi Iman Nurcahyo
+Steve Kemp
+Charlie Brady
+Markus Ullmann
+Diego d'Ambra
+Filippo Carletti
+luzluna park
+Tomas Lee
+Jonathan Martens
+Peter A Eisch
+Pim van den Berg
+David Nicol
+tpoindessous
+Larry Nedry
+Karl Y. Pradene
+Johan Almqvist
+Rick
+Jeff King
+Hinrik Örn Sigurðsson
+Henry Baragar
+Shad L. Lords
+Guy Hulbert
+andreamtp
+Dongsik Park
+lnedry
+Pedro Melo
+Norman Maurer

@@ -100,7 +100,7 @@ sub get_default_field_widths {
     );
 
     return %widths;
-};
+}
 
 sub handle_plugin {
     my ($message, $plugin, $pid, $line) = @_;
@@ -164,50 +164,53 @@ sub parse_line {
 
     # lines seen many times per connection
     return parse_line_plugin($line) if substr($message, 0, 1) eq '(';
-    return ('dispatch', $pid, undef, undef, $message)
+    return 'dispatch', $pid, undef, undef, $message
       if substr($message, 0, 12) eq 'dispatching ';
-    return ('response', $pid, undef, undef, $message)
+    return 'response', $pid, undef, undef, $message
       if $message =~ /^[2|3]\d\d/;
-    return ('tcpserver', $pid, undef, undef, undef)
+    return 'tcpserver', $pid, undef, undef, undef
       if substr($pid, 0, 10) eq 'tcpserver:';
 
     # lines seen about once per connection
-    return ('init', $pid, undef, undef, $message)
+    return 'init', $pid, undef, undef, $message
       if substr($message, 0, 19) eq 'Accepted connection';
-    return ('connect', $pid, undef, undef, substr($message, 16))
+    return 'connect', $pid, undef, undef, substr($message, 16)
       if substr($message, 0, 15) eq 'Connection from';
-    return ('close', $pid, undef, undef, $message)
+    return 'close', $pid, undef, undef, $message
       if substr($message, 0, 6) eq 'close ';
-    return ('close', $pid, undef, undef, $message)
+    return 'close', $pid, undef, undef, $message
       if substr($message, 0, 20) eq 'click, disconnecting';
     return parse_line_cleanup($line)
       if substr($message, 0, 11) eq 'cleaning up';
 
     # lines seen less than once per connection
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if $message eq 'spooling message to disk';
-    return ('reject', $pid, undef, undef, $message) if $message =~ /^[4|5]\d\d/;
-    return ('reject', $pid, undef, undef, $message)
+    return 'reject', $pid, undef, undef, $message
+      if $message =~ /^[4|5]\d\d/;
+    return 'reject', $pid, undef, undef, $message
       if substr($message, 0, 14) eq 'deny mail from';
-    return ('reject', $pid, undef, undef, $message)
+    return 'reject', $pid, undef, undef, $message
       if substr($message, 0, 18) eq 'denysoft mail from';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 15) eq 'Lost connection';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if $message eq 'auth success cleared naughty';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 15) eq 'Running as user';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 16) eq 'Loaded Qpsmtpd::';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 24) eq 'Permissions on spool_dir';
-    return ('info', $pid, undef, undef, $message)
+    return 'info', $pid, undef, undef, $message
       if substr($message, 0, 13) eq 'Listening on ';
+    return 'info', $pid, undef, undef, $message
+      if substr($message, 0, 15) eq 'Loaded logging/';
 
-    return ('err', $pid, undef, undef, $message)
+    return 'err', $pid, undef, undef, $message
       if $line =~ /at [\S]+ line \d/;    # generic perl error
     print "UNKNOWN LINE: $line\n";
-    return ('unknown', $pid, undef, undef, $message);
+    return 'unknown', $pid, undef, undef, $message;
 }
 
 sub parse_line_plugin {
@@ -231,7 +234,7 @@ sub parse_line_plugin {
         $message = 'pass';
     }
 
-    return ('plugin', $pid, $hook, $plugin, $message);
+    return 'plugin', $pid, $hook, $plugin, $message;
 }
 
 sub parse_line_cleanup {
@@ -240,7 +243,7 @@ sub parse_line_cleanup {
     # @tai 85931 cleaning up after 3210
     my $pid = (split /\s+/, $line)[-1];
     $has_cleanup++;
-    return ('cleanup', $pid, undef, undef, $line);
+    return 'cleanup', $pid, undef, undef, $line;
 }
 
 sub print_auto_format {

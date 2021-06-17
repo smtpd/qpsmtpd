@@ -2,18 +2,16 @@
 use strict;
 use warnings;
 
-use lib 't';
-use lib 'lib';
-
 use Data::Dumper;
 use Digest::HMAC_MD5 qw(hmac_md5_hex);
 use English qw/ -no_match_vars /;
 use File::Path;
-
-use Qpsmtpd::Constants;
 use Scalar::Util qw( openhandle );
 use Test::More qw(no_plan);
 
+use lib 't';
+use lib 'lib';
+use Qpsmtpd::Constants;
 use_ok('Test::Qpsmtpd');
 use_ok('Qpsmtpd::Auth');
 
@@ -21,10 +19,6 @@ my ($smtpd, $conn) = Test::Qpsmtpd->new_conn();
 
 ok($smtpd, "get new connection ($smtpd)");
 isa_ok($conn, 'Qpsmtpd::Connection', "get new connection");
-
-#warn Dumper($smtpd) and exit;
-#my $hooks = $smtpd->hooks;
-#warn Dumper($hooks) and exit;
 
 my $r;
 my $user      = 'good@example.com';
@@ -49,14 +43,14 @@ ok(!$passClear, "get_auth_details_plain, pass -");
 
 # PLAIN
 $r = Qpsmtpd::Auth::SASL($smtpd, 'plain', $enc_plain);
-cmp_ok(OK, '==', $r, "plain auth");
+is( return_code($r), 'OK', 'plain auth' );
 
 if ($ENV{QPSMTPD_DEVELOPER} && is_interactive()) {
 
     # same thing, but must be entered interactively
     print "answer: $enc_plain\n";
     $r = Qpsmtpd::Auth::SASL($smtpd, 'plain', '');
-    cmp_ok(OK, '==', $r, "SASL, plain");
+    is( return_code($r), 'OK', 'SASL, plain' );
 }
 
 # LOGIN
@@ -80,7 +74,7 @@ if ($ENV{QPSMTPD_DEVELOPER} && is_interactive()) {
 
     print "encoded pass: $enc_pass\n";
     $r = Qpsmtpd::Auth::SASL($smtpd, 'login', $enc_user);
-    cmp_ok(OK, '==', $r, "SASL, login");
+    is( return_code($r), 'OK', 'SASL, login' );
 }
 
 # CRAM-MD5
@@ -103,7 +97,7 @@ if ($ENV{QPSMTPD_DEVELOPER} && is_interactive()) {
 
   # this isn't going to work without bidirection communication to get the ticket
   #$r = Qpsmtpd::Auth::SASL($smtpd, 'cram-md5' );
-  #cmp_ok( OK, '==', $r, "login auth");
+  #is( return_code($r), 'OK', 'login auth' );
 }
 
 sub is_interactive {

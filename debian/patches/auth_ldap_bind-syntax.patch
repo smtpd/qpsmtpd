@@ -1,0 +1,12 @@
+diff -aruN qpsmtpd-0.94.orig/plugins/auth/auth_ldap_bind qpsmtpd-0.94/plugins/auth/auth_ldap_bind
+--- qpsmtpd-0.94.orig/plugins/auth/auth_ldap_bind	2014-09-05 20:14:28.000000000 -0700
++++ qpsmtpd-0.94/plugins/auth/auth_ldap_bind	2014-10-29 00:01:04.914170133 -0700
+@@ -81,7 +81,7 @@
+ use strict;
+ use warnings;
+ 
+-use Net::LDAP qw(:all);
++use Net::LDAP;
+ use Qpsmtpd::Constants;
+ 
+ sub register {

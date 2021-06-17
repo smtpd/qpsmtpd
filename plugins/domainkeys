@@ -83,7 +83,7 @@ sub register {
         }
     }
 
-    $self->register_hook('data_post', 'data_post_handler');
+    $self->register_hook('data_post_headers', 'data_post_handler');
 }
 
 sub data_post_handler {
@@ -124,7 +124,7 @@ sub data_post_handler {
     $self->log(LOGERROR, "fail, signature invalid");
     return DECLINED if !$self->{reject};
     my $deny = $self->{reject_type} eq 'temp' ? DENYSOFT : DENY;
-    return ($deny, "DomainKeys signature validation failed");
+    return $deny, "DomainKeys signature validation failed";
 }
 
 sub get_message_status {

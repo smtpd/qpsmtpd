@@ -52,7 +52,7 @@ sub auth_vpopmaild {
     # check for successful login (single line (+OK) or multiline (+OK+))
     if ($response =~ /^\+OK/) {
         $self->log(LOGINFO, "pass, clear");
-        return (OK, 'auth_vpopmaild');
+        return OK, 'auth_vpopmaild';
     }
 
     chomp $response;
@@ -81,7 +81,7 @@ sub get_response {
     };
 
     return $response;
-};
+}
 
 sub get_socket {
     my ($self) = @_;
@@ -99,7 +99,7 @@ sub get_socket {
         return;
       };
     return $socket;
-};
+}
 
 __END__
 

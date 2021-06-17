@@ -122,10 +122,6 @@ If the X-Spam-User header is present, the LDA should submit the message to
 spamd for re-processing with the recipients address.
 
 
-=head1 TODO
-
-Make the "subject munge string" configurable
-
 =head1 CHANGES
 
 2012.04.02 - Matt Simerson
@@ -174,22 +170,22 @@ sub register {
 sub data_post_handler {
     my ($self, $transaction) = @_;
 
-    return (DECLINED) if $self->is_immune();
+    return DECLINED if $self->is_immune();
 
     if ($transaction->data_size > 500_000) {
         $self->log(LOGINFO,
                    "skip, too large (" . $transaction->data_size . ")");
-        return (DECLINED);
+        return DECLINED;
     }
 
-    my $SPAMD    = $self->connect_to_spamd() or return (DECLINED);
+    my $SPAMD    = $self->connect_to_spamd() or return DECLINED;
     my $username = $self->select_spamd_username($transaction);
     my $message  = $self->assemble_message($transaction);
     my $length   = length $message;
 
     $self->print_to_spamd($SPAMD, $message, $length, $username);
     shutdown($SPAMD, 1);  # close our side of the socket (tell spamd we're done)
-    my $headers = $self->parse_spamd_response($SPAMD) or return (DECLINED);
+    my $headers = $self->parse_spamd_response($SPAMD) or return DECLINED;
 
     $self->insert_spam_headers($transaction, $headers, $username);
     $self->munge_subject($transaction);
@@ -277,7 +273,7 @@ sub insert_spam_headers {
         if ($name eq 'X-Spam-Status') {
             $self->parse_spam_header($new_headers->{$name});
         }
-        $new_headers->{$name} =~ s/\015//;    # hack for outlook
+        $new_headers->{$name} =~ s/\015//g;    # hack for outlook
         $self->_cleanup_spam_header($transaction, $name);
         $transaction->header->add($name, $new_headers->{$name}, 0);
     }
@@ -434,7 +430,7 @@ sub reject {
     }
 
     $self->log(LOGINFO, "fail, $status, > $reject, $learn");
-    return ($self->get_reject_type(), "spam score exceeded threshold");
+    return $self->get_reject_type(), "spam score exceeded threshold";
 }
 
 sub munge_subject {
@@ -450,10 +446,11 @@ sub munge_subject {
         $self->log(LOGDEBUG, "skipping munge, no user or qpsmtpd pref set");
         return;
     };
-    return unless $sa->{score} > $required;
-    return unless $sa->{score} > $qp_num;
+    return if !defined $sa->{score};
+    return if $required && $sa->{score} <= $required;
+    return if $sa->{score} <= $qp_num;
 
-    my $subject_prefix = $self->qp->config('subject_prefix')  || '*** SPAM ***';
+    my $subject_prefix = $self->{_args}{subject_prefix} || $self->qp->config('subject_prefix') || '*** SPAM ***';
     my $subject        = $transaction->header->get('Subject') || '';
     $transaction->header->replace('Subject', "$subject_prefix $subject");
 }

@@ -1,14 +1,14 @@
 # Danish translation of qpsmtpd debconf templates.
-# Copyright (C) 2012 qpsmtpd & nedenstående oversættere.
+# Copyright (C) 2015 qpsmtpd & nedenstående oversættere.
 # This file is distributed under the same license as the qpsmtpd package.
-# Joe Hansen <joedalton2@yahoo.dk>, 2012.
+# Joe Hansen <joedalton2@yahoo.dk>, 2012, 2015.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: qpsmtpd\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
-"POT-Creation-Date: 2009-12-14 01:40-0800\n"
-"PO-Revision-Date: 2012-08-20 17:30+01:00\n"
+"POT-Creation-Date: 2019-01-11 10:02+0100\n"
+"PO-Revision-Date: 2019-01-11 10:04+0100\n"
 "Last-Translator: Joe Hansen <joedalton2@yahoo.dk>\n"
 "Language-Team: Danish <debian-l10n-danish@lists.debian.org>\n"
 "Language: da\n"
@@ -48,8 +48,8 @@ msgstr ""
 "binder til SMTP TCP-porten på mindst en netværksflade. Den gængse metode er "
 "at lade din MTA lytte på loopback-grænsefladen (127.0.0.1) og qpsmtpd lytter "
 "på den eksterne grænseflade. Instruktioner for konfiguration af gængse "
-"MTA'er så de fungerer med qpsmtpd kan findes efter installationen i "
-"/usr/share/doc/qpsmtpd/README.Debian."
+"MTA'er så de fungerer med qpsmtpd kan findes efter installationen i /usr/"
+"share/doc/qpsmtpd/README.Debian."
 
 #. Type: boolean
 #. Description
@@ -100,10 +100,10 @@ msgid ""
 "setting empty, qpsmtpd will listen on all interfaces available at startup "
 "time."
 msgstr ""
-"Indtast en eller flere af dine lokale IP-adresser, adskilt med mellemrum, som "
-"qpsmtpd skal lytte på efter indgående SMTP-forbindelser. Hvis du efterlader "
-"denne indstilling tom, vil qpsmtpd lytte på alle tilgængelige grænseflader "
-"på opstartstidspunktet."
+"Indtast en eller flere af dine lokale IP-adresser, adskilt med mellemrum, "
+"som qpsmtpd skal lytte på efter indgående SMTP-forbindelser. Hvis du "
+"efterlader denne indstilling tom, vil qpsmtpd lytte på alle tilgængelige "
+"grænseflader på opstartstidspunktet."
 
 #. Type: string
 #. Description
@@ -127,8 +127,8 @@ msgid ""
 "\"127.0.0.1:2526\"."
 msgstr ""
 "For hver grænseflade kan du valgfrit angive en port at lytte på i stedet for "
-"standardporten 25; gør dette ved at tilføje :<port> til grænsefladen, som "
-"i »127.0.0.1:2526«."
+"standardporten 25; gør dette ved at tilføje :<port> til grænsefladen, som i "
+"»127.0.0.1:2526«."
 
 #. Type: select
 #. Description
@@ -145,8 +145,8 @@ msgid ""
 "installed MTA (the installer will try to pick the correct default.)"
 msgstr ""
 "Vælg metoden for post i kø når den er blevet leveret via SMTP. Hvis du "
-"leverer din post lokalt, så vælg metoden der svarer til den installerede "
-"MTA (installationsprogrammet vil forsøge at vælge den korrekte standard)."
+"leverer din post lokalt, så vælg metoden der svarer til den installerede MTA "
+"(installationsprogrammet vil forsøge at vælge den korrekte standard)."
 
 #. Type: select
 #. Description
@@ -156,8 +156,9 @@ msgid ""
 "MTA (local or remote).  You will then be prompted to enter a destination "
 "host."
 msgstr ""
-"Vælg »proxy« hvis du ønsker, at qpsmtpd skal fungere som en SMTP-proxy for en "
-"anden MTA (lokal eller ekstern). Du vil blive spurgt om en destinationsvært."
+"Vælg »proxy« hvis du ønsker, at qpsmtpd skal fungere som en SMTP-proxy for "
+"en anden MTA (lokal eller ekstern). Du vil blive spurgt om en "
+"destinationsvært."
 
 #. Type: select
 #. Description
@@ -194,8 +195,8 @@ msgid ""
 "a colon, such as \"localhost:25\"."
 msgstr ""
 "For at qpsmtpd skal fungere som en SMTP-proxy for en anden vært skal du "
-"angive værtsnavnet eller IP-adressen for den vært her. Du kan valgfrit angive "
-"et portnummer efter et kolon, såsom »localhost:25«."
+"angive værtsnavnet eller IP-adressen for den vært her. Du kan valgfrit "
+"angive et portnummer efter et kolon, såsom »localhost:25«."
 
 #. Type: string
 #. Description
@@ -233,11 +234,11 @@ msgid ""
 "legitimate mail."
 msgstr ""
 "Ved at vælge »none« som et tilføjelsesprogram for køhåndtering har du "
-"deaktiveret lokal køhåndtering for indgående post. Dette vil forhindre "
-"at post bliver sat i kø af qpsmtpd, til du manuelt konfigurerer en kømetode. "
+"deaktiveret lokal køhåndtering for indgående post. Dette vil forhindre at "
+"post bliver sat i kø af qpsmtpd, til du manuelt konfigurerer en kømetode. "
 "Alle værter som forsøger at leverere post til dig vil modtage 4xx-"
-"fejlmeddelelser, med risko for at spilde båndbredde og eventuel afvisning "
-"af legitim post."
+"fejlmeddelelser, med risko for at spilde båndbredde og eventuel afvisning af "
+"legitim post."
 
 #. Type: boolean
 #. Description
@@ -249,11 +250,11 @@ msgid ""
 "SMTP proxy method instead, configuring it to proxy into your MTA on a "
 "suitable local address/port."
 msgstr ""
-"Hvis du vil konfigurere køhåndtering manuelt, så rediger /etc/qpsmtpd/"
-"og vælg en af kømetoderne vist der. Hvis du ikke ser din installerede "
-"MTA i listen og du ikke er sikker på hvad du skal gøre, så vælg »Cancel« "
-"her og vælg SMTP proxy-metoden i stedet for, konfigurer den til at proxy ind "
-"i din MTA på en egnet lokal adresse/port."
+"Hvis du vil konfigurere køhåndtering manuelt, så rediger /etc/qpsmtpd/og "
+"vælg en af kømetoderne vist der. Hvis du ikke ser din installerede MTA i "
+"listen og du ikke er sikker på hvad du skal gøre, så vælg »Cancel« her og "
+"vælg SMTP proxy-metoden i stedet for, konfigurer den til at proxy ind i din "
+"MTA på en egnet lokal adresse/port."
 
 #. Type: string
 #. Description
@@ -273,13 +274,13 @@ msgid ""
 "as used for that MTA (the installer will attempt to extract that setting as "
 "a default.)"
 msgstr ""
-"Indtast en liste af domænenavne som qpsmtpd skal acceptere post fra, "
-"adskilt med mellemrum. Denne liste skal inkludere alle værtsnavne eller "
-"domænenavne, som du forventer skal acceptere lokal levering, samt eventuelle "
+"Indtast en liste af domænenavne som qpsmtpd skal acceptere post fra, adskilt "
+"med mellemrum. Denne liste skal inkludere alle værtsnavne eller domænenavne, "
+"som du forventer skal acceptere lokal levering, samt eventuelle "
 "modtagerdomæner for hvilke du forventer at fungere som et postrelæ. Hvis du "
 "forventer generelt at bruge pulje for modtaget post i en lokal MTA, så skal "
-"denne liste være den samme som brugt for den MTA (installationsprogrammet vil "
-"forsøge at udtrække den indstilling som en standard)."
+"denne liste være den samme som brugt for den MTA (installationsprogrammet "
+"vil forsøge at udtrække den indstilling som en standard)."
 
 #. Type: string
 #. Description
@@ -288,6 +289,26 @@ msgid ""
 "If you prefer to manage this list manually, leave the entry blank and edit "
 "the file /etc/qpsmtpd/rcpthosts."
 msgstr ""
-"Hvis du foretrækker at håndtere denne liste manuelt, så efterlad punktet blankt "
-"og rediger filen /etc/qpsmtpd/rcpthosts."
+"Hvis du foretrækker at håndtere denne liste manuelt, så efterlad punktet "
+"blankt og rediger filen /etc/qpsmtpd/rcpthosts."
 
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid "Incompatible upstream naming of check_* plugins"
+msgstr "Ikke kompatibel opstrømsnavngivning af check_*-udvidelsesmoduler"
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid ""
+"As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which "
+"lack the check_ prefix in their names.  Wrappers re-enabling the old names "
+"are shipped in this release, but will be removed in the future; see /usr/"
+"share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
+msgstr ""
+"Fra og med 0-94 omdøbte qpsmtpd check_*-udvidelsesmodulerne til opdaterede "
+"versioner som mangler check_-præfikset i deres navne. Omslag der "
+"genaktiverer de gamle navn leveres med denne udgivelse, men vil blive "
+"fjernet senere; se /usr/share/doc/qpsmtpd/plugins/README.check_plugins for "
+"opgraderingsinstrukser."

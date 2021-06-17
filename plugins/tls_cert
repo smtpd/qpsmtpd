@@ -3,15 +3,13 @@
 use strict;
 use warnings;
 
-# Very basic script to create TLS certificates for qpsmtpd
+# create TLS certificates for qpsmtpd
 use File::Temp qw/ tempfile tempdir /;
 use Getopt::Long;
+use Sys::Hostname;
 
 my %opts = ();
-chomp (my $hostname = `hostname --fqdn`);
-if ($?) {
-    chomp($hostname = `hostname`);
-}
+my $hostname = hostname();
 print "Using hostname: $hostname\n";
 my %defaults = (
     C  => 'XY',
@@ -41,7 +39,7 @@ foreach my $key ( keys %defaults ) {
 }
 $opts{emailAddress} = 'postmaster@'.$opts{CN};
 
-mkdir('ssl') unless -d 'ssl';
+mkdir 'ssl' if ! -d 'ssl';
 
 my $CA_key = 'ssl/qpsmtpd-ca.key';
 my $CA_crt = 'ssl/qpsmtpd-ca.crt';
@@ -64,6 +62,7 @@ system('openssl', 'req', '-config', $CAfilename, '-new', '-x509',
 my $SERVER_key = 'ssl/qpsmtpd-server.key';
 my $SERVER_csr = 'ssl/qpsmtpd-server.csr';
 my $SERVER_crt = 'ssl/qpsmtpd-server.crt';
+my $SERVER_dhparam = 'ssl/qpsmtpd-dhparam.pem';
 
 my ($SERVER, $SERVERfilename) = tempfile( $template, DIR => "ssl", UNLINK => 1);
 print ${SERVER} return_cfg($opts{OU});
@@ -95,6 +94,9 @@ system('openssl', 'x509', '-extfile', $SIGNfilename, '-days', (365*2),
 	'-CAkey', $CA_key, '-in', $SERVER_csr,
 	'-req', '-out', $SERVER_crt) == 0
     or die "Cannot sign cert: $?";
+
+system('openssl', 'dhparam', '-out', $SERVER_dhparam, 2048) == 0
+    or die "Cannot create server dhparam: $?";
 
 exit(0);
 	

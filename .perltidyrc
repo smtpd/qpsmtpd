@@ -2,9 +2,6 @@
 -i=4    # 4 space indentation (we used to use 2; in the future we'll use 4)
 -ci=2   # continuation indention
 
--pt=2   # tight parens
--sbt=2  # tight square parens
--bt=2   # tight curly braces
 -bbt=0  # open code block curly braces
 
 -lp     # line up with parentheses

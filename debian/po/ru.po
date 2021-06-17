@@ -8,15 +8,17 @@ msgid ""
 msgstr ""
 "Project-Id-Version: qpsmtpd 0.83-1\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
-"POT-Creation-Date: 2009-12-14 01:40-0800\n"
+"POT-Creation-Date: 2019-01-11 10:02+0100\n"
 "PO-Revision-Date: 2010-01-04 13:02+0300\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
+"Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: KBabel 1.11.4\n"
-"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #. Type: boolean
 #. Description
@@ -79,12 +81,12 @@ msgid ""
 "handle new connections, offering slightly better performance at the cost of "
 "more memory."
 msgstr ""
-"В Qpsmtpd поддерживает две типа обработки подключений. "
-"В типе forkserver используется один ожидающий процесс, а для обработки "
-"поступивших соединений порождаются новые. Это позволяет экономнее "
-"расходовать память, но уменьшает производительность. "
-"В типе prefork создаётся сразу несколько ожидающих новых соединений процессов, "
-"что улучшает производительность, но расходует больше памяти."
+"В Qpsmtpd поддерживает две типа обработки подключений. В типе forkserver "
+"используется один ожидающий процесс, а для обработки поступивших соединений "
+"порождаются новые. Это позволяет экономнее расходовать память, но уменьшает "
+"производительность. В типе prefork создаётся сразу несколько ожидающих новых "
+"соединений процессов, что улучшает производительность, но расходует больше "
+"памяти."
 
 #. Type: string
 #. Description
@@ -127,8 +129,8 @@ msgid ""
 "\"127.0.0.1:2526\"."
 msgstr ""
 "Для каждого интерфейса дополнительно вы можете указать прослушиваемый порт "
-"(вместо используемого порта по умолчанию -- 25); для этого добавьте :<номер_порта> "
-"к интерфейсу, например \"127.0.0.1:2526\"."
+"(вместо используемого порта по умолчанию -- 25); для этого добавьте :"
+"<номер_порта> к интерфейсу, например \"127.0.0.1:2526\"."
 
 #. Type: select
 #. Description
@@ -293,3 +295,18 @@ msgstr ""
 "Если хотите управлять списком вручную, ничего не вводите и отредактируйте "
 "файл /etc/qpsmtpd/rcpthosts."
 
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid "Incompatible upstream naming of check_* plugins"
+msgstr ""
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid ""
+"As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which "
+"lack the check_ prefix in their names.  Wrappers re-enabling the old names "
+"are shipped in this release, but will be removed in the future; see /usr/"
+"share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
+msgstr ""

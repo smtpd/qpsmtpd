@@ -8,10 +8,10 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_relay_only', 2);
-    $self->register_test('test_is_octet_match', 3);
-    $self->register_test('test_is_in_cidr_block', 4);
-    $self->register_test('test_is_in_norelayclients', 5);
+    $self->register_test('test_relay_only');
+    $self->register_test('test_is_octet_match');
+    $self->register_test('test_is_in_cidr_block');
+    $self->register_test('test_is_in_norelayclients');
 }
 
 sub test_relay_only {
@@ -26,7 +26,7 @@ sub test_relay_only {
     cmp_ok( $r, '==', OK, "relay_only +");
 
     $self->qp->connection->relay_client(0);
-};
+}
 
 sub test_is_octet_match {
     my $self = shift;
@@ -41,7 +41,7 @@ sub test_is_octet_match {
 
     $self->qp->connection->remote_ip('203.0.113.0');
     ok( ! $self->is_octet_match(), "nope, -");
-};
+}
 
 sub test_is_in_cidr_block {
     my $self = shift;
@@ -60,7 +60,7 @@ sub test_is_in_cidr_block {
 
     $self->{_cidr_blocks} = [ 'fdda:b13d:e431:be17::' ];
     ok( ! $self->is_in_cidr_block(), "nope, -" );
-};
+}
 
 sub test_is_in_norelayclients {
     my $self = shift;
@@ -71,11 +71,11 @@ sub test_is_in_norelayclients {
     foreach ( @matches ) {
         $self->qp->connection->remote_ip($_);
         ok( $self->is_in_norelayclients(), "match, + ($_)");
-    };
+    }
 
     foreach ( @false ) {
         $self->qp->connection->remote_ip($_);
         ok( ! $self->is_in_norelayclients(), "match, - ($_)");
-    };
-};
+    }
+}
 

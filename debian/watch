@@ -1,0 +1,5 @@
+version=2
+
+http://smtpd.develooper.com/get.html \
+	files/qpsmtpd-([\d.]+).tar.gz
+

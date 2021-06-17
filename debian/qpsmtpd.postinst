@@ -159,12 +159,30 @@ setup_maildir_spool()
 	fi
 }
 
+upgrade_config()
+{
+  from_version="$1" ; shift
+  if dpkg --compare-versions "$from_version" lt 0.32 ; then
+    if [ -f /var/log/qpsmtpd/qpsmtpd.log ] ; then
+      chown qpsmtpd /var/log/qpsmtpd/qpsmtpd.log
+    fi
+  fi
+  if dpkg --compare-versions "$from_version" le 0.94-1 ; then
+    # "check_" prefix was removed in upstream change
+    # b1c2fa16b5fda84f361abf15764501fd11e84022
+    db_input high qpsmtpd/pre094_checkplugin_warning || true
+    db_go
+  fi
+}
+
 case "$1" in
 	configure)
+        previous="$2"
 		setup_debconf
 		setup_user
 		setup_perms
 		setup_maildir_spool
+        upgrade_config "$previous"
 		;;
 	abort-upgrade|abort-remove|abort-deconfigure)
 		# no-op

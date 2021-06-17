@@ -133,7 +133,7 @@ sub register {
 
 sub check_host {
     my ($self, $transaction, $rcpt) = @_;
-    my $ip = $self->qp->connection->remote_ip || return (DECLINED);
+    my $ip = $self->qp->connection->remote_ip or return DECLINED;
 
     # From tcpserver
     if (exists $ENV{WHITELISTCLIENT}) {

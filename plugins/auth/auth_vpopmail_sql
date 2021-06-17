@@ -94,8 +94,11 @@ sub get_db_handle {
     my $dbuser = $self->qp->config("vpopmail_mysql_user") || "vpopmailuser";
     my $dbpass = $self->qp->config("vpopmail_mysql_pass") || "vpoppasswd";
 
-    my $dbh = DBI->connect($dsn, $dbuser, $dbpass) or do {
-        $self->log(LOGERROR, "skip: db connection failed");
+    my $dbh;
+    eval { $dbh = DBI->connect($dsn, $dbuser, $dbpass); };
+    if (!$dbh) {
+        $self->log(LOGERROR, "skip: db connection failed: $!");
+        $self->log(LOGERROR, $@) if $@;
         return;
     };
     $dbh->{ShowErrorStatement} = 1;
@@ -140,7 +143,7 @@ sub auth_vmysql {
 
     if (!$u->{pw_passwd} && !$u->{pw_clear_passwd}) {
         $self->log(LOGINFO, "fail: no such user");
-        return (DENY, "auth_vmysql - no such user");
+        return DENY, "auth_vmysql - no such user";
     }
 
     # at this point, the user name has matched

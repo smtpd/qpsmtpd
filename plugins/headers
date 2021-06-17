@@ -152,7 +152,7 @@ sub hook_data_post {
     };
 
     $self->log(LOGINFO, 'pass');
-    return (DECLINED);
+    return DECLINED;
 }
 
 sub has_required_headers {
@@ -168,7 +168,7 @@ sub has_required_headers {
         $self->log(LOGINFO, "fail, no $h header" );
     }
     return $errors;
-};
+}
 
 sub has_singular_headers {
     my ($self, $header) = @_;
@@ -187,7 +187,7 @@ sub has_singular_headers {
         $self->log(LOGINFO, "fail, too many $h headers" );
     }
     return $errors;
-};
+}
 
 sub invalid_date_range {
     my $self = shift;
