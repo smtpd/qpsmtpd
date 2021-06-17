@@ -1,0 +1,10 @@
+diff -aruN qpsmtpd-0.94.orig/UPGRADING.pod qpsmtpd-0.94/UPGRADING.pod
+--- qpsmtpd-0.94.orig/UPGRADING.pod	2014-09-05 20:14:28.000000000 -0700
++++ qpsmtpd-0.94/UPGRADING.pod	2014-10-22 00:10:39.127786051 -0700
+@@ -1,3 +1,6 @@
++=head1 NAME
++
++qpsmtpd - Upgrade notes
+ 
+ =head1 Upgrade notes
+ 

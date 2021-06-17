@@ -1,0 +1,88 @@
+.TH qpsmtpd-prefork 8
+
+.SH NAME
+qpsmtpd\-prefork \- Preforkin server for qpsmtpd
+
+.SH SYNOPSIS
+.na
+.B qpsmtpd\-prefork
+.RI [ options ]
+.ad
+
+.SH DESCRIPTION
+.LP
+\fBqpsmtpd\-prefork\fR is the qpsmtpd frontend script which binds to the SMTP TCP socket, and asynchronously forks new children in advance of new connections.
+
+.SH OPTIONS
+.TP
+.BR \-\-port\ \fIport\fR
+Binds to a specific \fIport\fR, instead of the default 2525.
+
+.TP
+.BR \-\-user\ \fIuser\fR
+On startup, switch to run as \fIuser\fR instead of the starting user.  Applies only when started as root (as is normal when listening on port 25).
+
+.TP
+.BR \-\-limit\-connections\ \fIlimit\fR
+Accept at most \fIlimit\fR simultaneous connections.  Inbound connections beyondthis limit will be deferred or refused.
+
+.TP
+.BR \-\-max\-from\-ip\ \fIlimit\fR
+Accept at most \fIlimit\fR simultaneous connections from any given IP address; does not override \fB\-\-limit\-connections\fR, if set.
+
+.TP
+.BR \-\-children\ \fIlimit\fR
+Limit the total number of child processes to \fIlimit\fR; once all children
+are handling requests, further connections are deferred.
+
+.TP
+.BR \-\-idle\-children\ \fIcount\fR
+
+Keep \fIcount\fR child processes available, subject to the upper bound given
+via \-\-children.  Specify 0 to disable preforking entirely.
+
+.TP
+.BR \-\-interface\ \fIaddr\fR
+Bind to the local address \fIaddr\fR, instead of the default behavior of binding to all interfaces.  Can be specified multiple times to bind to more than one interface or local address.
+
+.TP
+.BR \-\-renice\-parent\ \fIdelta\fR
+
+Adjust the priority of the parent process by \fIdelta\fR, yielding more CPU time
+to other processes.  The default is 5.
+
+.TP
+.BR \-\-detach
+Detach from the controlling terminal at startup, to run as a standalone daemon.  See also \fB--pid-file\fR.
+
+.TP
+.BR \-\-pid-file\ \fIfilename\fR
+Upon startup, and after daemonizing if applicable, write the process ID to \fIfilename\fR, for use by sysvinit control scripts or similar utilities.
+
+.TP
+.BR \-\-pretty\-child
+
+Update child process names within the process table.
+
+.TP
+.BR \-\-version
+Print the qpsmtpd release version and exit.
+
+.TP
+.BR \-\-debug
+Be somewhat more verbose about logging during startup (has no effect once
+fully started).
+
+.TP
+.BR \-\-help
+Display commandline help and exit.
+
+.SH AUTHOR
+.LP
+Copyright (c) 2006, SoftScan; based on qpsmtpd-forkserver by Ask Bjorn
+Hansen <ask@develooper.com>
+
+.BR
+http://smtpd.develooper.com/
+
+

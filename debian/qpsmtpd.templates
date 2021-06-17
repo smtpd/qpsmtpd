@@ -109,3 +109,11 @@ _Description: Destination domain(s) to accept mail for (blank for none):
  .
  If you prefer to manage this list manually, leave the entry blank and edit
  the file /etc/qpsmtpd/rcpthosts.
+
+Template: qpsmtpd/pre094_checkplugin_warning
+Type: note
+_Description: Incompatible upstream naming of check_* plugins
+ As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which
+ lack the check_ prefix in their names.  Wrappers re-enabling the old names
+ are shipped in this release, but will be removed in the future; see
+ /usr/share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions.

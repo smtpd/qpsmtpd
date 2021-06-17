@@ -1,4 +1,14 @@
-Copyright (C) 2001-2010 Ask Bjoern Hansen, Develooper LLC
+This package was debianized by Devin Carraway <devin@debian.org> on 
+Tue Jun 28 01:59:13 PDT 2005
+
+It was downloaded from http://smtpd.develooper.com/
+
+Qpsmtpd is copyright 2001-2005 by Ask Bjorn Hansen and others (see Changes
+file for other contributors).
+
+It is distributed under the MIT license, which reads as follows:
+
+Copyright (C) 2001-2004 Ask Bjorn Hansen, Develooper LLC
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -17,3 +27,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Translations:
+nl.po (C) 2014,2018 by Frans Spiesschaert <Frans.Spiesschaert@yucom.be>
+fr.po (C) 2006,2015 by Steve Petruzzello <dlist@bluewin.ch>
+da.po (C) 2012,2015 by Joe Hansen <joedalton2@yahoo.dk>
+de.po (C) 2007,2009,2016 by Helge Kreutzmann <debian@helgefjell.de>
+ja.po (C) 2013 by victory <victory.deb@gmail.com>
+          2016 by Takuma Yamada <tyamada@takumayamada.com>
+pt.po (C) 2010 by Tiago Fernandes <tjg.fernandes@gmail.com>
+          2017 by Rui Branco - DebianPT <ruipb@debianpt.org>
+	  2017 by Tiago Fernandes <tjg.fernandes@gmail.com>
+ru.po (C) 2009 by Sergey Alyoshin <alyoshin.s@gmail.com>
+          2009,2019 by Yuri Kozlov <yuray@komyakino.ru>
+cs.po (C) 2010 by Miroslav Kure <kurem@debian.cz>
+es.po (C) 2010 by Francisco Javier Cuadrado <fcocuadrado@gmail.com>
+it.po (C) 2012 by Beatrice Torracca <beatricet@libero.it>
+sk.po (C) 2012 by Slavko <linux@slavino.sk>
+sv.po (C) 2008 by Martin Ågren <martin.agren@gmail.com>
+      (C) 2010 by Martin Bagge <brother@bsnet.se>

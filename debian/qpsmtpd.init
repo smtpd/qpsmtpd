@@ -41,13 +41,6 @@ fi
 
 qpsmtpd_start()
 {
-	# a bug in 0.31.1 caused logfiles to be created as root, rather
-	# than as the $RUNAS user
-	if [ "x$RUNAS" != "x" -a \
-             "`stat --format '%u' /var/log/qpsmtpd/qpsmtpd.log 2>/dev/null`" \
-	       = "0" ] ; then
-                chown "$RUNAS" /var/log/qpsmtpd/qpsmtpd.log
-        fi
 	export QPSMTPD_CONFIG="/etc/qpsmtpd"
 	if [ ! -d "/var/run/qpsmtpd" ] ; then
 		mkdir -p /var/run/qpsmtpd
@@ -110,7 +103,7 @@ case "$1" in
 		qpsmtpd_status
 		;;
 	*)
-		echo "usage: $0 {start|stop|restart|reload|force-reload|status}"
+		echo "usage: $0 {start|stop|restart|status}"
 		exit 1
 		;;
 esac

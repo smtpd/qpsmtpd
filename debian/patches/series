@@ -1,0 +1,4 @@
+pod2man-utf8.patch
+upgrading-pod2man-lint.patch
+auth_ldap_bind-syntax.patch
+pre0.94-checkplugins.patch

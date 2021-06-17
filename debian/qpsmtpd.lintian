@@ -1,0 +1,3 @@
+qpsmtpd: script-not-executable usr/share/qpsmtpd/plugins/loadcheck
+qpsmtpd: script-not-executable usr/share/qpsmtpd/plugins/qmail_deliverable
+qpsmtpd: script-not-executable usr/share/qpsmtpd/plugins/tls_cert

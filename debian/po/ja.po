@@ -2,19 +2,22 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the qpsmtpd package.
 # victory <victory.deb@gmail.com>, 2013.
+# Takuma Yamada <tyamada@takumayamada.com>, 2016.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: qpsmtpd\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
-"POT-Creation-Date: 2013-07-02 14:36+0000\n"
-"PO-Revision-Date: 2013-07-02 23:36+0900\n"
-"Last-Translator: victory <victory.deb@gmail.com>\n"
+"POT-Creation-Date: 2019-01-11 10:02+0100\n"
+"PO-Revision-Date: 2019-01-11 10:05+0100\n"
+"Last-Translator: Takuma Yamada <tyamada@takumayamada.com>\n"
 "Language-Team: Japanese <debian-japanese@lists.debian.org>\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Generator: Gtranslator 2.91.6\n"
 
 #. Type: boolean
 #. Description
@@ -29,9 +32,9 @@ msgid ""
 "Because most MTAs in Debian listen on one or all network interfaces by "
 "default, when first installed qpsmtpd cannot normally be started."
 msgstr ""
-"Debian のほとんどの MTA はネットワークインターフェイスを一つまたは全部、デフォ"
-"ルトで待ち受けるため、qpsmtpd を最初にインストールしたときには通常開始させるこ"
-"とができません。"
+"Debian のほとんどの MTA はネットワークインターフェイスを一つまたは全部、デ"
+"フォルトで待ち受けるため、qpsmtpd を最初にインストールしたときには通常開始さ"
+"せることができません。"
 
 #. Type: boolean
 #. Description
@@ -45,11 +48,11 @@ msgid ""
 "share/doc/qpsmtpd/README.Debian."
 msgstr ""
 "qpsmtpd を有効にする前にまず、ローカル MTA が少なくとも一つのインターフェイス"
-"の SMTP TCP ポートを待ち受けしないように設定する必要があります。最も一般的なの"
-"は、MTA にはループバックインターフェイス (127.0.0.1) を待ち受けさせ、qpsmtpd "
-"には外部インターフェイスを待ち受けさせる方法です。一般的な MTA を qpsmtpd と連"
-"携させるように設定する手順は、インストール後、/usr/share/doc/qpsmtpd/README."
-"Debian に置かれます。"
+"の SMTP TCP ポートを待ち受けしないように設定する必要があります。最も一般的な"
+"のは、MTA にはループバックインターフェイス (127.0.0.1) を待ち受けさせ、"
+"qpsmtpd には外部インターフェイスを待ち受けさせる方法です。一般的な MTA を "
+"qpsmtpd と連携させるように設定する手順は、インストール後、/usr/share/doc/"
+"qpsmtpd/README.Debian に置かれます。"
 
 #. Type: boolean
 #. Description
@@ -58,8 +61,8 @@ msgid ""
 "Once you have adjusted your MTA configuration, you can enable qpsmtpd by "
 "restarting this configuration, by running 'dpkg-reconfigure qpsmtpd'."
 msgstr ""
-"MTA 設定の調整が済めば、「dpkg-reconfigure qpsmtpd」を実行することでこの設定を"
-"再開し、qpsmtpd を有効化することができます。"
+"MTA 設定の調整が済めば、「dpkg-reconfigure qpsmtpd」を実行することでこの設定"
+"を再開し、qpsmtpd を有効化することができます。"
 
 #. Type: select
 #. Description
@@ -80,9 +83,9 @@ msgid ""
 msgstr ""
 "qpsmtpd は接続の処理に2つの処理型をサポートしています。「forkserver」型では待"
 "機時には単一のプロセスを使い、新しいプロセスを分岐 (fork) して接続を処理しま"
-"す。これはメモリ使用量は少なくなりますがサーバの処理能力がわずかに低下します。"
-"「prefork」型では新しい接続の処理に利用できる待機プロセスをある程度維持し、メ"
-"モリを多く使いますがその代わりに性能はわずかに向上します。"
+"す。これはメモリ使用量は少なくなりますがサーバの処理能力がわずかに低下しま"
+"す。「prefork」型では新しい接続の処理に利用できる待機プロセスをある程度維持"
+"し、メモリを多く使いますがその代わりに性能はわずかに向上します。"
 
 #. Type: string
 #. Description
@@ -153,8 +156,9 @@ msgid ""
 "MTA (local or remote).  You will then be prompted to enter a destination "
 "host."
 msgstr ""
-"qpsmtpd に別の MTA (ローカルまたはリモート) 用の SMTP プロキシとして動作させた"
-"い場合は「proxy」を選択してください。そうすると宛先ホストの入力を求められます。"
+"qpsmtpd に別の MTA (ローカルまたはリモート) 用の SMTP プロキシとして動作させ"
+"たい場合は「proxy」を選択してください。そうすると宛先ホストの入力を求められま"
+"す。"
 
 #. Type: select
 #. Description
@@ -163,9 +167,9 @@ msgid ""
 "Select \"maildir\" to have qpsmtpd deliver into a local maildir-format spool "
 "instead of queueing it for delivery (e.g. if you're setting up a spamtrap.)"
 msgstr ""
-"キューに送り配送する代わりにローカルの maildir 形式のスプールに qpsmtpd により"
-"配送させる (例えば spam 用に罠を仕掛ける場合) には「maildir」を選択してくださ"
-"い。"
+"キューに送り配送する代わりにローカルの maildir 形式のスプールに qpsmtpd によ"
+"り配送させる (例えば spam 用に罠を仕掛ける場合) には「maildir」を選択してくだ"
+"さい。"
 
 #. Type: select
 #. Description
@@ -174,8 +178,8 @@ msgid ""
 "If you select \"none,\" no queueing will be done at all, unless you manually "
 "configure it yourself by editing /etc/qpsmtpd/plugins."
 msgstr ""
-"「none」を選択すると自分で /etc/qpsmtpd/plugins を編集して手作業により設定しな"
-"い限りキューには全く送られません。"
+"「none」を選択すると自分で /etc/qpsmtpd/plugins を編集して手作業により設定し"
+"ない限りキューには全く送られません。"
 
 #. Type: string
 #. Description
@@ -191,9 +195,9 @@ msgid ""
 "or IP address of that host here.  You can optionally add a port number after "
 "a colon, such as \"localhost:25\"."
 msgstr ""
-"qpsmtpd を別のホストの SMTP プロキシとして動作させるには、そのホストのホスト名"
-"または IP アドレスをここで提示してください。オプションで「localhost:25」のよう"
-"にコロンの後にポート番号を追加することもできます。"
+"qpsmtpd を別のホストの SMTP プロキシとして動作させるには、そのホストのホスト"
+"名または IP アドレスをここで提示してください。オプションで「localhost:25」の"
+"ようにコロンの後にポート番号を追加することもできます。"
 
 #. Type: string
 #. Description
@@ -230,12 +234,12 @@ msgid ""
 "potential cost of wasted bandwidth and eventual bouncing of possibly "
 "legitimate mail."
 msgstr ""
-"キューに送るプラグインに「none」を選択すると入ってくるメールをローカルのキュー"
-"に送らなくなります。手作業によりキューに送る方法を設定するまで qpsmtpd はメー"
-"ルを一切スプールに送らなくなります。それまでこのホストにメールを配送しようとし"
-"たあらゆるホストが 4xx soft-failure メッセージを受け取ることとなり、無駄にした"
-"帯域の潜在的コストが発生し、最終的には正当なメールをバウンスさせる可能性もあり"
-"ます。"
+"キューに送るプラグインに「none」を選択すると入ってくるメールをローカルの"
+"キューに送らなくなります。手作業によりキューに送る方法を設定するまで qpsmtpd "
+"はメールを一切スプールに送らなくなります。それまでこのホストにメールを配送し"
+"ようとしたあらゆるホストが 4xx soft-failure メッセージを受け取ることとなり、"
+"無駄にした帯域の潜在的コストが発生し、最終的には正当なメールをバウンスさせる"
+"可能性もあります。"
 
 #. Type: boolean
 #. Description
@@ -249,9 +253,9 @@ msgid ""
 msgstr ""
 "キューに送る方法を手作業により設定するには、/etc/qpsmtpd/plugins を編集して"
 "キューに送る方法を一つ選択してください。インストールされている MTA が一覧にな"
-"く何をしたらいいのかよくわからない場合はここで「Cancel」を選び、代わりに SMTP "
-"プロキシの方法を選択して、適切なローカルのアドレス/ポートで MTA 用プロキシとし"
-"て設定してください。"
+"く何をしたらいいのかよくわからない場合はここで「Cancel」を選び、代わりに "
+"SMTP プロキシの方法を選択して、適切なローカルのアドレス/ポートで MTA 用プロキ"
+"シとして設定してください。"
 
 #. Type: string
 #. Description
@@ -271,11 +275,11 @@ msgid ""
 "as used for that MTA (the installer will attempt to extract that setting as "
 "a default.)"
 msgstr ""
-"qpsmtpd が受け付けるメールのドメイン名一覧を空白で区切って入力してください。こ"
-"れにはローカル配送用に受け入れるホスト名やドメイン名やメールを中継させる宛先の"
-"ドメインを全て列挙してください。一般的に、受け取ったメールをローカル MTA に回"
-"す場合は MTA 側で利用されている設定と同一になるはずです (インストーラはデフォ"
-"ルトでこの設定の抽出を試みます)。"
+"qpsmtpd が受け付けるメールのドメイン名一覧を空白で区切って入力してください。"
+"これにはローカル配送用に受け入れるホスト名やドメイン名やメールを中継させる宛"
+"先のドメインを全て列挙してください。一般的に、受け取ったメールをローカル MTA "
+"に回す場合は MTA 側で利用されている設定と同一になるはずです (インストーラはデ"
+"フォルトでこの設定の抽出を試みます)。"
 
 #. Type: string
 #. Description
@@ -284,5 +288,25 @@ msgid ""
 "If you prefer to manage this list manually, leave the entry blank and edit "
 "the file /etc/qpsmtpd/rcpthosts."
 msgstr ""
-"このリストを手作業により管理したい場合はこれを空白にしてファイル /etc/qpsmtpd/"
-"rcpthosts を編集してください。"
+"このリストを手作業により管理したい場合はこれを空白にしてファイル /etc/"
+"qpsmtpd/rcpthosts を編集してください。"
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid "Incompatible upstream naming of check_* plugins"
+msgstr "互換性のない check_* プラグインの上流の命名"
+
+#. Type: note
+#. Description
+#: ../qpsmtpd.templates:9001
+msgid ""
+"As of 0.94, qpsmtpd renamed the check_* plugins to updated versions which "
+"lack the check_ prefix in their names.  Wrappers re-enabling the old names "
+"are shipped in this release, but will be removed in the future; see /usr/"
+"share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
+msgstr ""
+"0.94 で、qpsmptd は check_* プラグインを check_ プレフィックスの付かない名前"
+"に更新されたバージョンに変更しました。古い名前を再度有効にするラッパーは、こ"
+"のリリースでは出荷されますが、将来的に削除されます。アップグレード手順につい"
+"ては /usr/share/doc/qpsmtpd/plugins/README.check_plugins を参照してください。"

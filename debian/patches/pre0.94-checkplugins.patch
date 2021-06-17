@@ -1,0 +1,106 @@
+diff -aruN qpsmtpd-0.94.orig/plugins/check_badmailfrom qpsmtpd-0.94/plugins/check_badmailfrom
+--- qpsmtpd-0.94.orig/plugins/check_badmailfrom	1969-12-31 16:00:00.000000000 -0800
++++ qpsmtpd-0.94/plugins/check_badmailfrom	2015-02-21 23:34:00.005670303 -0800
+@@ -0,0 +1,14 @@
++# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
++# from the upstream distribution to remove the check_ prefix.  This plugin
++# exists to allow older, un-migrated configurations to work properly with
++# the 0.94 release.
++
++my $whoami = 'badmailfrom';
++
++sub init {
++  my $self = shift;
++  $self->log(LOGINFO,
++             "The check_$whoami plugin is deprecated; see" .
++             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
++  $self->isa_plugin($whoami);
++}
+diff -aruN qpsmtpd-0.94.orig/plugins/check_badrcptto qpsmtpd-0.94/plugins/check_badrcptto
+--- qpsmtpd-0.94.orig/plugins/check_badrcptto	1969-12-31 16:00:00.000000000 -0800
++++ qpsmtpd-0.94/plugins/check_badrcptto	2015-02-21 23:34:00.009670201 -0800
+@@ -0,0 +1,14 @@
++# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
++# from the upstream distribution to remove the check_ prefix.  This plugin
++# exists to allow older, un-migrated configurations to work properly with
++# the 0.94 release.
++
++my $whoami = 'badrcptto';
++
++sub init {
++  my $self = shift;
++  $self->log(LOGINFO,
++             "The check_$whoami plugin is deprecated; see" .
++             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
++  $self->isa_plugin($whoami);
++}
+diff -aruN qpsmtpd-0.94.orig/plugins/check_earlytalker qpsmtpd-0.94/plugins/check_earlytalker
+--- qpsmtpd-0.94.orig/plugins/check_earlytalker	1969-12-31 16:00:00.000000000 -0800
++++ qpsmtpd-0.94/plugins/check_earlytalker	2015-02-21 23:34:00.005670303 -0800
+@@ -0,0 +1,14 @@
++# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
++# from the upstream distribution to remove the check_ prefix.  This plugin
++# exists to allow older, un-migrated configurations to work properly with
++# the 0.94 release.
++
++my $whoami = 'earlytalker';
++
++sub init {
++  my $self = shift;
++  $self->log(LOGINFO,
++             "The check_$whoami plugin is deprecated; see" .
++             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
++  $self->isa_plugin($whoami);
++}
+diff -aruN qpsmtpd-0.94.orig/plugins/check_loop qpsmtpd-0.94/plugins/check_loop
+--- qpsmtpd-0.94.orig/plugins/check_loop	1969-12-31 16:00:00.000000000 -0800
++++ qpsmtpd-0.94/plugins/check_loop	2015-02-21 23:34:00.009670201 -0800
+@@ -0,0 +1,14 @@
++# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
++# from the upstream distribution to remove the check_ prefix.  This plugin
++# exists to allow older, un-migrated configurations to work properly with
++# the 0.94 release.
++
++my $whoami = 'loop';
++
++sub init {
++  my $self = shift;
++  $self->log(LOGINFO,
++             "The check_$whoami plugin is deprecated; see" .
++             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
++  $self->isa_plugin($whoami);
++}
+diff -aruN qpsmtpd-0.94.orig/plugins/check_relay qpsmtpd-0.94/plugins/check_relay
+--- qpsmtpd-0.94.orig/plugins/check_relay	1969-12-31 16:00:00.000000000 -0800
++++ qpsmtpd-0.94/plugins/check_relay	2015-02-21 23:34:00.005670303 -0800
+@@ -0,0 +1,14 @@
++# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
++# from the upstream distribution to remove the check_ prefix.  This plugin
++# exists to allow older, un-migrated configurations to work properly with
++# the 0.94 release.
++
++my $whoami = 'relay';
++
++sub init {
++  my $self = shift;
++  $self->log(LOGINFO,
++             "The check_$whoami plugin is deprecated; see" .
++             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
++  $self->isa_plugin($whoami);
++}
+diff -aruN qpsmtpd-0.94.orig/plugins/check_spamhelo qpsmtpd-0.94/plugins/check_spamhelo
+--- qpsmtpd-0.94.orig/plugins/check_spamhelo	1969-12-31 16:00:00.000000000 -0800
++++ qpsmtpd-0.94/plugins/check_spamhelo	2015-02-21 23:41:26.544049127 -0800
+@@ -0,0 +1,12 @@
++# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
++# from the upstream distribution to remove the check_ prefix.  This plugin
++# exists to allow older, un-migrated configurations to work properly with
++# the 0.94 release.
++
++sub init {
++  my $self = shift;
++  $self->log(LOGINFO,
++             "The check_spamhelo plugin is deprecated; see" .
++             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
++  $self->isa_plugin('helo');
++}
