@@ -25,8 +25,6 @@ my %return_codes = (
          DENYSOFT_DISCONNECT => 904,    # 450 + disconnect
          DECLINED            => 909,
          DONE                => 910,
-         CONTINUATION        => 911,    # deprecated - use YIELD
-         YIELD               => 911,
                    );
 
 use vars qw(@ISA @EXPORT);

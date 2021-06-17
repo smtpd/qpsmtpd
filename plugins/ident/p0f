@@ -107,6 +107,34 @@ Example entry:
 
   ident/p0f /tmp/.p0f_socket smite_os windows
 
+=head2 add_headers <true|false>
+
+Add message headers with p0f data
+
+  ident/p0f [ add_headers (true|false) ]
+
+Example entry disabling header addition
+
+  ident/p0f /tmp/.p0f_socket add_headers false
+
+Default: true
+
+=head1 CONFIGURATION FILES
+
+=head2 p0f_blocked_operating_systems
+
+If populated, systems that match the phrases and regular expressions
+in this list will be rejected.
+
+Regular expressions are case-insensitive.
+
+Example entries:
+
+Windows XP
+/windows/
+
+Default: none (p0f rejections disabled)
+
 =head1 Environment requirements
 
 p0f v3 requires only the remote IP.
@@ -114,7 +142,7 @@ p0f v3 requires only the remote IP.
 p0f v2 requires four pieces of information to look up the p0f fingerprint:
 local_ip, local_port, remote_ip, and remote_port. TcpServer.pm has been
 has been updated to provide that information when running under djb's
-tcpserver. The async, forkserver, and prefork models will likely require
+tcpserver. The forkserver and prefork models will likely require
 some additional changes to make sure these fields are populated.
 
 =head1 ACKNOWLEDGEMENTS
@@ -154,7 +182,62 @@ sub register {
     foreach (keys %args) {
         $self->{_args}->{$_} = $args{$_};
     }
+    $self->register_headers();
+    $self->register_genre_blocking();
 }
+
+sub register_headers {
+    my ( $self ) = @_;
+    my $enabled = $self->{_args}{add_headers};
+    $enabled = 'true' if ! defined $enabled;
+    return if $enabled =~ /false/i;
+    $self->register_hook( data_post => 'add_headers' );
+}
+
+sub register_genre_blocking {
+    my ( $self ) = @_;
+    my @patterns = $self->qp->config('p0f_blocked_operating_systems');
+    return unless @patterns;
+    for my $pattern ( @patterns ) {
+        if ( $pattern =~ /^\/(.*)\/$/ ) {
+            push @{ $self->{os_block_re} }, qr/$1/i;
+        } else {
+            push @{ $self->{os_block} }, $pattern;
+        }
+    }
+    $self->register_hook( rcpt => 'rcpt_handler' );
+}
+
+sub rcpt_handler {
+    my ( $self, $txn, $rcpt ) = @_;
+    return DECLINED if ! $self->check_genre($rcpt);
+    return DENY, 'OS Blocked';
+}
+
+sub check_genre {
+    my ( $self, $rcpt ) = @_;
+    my $genre = ( $self->connection->notes('p0f') || {} )->{genre} or return 0;
+    return 0 if $self->exclude_connection();
+    return 0 if $self->exclude_recipient($rcpt);
+    for my $phrase ( @{ $self->{os_block} || [] } ) {
+        return 1 if $genre eq $phrase;
+    }
+    for my $re ( @{ $self->{os_block_re} || [] } ) {
+        return 1 if $genre =~ $re;
+    }
+    return 0;
+}
+
+sub exclude_connection {
+    my ( $self ) = @_;
+    my $cxn = $self->connection;
+    return $cxn->notes('p0f_exclude')   if defined $cxn->notes('p0f_exclude');
+    return $cxn->notes('p0f_exclude',1) if $self->is_immune();
+    return $cxn->notes('p0f_exclude',0);
+}
+
+# This sub exists to be overridden by plugins that inherit from this one
+sub exclude_recipient  { return 0 }
 
 sub hook_connect {
     my ($self, $qp) = @_;
@@ -172,6 +255,21 @@ sub hook_connect {
     }
 
     return DECLINED;
+}
+
+sub add_headers {
+    my ( $self, $txn ) = @_;
+    my $p0f = $self->connection->notes('p0f') or return DECLINED;
+    $self->add_p0f_header( 'X-P0F-Genre'     => $p0f->{genre}     );
+    $self->add_p0f_header( 'X-P0F-Link-Type' => $p0f->{link_type} );
+    return DECLINED;
+}
+
+sub add_p0f_header {
+    my ( $self, $tag, $value ) = @_;
+    return if ! $value;
+    $self->transaction->header->delete( $tag );
+    $self->transaction->header->add( $tag, $value, 0 );
 }
 
 sub get_v2_query {
@@ -225,12 +323,9 @@ sub query_p0f_v3 {
     my $query = $self->get_v3_query() or return;
 
     # Open the connection to p0f
-    my $sock;
-    eval {
-        $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM);
-    };
+    my $sock = IO::Socket::UNIX->new(Peer => $p0f_socket, Type => SOCK_STREAM);
     if (!$sock) {
-        $self->log(LOGERROR, "skip, could not open socket: $@");
+        $self->log(LOGERROR, "skip, could not open socket: $!");
         return;
     }
 

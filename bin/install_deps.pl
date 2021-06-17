@@ -40,7 +40,7 @@ my @failed;
 foreach ( @$apps ) {
     my $name = $_->{app} or die 'missing app name';
     install_app( $name, $_->{info} );
-};
+}
 
 foreach ( get_perl_modules() ) {
 #print Dumper($_);
@@ -78,7 +78,7 @@ sub get_perl_modules {
         return get_perl_modules_from_Makefile_PL();
     };
     die "unable to find module list. Run this script in the dist dir\n";
-};
+}
 
 sub get_perl_modules_from_Makefile_PL {
     my $fh = new IO::File 'Makefile.PL', 'r'
@@ -102,7 +102,7 @@ sub get_perl_modules_from_Makefile_PL {
     }
     $fh->close;
     return @modules;
-};
+}
 
 sub get_perl_modules_from_ini {
     my $fh = new IO::File 'dist.ini', 'r'
@@ -127,7 +127,7 @@ sub get_perl_modules_from_ini {
     $fh->close;
 #print Dumper(\@modules);
     return @modules;
-};
+}
 
 sub install_app {
     my ( $app, $info) = @_;
@@ -142,7 +142,7 @@ sub install_app {
         install_app_linux( $app, $info );
     };
 
-};
+}
 
 sub install_app_darwin {
     my ($app, $info ) = @_;
@@ -181,7 +181,7 @@ sub install_app_freebsd {
         system "make install clean"
             and warn "'make install clean' failed for port $app\n";
     };
-};
+}
 
 sub install_app_linux {
     my ($app, $info ) = @_;
@@ -197,7 +197,7 @@ sub install_app_linux {
     else {
         warn "no Linux package manager detected\n";
     };
-};
+}
 
 
 sub install_module {
@@ -220,7 +220,7 @@ sub install_module {
     return 1 if ! $EVAL_ERROR;
 
     install_module_cpan($module, $version);
-};
+}
 
 sub install_module_cpan {
 
@@ -309,7 +309,7 @@ sub install_module_linux {
         return install_module_linux_apt($module, $info);
     }
     warn "no Linux package manager detected\n";
-};
+}
 
 sub install_module_linux_yum {
     my ($module, $info) = @_;
@@ -322,7 +322,7 @@ sub install_module_linux_yum {
         $package =~ s/::/-/g;
     };
     system "/usr/bin/yum -y install $package";
-};
+}
 
 sub install_module_linux_apt {
     my ($module, $info) = @_;
@@ -335,7 +335,7 @@ sub install_module_linux_apt {
         $package =~ s/::/-/g;
     };
     system "/usr/bin/apt-get -y install $package";
-};
+}
 
 sub get_cpan_config {
 
@@ -397,4 +397,4 @@ sub name_overrides {
     my ($match) = grep { $_->{module} eq $mod } @modules;
     return $match if $match;
     return { module=>$mod, info => { } };
-};
+}

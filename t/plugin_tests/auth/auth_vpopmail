@@ -8,7 +8,7 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_auth_vpopmail", 3);
+    $self->register_test("test_auth_vpopmail");
 }
 
 my @u_list = qw ( good bad none );
@@ -25,7 +25,7 @@ sub test_auth_vpopmail {
         warn "vpopmail plugin not configured\n";
         foreach ( 0..2) { ok( 1, "skipped") };
         return;
-    };
+    }
 
     my ($tran, $ret, $note, $u, $r, $p, $a );
     $tran = $self->qp->transaction;

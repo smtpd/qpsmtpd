@@ -44,7 +44,7 @@ With SPF:
 
 With DMARC:
 
-_dmarc  TXT "v=DMARC1; p=reject; adkim=s; aspf=r; rua=mailto:dmarc-feedback@$DOMAIN; ruf=mailto:dmarc-feedback@'$DOMAIN; pct=100"
+_dmarc  TXT "v=DMARC1; p=reject; adkim=s; aspf=r; rua=mailto:dmarc-feedback@$DOMAIN; ruf=mailto:dmarc-feedback@$DOMAIN; pct=100"
 
 With DomainKeys (deprecated)
 

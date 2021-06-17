@@ -1,0 +1,24 @@
+#!perl -w
+use Test::More tests => 2;
+use strict;
+use lib 't';
+
+use_ok('Net::IMAP::Simple');
+
+sub auth_imap {
+
+    use Net::IMAP::Simple::SSL;
+
+    my ($imaphost, $imapport, $imapserver);
+
+    $imaphost   = "imap.gmail.com";
+    $imapport   = "993";
+    $imapserver = "$imaphost:$imapport";
+
+    my $server = Net::IMAP::Simple->new($imapserver, use_ssl => 1,)
+      or return ("auth_imap - could not connect to $imapserver");
+    sleep 1;
+    $server->quit;
+}
+
+ok(auth_imap, "auth_imap, connected to imap.gmail.com for a sec");

@@ -28,7 +28,7 @@ sub hook_mail_pre {
         $self->adjust_karma(-2);
         $self->log(LOGINFO, "fail, added MAIL angle brackets");
     }
-    return (OK, $addr);
+    return OK, $addr;
 }
 
 sub hook_rcpt_pre {
@@ -38,5 +38,5 @@ sub hook_rcpt_pre {
         $self->adjust_karma(-2);
         $self->log(LOGINFO, "fail, added RCPT angle brackets");
     }
-    return (OK, $addr);
+    return OK, $addr;
 }

@@ -161,7 +161,7 @@ sub hook_data_post {
     # check if something went wrong
     if ($signal) {
         $self->log(LOGERROR, "kavscanner exited with signal: $signal");
-        return (DECLINED);
+        return DECLINED;
     }
 
     # either we found a virus or something went wrong
@@ -174,7 +174,7 @@ sub hook_data_post {
             $self->log(LOGWARN, "Virus found! ($description)");
 
      # we don't want to be disturbed be these, so block mail and DENY connection
-            return (DENY, "Virus found: $description");
+            return DENY, "Virus found: $description";
 
         }
         else {
@@ -188,17 +188,17 @@ sub hook_data_post {
 "aveserver: some of the required parameters are missing from the command line."
               )
               if ($result =~ /^9$/);
-            return (DENY,
+            if ( $self->{_blockonerror} ) {
+                return DENY,
                         "Unable to scan for virus, please contact admin of "
                       . $self->qp->config("me")
                       . ", if you feel this is an error!"
-                   )
-              if $self->{_blockonerror};
+            }
         }
     }
 
     $self->log(LOGINFO, "kavscanner results: $description");
     $transaction->header->add('X-Virus-Checked',
                           'Checked by Kaspersky on ' . $self->qp->config("me"));
-    return (DECLINED);
+    return DECLINED;
 }

@@ -1,14 +1,12 @@
 #!perl -w
-
 use strict;
-use Data::Dumper;
 
 use Qpsmtpd::Address;
 
 sub register_tests {
     my $self = shift;
 
-    $self->register_test("test_badmailfromto_is_sender_immune", 5);
+    $self->register_test("test_badmailfromto_is_sender_immune");
 }
 
 sub test_badmailfromto_is_sender_immune {
@@ -32,5 +30,5 @@ sub test_badmailfromto_is_sender_immune {
 
     $transaction->sender( Qpsmtpd::Address->new( '<matt@example.com>' ) );
     ok( ! $self->is_sender_immune( $transaction->sender, ['bad@example.com'] ), "false");
-};
+}
 

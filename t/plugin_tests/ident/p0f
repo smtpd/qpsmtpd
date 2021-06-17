@@ -8,11 +8,154 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_get_v2_query', 1);
-    $self->register_test('test_get_v3_query', 1);
-    $self->register_test('test_store_v2_results', 2);
-    $self->register_test('test_store_v3_results', 2);
-};
+    $self->register_test('test_add_headers');
+    $self->register_test('test_get_v2_query');
+    $self->register_test('test_get_v3_query');
+    $self->register_test('test_store_v2_results');
+    $self->register_test('test_store_v3_results');
+    $self->register_test('test_register_headers');
+    $self->register_test('test_register_genre_blocking');
+    $self->register_test('test_rcpt_handler');
+    $self->register_test('test_check_genre');
+    $self->register_test('test_exclude_connection');
+    $self->register_test('test_exclude_recipient');
+}
+
+sub register_hook {
+    # Override normal register_hook() to record behavior
+    my $self = shift;
+    $self->{_lastreg} = join ',', @_;
+}
+
+sub test_register_headers {
+    my ( $self ) = @_;
+
+    # reset last_register_args
+    $self->register_hook();
+    delete $self->{_args}{add_headers};
+    $self->register_headers();
+    is( $self->{_lastreg}, 'data_post,add_headers',
+        'register_headers() registers data_post hook by default' );
+
+    $self->register_hook();
+    $self->{_args}{add_headers} = 'asdf';
+    $self->register_headers();
+    is( $self->{_lastreg}, 'data_post,add_headers',
+        'register_headers() registers data_post hook on invalid input' );
+
+    $self->register_hook();
+    $self->{_args}{add_headers} = 'true';
+    $self->register_headers();
+    is( $self->{_lastreg}, 'data_post,add_headers',
+        'register_headers() registers data_post hook when explicitly enabled' );
+    
+    $self->register_hook();
+    $self->{_args}{add_headers} = 'false';
+    $self->register_headers();
+    is( $self->{_lastreg}, '',
+        'register_headers() does not register data_post hook when disabled' );
+
+}
+
+sub test_register_genre_blocking {
+    my ( $self ) = @_;
+
+    $self->register_hook();
+    $self->register_genre_blocking();
+    is( $self->{_lastreg}, '',
+        'rcpt_handler not registered when no blocked genres are configured' );
+
+    $self->register_hook();
+    $self->mock_config( p0f_blocked_operating_systems => 'Crapple Macintawsh' );
+    $self->register_genre_blocking();
+    is( $self->{_lastreg}, 'rcpt,rcpt_handler',
+        'rcpt_handler registered when blocked genre phrases are configured' );
+    is( join('|', @{ delete $self->{os_block}    || [] }), 'Crapple Macintawsh',
+        'blocked OS phrases processed correctly' );
+    is( join('|', @{ delete $self->{os_block_re} || [] }), '',
+        'no blocked OS regexes' );
+
+    $self->register_hook();
+    $self->mock_config( p0f_blocked_operating_systems => '/windoze/' );
+    $self->register_genre_blocking();
+    is( $self->{_lastreg}, 'rcpt,rcpt_handler',
+        'rcpt_handler registered when blocked genre regexes are configured' );
+    is( join('|', @{ delete $self->{os_block}    || [] }), '',
+        'no blocked OS phrases' );
+    is( join('|', @{ delete $self->{os_block_re} || [] }), qr/windoze/i,
+        'blocked OS regexes processed correctly' );
+
+    $self->unmock_config;
+}
+
+sub test_rcpt_handler {
+    my ( $self ) = @_;
+
+    $self->{os_block} = ['Windows 7 or 8'];
+    my ( $r, $msg ) = $self->rcpt_handler();
+    is( return_code($r) . "/$msg", "DENY/OS Blocked",
+        'rcpt_handler rejects on p0f genre match' );
+
+    $self->{os_block} = ['Commodor 16'];
+    ( $r, $msg ) = $self->rcpt_handler();
+    $msg = 'undef' if ! defined $msg;
+    is( return_code($r) . "/$msg", "DECLINED/undef",
+        'rcpt_handler returns DECLINED on no p0f genre match' );
+
+    delete $self->{os_block};
+}
+
+sub test_check_genre {
+    my ( $self ) = @_;
+
+    $self->{os_block_re} = [qr/windows/i];
+    ok( $self->check_genre, 'check_genre() returns true on OS match' );
+
+    $self->{os_block_re} = [qr/windoze/i];
+    ok( ! $self->check_genre, 'check_genre() returns false for no OS match' );
+
+    delete $self->{os_block_re};
+}
+
+sub test_exclude_connection {
+    my ( $self ) = @_;
+    $self->connection->relay_client(0);
+    ok( ! $self->exclude_connection,
+        'default: exclude no connections from genre check' );
+    $self->connection->notes( p0f_exclude => undef );
+    $self->connection->relay_client(1);
+    ok( $self->exclude_connection, 'relay clients excluded from genre check' );
+}
+
+sub test_exclude_recipient {
+    my ( $self ) = @_;
+    ok( ! $self->exclude_recipient({}),
+        'default: exclude no recipients from genre check' );
+}
+
+sub test_add_headers {
+    my ( $self ) = @_;
+    $self->connection->notes( 'p0f',
+        {
+            genre     => 'test genre',
+            link_type => 'test link_type',
+        }
+    );
+    my $header = $self->transaction->header( Mail::Header->new );
+    my @tags = (qw( X-P0F-Genre X-P0F-Link-Type ));
+    $header->add( $_ => 'DELETETHIS' ) for @tags;
+    $self->add_headers($self->transaction);
+    is( $self->all_headers('X-P0F-Genre'), 'test genre',
+        'X-P0F-Genre header added' );
+    is( $self->all_headers('X-P0F-Link-Type'), 'test link_type',
+        'X-P0F-Link-Type header added' );
+}
+
+sub all_headers {
+    # Return all instances of a given message header
+    my ( $self, $tag ) = @_;
+    return join " | ", map { chomp $_; $_ } $self->transaction->header->get($tag);
+}
 
 sub test_query_p0f_v2 {
 #TODO
@@ -25,11 +168,11 @@ sub test_query_p0f_v2 {
 #     or   c) is there a p0f test value?
 # parse and validate the response
 # using $self->test_v2_response()
-};
+}
 
 sub test_query_p0f_v3 {
 #TODO: similar to v2 ....
-};
+}
 
 sub test_get_v2_query {
     my $self = shift;
@@ -44,8 +187,7 @@ sub test_get_v2_query {
 
     my $r = $self->get_v2_query();
     ok( $r, 'r +' );
-    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
-};
+}
 
 sub test_get_v3_query {
     my $self = shift;
@@ -55,7 +197,7 @@ sub test_get_v3_query {
 
     my $r = $self->get_v3_query();
     ok( $r, 'any +' );
-};
+}
 
 sub test_store_v2_results {
     my $self = shift;
@@ -68,8 +210,7 @@ sub test_store_v2_results {
 
     ok( $r, "r: +") or return;
     ok( $r->{genre} =~ /windows/i, "genre +" );
-    #use Data::Dumper; warn Data::Dumper::Dumper( $r );
-};
+}
 
 sub test_store_v3_results {
     my $self = shift;
@@ -81,6 +222,5 @@ sub test_store_v3_results {
 
     ok( $r, "result");
     ok( $r->{genre} =~ /windows/i, "genre" );
-};
-
+}
 

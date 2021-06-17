@@ -1,0 +1,58 @@
+#!perl -w
+
+use strict;
+#use POSIX qw(strftime);
+
+#use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+
+my $test_email = 'matt@tnpi.net';
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('_is_valid_localhost');
+    $self->register_test('_is_fqdn');
+}
+
+
+sub _is_valid_localhost {
+    my $self = shift;
+    my @passes = qw/ 127.0.0.1 127.1.1.1 127.255.255.255 /;
+    my @fails  = qw/ 128.0.0.1 126.1.1.1 /;
+
+    foreach my $pass (@passes) {
+        $self->qp->connection->remote_ip($pass);
+        cmp_ok( $self->is_valid_localhost(), '==', 1, "$pass, true");
+    }
+
+    $self->qp->connection->remote_host('localhost');
+    foreach my $fail (@fails) {
+        $self->qp->connection->remote_ip($fail);
+        cmp_ok( $self->is_valid_localhost(), '==', 0, "$fail, false");
+    }
+
+    cmp_ok( $self->is_valid_localhost(), '==', 0, "localhost, non-loopback IP, false");
+
+    $self->qp->connection->remote_ip('127.0.0.1');
+    cmp_ok( $self->is_valid_localhost(), '==', 1, "localhost, loop IP, true");
+
+    $self->qp->connection->remote_ip('::1');
+    cmp_ok( $self->is_valid_localhost(), '==', 1, "localhost, IPv6 loop, true");
+}
+
+sub _is_fqdn {
+    my $self = shift;
+    my @passes = qw/ foo.com example.com /;
+    my @fails = qw/ com net edu boogers /;
+
+    foreach my $pass (@passes) {
+        $self->qp->connection->remote_host($pass);
+        cmp_ok( $self->is_fqdn(), '==', 1, "$pass, true");
+    }
+
+    foreach my $fail (@fails) {
+        $self->qp->connection->remote_host($fail);
+        cmp_ok( $self->is_fqdn(), '==', 0, "$fail, false");
+    }
+}

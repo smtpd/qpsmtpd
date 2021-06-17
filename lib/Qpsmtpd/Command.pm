@@ -33,21 +33,24 @@ Inside a plugin
 
  sub hook_unrecognized_command_parse {
     my ($self, $transaction, $cmd) = @_;
-    return (OK, \&bdat_parser) if ($cmd eq 'bdat');
+    if ($cmd eq 'bdat') {
+      return OK, \&bdat_parser;
+    };
  }
 
  sub bdat_parser {
     my ($self,$cmd,$line) = @_;
     # .. do something with $line...
-    return (DENY, "Invalid arguments") 
-      if $some_reason_why_there_is_a_syntax_error;
-    return (OK, @args);
+    if ($some_reason_why_there_is_a_syntax_error) {
+      return DENY, "Invalid arguments";
+    };
+    return OK, @args;
  }
 
  sub hook_unrecognized_command {
     my ($self, $transaction, $cmd, @args) = @_;
-    return (DECLINED) if ($self->qp->connection->hello eq 'helo');
-    return (DECLINED) unless ($cmd eq 'bdat');
+    return DECLINED if $self->qp->connection->hello eq 'helo';
+    return DECLINED if $cmd ne 'bdat';
     ....
  }
 
@@ -61,7 +64,7 @@ use vars qw(@ISA);
 
 sub parse {
     my ($me, $cmd, $line, $sub) = @_;
-    return (OK) unless defined $line;    # trivial case
+    return OK if !defined $line;    # trivial case
     my $self = {};
     bless $self, $me;
     $cmd = lc $cmd;
@@ -69,12 +72,10 @@ sub parse {
         my @ret = eval { $sub->($self, $cmd, $line); };
         if ($@) {
             $self->log(LOGERROR, "Failed to parse command [$cmd]: $@");
-            return (DENY, $line, ());
+            return DENY, $line;
         }
         ## my @log = @ret;
-        ## for (@log) {
-        ##     $_ ||= "";
-        ## }
+        ## for (@log) { $_ ||= ""; }
         ## $self->log(LOGDEBUG, "parse($cmd) => [".join("], [", @log)."]");
         return @ret;
     }
@@ -85,23 +86,27 @@ sub parse {
         my @out = eval { $self->$parse($cmd, $line); };
         if ($@) {
             $self->log(LOGERROR, "$parse($cmd,$line) failed: $@");
-            return (DENY, "Failed to parse line");
+            return DENY, "Failed to parse line";
         }
         return @out;
     }
-    return (OK, split(/ +/, $line));    # default :)
+    return OK, split(/ +/, $line);    # default :)
 }
 
 sub parse_rcpt {
     my ($self, $cmd, $line) = @_;
-    return (DENY, "Syntax error in command") unless $line =~ s/^to:\s*//i;
-    return &_get_mail_params($cmd, $line);
+    if ($line !~ s/^to:\s*//i) {
+        return DENY, "Syntax error in command";
+    };
+    return _get_mail_params($cmd, $line);
 }
 
 sub parse_mail {
     my ($self, $cmd, $line) = @_;
-    return (DENY, "Syntax error in command") unless $line =~ s/^from:\s*//i;
-    return &_get_mail_params($cmd, $line);
+    if ($line !~ s/^from:\s*//i) {
+        return DENY, "Syntax error in command";
+    };
+    return _get_mail_params($cmd, $line);
 }
 ### RFC 1869:
 ## 6.  MAIL FROM and RCPT TO Parameters
@@ -141,33 +146,29 @@ sub _get_mail_params {
 
         # parameter syntax error, i.e. not all of the arguments were
         # stripped by the while() loop:
-        return (DENY, "Syntax error in parameters")
-          if ($line =~ /\@.*\s/);
-        return (OK, $line, @params);
+        if ($line =~ /\@.*\s/) {
+            return DENY, "Syntax error in parameters";
+        };
+        return OK, $line, @params;
     }
 
     $line = shift @params;
-    if ($cmd eq "mail") {
-        return (OK, "<>") unless $line;    # 'MAIL FROM:' --> 'MAIL FROM:<>'
-        return (DENY, "Syntax error in parameters")
-          if ($line =~ /\@.*\s/);          # parameter syntax error
-    }
-    else {
-        if ($line =~ /\@/) {
-            return (DENY, "Syntax error in parameters")
-              if ($line =~ /\@.*\s/);
+    if ($cmd eq 'mail') {
+        return OK, '<>' if !$line;    # 'MAIL FROM:' --> 'MAIL FROM:<>'
+        if ($line =~ /\@.*\s/) {
+            return DENY, "Syntax error in parameters";
         }
-        else {
-            # XXX: what about 'abuse' in Qpsmtpd::Address?
-            return (DENY, "Syntax error in parameters") if $line =~ /\s/;
-            return (DENY, "Syntax error in address")
-              unless ($line =~ /^(postmaster|abuse)$/i);
-        }
+        return OK, $line, @params;
     }
-    ## XXX:  No: let this do a plugin, so it's not up to us to decide
-    ##       if we require <> around an address :-)
-    ## unless ($line =~ /^<.*>$/) { $line = "<".$line.">"; }
-    return (OK, $line, @params);
+
+    if ($line =~ /\@/) {
+        return DENY, "Syntax error in parameters" if $line =~ /\@.*\s/;
+        return OK, $line, @params;
+    }
+
+    return DENY, "Syntax error in parameters" if $line =~ /\s/;
+    return DENY, "Syntax error in address" if $line !~ /^(postmaster|abuse)$/i;
+    return OK, $line, @params;
 }
 
 1;

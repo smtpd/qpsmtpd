@@ -79,10 +79,11 @@ And the values in the address have the following meaning:
 After confirming that the DKIM public key can be fetched with DNS (dig TXT may2013._domainkey.example.org. @ns1.example.org.), send test messages. You can testing DKIM by sending an email to:
 
   * a Gmail address and inspect the Authentication-Results header.
+  * mailtest@unlocktheinbox.com
   * check-auth@verifier.port25.com
   * checkmyauth@auth.returnpath.net
 
-The two DKIM relays provide a nice email report with additional debugging information.
+The three email reflectors provide nice email reports with additional debugging information.
 
 =head2 publish DKIM policy in DNS
 
@@ -105,11 +106,11 @@ Following the directions above will configure QP to DKIM sign messages from auth
   cd ~smtpd/config/dkim
   ln -s example.org client.com
 
-QP will follow the symlink target and sign client.com emails with the example.org DKIM key.
+QP will follow the symlink target and sign client.com emails with the example.org DKIM key and set d=example.org.
 
 This is B<not> necessary for hosts or subdomains. If the DKIM key for host.example.com does not exist, and a key for example.com does exist, the parent DKIM key will be used to sign the message. So long as your DKIM and DMARC policies are set to relaxed alignment, these signed messages for subdomains will pass.
 
-CAUTION: just because you can sign for other domains, doesn't mean you should. Even with a relaxed DKIM policy, if the other domain doesn't have a suitable DMARC record for client.com, they may encounter deliverability problems. It is better to have keys generated and published for each domain.
+CAUTION: just because you can sign for other domains, doesn't mean you should. Even with a relaxed DKIM policy, signing client.com's email with d=example.org causes an alignment error, and they may encounter deliverability problems. It is better to have keys generated and published for each domain, or at least to make a copy of config/dkim/example.org rather than linking to it.
 
 =head1 SEE ALSO
 
@@ -191,7 +192,7 @@ sub register {
         }
     }
 
-    $self->register_hook('data_post', 'data_post_handler');
+    $self->register_hook('data_post_headers', 'data_post_handler');
 }
 
 sub data_post_handler {
@@ -302,7 +303,7 @@ sub handle_sig_temperror {
     my ($self, $dkim, $mess) = @_;
 
     $self->log(LOGINFO, "error, $mess");
-    return (DENYSOFT, "Please try again later - $dkim->result_detail");
+    return DENYSOFT, "Please try again later - $dkim->result_detail";
 }
 
 sub handle_sig_invalid {
@@ -447,7 +448,7 @@ sub get_keydir {
         $self->log(LOGINFO, "error, unable to read dkim key from $dir/private");
         return;
     }
-    return ($domain, $dir);
+    return $domain, $dir;
 }
 
 sub save_signatures_to_note {

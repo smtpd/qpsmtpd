@@ -8,49 +8,100 @@ use Qpsmtpd::Constants;
 
 my $test_email = 'user@example.com';
 
-my @greydbs = qw( denysoft_greylist.dbm denysoft_greylist.dbm.lock );
-foreach ( @greydbs ) {
-    unlink $_ if -f $_;
-};
-
 sub register_tests {
     my $self = shift;
 
-    $self->register_test('test_hook_data', 4);
-    $self->register_test('test_get_db_key', 4);
-    $self->register_test('test_get_db_location', 1);
-    $self->register_test("test_greylist_geoip", 7);
-    $self->register_test("test_greylist_p0f_genre", 2);
-    $self->register_test("test_greylist_p0f_distance", 2);
-    $self->register_test("test_greylist_p0f_link", 2);
-    $self->register_test("test_greylist_p0f_uptime", 2);
+    $self->register_test("test_load_exclude_files");
+    $self->register_test('test_data_handler');
+    $self->register_test('test_get_greylist_key');
+    $self->register_test('test_exclude');
+    $self->register_test("test_greylist_geoip");
+    $self->register_test("test_greylist_p0f_genre");
+    $self->register_test("test_greylist_p0f_distance");
+    $self->register_test("test_greylist_p0f_link");
+    $self->register_test("test_greylist_p0f_uptime");
+    $self->register_test('test_exclude_file_match');
+    $self->register_test('test_prune_db');
+    $self->register_test('test_greylist');
+    $self->register_test('test_init_redis');
+    $self->register_test('test_init_dbm');
+    $self->register_test('test_parse_redis_server');
+    $self->register_test('test_failcode');
+    $self->register_test('test_errcode');
 }
 
-sub test_hook_data {
+sub test_load_exclude_files {
+    my ( $self ) = @_;
+    delete $self->{$_} for qw( _exclude_ip _exclude_hostname exclude_re );
+    $self->load_exclude_files();
+    ok( $self->{_exclude_ip}{'194.7.234.142'},
+        'Excluded IPs populated by load_exclude_files()' );
+    ok( $self->{_exclude_hostname}{'yahoo.com'},
+        'Excluded hostnames populated by load_exclude_files()' );
+    ok( ( grep { $_ eq qr/^mta[12].siol.net$/ } @{ $self->{_exclude_re} || [] } ),
+        'Excluded REs populated by load_exlude_files()' );
+}
+
+sub test_exclude_file_match {
+    my ( $self ) = @_;
+    my @test_data = (
+        {
+            ip       => 192.168.1.1,
+            hostname => 'mta1234.siol.net',
+            expected => 0,
+            descr    => 'miss',
+        },
+        {
+            ip       => '194.7.234.142',
+            hostname => 'mta1234.siol.net',
+            expected => 1,
+            descr    => 'IP match',
+        },
+        {
+            ip       => 192.168.1.1,
+            hostname => 'postini.com',
+            expected => 1,
+            descr    => 'Hostname match',
+        },
+        {
+            ip       => 192.168.1.1,
+            hostname => 'mta2.siol.net',
+            expected => 1,
+            descr    => 'Regex match',
+        },
+    );
+    for my $t ( @test_data ) {
+        $self->connection->remote_ip( $t->{ip} );
+        $self->connection->remote_host( $t->{hostname} );
+        is( $self->exclude_file_match(), $t->{expected}, "exclude_file_match(): $t->{descr}" );
+    }
+}
+
+sub test_data_handler {
     my $self = shift;
     my $transaction = $self->qp->transaction;
 
-    my ($code, $mess) = $self->hook_data( $transaction );
+    my ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DECLINED, "no note" );
 
     $transaction->notes('greylist', 1);
 
-    ($code, $mess) = $self->hook_data( $transaction );
+    ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DECLINED, "no recipients");
 
     my $address = Qpsmtpd::Address->new( "<$test_email>" );
     $transaction->recipients( $address );
 
     $transaction->notes('whitelistrcpt', 2);
-    ($code, $mess) = $self->hook_data( $transaction );
+    ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DENYSOFT, "missing recipients");
 
     $transaction->notes('whitelistrcpt', 1);
-    ($code, $mess) = $self->hook_data( $transaction );
+    ($code, $mess) = $self->data_handler( $transaction );
     cmp_ok( $code, '==', DECLINED, "missing recipients");
-};
+}
 
-sub test_get_db_key {
+sub test_get_greylist_key {
     my $self = shift;
 
     $self->{_args}{sender}    = 0;
@@ -64,28 +115,40 @@ sub test_get_db_key {
     $self->qp->transaction->add_recipient( $address );
     $self->qp->connection->remote_ip($test_ip);
 
-    my $key = $self->get_db_key();
+    my $key = $self->get_greylist_key();
     ok( ! $key, "db key empty: -");
 
     $self->{_args}{remote_ip} = 1;
-    $key = $self->get_db_key( $address, $address );
+    $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', '3232235777', "db key: $key");
 
     $self->{_args}{sender} = 1;
-    $key = $self->get_db_key( $address, $address );
+    $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', "3232235777:$test_email", "db key: $key");
 
     $self->{_args}{recipient} = 1;
-    $key = $self->get_db_key( $address, $address );
+    $key = $self->get_greylist_key( $address, $address );
     cmp_ok( $key, 'eq', "3232235777:$test_email:$test_email", "db key: $key");
-};
+}
 
-sub test_get_db_location {
-    my $self = shift;
+sub test_exclude {
+    my ( $self ) = @_;
 
-    my $db = $self->get_db_location();
-    ok( $db, "db location: $db");
-};
+    $self->connection->relay_client(1);
+    ok( $self->exclude(), "Relay client results in exclude() hit" );
+    $self->connection->relay_client(0);
+    ok( ! $self->exclude(), "Non-relay client results in exclude() miss" );
+
+    my $old_p0f = $self->connection->notes('p0f');
+    $self->connection->notes('p0f'=> { genre => 'windows' } );
+    delete $self->{_args}{p0f};
+    ok( ! $self->exclude(), 'no p0f args = no exclusion' );
+    $self->{_args}{'p0f'} = 'genre,Lindows';
+    ok(   $self->exclude(), 'p0f miss = exclusion' );
+    $self->{_args}{'p0f'} = 'genre,Windows';
+    ok( ! $self->exclude(), 'p0f hit = no exclusion' );
+    $self->connection->notes( p0f => $old_p0f );
+}
 
 sub test_greylist_geoip {
     my $self = shift;
@@ -98,13 +161,15 @@ sub test_greylist_geoip {
     foreach my $cc ( @valid ) {
         $self->connection->notes('geoip_country', $cc );
         ok( $self->geoip_match(), "match + ($cc)");
-    };
+        ok( $self->exclude(),     "match + ($cc) results in exclude() hit");
+    }
 
     foreach my $cc ( @invalid ) {
         $self->connection->notes('geoip_country', $cc );
         ok( ! $self->geoip_match(), "bad - ($cc)");
-    };
-};
+        ok( ! $self->exclude(),     "miss - ($cc) results in exclude() miss");
+    }
+}
 
 sub test_greylist_p0f_genre {
     my $self = shift;
@@ -136,10 +201,12 @@ sub test_greylist_p0f_link {
     $self->{_args}{'p0f'} = 'link,dsl';
     $self->connection->notes('p0f'=> { link=>'DSL' } );
     ok( $self->p0f_match(), 'p0f link hit');
+    ok( ! $self->exclude(), 'p0f link hit results in exclude() miss' );
 
     $self->{_args}{'p0f'} = 'link,dsl';
     $self->connection->notes('p0f'=> { link=>'Ethernet' } );
     ok( ! $self->p0f_match(), 'p0f link miss');
+    ok( $self->exclude(),     'p0f link miss results in exclude() hit' );
 }
 
 sub test_greylist_p0f_uptime {
@@ -154,14 +221,178 @@ sub test_greylist_p0f_uptime {
     ok( ! $self->p0f_match(), 'p0f uptime miss');
 }
 
-sub _reset_transaction {
-    my $self = shift;
+my $mocktime;
 
-    $self->qp->connection->relay_client(0);
-    $self->qp->transaction->notes('whitelistsender',0);
-    $self->connection->notes('whitelisthost',0);
-    $self->qp->transaction->notes('tls_enabled',0);
-    $self->{_args}{p0f} = undef;
-    $self->{_args}{geoip} = undef;
-};
+{
+    no warnings qw( redefine );
+    sub now { $mocktime || time() }
+}
+
+sub test_prune_db {
+    my ($self) = @_;
+    my $start     = time() - 40 * 3600 * 24; # 40 days ago
+    my $oneday    = $start - 60 * 60 * 24;
+    my $onemonth  = $start - 60 * 60 * 24 * 30;
+    my $twomonths = $start - 60 * 60 * 24 * 60;
+    $self->{_args} = {
+        white_timeout => 36 * 3600 * 24, # 36 days
+    };
+    for my $test_class (@Qpsmtpd::DB::child_classes) {
+        delete $self->{db};
+        eval { $self->db( class => $test_class, dir => 't/tmp' ) };
+        next if $@;
+        $self->db->lock;
+        $self->db->flush;
+        $self->db->set( startkey    => "$start:testdata"     );
+        $self->db->set( onedaykey   => "$oneday:testdata"    );
+        $self->db->set( onemonthkey => "$onemonth:testdata"  );
+        $self->db->set( twomonthkey => "$twomonths:testdata" );
+        $self->db->unlock;
+        is( $self->allkeys, 'onedaykey|onemonthkey|startkey|twomonthkey',
+            'initial prune_db() test data set correctly' );
+        $self->db->unlock;
+        $mocktime = $start;
+        $self->prune_db;
+        is( $self->allkeys, 'onedaykey|onemonthkey|startkey',
+            'prune_db() expires two-month-old data' );
+        $mocktime = $start + 60 * 60 * 24 * 7;
+        $self->prune_db;
+        is( $self->allkeys, 'onedaykey|startkey',
+            'prune_db() expires one-month-old data 7 days later' );
+        $mocktime = $start + 60 * 60 * 24 * 37;
+        $self->prune_db;
+        is( $self->allkeys, '',
+            'prune_db() expires all remaining keys 37 days later' );
+    }
+    # Ensure prune_db does not leave the database locked after doing nothing
+    delete $self->{db};
+    $self->db( class => 'Qpsmtpd::DB::File::DBM', dir => 't/tmp' );
+    $self->prune_db;
+    $self->prune_db;
+    ok(1, "We won't get this far if prune_db leaves the database locked");
+}
+
+sub allkeys {
+    my ($self) = @_;
+    $self->db->lock;
+    my $allkeys = join '|', sort $self->db->get_keys;
+    $self->db->unlock;
+    return $allkeys;
+}
+
+sub test_greylist {
+    my ( $self ) = @_;
+    $self->{_args} = {
+        remote_ip     => 1,
+        sender        => 0,
+        recipient     => 0,
+        reject        => 1,
+        black_timeout => 50 * 60,               # 50m
+        grey_timeout  => 3 * 3600 + 20 * 60,    # 3h:20m
+        white_timeout => 36 * 3600 * 24,        # 36 days
+        p0f           => 0,
+        geoip         => 0,
+    };
+    $self->connection->remote_host('example.com');
+    $self->connection->remote_ip('1.2.3.4');
+    my $sender = Qpsmtpd::Address->new( "<$test_email>" );
+    my $rcpt   = Qpsmtpd::Address->new( "<$test_email>" );
+    for my $test_class (@Qpsmtpd::DB::child_classes) {
+        delete $self->{db};
+        eval { $self->db( class => $test_class, dir => 't/tmp' ) };
+        if ( $@ ) {
+            warn "Unable to test greylisting against $test_class: $@";
+            next;
+        }
+        $self->db->lock;
+        $self->db->flush;
+        $self->db->unlock;
+        my $start = time() - 40 * 3600 * 24; # 40 days ago
+        $mocktime = $start;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DENYSOFT: This mail is temporarily denied',
+            'Initial connection attempt greylisted' );
+        $mocktime = $start + 60 * 49;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DENYSOFT: This mail is temporarily denied',
+            'Greylisted 49 minutes later' );
+        $mocktime = $start + 60 * 51;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DECLINED',
+            'Allowed 51 minutes later' );
+        $mocktime = $start + 60 * 52 + 36 * 3600 * 24;
+        $self->prune_db;
+        is( $self->rc( $self->greylist( $self->transaction, $sender, $rcpt ) ),
+            'DENYSOFT: This mail is temporarily denied',
+            're-greylisted 36 days later' );
+        $self->db->lock;
+        $self->db->flush;
+        $self->db->unlock;
+    }
+}
+
+sub rc {
+    my ( $self, $r, $msg ) = @_;
+    return '' if ! defined $r;
+    return return_code($r) if ! defined $msg;
+    return return_code($r) . ": $msg";
+}
+
+sub test_init_redis {
+    my ($self) = @_;
+    delete $self->{db};
+    $self->{_args}{redis} = 'testredis';
+    $self->init_db;
+    is( keyvals($self->db_args),
+      'class=Qpsmtpd::DB::Redis;cnx_timeout=1;'
+      . 'name=greylist;server=testredis:6379',
+      'init_redis() sets redis args' );
+}
+
+sub keyvals {
+    my ( %h ) = @_;
+    return join ";", map { "$_=$h{$_}" } sort keys %h;
+}
+
+sub test_init_dbm {
+    my ($self) = @_;
+    delete $self->{db};
+    delete $self->{_args}{redis};
+    $self->{_args}{db_dir} = 't/tmp';
+    $self->init_db;
+    is( $self->db->name, 'greylist', 'init_dbm() sets correct db name' );
+    is( $self->db->path, 't/tmp/greylist.dbm', 'init_dbm() sets correct path' );
+    is( ref $self->db, 'Qpsmtpd::DB::File::DBM', 'init_dbm() gives DBM object' );
+}
+
+sub test_parse_redis_server {
+    my ($self) = @_;
+    $self->{_args}{redis} = 'asdf:1234';
+    is( $self->parse_redis_server, 'asdf:1234',
+        'parse_redis_server(): leave provided port alone' );
+    $self->{_args}{redis} = 'qwerty';
+    is( $self->parse_redis_server, 'qwerty:6379',
+        'parse_redis_server(): add default port' );
+}
+
+sub test_failcode {
+    my ($self) = @_;
+    $self->{_args}{reject} = 0;
+    is( $self->rc( $self->failcode() ), 'DECLINED',
+      'failcode(): reject disabled' );
+    delete $self->{_args}{reject};
+    is( $self->rc( $self->failcode() ), 'DENYSOFT: This mail is temporarily denied',
+      'failcode(): reject enabled' );
+}
+
+sub test_errcode {
+    my ($self) = @_;
+    delete $self->qp->{_logged};
+    is( $self->rc( $self->errcode('test error') ),
+      'DECLINED',
+      'errcode(): proper return code' );
+    is( join("\n", @{ $self->qp->{_logged} || [] }),
+      'LOGERROR:greylistingUNABLE TO OBTAIN GREYLIST RESULT:test error',
+      'errocode(): logged error' );
+}
 

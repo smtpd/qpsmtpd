@@ -98,10 +98,10 @@ sub loadcheck {
 
     if ($self->{_load} > $self->{_args}{max_load}) {
         $self->log(LOGERROR, "local load too high: $self->{_load}");
-        return (DENYSOFT, "Server load too high, please try again later.");
+        return DENYSOFT, "Server load too high, please try again later.";
     }
 
-    return (DECLINED, "continuing with load: $self->{_load}");
+    return DECLINED, "continuing with load: $self->{_load}";
 }
 
 sub get_load_method {
@@ -154,5 +154,5 @@ sub get_load_method {
 
     $self->log(LOGERROR, "unable to acquire system load");
     return;
-};
+}
 

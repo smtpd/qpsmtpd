@@ -4,7 +4,7 @@ warn "loaded test auth_vpopmaild\n";
 
 sub register_tests {
     my $self = shift;
-    $self->register_test("test_auth_vpopmaild", 3);
+    $self->register_test("test_auth_vpopmaild");
 }
 
 my @u_list = qw ( good bad none );

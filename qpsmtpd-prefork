@@ -63,7 +63,7 @@ my $select = new IO::Select;    # socket(s)
 # default settings
 my $pid_file;
 my $d_port = 25;
-my @d_addr;                     # default applied after getopt call
+my @d_addr;                  # default applied after getopt call
 
 my $debug          = 0;
 my $max_children   = 15;     # max number of child processes to spawn
@@ -129,13 +129,11 @@ else                                 { &usage }
 
 if (@d_addr) {
     for my $i (0 .. $#d_addr) {
-        if ($d_addr[$i] =~ /^(\[.*\]|[\d\w\-.]+)(?::(\d+))?$/) {
-            $d_addr[$i] = {'addr' => $1, 'port' => $2 || $d_port};
-        }
-        else {
+        if ($d_addr[$i] !~ /^(\[.*\]|[\d\w\-.]+)(?::(\d+))?$/) {
             print STDERR "Malformed listen address '$d_addr[$i]'\n";
             &usage;
         }
+        $d_addr[$i] = {'addr' => $1, 'port' => $2 || $d_port};
     }
 }
 else {
@@ -283,7 +281,6 @@ sub run {
 
         # reload qpmstpd plugins
         $qpsmtpd = qpsmtpd_instance('restart' => 1);    # reload plugins...
-        $qpsmtpd->load_plugins;
         kill 'HUP' => keys %children;
         info("reload daemon requested");
     };
@@ -410,7 +407,7 @@ sub block_signal {
     sigprocmask(SIG_BLOCK, $blockset, $sigset)
       or die "Could not block @signal signals: $!\n";
 
-    return ($sigset);
+    return $sigset;
 }
 
 # unblock_signal: unblock/reset and receive pending signals
@@ -527,11 +524,10 @@ sub respond_client {
 sub qpsmtpd_instance {
     my %args    = @_;
     my $qpsmtpd = Qpsmtpd::TcpServer::Prefork->new(%args);
-    $qpsmtpd->load_plugins;
     $qpsmtpd->spool_dir;
     $qpsmtpd->size_threshold;
 
-    return ($qpsmtpd);
+    return $qpsmtpd;
 }
 
 # shmem: tie to shared memory hash
@@ -559,7 +555,7 @@ sub shmem {
         return;
     }
 
-    return (\%shmem_hash);
+    return \%shmem_hash;
 }
 
 # shmem_opt: connect to shared memory and perform options
@@ -649,7 +645,7 @@ sub shmem_opt {
         warn("$@");
     }
 
-    return ($chld_busy);
+    return $chld_busy;
 }
 
 # info: write info
@@ -679,7 +675,7 @@ sub qpsmtpd_session {
 
     # get local/remote hostname, port and ip address
     my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) =
-      Qpsmtpd::TcpServer::lrpip($socket, $client, $iinfo);
+        $qpsmtpd->lrpip($socket, $client, $iinfo);
 
     # get current connected ip addresses (from shared memory)
     my %children;
@@ -734,7 +730,7 @@ sub qpsmtpd_session {
 
     # set enviroment variables
     ($ENV{TCPLOCALIP}, $ENV{TCPREMOTEIP}, $ENV{TCPREMOTEHOST}) =
-      Qpsmtpd::TcpServer::tcpenv($nto_laddr, $nto_iaddr);
+      $qpsmtpd->tcpenv($nto_laddr, $nto_iaddr);
 
     # run qpmsptd functions
     $SIG{__DIE__} = 'DEFAULT';

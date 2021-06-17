@@ -230,7 +230,9 @@ sub maybe_reopen {
         unless ($self->open_log($new_output, $transaction)) {
             return undef;
         }
-        $transaction->notes('file-reopened-this-session', 1);
+        if (UNIVERSAL::can($transaction,'isa')) {
+            $transaction->notes('file-reopened-this-session', 1);
+        }
         return 1;
     }
     return 0;
@@ -262,10 +264,12 @@ sub hook_disconnect {
 sub hook_logging {
     my ($self, $transaction, $trace, $hook, $plugin, @log) = @_;
 
-    return DECLINED
-      if !defined $self->{_loglevel}
-      or $trace > $self->{_loglevel};
-    return DECLINED if defined $plugin and $plugin eq $self->plugin_name;
+    if (!defined $self->{_loglevel}) { return DECLINED; }
+    if ($trace > $self->{_loglevel}) { return DECLINED; }
+
+    if (defined $plugin && $plugin eq $self->plugin_name) {
+        return DECLINED;
+    }
 
     # Possibly reopen the log iff:
     # - It's not already open
@@ -280,7 +284,9 @@ sub hook_logging {
         unless (defined $self->maybe_reopen($transaction)) {
             return DECLINED;
         }
-        $transaction->notes('file-logged-this-session', 1) if $transaction;
+        if (UNIVERSAL::can($transaction,'isa')) {
+            $transaction->notes('file-logged-this-session', 1) if $transaction;
+        }
     }
 
     my $f = $self->{_f};

@@ -57,8 +57,8 @@ or
     $_[0]->log(LOGINFO,
                "to fail, rand(1) must be more than " . ($successp**(1 / 6)));
     rand(1) < ($successp**(1 / 6)) and return NEXT;
-    rand(5) < 2 and return (DENYSOFT_DISCONNECT, "random failure");
-    return (DENYSOFT, "random failure");
+    rand(5) < 2 and return DENYSOFT_DISCONNECT, "random failure";
+    return DENYSOFT, "random failure";
 }
 
 sub hook_connect {

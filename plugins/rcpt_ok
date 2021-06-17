@@ -30,15 +30,15 @@ use Qpsmtpd::DSN;
 sub hook_rcpt {
     my ($self, $transaction, $recipient, %param) = @_;
 
-    return (OK) if $self->is_immune();     # relay_client or whitelist
+    return OK if $self->is_immune();    # relay_client or whitelist
 
     # Allow 'no @' addresses for 'postmaster' and 'abuse'
     # qmail-smtpd will do this for all users without a domain, but we'll
     # be a bit more picky.  Maybe that's a bad idea.
-    my $host = $self->get_rcpt_host($recipient) or return (OK);
+    my $host = $self->get_rcpt_host($recipient) or return OK;
 
-    return (OK) if $self->is_in_rcpthosts($host);
-    return (OK) if $self->is_in_morercpthosts($host);
+    return OK if $self->is_in_rcpthosts($host);
+    return OK if $self->is_in_morercpthosts($host);
 
     # default of relaying_denied is obviously DENY,
     # we use the default "Relaying denied" message...

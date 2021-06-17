@@ -1,4 +1,5 @@
 package Test::Qpsmtpd::Plugin;
+use strict;
 1;
 
 # Additional plugin methods used during testing
@@ -7,8 +8,8 @@ package Qpsmtpd::Plugin;
 use strict;
 use warnings;
 
-use Qpsmtpd::Constants;
 use Test::More;
+use Qpsmtpd::Constants;
 
 sub register_tests {
 
@@ -16,28 +17,17 @@ sub register_tests {
 }
 
 sub register_test {
-    my ($plugin, $test, $num_tests) = @_;
-    $num_tests = 1 unless defined($num_tests);
+    my ($plugin, $test) = @_;
 
     # print STDERR "Registering test $test ($num_tests)\n";
-    push @{$plugin->{_tests}}, {name => $test, num => $num_tests};
-}
-
-sub total_tests {
-    my ($plugin) = @_;
-    my $total = 0;
-    foreach my $t (@{$plugin->{_tests}}) {
-        $total += $t->{num};
-    }
-    return $total;
+    push @{$plugin->{_tests}}, {name => $test};
 }
 
 sub run_tests {
     my ($plugin, $qp) = @_;
     foreach my $t (@{$plugin->{_tests}}) {
         my $method = $t->{name};
-        print "# Running $method tests for plugin "
-          . $plugin->plugin_name . "\n";
+        print "# " . $plugin->plugin_name . "\t $method\n";
         local $plugin->{_qp} = $qp;
         $plugin->$method();
     }
@@ -58,40 +48,45 @@ sub validate_password {
 
     if (!$src_crypt && !$src_clear) {
         $self->log(LOGINFO, "fail: missing password");
-        return ($deny, "$file - no such user");
+        return $deny, "$file - no such user";
     }
 
     if (!$src_clear && $method =~ /CRAM-MD5/i) {
         $self->log(LOGINFO, "skip: cram-md5 not supported w/o clear pass");
-        return (DECLINED, $file);
+        return DECLINED, $file;
     }
 
     if (defined $attempt_clear) {
         if ($src_clear && $src_clear eq $attempt_clear) {
             $self->log(LOGINFO, "pass: clear match");
-            return (OK, $file);
+            return OK, $file;
         }
 
         if ($src_crypt && $src_crypt eq crypt($attempt_clear, $src_crypt)) {
             $self->log(LOGINFO, "pass: crypt match");
-            return (OK, $file);
+            return OK, $file;
         }
     }
 
     if (defined $attempt_hash && $src_clear) {
         if (!$ticket) {
             $self->log(LOGERROR, "skip: missing ticket");
-            return (DECLINED, $file);
+            return DECLINED, $file;
         }
 
         if ($attempt_hash eq hmac_md5_hex($ticket, $src_clear)) {
             $self->log(LOGINFO, "pass: hash match");
-            return (OK, $file);
+            return OK, $file;
         }
     }
 
     $self->log(LOGINFO, "fail: wrong password");
-    return ($deny, "$file - wrong password");
+    return $deny, "$file - wrong password";
 }
+
+sub mock_hook     { shift->qp->mock_hook(@_)     }
+sub unmock_hook   { shift->qp->unmock_hook(@_)   }
+sub mock_config   { shift->qp->mock_config(@_)   }
+sub unmock_config { shift->qp->unmock_config(@_) }
 
 1;

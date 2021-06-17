@@ -12,14 +12,14 @@ use lib 'lib';
 
 my $this_perl = $Config{'perlpath'} || $EXECUTABLE_NAME;
 
-my @files =
-  find({wanted => \&test_syntax, no_chdir => 1}, 'plugins', 'lib', 't');
+my @files = find({wanted => \&test_syntax, no_chdir => 1}, 'plugins', 'lib', 't');
 
 sub test_syntax {
     my $f = $File::Find::name;
     chomp $f;
     return if !-f $f;
-    return if $f =~ m/(~|\.(bak|orig|rej))/;
+    return if $f =~ m/(~|\.(bak|orig|rej|txt))$/;
+    return if $f =~ m/^t\/config/;
     my $r;
     eval { $r = `$this_perl -Ilib -MQpsmtpd::Constants -c $f 2>&1`; };
     my $exit_code = sprintf("%d", $CHILD_ERROR >> 8);
