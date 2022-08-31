@@ -85,7 +85,7 @@ sub init {
     $key  ||= "$dir/qpsmtpd-server.key";
     $ca   ||= "$dir/qpsmtpd-ca.crt";
     $dhparam ||= "$dir/qpsmtpd-dhparam.pem";
-    unless (-f $cert && -f $key && -f $ca) {
+    unless (-r $cert && -r $key && -r $ca) {
         $self->log(LOGERROR,
                    "Cannot locate cert/key!  Run plugins/tls_cert to generate");
         return;
