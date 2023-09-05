@@ -193,7 +193,7 @@ POSIX::setgid($qgid) or die "unable to change gid: $!\n";
 POSIX::setuid($quid) or die "unable to change uid: $!\n";
 $> = $quid;
 
-#$qpsmtpd->load_plugins;
+$qpsmtpd->load_plugins;
 
 foreach my $addr (@LISTENADDR) {
     ::log(LOGINFO, "Listening on $addr->{addr}:$addr->{port}");
