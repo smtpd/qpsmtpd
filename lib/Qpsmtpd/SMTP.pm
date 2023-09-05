@@ -860,8 +860,8 @@ sub received_line {
     my $header_str;
     my ($rc, @received) =
       $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
-    if ($rc == OK) {
-        return join("\n", @received);
+    if ($rc == OK) {        
+        $header_str = join("\n", @received);
     }
     else {    # assume $rc == DECLINED
         $header_str =
