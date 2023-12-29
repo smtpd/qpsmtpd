@@ -681,20 +681,20 @@ sub data_respond {
 
     my $timeout = $self->config('timeout');
     while (defined($_ = $self->getline($timeout))) {
+        # Reject messages that have either bare LF or CR. rjkaes noticed a
+        # lot of spam that is malformed in the header.
+
+        if ($_ !~ /\r\n$/) {
+            $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
+            $self->disconnect;
+            return 1;
+        }
+
         if ($_ eq ".\r\n") {
             $complete++;
             $_ = '';
         }
         $i++;
-
-        # Reject messages that have either bare LF or CR. rjkaes noticed a
-        # lot of spam that is malformed in the header.
-
-        if ($_ eq ".\n" || $_ eq ".\r") {
-            $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
-            $self->disconnect;
-            return 1;
-        }
 
         unless (($max_size and $size > $max_size)) {
             s/\r\n$/\n/;
