@@ -4,10 +4,12 @@ on:
   push:
   pull_request:
 
-steps:
-  - uses: actions/checkout@v4
-  - uses: shogo82148/actions-setup-perl@v1
-    with:
-      perl-version: "5.32"
-  - run: cpanm --installdeps .
-  - run: prove -lv t
+jobs:
+  test:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: "5.32"
+      - run: cpanm --installdeps .
+      - run: prove -lv t
