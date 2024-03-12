@@ -5,18 +5,23 @@ on:
   pull_request:
 
 jobs:
+
   test:
     strategy:
       matrix:
-        os: ["ubuntu-latest"]
-        perl: ["5.16", "5.32"]
+        perl-version:
+          - "5.16"
+          - "5.26"
+          - "5.38"
       fail-fast: false
     runs-on: ubuntu-latest
+
     services:
       redis:
         image: redis
         ports:
           - 6379:6379
+
     steps:
       - uses: actions/checkout@v4
         with:
