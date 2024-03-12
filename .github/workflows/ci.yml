@@ -6,6 +6,10 @@ on:
 
 jobs:
   test:
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+        perl: ["5.16", "5.32"]
     runs-on: ubuntu-latest
     services:
       redis:
@@ -16,6 +20,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shogo82148/actions-setup-perl@v1
         with:
-          perl-version: "5.32"
+          perl-version: ${{ matrix.perl }}
       - run: cpanm --installdeps .
       - run: prove -lv t
