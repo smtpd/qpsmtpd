@@ -31,7 +31,7 @@ WriteMakefile(
 #       'DBD::mysql'         => 0,   # log2sql
 #       'DBIx::Simple'       => 0,   # log2sql
         'Mail::SpamAssassin' => 0,
-        'GeoIP2'             => 2,
+#       'GeoIP2'             => 2,
         'Geo::IP'            => 1,
         'Math::Complex'      => 0,   # geodesic distance in Geo::IP
         'PerlIO::gzip'       => 0,   # gunzip GeoIP databases

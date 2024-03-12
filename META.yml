@@ -34,8 +34,6 @@ requires:
   Test::More: 0
   Test::Output: 0
   Mail::SPF: 0
-  Geo::IP: 0
-  GeoIP2: 0
   Redis: 0
   CDB_File: 0
 version: 1.00
