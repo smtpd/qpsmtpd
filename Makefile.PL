@@ -29,16 +29,16 @@ WriteMakefile(
 #       'DBD::mysql'         => 0,   # log2sql
 #       'DBIx::Simple'       => 0,   # log2sql
 # modules that cause Travis build tests to fail
-#       'Mail::SpamAssassin' => 0,
+        'Mail::SpamAssassin' => 0,
 #       'GeoIP2'             => 2,
-#       'Geo::IP'            => 1,
-#       'Math::Complex'      => 0,   # geodesic distance in Geo::IP
-#       'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
-#       'Mail::SPF'          => 0,
+        'Geo::IP'            => 1,
+        'Math::Complex'      => 0,   # geodesic distance in Geo::IP
+        'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
+        'Mail::SPF'          => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',
-    EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver qpsmtpd-prefork)],
+    EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver)],
     clean          => { FILES => [ '*.bak', 't/tmp' ], },
 );
 

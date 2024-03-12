@@ -159,10 +159,6 @@ newer version in plugins/logging/file
 * Wed Mar 12 2008 <rpmbuild@robinbowes.com> 0.43-0.3
 - Makefile.PL now updated in svn, so remove hack
 
-* Wed Mar 12 2008 <rpmbuild@robinbowes.com> 0.43-0.2
-- Added qpsmtpd-prefork to qpsmtpd RPM, inc. hack to work round
-  deficiency in Makefile.PL
-
 * Mon Mar 10 2008 <rpmbuild@robinbowes.com> 0.43-0.1
 - Updated to work with Makefile to build from svn
 
