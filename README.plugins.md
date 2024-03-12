@@ -25,8 +25,7 @@ subdirectory, the directory must also be given, like the
 may be given in the `config/plugin_dirs` config file, one directory
 per line, these will be searched first before using the builtin fallback
 of `plugins/` relative to the qpsmtpd root directory. It may be
-necessary, that the `config/plugin_dirs` must be used (if you're using
-`Apache::Qpsmtpd`, for example).
+necessary, that the `config/plugin_dirs` must be used.
 
 Some plugins may be configured by passing arguments in the `plugins`
 config file.

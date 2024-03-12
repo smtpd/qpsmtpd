@@ -46,11 +46,11 @@ run the following command in the /home/smtpd/ directory.
 
     git clone git://github.com/smtpd/qpsmtpd.git
 
-Beware that the master branch might be unstable and unsuitable for anything
+Beware that the master branch might be unsuitable for anything
 but development, so you might want to get a specific release, for
 example (after running git clone):
 
-    git checkout -b local_branch v0.93
+    git checkout -b local_branch v1.00
 
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
@@ -91,9 +91,8 @@ information about what's missing) to the mailinglist or a PR to github.
 
 # Better Performance
 
-For better performance we recommend using "qpsmtpd-forkserver" or
-running qpsmtpd under Apache 2.x.  If you need extremely high
-concurrency use [Haraka](http://haraka.github.io/).
+For better performance we recommend using "qpsmtpd-forkserver". If
+you need extremely high concurrency use [Haraka](http://haraka.github.io/).
 
 # Plugins
 

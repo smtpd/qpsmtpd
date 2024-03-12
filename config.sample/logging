@@ -10,9 +10,6 @@ logging/warn 6
 #logging/adaptive [accept minlevel] [reject maxlevel] [prefix char]
 #logging/adaptive 4 6
 
-# send logs to apache (useful if running qpsmtpd under apache)
-#logging/apache
-
 # send logs to the great bit bucket
 #logging/devnull
 
