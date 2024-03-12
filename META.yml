@@ -32,4 +32,5 @@ requires:
   Time::TAI64: 0
   Mail::SPF: 0
   Geo::IP: 0
+  Redis: 0
 version: 1.00
