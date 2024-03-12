@@ -45,8 +45,6 @@ sub clone {
     $new->{_notes} = $self->{_notes} if defined $self->{_notes};
 
     # reset the old connection object like it's done at the end of a connection
-    # to prevent leaks (like prefork/tls problem with the old SSL file handle
-    # still around)
     $self->reset unless $args{no_reset};
 
     # should we generate a new id here?

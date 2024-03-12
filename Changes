@@ -1,4 +1,10 @@
 
+  Forkserver is THE run model
+
+  Remove tcpserver run mode
+
+  Remove Apache::Qpsmtpd support
+
 1.00  Feb 16, 2023
 
   Use readable file test for certificate files (#304) 

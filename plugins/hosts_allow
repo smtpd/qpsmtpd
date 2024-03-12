@@ -13,7 +13,7 @@ file I<hosts_allow>.
 
 The plugin takes no config/plugin arguments.
 
-This plugin only works with the forkserver and prefork deployment models. It
+This plugin only works with the forkserver deployment model. It
 does not work with the tcpserver deployment model. See SEE ALSO below.
 
 =head1 CONFIG

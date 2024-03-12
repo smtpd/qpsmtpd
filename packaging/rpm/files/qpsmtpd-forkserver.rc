@@ -1,26 +1,26 @@
 #! /bin/bash
 #
-# qpsmtpd-forkserver          Start/Stop the qpsmtpd forking server
+# qpsmtpd          Start/Stop the qpsmtpd forking server
 #
 # chkconfig: 2345 90 60
 # description: qpsmtpd is a flexible smtpd daemon written in Perl. \
 #              Apart from the core SMTP features, all functionality is \
 #              implemented in small "extension plugins" using the easy \
 #              to use object oriented plugin API.
-# processname: qpsmtpd-forkserver
+# processname: qpsmtpd
 # config: /etc/qpsmtpd
-# pidfile: /var/run/qpsmtpd-forkserver.pid
+# pidfile: /var/run/qpsmtpd.pid
 
 
 # Source function library.
 . /etc/init.d/functions
-. /etc/sysconfig/qpsmtpd-forkserver
+. /etc/sysconfig/qpsmtpd
 
 RETVAL=0
 
 # See how we were called.
   
-prog="qpsmtpd-forkserver"
+prog="qpsmtpd"
 
 start() {
 	# cleanup environment a bit.
@@ -109,7 +109,7 @@ case "$1" in
   	reload
 	;;
   status)
-  	qpstatus qpsmtpd-forkserver
+  	qpstatus qpsmtpd
 	;;
   condrestart)
   	[ -f /var/lock/subsys/$prog ] && restart || :

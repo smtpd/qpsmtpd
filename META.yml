@@ -21,10 +21,12 @@ requires:
   CDB_File: 0
   Data::Dumper: 0
   Date::Parse: 0
+  DB_File: 0
   File::NFSLock: 0
   File::Tail: 0
   File::Temp: 0
-  GeoIP2: 0
+  File::NFSLock: 0
+  GeoIP2: 2
   IO::Socket::SSL: 0
   MIME::Base64: 0
   Mail::DKIM: 0

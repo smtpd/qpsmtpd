@@ -8,7 +8,7 @@ improvements for me to ever catch up on here.
 Matt Sergeant <matt@sergeant.org>: Clamav plugin.  Patch for the dnsbl
 plugin to give us all the dns results.  Resident SpamAssassin guru.
 PPerl. smtp-forward plugin. Documentation (yay!).  Lots of fixes and
-tweaks.  Apache module.  Event based high performance experiment.
+tweaks. Event based high performance experiment.
 
 Devin Carraway <qpsmtpd@devin.com>: Patch to not accept half mails if
 the connection gets dropped at the wrong moment.  Support and enable

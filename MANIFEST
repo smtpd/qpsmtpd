@@ -34,14 +34,12 @@ docs/development.md
 docs/hooks.md
 docs/logging.md
 docs/writing.md
-lib/Apache/Qpsmtpd.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
 lib/Qpsmtpd/Base.pm
 lib/Qpsmtpd/Command.pm
 lib/Qpsmtpd/Config.pm
-lib/Qpsmtpd/ConfigServer.pm
 lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
 lib/Qpsmtpd/DB.pm
@@ -53,9 +51,7 @@ lib/Qpsmtpd/Postfix.pm
 lib/Qpsmtpd/Postfix/Constants.pm
 lib/Qpsmtpd/Postfix/pf2qp.pl
 lib/Qpsmtpd/SMTP.pm
-lib/Qpsmtpd/SMTP/Prefork.pm
 lib/Qpsmtpd/TcpServer.pm
-lib/Qpsmtpd/TcpServer/Prefork.pm
 lib/Qpsmtpd/Transaction.pm
 LICENSE
 log/log2sql
@@ -105,7 +101,6 @@ plugins/karma
 plugins/karma_tool
 plugins/loadcheck
 plugins/logging/adaptive
-plugins/logging/apache
 plugins/logging/connection_id
 plugins/logging/devnull
 plugins/logging/file
@@ -150,12 +145,9 @@ plugins/virus/sophie
 plugins/virus/uvscan
 plugins/whitelist
 qpsmtpd
-qpsmtpd-forkserver
-qpsmtpd-prefork
 README.md
 README.plugins.md
-run.forkserver
-run.tcpserver
+run
 STATUS
 t/addresses.t
 t/auth.t

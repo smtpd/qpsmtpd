@@ -6,7 +6,7 @@ Name:           %{_package}
 Version:        %{_version}
 Release:        %{_release}
 
-Summary: qpsmtpd + qpsmtpd-apache
+Summary: qpsmtpd
 License: MIT
 Group: System Environment/Daemons
 URL: http://smtpd.develooper.com/
@@ -33,20 +33,10 @@ plugins" using the easy to use object oriented plugin API.
 qpsmtpd was originally written as a drop-in qmail-smtpd replacement, but
 now it also includes a smtp forward and a postfix "backend".
 
-%package apache
-Requires: perl(mod_perl2)
-Summary: mod_perl-2 connection handler for qpsmtpd
-Group: System Environment/Daemons
-
 %package xinetd
 Summary: xinetd support for qpsmtpd
 Group: System Environment/Daemons
 Requires: xinetd
-
-%description apache
-
-This module implements a mod_perl/apache 2.0 connection handler
-that turns Apache into an SMTP server using Qpsmtpd.
 
 %description xinetd
 This package contains the xinetd startup files for qpsmptd.
@@ -92,10 +82,6 @@ mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d
 cp %{SOURCE3} ${RPM_BUILD_ROOT}%{_sysconfdir}/xinetd.d/smtp
 mkdir -p ${RPM_BUILD_ROOT}%{_sbindir}
 cp %{SOURCE4} ${RPM_BUILD_ROOT}%{_sbindir}/in.qpsmtpd
-mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
-cp %{SOURCE5} ${RPM_BUILD_ROOT}%{_sysconfdir}/httpd/conf.d
-mkdir -p $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
-cp %{SOURCE6} $RPM_BUILD_ROOT%{_docdir}/%{name}-apache-%{version}
 
 [ -x /usr/lib/rpm/brp-compress ] && /usr/lib/rpm/brp-compress
 
@@ -106,22 +92,8 @@ find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
   grep -v packaging               | \
   grep -v README.selinux          | \
   grep -v in\\.qpsmtpd            | \
-  grep -v /Apache                 | \
-  grep -v /Danga                  | \
   grep -v Qpsmtpd/PollServer.pm   > %{name}-%{version}-%{release}-filelist
 if [ "$(cat %{name}-%{version}-%{release}-filelist)X" = "X" ] ; then
-  echo "ERROR: EMPTY FILE LIST"
-  exit -1
-fi
-
-find ${RPM_BUILD_ROOT}%{_prefix} -type f -print | \
-	sed "s@^$RPM_BUILD_ROOT@@g"     | \
-	grep -v [Aa]sync		| \
-	grep -v packaging		| \
-  grep -v README.selinux          | \
-	grep -v /Danga                  | \
-	grep -v Qpsmtpd/PollServer.pm   | cat - %{name}-%{version}-%{release}-filelist | sort | uniq -u > %{name}-%{version}-%{release}-apache-filelist
-if [ "$(cat %{name}-%{version}-%{release}-apache-filelist)X" = "X" ] ; then
   echo "ERROR: EMPTY FILE LIST"
   exit -1
 fi
@@ -134,11 +106,6 @@ fi
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
 %attr(2750,qpsmtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
-
-%files apache -f %{name}-%{version}-%{release}-apache-filelist
-%defattr(-,root,root)
-%config(noreplace) %{_sysconfdir}/httpd/conf.d/*
-%doc %{_docdir}/%{name}-apache-%{version}/README.selinux
 
 %files xinetd
 %defattr(-,root,root)
@@ -170,7 +137,6 @@ newer version in plugins/logging/file
 * Sun Jul 12 2009 <rpmbuild@robinbowes.com> 0.82-0.1
 - Update to latest release
 - don't add qpsmtpd to start-up by default
-- add apache config file to qpsmtpd-apache package
 - remove all patches
 - use rpm macros for dirs
 - use a filelist for main package instead of a long list of files
@@ -192,10 +158,6 @@ newer version in plugins/logging/file
   
 * Wed Mar 12 2008 <rpmbuild@robinbowes.com> 0.43-0.3
 - Makefile.PL now updated in svn, so remove hack
-
-* Wed Mar 12 2008 <rpmbuild@robinbowes.com> 0.43-0.2
-- Added qpsmtpd-prefork to qpsmtpd RPM, inc. hack to work round
-  deficiency in Makefile.PL
 
 * Mon Mar 10 2008 <rpmbuild@robinbowes.com> 0.43-0.1
 - Updated to work with Makefile to build from svn
@@ -316,7 +278,6 @@ newer version in plugins/logging/file
 
 * Sun Jun 12 2005 <hjp@hjp.at>
 - avoid installing patch backup files
-- split Apache::Qpsmtpd into separate package to avoid dependency hell.
 - fixed URL
 - changed group to Daemons.
 - Fixed installation for newer versions of ExtUtils::MakeMaker
