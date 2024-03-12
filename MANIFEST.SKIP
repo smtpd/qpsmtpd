@@ -36,3 +36,4 @@ packaging
 ^supervise/
 ^ssl/
 ^t/config/greylist
+^.github/

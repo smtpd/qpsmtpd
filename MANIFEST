@@ -1,5 +1,4 @@
 .gitignore
-.travis.yml
 bin/geolite-mirror-simple.pl
 bin/install_deps.pl
 Changes
