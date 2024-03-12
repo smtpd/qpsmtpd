@@ -32,9 +32,9 @@ WriteMakefile(
 #       'Mail::SpamAssassin' => 0,
 #       'GeoIP2'             => 2,
 #       'Geo::IP'            => 1,
-#       'Math::Complex'      => 0,   # geodesic distance in Geo::IP
-#       'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
-#       'Mail::SPF'          => 0,
+        'Math::Complex'      => 0,   # geodesic distance in Geo::IP
+        'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
+        'Mail::SPF'          => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',
