@@ -14,6 +14,7 @@ output/.*
 ^sqlite/
 ^output/
 ^tmp/
+^t/tmp/
 ^blib/
 ^blibdirs$
 ^Makefile$
@@ -36,3 +37,4 @@ packaging
 ^supervise/
 ^ssl/
 ^t/config/greylist
+^.github
