@@ -30,4 +30,6 @@ requires:
   Net::IP: 0
   Time::HiRes: 0
   Time::TAI64: 0
-version: 0.91
+  Mail::SPF: 0
+  Geo::IP: 0
+version: 1.00

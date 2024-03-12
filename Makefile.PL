@@ -28,7 +28,6 @@ WriteMakefile(
 #       'DBI'                => 0,   # auth_vpopmail_sql and
 #       'DBD::mysql'         => 0,   # log2sql
 #       'DBIx::Simple'       => 0,   # log2sql
-# modules that cause Travis build tests to fail
         'Mail::SpamAssassin' => 0,
         'GeoIP2'             => 2,
         'Geo::IP'            => 1,
