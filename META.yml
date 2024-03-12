@@ -33,4 +33,5 @@ requires:
   Mail::SPF: 0
   Geo::IP: 0
   Redis: 0
+  CDB_File: 0
 version: 1.00
