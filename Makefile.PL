@@ -23,18 +23,19 @@ WriteMakefile(
         'Test::Output'    => 0,
 # modules for specific features
         'Mail::DKIM'         => 0.40,
+        'Mail::DMARC'        => 0,
         'File::Tail'         => 0,   # log/summarize, log/watch
         'Time::TAI64'        => 0,   # log2sql
 #       'DBI'                => 0,   # auth_vpopmail_sql and
 #       'DBD::mysql'         => 0,   # log2sql
 #       'DBIx::Simple'       => 0,   # log2sql
 # modules that cause Travis build tests to fail
-#       'Mail::SpamAssassin' => 0,
-#       'GeoIP2'             => 2,
-#       'Geo::IP'            => 1,
-#       'Math::Complex'      => 0,   # geodesic distance in Geo::IP
-#       'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
-#       'Mail::SPF'          => 0,
+        'Mail::SpamAssassin' => 0,
+        'GeoIP2'             => 2,
+        'Math::Complex'      => 0,   # geodesic distance in Geo::IP
+        'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
+        'Redis'              => 2,
+        'Mail::SPF'          => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',

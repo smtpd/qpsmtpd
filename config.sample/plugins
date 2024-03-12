@@ -22,7 +22,7 @@ hosts_allow
 # connection / informational plugins
 #connection_time
 #karma penalty_box 1 reject naughty
-ident/geoip
+#ident/geoip
 #ident/p0f /tmp/.p0f_socket version 3
 fcrdns
 
@@ -90,7 +90,7 @@ spamassassin reject 12
 #   spamassassin reject 20 munge_subject_threshold 10
 
 # dspam must run after spamassassin for the learn_from_sa feature to work
-dspam autolearn spamassassin reject 0.95
+#dspam autolearn spamassassin reject 0.95
 
 # run the clamav virus checking plugin (max size in Kb)
 # virus/clamav
