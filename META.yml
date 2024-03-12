@@ -38,5 +38,4 @@ requires:
   GeoIP2: 0
   Redis: 0
   CDB_File: 0
-  DB_File: 0
 version: 1.00

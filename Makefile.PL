@@ -8,7 +8,6 @@ WriteMakefile(
     VERSION_FROM   => 'lib/Qpsmtpd.pm',
     PREREQ_PM      => {
         'CDB_File'        => 0,
-        'DB_File'         => 0,
         'Data::Dumper'    => 0,
         'Date::Parse'     => 0,
         'File::Temp'      => 0,
