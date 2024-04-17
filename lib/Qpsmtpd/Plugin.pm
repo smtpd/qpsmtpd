@@ -270,13 +270,13 @@ sub store_deferred_reject {
 
 sub store_auth_results {
     my ($self, $result) = @_;
-    my $auths = $self->qp->connection->notes('authentication_results') or do {
-        $self->qp->connection->notes('authentication_results', $result);
+    my $auths = $self->qp->transaction->notes('authentication_results') or do {
+        $self->qp->transaction->notes('authentication_results', $result);
         return;
     };
     my $ar = join('; ', $auths, $result);
     $self->log(LOGDEBUG, "auth-results: $ar");
-    $self->qp->connection->notes('authentication_results', $ar);
+    $self->qp->transaction->notes('authentication_results', $ar);
 }
 
 sub is_immune {
