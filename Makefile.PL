@@ -23,6 +23,7 @@ WriteMakefile(
         'Test::Output'    => 0,
 # modules for specific features
         'Mail::DKIM'         => 0.40,
+        'Mail::DMARC'        => 0,
         'File::Tail'         => 0,   # log/summarize, log/watch
         'Time::TAI64'        => 0,   # log2sql
 #       'DBI'                => 0,   # auth_vpopmail_sql and
