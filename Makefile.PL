@@ -30,10 +30,11 @@ WriteMakefile(
 #       'DBIx::Simple'       => 0,   # log2sql
 # modules that cause Travis build tests to fail
 #       'Mail::SpamAssassin' => 0,
-#       'GeoIP2'             => 2,
+        'GeoIP2'             => 2,
 #       'Geo::IP'            => 1,
         'Math::Complex'      => 0,   # geodesic distance in Geo::IP
         'PerlIO::gzip'       => 0,   # gunzip GeoIP databases
+        'Redis'              => 2,
         'Mail::SPF'          => 0,
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
