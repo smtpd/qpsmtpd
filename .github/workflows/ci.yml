@@ -53,7 +53,15 @@ jobs:
         continue-on-error: true
         with:
           install: |
+            Mail::Header
+            Mail::SPF
+            Mail::DKIM
+            Mail::DMARC
+            Net::IP
+            Redis
             Regexp::Common
+            Test::More
+            Test::Output
 
       - run: sudo cpanm --installdeps -n -f .
       - run: prove -lv t
