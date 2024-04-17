@@ -31,6 +31,12 @@ are shown below in ["Plugin settings"](#plugin-settings).
     the _Received: _header, ...
     Default is whatever Sys::Hostname's hostname() returns.
 
+- ar-me
+
+    Sets the ID string used in Authentication-Results: header (useful
+    for multi-server clusters).
+    Default is the same as me above.
+
 - plugin\_dirs
 
     Where to search for plugins (one directory per line), defaults to `./plugins`.

@@ -776,7 +776,7 @@ sub data_respond {
 sub authentication_results {
     my ($self) = @_;
 
-    my @auth_list = $self->config('me');
+    my @auth_list = $self->config('ar-me') // $self->config('me');
 
     if (!defined $self->{_auth}) {
         push @auth_list, 'auth=none';
