@@ -5,10 +5,10 @@ on:
   pull_request:
 
 jobs:
+
   test:
     strategy:
       matrix:
-        os: ["ubuntu-latest"]
         perl: ["5.16", "5.32"]
       fail-fast: false
     runs-on: ubuntu-latest
@@ -22,5 +22,39 @@ jobs:
       - uses: shogo82148/actions-setup-perl@v1
         with:
           perl-version: ${{ matrix.perl }}
+      - run: cpanm --installdeps -n -f .
+      - run: prove -lv t
+
+
+  perl_tester:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+        perl-version:
+          - "5.16"
+          - "5.26"
+          - "5.32"
+      fail-fast: false
+
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Perl Modules with cpanm
+        uses: perl-actions/install-with-cpanm@v1
+        continue-on-error: true
+        with:
+          install: |
+            Regexp::Common
+
       - run: cpanm --installdeps -n -f .
       - run: prove -lv t
