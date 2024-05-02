@@ -31,10 +31,11 @@ are shown below in ["Plugin settings"](#plugin-settings).
     the _Received: _header, ...
     Default is whatever Sys::Hostname's hostname() returns.
 
-- ar-me
+- me-auth-results
 
     Sets the ID string used in Authentication-Results: header (useful
-    for multi-server clusters).
+    for multi-server clusters). If this is set to "none", no
+    Authentication-Results: header will be added or modifed.
     Default is the same as me above.
 
 - plugin\_dirs
