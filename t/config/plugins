@@ -37,7 +37,7 @@ parse_addr_withhelo
 quit_fortune
 # tls should load before count_unrecognized_commands
 #tls
-earlytalker
+#earlytalker
 count_unrecognized_commands 4
 relay
 
@@ -50,7 +50,7 @@ badmailfromto
 badrcptto
 helo
 
-sender_permitted_from
+# sender_permitted_from
 greylisting p0f genre,windows db_dir ./t/tmp
 
 #auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
@@ -66,7 +66,7 @@ rcpt_ok
 headers days 5 reject_type temp require From,Date
 #domainkeys
 dkim
-dmarc
+# dmarc
 
 # content filters
 virus/klez_filter
@@ -83,7 +83,7 @@ spamassassin
 #   spamassassin reject_threshold 20 munge_subject_threshold 10
 
 # dspam must run after spamassassin for the learn_from_sa feature to work
-dspam learn_from_sa 7 reject 1
+# dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
 virus/clamav

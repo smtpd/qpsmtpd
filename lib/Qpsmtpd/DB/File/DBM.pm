@@ -4,7 +4,7 @@ use warnings;
 
 use parent 'Qpsmtpd::DB';
 
-BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File) }
+BEGIN { @AnyDBM_File::ISA = qw(DB_File GDBM_File NDBM_File SDBM_File ODBM_File) }
 use AnyDBM_File;
 use Fcntl qw(:DEFAULT :flock LOCK_EX LOCK_NB);
 

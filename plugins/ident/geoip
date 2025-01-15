@@ -6,7 +6,7 @@ geoip - provide geographic information about mail senders.
 
 =head1 SYNOPSIS
 
-Use MaxMind's GeoIP databases and the GeoIP2 or Geo::IP perl modules to report
+Use MaxMind's GeoIP databases and the Geo::IP perl module to report
 geographic information about incoming connections.
 
 =head1 DESCRIPTION
@@ -125,8 +125,7 @@ use warnings;
 
 use Qpsmtpd::Constants;
 
-#use GeoIP2;      # eval'ed in register()
-#use Geo::IP;     # eval loaded if GeoIP2 doesn't
+#use Geo::IP;     # eval loaded
 #use Math::Trig;  # eval'ed in set_distance_gc
 
 sub register {
@@ -144,13 +143,6 @@ sub register {
 }
 
 sub load_geoip {
-    my ( $self ) = @_;
-    $self->load_geoip2() and return 1;
-    $self->load_geoip1() and return 1;
-    return 0;
-}
-
-sub load_geoip1 {
     my $self = shift;
 
     eval 'use Geo::IP';
@@ -162,52 +154,14 @@ sub load_geoip1 {
 
     $self->open_geoip_db();
 
-# Note that opening the GeoIP DB only in register has caused problems before:
-# https://github.com/smtpd/qpsmtpd/commit/29ea9516806e9a8ca6519fcf987dbd684793ebdd#plugins/ident/geoip
-# Opening the DB anew for every connection is horribly inefficient.
-# Instead, attempt to reopen upon connect if the DB connection fails.
+    # Note that opening the GeoIP DB only in register has caused problems before:
+    # https://github.com/smtpd/qpsmtpd/commit/29ea9516806e9a8ca6519fcf987dbd684793ebdd#plugins/ident/geoip
+    # Opening the DB anew for every connection is horribly inefficient.
+    # Instead, attempt to reopen upon connect if the DB connection fails.
     $self->init_my_country_code();
 
     $self->register_hook('connect', 'geoip_lookup');
     return 1;
-}
-
-sub load_geoip2 {
-    my $self = shift;
-
-    eval 'use GeoIP2::Database::Reader';
-    if ($@) {
-        $self->log(LOGERROR, "could not load GeoIP2");
-        return;
-    }
-
-    warn "Using GeoIP2."
-       . " ASN data is not currently available using the GeoIP2 module!\n";
-
-    eval {
-        $self->{_geoip2_city} = GeoIP2::Database::Reader->new(
-            file => $self->{_args}{db_dir} . '/GeoLite2-City.mmdb',
-        );
-    };
-    if ($@) {
-        $self->log(LOGERROR, "unable to load GeoLite2-City.mmdb");
-    }
-
-    eval {
-        $self->{_geoip2_country} = GeoIP2::Database::Reader->new(
-            file => $self->{_args}{db_dir} . '/GeoLite2-Country.mmdb',
-        );
-    };
-    if ($@) {
-        $self->log(LOGERROR, "unable to load GeoLite2-Country.mmdb");
-    }
-
-    if ($self->{_geoip2_city} || $self->{_geoip2_country}) {
-        $self->register_hook('connect', 'geoip2_lookup');
-        return 1;
-    }
-
-    return;
 }
 
 sub add_headers {
@@ -218,36 +172,6 @@ sub add_headers {
         $txn->header->delete("X-GeoIP-$h");
         $txn->header->add( "X-GeoIP-$h", $self->connection->notes($note), 0 );
     }
-    return DECLINED;
-}
-
-sub geoip2_lookup {
-    my $self = shift;
-
-    my $ip = $self->qp->connection->remote_ip;
-    return DECLINED if $self->is_localhost($ip);
-
-    if ($self->{_geoip2_city}) {
-        my $city_rec = $self->{_geoip2_city}->city(ip => $ip);
-        if ($city_rec) {
-            $self->qp->connection->notes('geoip_country', $city_rec->country->iso_code());
-            $self->qp->connection->notes('geoip_country_name', $city_rec->country->name());
-            $self->qp->connection->notes('geoip_continent', $city_rec->continent->code());
-            $self->qp->connection->notes('geoip_city', $city_rec->city->name());
-            $self->qp->connection->notes('geoip_asn', $city_rec->traits->autonomous_system_number());
-            return DECLINED;
-        }
-    }
-
-    if ($self->{_geoip2_country}) {
-        my $country_rec = $self->{_geoip2_country}->country(ip => $ip);
-        if ($country_rec) {
-            $self->qp->connection->notes('geoip_country', $country_rec->country->iso_code());
-            $self->qp->connection->notes('geoip_country_name', $country_rec->country->name());
-            $self->qp->connection->notes('geoip_continent', $country_rec->continent->code());
-        };
-    }
-
     return DECLINED;
 }
 
