@@ -9,6 +9,11 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
 
+    eval 'use GeoIP2::Database::Reader';
+    if ( !$@ ) {
+        $self->register_test('test_geoip2_lookup');
+    }
+
     eval 'use Geo::IP';
     if ( !$@ ) {
         $self->register_test('test_geoip_lookup');
@@ -21,6 +26,22 @@ sub register_tests {
         $self->register_test('test_set_asn');
         $self->register_test('test_add_headers');
     }
+}
+
+sub test_geoip2_lookup {
+    my $self = shift;
+
+    $self->qp->connection->remote_ip('24.24.24.24');
+    cmp_ok( $self->geoip2_lookup(), '==', DECLINED, "exit code DECLINED");
+
+    if (!$self->load_geoip2()) {
+        warn "failed to load GeoIP2\n";
+    }
+
+    cmp_ok( $self->connection->notes('geoip_country'), 'eq', 'US', "24.24.24.24 is in country US");
+    cmp_ok( $self->connection->notes('geoip_country_name'), 'eq', 'United States', "24.24.24.24 is in country United States");
+    cmp_ok( $self->connection->notes('geoip_continent'), 'eq', 'NA', "24.24.24.24 is in continent NA");
+    cmp_ok( $self->connection->notes('geoip_city'), 'eq', 'Deer Park', "24.24.24.24 is in city of Deer Park");
 }
 
 sub test_add_headers {
