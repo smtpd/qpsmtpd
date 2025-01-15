@@ -776,7 +776,14 @@ sub data_respond {
 sub authentication_results {
     my ($self) = @_;
 
-    my @auth_list = $self->config('me');
+    # don't add an Authentication-Results if this is "none"
+    my @auth_list = $self->config('me-auth-results');
+    if (! $auth_list[0]) {
+        @auth_list = $self->config('me');
+    }
+    elsif ($auth_list[0] eq "none") {
+        return;
+    }
 
     if (!defined $self->{_auth}) {
         push @auth_list, 'auth=none';
@@ -804,6 +811,10 @@ sub authentication_results {
 
 sub clean_authentication_results {
     my $self = shift;
+
+    # don't change any Authentication-Results if this is "none"
+    my ($auth_id) = $self->config('me-auth-results');
+    return if ($auth_id && ($auth_id eq "none"));
 
     # On messages received from the internet, move Authentication-Results headers
     # to Original-AR, so our downstream can trust the A-R header we insert.
