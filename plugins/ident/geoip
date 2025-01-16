@@ -184,7 +184,7 @@ sub load_geoip2 {
     warn "Using GeoIP2."
        . " ASN data is not currently available using the GeoIP2 module!\n";
 
-   eval {
+    eval {
         $self->{_geoip2_city} = GeoIP2::Database::Reader->new(
             file => $self->{_args}{db_dir} . '/GeoLite2-City.mmdb',
         );
@@ -206,6 +206,7 @@ sub load_geoip2 {
         $self->register_hook('connect', 'geoip2_lookup');
         return 1;
     }
+
     return;
 }
 

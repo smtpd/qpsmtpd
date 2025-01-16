@@ -140,7 +140,7 @@ sub check_dmarc {
         return $self->get_reject( $@ );
     };
 
-#$self->log(LOGINFO, "result: " . Dumper( $dmarc ) );
+    #$self->log(LOGINFO, "result: " . Dumper( $dmarc ) );
 
     my $pol;
     eval { $pol = $dmarc->result->published; };

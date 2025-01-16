@@ -26,5 +26,5 @@ jobs:
         with:
           perl-version: ${{ matrix.perl }}
       - run: cpanm --installdeps -n -f .
-      - run: cpanm --installdeps -n -f Mail::SPF Mail::DMARC Geo::IP ClamAV::Client Redis
+      - run: cpanm --installdeps -n -f Mail::SPF Mail::DMARC GeoIP2 ClamAV::Client Redis
       - run: prove -lv t

@@ -22,7 +22,7 @@ content_log
 hosts_allow
 
 # information plugins
-ident/geoip
+# ident/geoip
 ident/p0f /tmp/.p0f_socket version 3
 connection_time
 fcrdns
@@ -37,7 +37,7 @@ parse_addr_withhelo
 quit_fortune
 # tls should load before count_unrecognized_commands
 #tls
-#earlytalker
+# earlytalker
 count_unrecognized_commands 4
 relay
 
@@ -50,7 +50,7 @@ badmailfromto
 badrcptto
 helo
 
-# sender_permitted_from
+sender_permitted_from
 greylisting p0f genre,windows db_dir ./t/tmp
 
 #auth/auth_checkpassword checkpw /usr/local/vpopmail/bin/vchkpw true /usr/bin/true
@@ -87,7 +87,7 @@ spamassassin
 
 # run the clamav virus checking plugin
 virus/clamav
-virus/clamdscan
+# virus/clamdscan
 
 # You must enable a queue plugin - see the options in plugins/queue/ - for example:
 
