@@ -1,0 +1,46 @@
+#!perl -w
+
+use strict;
+use English qw/-no_match_vars/;
+use POSIX qw(strftime);
+
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+
+my $remote_ip = '66.128.51.165';
+my $test_email = 'matt@tnpi.net';
+
+sub register_tests {
+    my $self = shift;
+
+    eval 'use Mail::DMARC';
+    if ($EVAL_ERROR) {
+        warn 'unable to load Mail::DMARC';
+        return;
+    }
+
+    $self->register_test('_check_dmarc');
+}
+
+sub _check_dmarc {
+    my $self = shift;
+
+    $self->qp->connection->remote_ip($remote_ip);
+    my $t = $self->qp->transaction;
+    $t->header(Mail::Header->new(Modify => 0, MailFrom => "COERCE"));
+    $t->sender(Qpsmtpd::Address->new( "<$test_email>" ));
+    $t->header->add('Date', strftime "%a %b %e %H:%M:%S %Y", localtime time);
+    $t->body_write( "test message body " );
+
+    # no From header, reject as invalid message
+    my ($rc, $msg) = $self->check_dmarc($t);
+    cmp_ok($rc, '==', DENY, "no From header, $msg");
+
+
+    $t->header->add('From', "<$test_email>");
+    ($rc, $msg) = $self->check_dmarc($t);
+    cmp_ok($rc, '==', DENY, "$msg");
+    cmp_ok($msg, 'eq', 'failed DMARC policy', 'check_dmarc, no SPF');
+
+    #warn $self->qp->connection->notes('authentication_results');
+}

@@ -53,7 +53,7 @@ sub test_invalid_localhost {
     my $self = shift;
 
     my ($err, $why);
-    foreach my $ip ( '', '192.0.99.5' ) {
+    foreach my $ip ( undef, '', '192.0.99.5' ) {
         $self->qp->connection->remote_ip(undef);
         ($err, $why) = $self->invalid_localhost('localhost');
         ok($err, "host: localhost, remote ip ($ip)");
