@@ -17,7 +17,6 @@ __tildeexp();
 __is_localhost();
 __is_valid_ip();
 __get_resolver();
-__get_async_resolver();
 __resolve_a();
 __resolve_aaaa();
 __resolve_mx();
@@ -61,14 +60,6 @@ sub __get_resolver {
     my $res = $base->get_resolver();
     isa_ok( $res, 'Net::DNS::Resolver', "get_resolver returns a Net::DNS::Resolver");
 
-}
-
-sub __get_async_resolver {
-    eval 'use Net::DNS::Async';
-    return if ($@);
-    my $res = $base->get_async_resolver() or return;
-    isa_ok( $res, 'Net::DNS::Async', "resolver object, $res");
-    isa_ok( $res->{Resolver}, 'Net::DNS::Resolver', "resolver object, $res");
 }
 
 sub __resolve_a {
