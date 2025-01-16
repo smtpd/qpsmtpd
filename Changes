@@ -1,7 +1,7 @@
 
   Forkserver is THE run model
 
-  Remove tcpserver run mode
+  Remove tcpserver run model
 
   Remove Apache::Qpsmtpd support
 
