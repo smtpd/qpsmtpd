@@ -34,7 +34,6 @@ docs/development.md
 docs/hooks.md
 docs/logging.md
 docs/writing.md
-lib/Apache/Qpsmtpd.pm
 lib/Qpsmtpd.pm
 lib/Qpsmtpd/Address.pm
 lib/Qpsmtpd/Auth.pm
@@ -105,7 +104,6 @@ plugins/karma
 plugins/karma_tool
 plugins/loadcheck
 plugins/logging/adaptive
-plugins/logging/apache
 plugins/logging/connection_id
 plugins/logging/devnull
 plugins/logging/file
