@@ -162,10 +162,10 @@ sub load_geoip1 {
 
     $self->open_geoip_db();
 
-# Note that opening the GeoIP DB only in register has caused problems before:
-# https://github.com/smtpd/qpsmtpd/commit/29ea9516806e9a8ca6519fcf987dbd684793ebdd#plugins/ident/geoip
-# Opening the DB anew for every connection is horribly inefficient.
-# Instead, attempt to reopen upon connect if the DB connection fails.
+    # Note that opening the GeoIP DB only in register has caused problems before:
+    # https://github.com/smtpd/qpsmtpd/commit/29ea9516806e9a8ca6519fcf987dbd684793ebdd#plugins/ident/geoip
+    # Opening the DB anew for every connection is horribly inefficient.
+    # Instead, attempt to reopen upon connect if the DB connection fails.
     $self->init_my_country_code();
 
     $self->register_hook('connect', 'geoip_lookup');

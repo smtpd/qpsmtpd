@@ -1,8 +1,8 @@
 .gitignore
-.travis.yml
 bin/geolite-mirror-simple.pl
 bin/install_deps.pl
 Changes
+config.sample/add_geoip_headers
 config.sample/badhelo
 config.sample/badmailfrom
 config.sample/badrcptto
@@ -12,6 +12,7 @@ config.sample/dnsbl_zones
 config.sample/flat_auth_pw
 config.sample/invalid_resolvable_fromhost
 config.sample/IP
+config.sample/karma_tlds
 config.sample/log2sql
 config.sample/logging
 config.sample/loglevel
@@ -43,6 +44,9 @@ lib/Qpsmtpd/Config.pm
 lib/Qpsmtpd/ConfigServer.pm
 lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
+lib/Qpsmtpd/DB.pm
+lib/Qpsmtpd/DB/File/DBM.pm
+lib/Qpsmtpd/DB/Redis.pm
 lib/Qpsmtpd/DSN.pm
 lib/Qpsmtpd/Plugin.pm
 lib/Qpsmtpd/Postfix.pm
@@ -67,6 +71,7 @@ META.yml			Module meta-data (added by MakeMaker)
 plugins/auth/auth_checkpassword
 plugins/auth/auth_cvm_unix_local
 plugins/auth/auth_flat_file
+plugins/auth/auth_imap
 plugins/auth/auth_ldap_bind
 plugins/auth/auth_vpopmail
 plugins/auth/auth_vpopmail_sql
@@ -154,8 +159,10 @@ run.tcpserver
 STATUS
 t/addresses.t
 t/auth.t
+t/config/add_geoip_headers
 t/config/badhelo
 t/config/badrcptto
+t/config/content_log_enabled
 t/config/dnsbl_allow
 t/config/dnsbl_zones
 t/config/flat_auth_pw
@@ -174,6 +181,7 @@ t/misc.t
 t/plugin_tests.t
 t/plugin_tests/auth/auth_checkpassword
 t/plugin_tests/auth/auth_flat_file
+t/plugin_tests/auth/auth_imap
 t/plugin_tests/auth/auth_vpopmail
 t/plugin_tests/auth/auth_vpopmail_sql
 t/plugin_tests/auth/auth_vpopmaild
@@ -182,11 +190,12 @@ t/plugin_tests/auth/authnull
 t/plugin_tests/badmailfrom
 t/plugin_tests/badmailfromto
 t/plugin_tests/badrcptto
+t/plugin_tests/content_log
 t/plugin_tests/count_unrecognized_commands
 t/plugin_tests/dmarc
 t/plugin_tests/dnsbl
-t/plugin_tests/dspam
 t/plugin_tests/earlytalker
+t/plugin_tests/fcrdns
 t/plugin_tests/greylisting
 t/plugin_tests/headers
 t/plugin_tests/helo
@@ -202,6 +211,10 @@ t/plugin_tests/virus/clamdscan
 t/qpsmtpd-address.t
 t/qpsmtpd-base.t
 t/qpsmtpd-config.t
+t/qpsmtpd-db-file-dbm.t
+t/qpsmtpd-db-redis.t
+t/qpsmtpd-db.t
+t/qpsmtpd-plugin.t
 t/qpsmtpd-smtp.t
 t/qpsmtpd.t
 t/rset.t

@@ -22,7 +22,7 @@ content_log
 hosts_allow
 
 # information plugins
-ident/geoip
+# ident/geoip
 ident/p0f /tmp/.p0f_socket version 3
 connection_time
 fcrdns
@@ -37,7 +37,7 @@ parse_addr_withhelo
 quit_fortune
 # tls should load before count_unrecognized_commands
 #tls
-earlytalker
+# earlytalker
 count_unrecognized_commands 4
 relay
 
@@ -66,7 +66,7 @@ rcpt_ok
 headers days 5 reject_type temp require From,Date
 #domainkeys
 dkim
-dmarc
+# dmarc
 
 # content filters
 virus/klez_filter
@@ -83,11 +83,11 @@ spamassassin
 #   spamassassin reject_threshold 20 munge_subject_threshold 10
 
 # dspam must run after spamassassin for the learn_from_sa feature to work
-dspam learn_from_sa 7 reject 1
+# dspam learn_from_sa 7 reject 1
 
 # run the clamav virus checking plugin
 virus/clamav
-virus/clamdscan
+# virus/clamdscan
 
 # You must enable a queue plugin - see the options in plugins/queue/ - for example:
 

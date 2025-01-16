@@ -31,7 +31,7 @@ sub new {
 
     my $self = bless({args => \%args}, $class);
 
-   # this list of valid commands should probably be a method or a set of methods
+    # this list of valid commands should probably be a method or a set of methods
     $self->{_commands} =
       {map { $_ => '' } qw(ehlo helo rset mail rcpt data help vrfy noop quit)};
 
@@ -711,8 +711,6 @@ sub data_respond {
         #   way a Received: line that is already in the header.
 
                 $header->extract(\@headers);
-
-#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.github.io/qpsmtpd/");
 
                 $buffer = '';
 

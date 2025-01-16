@@ -29,9 +29,6 @@ use English qw( -no_match_vars );
 my $apps = [
    { app => 'daemontools', info => { } },
    { app => 'ucspi-tcp',   info => { } },
-#   { app => 'dspam',       info => { } },
-#   { app => 'mysql-server-55', info => { port => 'mysql55-server', dport=>'mysql5',  yum =>'mysql-server'} },
-#   { app => 'apache22'      , info => { port => 'apache22',       dport=>'',     yum => 'httpd' } },
 ];
 
 $EUID == 0 or die "You will have better luck if you run me as root.\n";
