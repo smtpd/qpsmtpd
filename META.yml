@@ -18,16 +18,24 @@ no_index:
     - t
     - inc
 requires:
+  CDB_File: 0
   Data::Dumper: 0
   Date::Parse: 0
+  File::NFSLock: 0
   File::Tail: 0
   File::Temp: 0
+  GeoIP2: 0
   IO::Socket::SSL: 0
   MIME::Base64: 0
   Mail::DKIM: 0
+  Mail::DMARC: 0
   Mail::Header: 0
+  Mail::SPF: 0
   Net::DNS: 0.39
   Net::IP: 0
+  Redis: 0
   Time::HiRes: 0
   Time::TAI64: 0
-version: 0.91
+  Test::More: 0
+  Test::Output: 0
+version: 1.00
