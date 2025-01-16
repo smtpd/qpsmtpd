@@ -178,6 +178,6 @@ the logfile on a webserver and include a reference to it in the mail.
 
 [cov-img]: https://coveralls.io/repos/smtpd/qpsmtpd/badge.svg
 [cov-url]: https://coveralls.io/r/smtpd/qpsmtpd
-[ci-img]: https://travis-ci.org/smtpd/qpsmtpd.svg?branch=master
-[ci-url]: https://travis-ci.org/smtpd/qpsmtpd
+[ci-img]: https://github.com/smtpd/qpsmtpd/actions/workflows/ci.yml/badge.svg
+[ci-url]: https://github.com/smtpd/qpsmtpd/actions/workflows/ci.yml
 
