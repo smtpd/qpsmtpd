@@ -114,16 +114,9 @@ sub register {
     }
     # /end compat
 
-    if ($qp->{conn} && $qp->{conn}->isa('Apache2::Connection')) {
-        require APR::Const;
-        APR::Const->import(qw(POLLIN SUCCESS));
-        $self->register_hook('connect', 'apr_connect_handler');
-        $self->register_hook('data',    'apr_data_handler');
-    }
-    else {
-        $self->register_hook('connect', 'connect_handler');
-        $self->register_hook('data',    'data_handler');
-    }
+    $self->register_hook('connect', 'connect_handler');
+    $self->register_hook('data',    'data_handler');
+
     if ($self->{_args}{'defer-reject'}) {
         $self->register_hook('mail', 'mail_handler')
     };
