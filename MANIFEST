@@ -41,7 +41,6 @@ lib/Qpsmtpd/Auth.pm
 lib/Qpsmtpd/Base.pm
 lib/Qpsmtpd/Command.pm
 lib/Qpsmtpd/Config.pm
-lib/Qpsmtpd/ConfigServer.pm
 lib/Qpsmtpd/Connection.pm
 lib/Qpsmtpd/Constants.pm
 lib/Qpsmtpd/DB.pm
