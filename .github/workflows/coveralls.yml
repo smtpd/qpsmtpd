@@ -1,0 +1,39 @@
+name: Coveralls
+
+on: ["push", "pull_request"]
+
+jobs:
+
+  coverage:
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 10
+        fetch-tags: true
+
+    - name: Install Perl
+      uses: shogo82148/actions-setup-perl@v1
+      with:
+        perl-version: 5.38
+
+    - run: cpanm --installdeps -n -f Mail::SPF Mail::DMARC GeoIP2
+
+    - name: Coveralls
+      uses: mihyaeru21/actions-report-coveralls-perl@v1
+
+    # - name: install Devel::Cover
+    #   uses: perl-actions/install-with-cpanm@v1
+    #   with:
+    #     sudo: true
+    #     install: |
+    #       Devel::Cover
+
+    - run: cpanm --installdeps -n -f ClamAV::Client Redis Time::TAI64
+    - run: cpanm --installdeps -n -f .
+
+    - name: Run tests with coverage
+      env:
+        HARNESS_PERL_SWITCHES: '-MDevel::Cover=+ignore,^t/'
+      run: prove -lrv t
