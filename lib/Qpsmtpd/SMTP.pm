@@ -798,8 +798,8 @@ sub authentication_results {
     }
 
     # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
-    if ($self->connection->notes('authentication_results')) {
-        push @auth_list, $self->connection->notes('authentication_results');
+    if ($self->transaction->notes('authentication_results')) {
+        push @auth_list, $self->transaction->notes('authentication_results');
     }
 
     $self->log(LOGDEBUG, "adding auth results header");
