@@ -9,7 +9,7 @@ hosts_allow - decide if a host is allowed to connect
 The B<hosts_allow> module decides before the SMTP-Greeting if a host is
 allowed to connect. It checks for too many (running) connections from one
 host (see -m/--max-from-ip options in qpsmtpd-forkserver) and the config
-file I<hosts_allow>.
+file I<hosts_allow>. It now supports IPv6 addresses.
 
 The plugin takes no config/plugin arguments.
 
@@ -28,8 +28,10 @@ Example:
 
   192.168.3.4    DECLINED
   192.168.3.0/24 DENY Sorry, known spam only source
+  fd7a:115c:a1e0::/96 DENY 
 
-This would exclude 192.168.3.4 from the DENY of 192.168.3.0/24.
+This would exclude 192.168.3.4 from the DENY of 192.168.3.0/24, and refuse
+Tailscale IPv6 local addresses.
 
 =head1 SEE ALSO
 
@@ -56,25 +58,27 @@ use warnings;
 use Qpsmtpd::Constants;
 use Socket;
 
+use Net::IP;
+
 sub hook_pre_connection {
     my ($self, $transaction, %args) = @_;
 
-    # remote_ip    => inet_ntoa($iaddr),
+    # remote_ip    => inet_ntop(AF, $iaddr),
     # remote_port  => $port,
-    # local_ip     => inet_ntoa($laddr),
+    # local_ip     => inet_ntop(AF, $laddr),
     # local_port   => $lport,
     # max_conn_ip  => $MAXCONNIP,
     # child_addrs  => [values %childstatus],
 
     my $remote = $args{remote_ip};
+    my $rip    = new Net::IP($remote);
     my $max    = $args{max_conn_ip};
     my $karma  = $self->connection->notes('karma_history');
 
     if ($max) {
         my $num_conn = 1;                    # seed with current value
-        my $raddr    = inet_aton($remote);
-        foreach my $rip (@{$args{child_addrs}}) {
-            ++$num_conn if (defined $rip && $rip eq $raddr);
+        foreach my $cip (@{$args{child_addrs}}) {
+            ++$num_conn if (defined $cip && $rip->overlaps($cip)==$IP_IDENTICAL);
         }
         $max = $self->karma_bump($karma, $max) if defined $karma;
         if ($num_conn > $max) {
@@ -84,7 +88,7 @@ sub hook_pre_connection {
         }
     }
 
-    my @r = $self->in_hosts_allow($remote);
+    my @r = $self->in_hosts_allow($rip);
     return @r if scalar @r;
 
     $self->log(LOGDEBUG, "pass");
@@ -93,22 +97,22 @@ sub hook_pre_connection {
 
 sub in_hosts_allow {
     my $self   = shift;
-    my $remote = shift;
+    my $rip    = shift;
 
     foreach ($self->qp->config('hosts_allow')) {
         s/^\s*//;    # trim leading whitespace
-        my ($ipmask, $const, $message) = split /\s+/, $_, 3;
+        my ($iprange, $const, $message) = split /\s+/, $_, 3;
         next unless defined $const;
 
-        my ($net, $mask) = split /\//, $ipmask, 2;
-        $mask = 32 if !defined $mask;
-        $mask = pack "B32", "1" x ($mask) . "0" x (32 - $mask);
-        if (join('.', unpack('C4', inet_aton($remote) & $mask)) eq $net) {
+        my $overlap = $rip->overlaps(new Net::IP($iprange));
+        next unless defined $overlap;
+
+        if ($overlap == $IP_A_IN_B_OVERLAP || $overlap == $IP_IDENTICAL) {
             $const = Qpsmtpd::Constants::return_code($const) || DECLINED;
             if ($const =~ /deny/i) {
-                $self->log(LOGINFO, "fail, $message");
+                $self->log(LOGINFO, "fail, " . $message || '-');
             }
-            $self->log(LOGDEBUG, "pass, $const, $message");
+            $self->log(LOGDEBUG, "pass, $const, " . $message || '-');
             return $const, $message;
         }
     }
