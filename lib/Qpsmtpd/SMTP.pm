@@ -681,6 +681,12 @@ sub data_respond {
 
     my $timeout = $self->config('timeout');
     while (defined($_ = $self->getline($timeout))) {
+        if ($_ eq ".\r\n") {
+            $complete++;
+            $_ = '';
+        }
+        $i++;
+
         # Reject messages that have either bare LF or CR. rjkaes noticed a
         # lot of spam that is malformed in the header.
 
@@ -689,12 +695,6 @@ sub data_respond {
             $self->disconnect;
             return 1;
         }
-
-        if ($_ eq ".\r\n") {
-            $complete++;
-            $_ = '';
-        }
-        $i++;
 
         unless (($max_size and $size > $max_size)) {
             s/\r\n$/\n/;
