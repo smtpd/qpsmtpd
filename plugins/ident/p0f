@@ -157,6 +157,8 @@ Version 2 code heavily based upon the p0fq.pl included with the p0f distribution
 
 2012 - Matt Simerson - refactored, added v3 support
 
+2021 - Chris Maltby - fixed IPv6 address handling
+
 =cut
 
 use strict;
@@ -297,20 +299,17 @@ sub get_v2_query {
 sub get_v3_query {
     my $self = shift;
 
-    my $src_ip = $self->qp->connection->remote_ip or do {
+    my $src = $self->qp->connection->remote_ip or do {
         $self->log(LOGERROR, "skip, unable to determine remote IP");
         return;
     };
 
-    if ($src_ip =~ /:/) {    # IPv6
-        my @bits = split(/\:/, $src_ip);
-        return
-          pack("L C C C C C C C C C C C C C C C C C",
-               $QUERY_MAGIC_V3, 0x06, @bits);
-    }
+    my $ip = new Net::IP($src, $src =~ /:/ ? 6 : 4) or do {
+        $self->log(LOGERROR, "skip, " . NET::IP::Error());
+        return;
+    };
 
-    my @octets = split(/\./, $src_ip);
-    return pack("L C C16", $QUERY_MAGIC_V3, 0x04, @octets);
+    return pack("L C B128", $QUERY_MAGIC_V3, $ip->version(), $ip->binip());
 }
 
 sub query_p0f_v3 {
