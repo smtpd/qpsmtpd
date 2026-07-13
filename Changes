@@ -1,6 +1,44 @@
+1.01  Jul 13, 2026
 
+  logging/file: guard all transaction notes access so logging outside a transaction cannot crash (#343)
 
-  Remove Apache::Qpsmtpd support
+  milter: document that only protocol version 2 is supported, not Rspamd/v6 (#342)
+
+  badrcptto: always block listed recipients, even for whitelisted senders (#341)
+
+  hosts_allow: fix the per-IP connection limit (max-from-ip) in the forkserver and prefork models (#340)
+
+  Discard the message if the client disconnects before queueing, avoiding duplicate delivery (#339)
+
+  naughty: honor whitelists (is_immune) before disconnecting (#338)
+
+  Extend the bare LF/CR check to every message line to mitigate SMTP smuggling (#318, #337)
+
+  Authentication-Results: track connection and transaction results separately (#336)
+
+  geoip: remove legacy Geo::IP support; GeoIP2 only, with distance calculation (#335)
+
+  p0f: fix handling of IPv6 addresses in get_v3_query (#333)
+
+  Enhance SSL context error reporting (#332)
+
+  hosts_allow: support IPv6 addresses (#330)
+
+  Remove Apache::Qpsmtpd and Qpsmtpd::ConfigServer (#326, #327)
+
+  Test on Perl 5.38; drop GeoIP1 tests; disable geoip and dspam in the sample config (#325)
+
+  CI: migrate to GitHub Actions and restore test coverage (#324, #328)
+
+  Allow an alternate ID for the Authentication-Results header (#323)
+
+  postfix queue: avoid logging full message headers (#319)
+
+  Fix received_line hook behaviour (#312)
+
+  Load plugins in qpsmtpd-forkserver at startup again (#311)
+
+  whitelist: add missing NetAddr::IP use statement (#310)
 
 1.00  Feb 16, 2023
 

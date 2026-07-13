@@ -38,4 +38,4 @@ requires:
   Time::TAI64: 0
   Test::More: 0
   Test::Output: 0
-version: 1.00
+version: 1.01
