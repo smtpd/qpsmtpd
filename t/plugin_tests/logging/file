@@ -9,6 +9,7 @@ sub register_tests {
     my $self = shift;
     $self->register_test('test_note');
     $self->register_test('test_hook_logging_bad_transaction');
+    $self->register_test('test_reopen_without_transaction');
 }
 
 sub test_note {
@@ -42,4 +43,18 @@ sub test_hook_logging_bad_transaction {
         };
         ok( $r, "hook_logging survives $desc transaction" );
     }
+}
+
+sub test_reopen_without_transaction {
+    my $self = shift;
+
+    # With reopen enabled but no transaction (global/startup logs), the log
+    # must not be reopened on every call -- only when the filename changes.
+    local $self->{_reopen}         = 1;
+    local $self->{_current_output} = '';
+    local $self->{_f};
+
+    ok( $self->maybe_reopen(undef), "first non-transaction log opens the file" );
+    is( $self->maybe_reopen(undef), 0,
+        "reopen is not forced again for non-transaction logging" );
 }

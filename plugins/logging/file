@@ -230,12 +230,17 @@ sub maybe_reopen {
     my ($self, $transaction) = @_;
 
     my $new_output = $self->log_output($transaction);
-    if (
-          !$self->{_current_output}
+
+    # The "reopen once per connection" check only applies when we can track it
+    # in the transaction notes. Logging outside a transaction (startup/shutdown,
+    # other global logs) has no session to remember, so it must not force a
+    # reopen on every call -- only a filename change reopens in that case.
+    my $reopened = $self->_note($transaction, 'file-reopened-this-session');
+    my $session_reopen = $self->{_reopen} && defined($reopened) && !$reopened;
+
+    if (   !$self->{_current_output}
         || $self->{_current_output} ne $new_output
-        || ($self->{_reopen}
-            && !$self->_note($transaction, 'file-reopened-this-session'))
-       )
+        || $session_reopen)
     {
         unless ($self->open_log($new_output, $transaction)) {
             return undef;
