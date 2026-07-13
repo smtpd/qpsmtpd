@@ -283,7 +283,9 @@ while (1) {
         if ($pid) {
 
             # parent
-            $childstatus{$pid} = $iaddr;    # add to table
+            # store the printable IP (same form the pre-connection hook gets
+            # as remote_ip) so plugins can compare child_addrs against it
+            $childstatus{$pid} = $nto_iaddr;    # add to table
             $running++;
             close $client;
             next;
