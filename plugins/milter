@@ -25,6 +25,23 @@ or
 
 This plugin has so far only been tested with Brightmail's milter module.
 
+=head1 LIMITATIONS
+
+This plugin speaks only milter protocol version 2, as implemented by the
+long-unmaintained C<Net::Milter> module (last released in 2007). It does
+B<not> support milter protocol version 6.
+
+As a result it does not work with milter backends that require version 6,
+notably B<Rspamd>, which rejects the connection with "MTA specifies too old
+protocol: 2". Advertising version 6 from C<Net::Milter> is not sufficient:
+version 6 negotiates per-command "no reply" flags (C<SMFIP_NR_*>), and because
+C<Net::Milter> does not honor them it blocks waiting for responses the milter
+never sends, hanging the connection until it times out.
+
+To use Rspamd, integrate it via its native HTTP API or the C<rspamc> command
+rather than this plugin. See:
+L<https://github.com/smtpd/qpsmtpd/issues/329>
+
 =cut
 
 use Net::Milter;
