@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-geoip2 - provide geographic information about mail senders using GeoIP2/GeoLite2 databases.
+geoip - provide geographic information about mail senders using GeoIP2/GeoLite2 databases.
 
 =head1 SYNOPSIS
 
