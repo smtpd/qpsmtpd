@@ -155,12 +155,40 @@ sub __data_respond {
         'data_respond(DECLINED) response - no recips' );
     $smtpd->transaction->add_recipient(Qpsmtpd::Address->new('recip@example.com'));
 
-    # data_respond also runs the data_post hooks, so this will require a bit
-    # more work to get under test. we also don't yet have a way to mock
-    # message data; that will probably require overriding getline()
-    #$smtpd->mock_data( _test_message() );
-    #$smtpd->mock_hook( data_post => sub { return DECLINED } );
-    #is( $smtpd->data_respond(DECLINED), 1, 'data_respond, DECLINED' );
+    __data_respond_barelf();
+}
+
+sub __data_respond_barelf {
+    # A well-formed message must not be rejected as bare-LF; a bare LF/CR on
+    # any line must be.
+    my $drive = sub {
+        my @lines = @_;
+        ( $smtpd ) = Test::Qpsmtpd->new_conn();
+        $smtpd->transaction->sender(Qpsmtpd::Address->new('sender@example.com'));
+        $smtpd->transaction->add_recipient(Qpsmtpd::Address->new('recip@example.com'));
+        $smtpd->connection->notes( disconnected => 0 );
+        $smtpd->mock_data( [@lines] );
+
+        # Neutralize the data_* hooks so the barelf check in the DATA loop is
+        # exercised in isolation from the configured plugins.
+        no warnings 'redefine';
+        local *Qpsmtpd::run_hooks = sub { return (DECLINED, '') };
+        $smtpd->data_respond(DECLINED);
+        return ($smtpd->response)[0];
+    };
+
+    my $code = $drive->("From: a\@example.com\r\n", "Date: now\r\n", "\r\n", "body\r\n", ".\r\n");
+    isnt( $code, 421, 'well-formed message is not rejected as bare-LF' );
+    isnt( $smtpd->connection->notes('disconnected'), 1,
+        'well-formed message does not disconnect' );
+
+    $code = $drive->("From: a\@example.com\r\n", "bare\n", ".\r\n");
+    is( $code, 421, 'bare LF in body is rejected' );
+    is( $smtpd->connection->notes('disconnected'), 1, 'bare LF in body disconnects' );
+
+    $code = $drive->("From: a\@example.com\r\n", "\r\n", "body\r\n", ".\n");
+    is( $code, 421, 'bare LF terminator is rejected' );
+    is( $smtpd->connection->notes('disconnected'), 1, 'bare LF terminator disconnects' );
 }
 
 sub __clean_authentication_results {
