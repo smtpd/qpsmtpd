@@ -682,7 +682,6 @@ sub data_respond {
     my $timeout = $self->config('timeout');
     while (defined($_ = $self->getline($timeout))) {
 
-        # Reject messages with a bare LF or CR, mitigates SMTP smuggling
         if ($_ !~ /\r\n$/) {
             $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
             $self->disconnect;
