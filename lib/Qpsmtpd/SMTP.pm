@@ -690,7 +690,7 @@ sub data_respond {
         # Reject messages that have either bare LF or CR. rjkaes noticed a
         # lot of spam that is malformed in the header.
 
-        if ($_ eq ".\n" || $_ eq ".\r") {
+        if ($_ !~ /\r\n$/) {
             $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
             $self->disconnect;
             return 1;
