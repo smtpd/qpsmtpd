@@ -80,7 +80,8 @@ sub hook_pre_connection {
         foreach my $cip (@{$args{child_addrs}}) {
             next if !defined $cip;
             my $child = Net::IP->new($cip) or next;
-            ++$num_conn if $rip->overlaps($child) == $IP_IDENTICAL;
+            my $overlap = $rip->overlaps($child);    # undef for mixed v4/v6
+            ++$num_conn if defined $overlap && $overlap == $IP_IDENTICAL;
         }
         $max = $self->karma_bump($karma, $max) if defined $karma;
         if ($num_conn > $max) {

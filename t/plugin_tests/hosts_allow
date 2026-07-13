@@ -8,6 +8,7 @@ use Qpsmtpd::Constants;
 sub register_tests {
     my $self = shift;
     $self->register_test('test_max_conn_ip');
+    $self->register_test('test_mixed_ip_versions');
 }
 
 sub _pre {
@@ -45,4 +46,24 @@ sub test_max_conn_ip {
     my $ip6 = '2001:db8::1';
     cmp_ok( $self->_pre($ip6, 1, $ip6), '==', DENYSOFT,
         "IPv6 connections are counted" );
+}
+
+sub test_mixed_ip_versions {
+    my $self = shift;
+
+    # On a dual-stack server child_addrs can mix v4 and v6; Net::IP->overlaps
+    # returns undef across versions and must not warn or be miscounted.
+    my $ip  = '192.0.2.50';
+    my $ip6 = '2001:db8::1';
+
+    my @warnings;
+    local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+
+    # remote v4, max 2, children: v6, v4, v6 -> only the v4 matches
+    my $rc = $self->_pre($ip, 2, $ip6, $ip, $ip6);
+
+    ok( !grep({ /uninitialized/i } @warnings),
+        "no uninitialized warning when comparing across IP versions" );
+    cmp_ok( $rc, '==', DECLINED,
+        "cross-version child_addrs are ignored, not miscounted" );
 }

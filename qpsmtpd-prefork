@@ -683,6 +683,11 @@ sub qpsmtpd_session {
     my %children;
     shmem_opt(\%children, undef, $$, $nto_iaddr);
 
+    # our own pid was just stored in shared memory; drop it from the local copy
+    # so the current connection isn't counted twice (hosts_allow already seeds
+    # the count with 1 for this connection)
+    delete $children{$$};
+
     my ($rc, @msg) =
       $qpsmtpd->run_hooks(
                           "pre-connection",
