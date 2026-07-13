@@ -3,6 +3,7 @@ use strict;
 
 use POSIX ();
 use Socket;
+use IO::Select;
 
 use lib 'lib';
 use Qpsmtpd::Base;
@@ -207,9 +208,17 @@ sub tcpenv {
 sub check_socket() {
     my $self = shift;
 
-    return 1 if ($self->{__client_socket}->connected);
+    my $sock = $self->{__client_socket} or return 1;
+    return 0 if !$sock->connected;
 
-    return 0;
+    # A client that gave up and sent FIN still reports ->connected until the
+    # socket is fully closed. Detect that half-closed state: if the socket is
+    # readable but a non-destructive peek returns no data, the peer is gone.
+    return 1 if !IO::Select->new($sock)->can_read(0);
+    my $peek = '';
+    my $rv = recv($sock, $peek, 1, MSG_PEEK);
+    return 0 if defined $rv && $peek eq '';
+    return 1;
 }
 
 1;

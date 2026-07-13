@@ -83,7 +83,26 @@ are shown below in ["Plugin settings"](#plugin-settings).
 - timeoutsmtpd
 
     Set the timeout for the clients, `timeoutsmtpd` is the qmail smtpd control
-    file, `timeout` the qpsmtpd file. Default is 1200 seconds.
+    file, `timeout` the qpsmtpd file. Default is 1200 seconds. Note that this
+    bounds client I/O, not the time a plugin may spend in a hook; see
+    `hook_timeout`.
+
+- hook_timeout
+
+    Maximum seconds any single plugin may spend in a hook before it is aborted
+    and skipped (logged as `PLUGIN TIMEOUT`). Guards against a plugin that calls
+    slow third-party software (SpamAssassin, virus scanners) and stalls the
+    whole connection. `0` (the default) disables the limit. A plugin that
+    manages its own `alarm` will override this while it runs.
+
+- plugin\_timeouts
+
+    Per-plugin overrides of `hook_timeout`, one plugin per line as
+    `plugin_name seconds` (or `plugin_name:seconds`); lines beginning with `#`
+    are ignored. A plugin not listed here uses `hook_timeout`.
+
+        spamassassin 30
+        virus/clamav 20
 
 - tls\_before\_auth
 

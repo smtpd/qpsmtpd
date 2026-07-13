@@ -290,10 +290,27 @@ sub run_continuation {
 
         $self->varlog(LOGDEBUG, $hook, $name);
         my $tran = $self->transaction;
-        eval { @r = $code->{code}->($self, $tran, @$args); };
-        if ($@) {
-            chomp $@;
-            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $@);
+        my $timeout = $self->hook_timeout($name);
+        eval {
+            # localize here so the handler stays in effect for the hook call
+            local $SIG{ALRM};
+            if ($timeout) {
+                $SIG{ALRM} = sub { die "hook timeout\n" };
+                alarm $timeout;
+            }
+            @r = $code->{code}->($self, $tran, @$args);
+        };
+        my $err = $@;
+        alarm 0 if $timeout;
+        if ($err) {
+            chomp $err;
+            if ($err eq 'hook timeout') {
+                $self->log(LOGCRIT,
+                    "PLUGIN TIMEOUT [$name]: hook $hook exceeded ${timeout}s");
+            }
+            else {
+                $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $err);
+            }
             next;
         }
 
@@ -347,6 +364,30 @@ sub run_continuation {
         @r = map { split /\n/ } @r;
     };
     return $self->hook_responder($hook, \@r, $args);
+}
+
+sub hook_timeout {
+    my ($self, $name) = @_;
+
+    if (!exists $self->{_hook_timeouts}) {
+        # global default: seconds, from the 'hook_timeout' config; 0 disables
+        my ($default) = $self->config('hook_timeout');
+        $self->{_hook_timeout_default} = $default || 0;
+
+        # per-plugin overrides from the 'plugin_timeouts' config, one per line:
+        #   plugin_name seconds
+        my %per_plugin;
+        for my $line ($self->config('plugin_timeouts')) {
+            next if $line =~ /^\s*#/;
+            my ($plugin, $secs) = split /[:\s]+/, $line, 2;
+            $per_plugin{$plugin} = $secs if defined $plugin && defined $secs;
+        }
+        $self->{_hook_timeouts} = \%per_plugin;
+    }
+
+    my $timeout = $self->{_hook_timeouts}{$name};
+    $timeout = $self->{_hook_timeout_default} if !defined $timeout;
+    return $timeout + 0;
 }
 
 sub hook_responder {
