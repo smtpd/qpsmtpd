@@ -13,6 +13,10 @@ use Qpsmtpd::Constants;
 
 our $hooks = {};
 our $LOGGING_LOADED = 0;
+
+# private, unforgeable sentinel so a plugin can't die() its way into looking
+# like a hook timeout
+my $HOOK_TIMEOUT = \'hook timeout';
 my $git = git_version();
 
 sub _restart {
@@ -290,10 +294,32 @@ sub run_continuation {
 
         $self->varlog(LOGDEBUG, $hook, $name);
         my $tran = $self->transaction;
-        eval { @r = $code->{code}->($self, $tran, @$args); };
-        if ($@) {
-            chomp $@;
-            $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $@);
+        my $timeout = $self->hook_timeout($name);
+        my $prev_alarm;
+        eval {
+            # localize here so the handler stays in effect for the hook call
+            local $SIG{ALRM};
+            if ($timeout) {
+                $SIG{ALRM} = sub { die $HOOK_TIMEOUT };
+                $prev_alarm = alarm $timeout;    # seconds left on any prior timer
+            }
+            @r = $code->{code}->($self, $tran, @$args);
+        };
+        my $err = $@;
+        if ($timeout) {
+            alarm 0;
+            alarm $prev_alarm if $prev_alarm;    # restore any pre-existing timer
+        }
+        if ($err) {
+            @r = ();    # don't carry a previous plugin's return value forward
+            if (ref $err && $err == $HOOK_TIMEOUT) {
+                $self->log(LOGCRIT,
+                    "PLUGIN TIMEOUT [$name]: hook $hook exceeded ${timeout}s");
+            }
+            else {
+                chomp(my $msg = "$err");
+                $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $msg);
+            }
             next;
         }
 
@@ -347,6 +373,30 @@ sub run_continuation {
         @r = map { split /\n/ } @r;
     };
     return $self->hook_responder($hook, \@r, $args);
+}
+
+sub hook_timeout {
+    my ($self, $name) = @_;
+
+    if (!exists $self->{_hook_timeouts}) {
+        # global default: seconds, from the 'hook_timeout' config; 0 disables
+        my ($default) = $self->config('hook_timeout');
+        $self->{_hook_timeout_default} = $default || 0;
+
+        # per-plugin overrides from the 'plugin_timeouts' config, one per line:
+        #   plugin_name seconds
+        my %per_plugin;
+        for my $line ($self->config('plugin_timeouts')) {
+            next if $line =~ /^\s*#/;
+            my ($plugin, $secs) = split /[:\s]+/, $line, 2;
+            $per_plugin{$plugin} = $secs if defined $plugin && defined $secs;
+        }
+        $self->{_hook_timeouts} = \%per_plugin;
+    }
+
+    my $timeout = $self->{_hook_timeouts}{$name};
+    $timeout = $self->{_hook_timeout_default} if !defined $timeout;
+    return $timeout + 0;
 }
 
 sub hook_responder {

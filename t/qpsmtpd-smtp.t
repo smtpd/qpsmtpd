@@ -26,8 +26,65 @@ __helo_respond('ehlo_respond');
 __data_respond('data_respond');
 __clean_authentication_results();
 __authentication_results();
+__queue_liveness();
+__hook_timeout();
 
 done_testing();
+
+sub __queue_liveness {
+    # client still connected: queue proceeds to the queue hooks
+    my ($smtpd) = Test::Qpsmtpd->new_conn();
+    $smtpd->transaction->sender(Qpsmtpd::Address->new('sender@example.com'));
+    $smtpd->transaction->add_recipient(Qpsmtpd::Address->new('r@example.com'));
+    my $ran = 0;
+    $smtpd->mock_hook('queue', sub { $ran = 1; return DONE });
+    $smtpd->queue($smtpd->transaction);
+    ok( $ran, "queue hooks run when the client is still connected" );
+    $smtpd->unmock_hook('queue');
+
+    # client gone before queue: discard without running queue hooks
+    ($smtpd) = Test::Qpsmtpd->new_conn();
+    $smtpd->transaction->sender(Qpsmtpd::Address->new('sender@example.com'));
+    $smtpd->transaction->add_recipient(Qpsmtpd::Address->new('r@example.com'));
+    $ran = 0;
+    $smtpd->mock_hook('queue', sub { $ran = 1; return DONE });
+    $smtpd->{_response} = undef;
+    no warnings 'redefine';
+    local *Test::Qpsmtpd::check_socket = sub { 0 };
+    $smtpd->queue($smtpd->transaction);
+    ok( !$ran, "queue hooks skipped when client disconnected before queue" );
+    is( $smtpd->{_response}, undef, "no response sent to a disconnected client" );
+    ok( !$smtpd->transaction->sender, "transaction discarded when client is gone" );
+    $smtpd->unmock_hook('queue');
+}
+
+sub __hook_timeout {
+    my ($smtpd) = Test::Qpsmtpd->new_conn();
+
+    # config parsing: per-plugin override, comments, and global fallback
+    no warnings 'redefine';
+    local *Test::Qpsmtpd::config = sub {
+        my ($self, $key) = @_;
+        return (5)                                if $key eq 'hook_timeout';
+        return ('# comment', 'slow 2', 'other:9') if $key eq 'plugin_timeouts';
+        return;
+    };
+    delete $smtpd->{$_} for qw( _hook_timeouts _hook_timeout_default );
+    is( $smtpd->hook_timeout('slow'),  2, "per-plugin timeout (space form)" );
+    is( $smtpd->hook_timeout('other'), 9, "per-plugin timeout (colon form)" );
+    is( $smtpd->hook_timeout('unlisted'), 5, "falls back to global hook_timeout" );
+
+    # a hook that overruns its timeout is aborted rather than blocking forever
+    $smtpd->{_hook_timeouts} = {};
+    $smtpd->{_hook_timeout_default} = 1;
+    my $finished = 0;
+    $smtpd->mock_hook('slow_test_hook', sub { sleep 4; $finished = 1; return DECLINED });
+    my $start = time;
+    $smtpd->run_hooks('slow_test_hook');
+    ok( time - $start < 4, "slow hook aborted by hook_timeout" );
+    ok( !$finished, "hook did not run to completion after timeout" );
+    $smtpd->unmock_hook('slow_test_hook');
+}
 
 sub __new {
     isa_ok( $smtp, 'Qpsmtpd::SMTP' );

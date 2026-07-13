@@ -935,8 +935,21 @@ sub getline {
     return $line;
 }
 
+# overridden by the transport (Qpsmtpd::TcpServer); assume connected elsewhere
+sub check_socket { 1 }
+
 sub queue {
     my ($self, $transaction) = @_;
+
+    # The message has passed every check. If the client gave up while we were
+    # working (e.g. a slow content filter), we cannot deliver the 250 and they
+    # will retry, producing a duplicate. Discard now so their retry delivers it
+    # exactly once, rather than queueing a message we can't acknowledge.
+    if (!$self->check_socket) {
+        $self->log(LOGERROR,
+            "client disconnected before queue; discarding message (sender will retry)");
+        return $self->reset_transaction;
+    }
 
     # First fire any queue_pre hooks
     $self->run_hooks("queue_pre");
