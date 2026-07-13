@@ -1,8 +1,13 @@
 name: CI Tests
 
 on:
-  push:
   pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
 
 jobs:
 
