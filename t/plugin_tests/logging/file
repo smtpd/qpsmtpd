@@ -1,0 +1,60 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test('test_note');
+    $self->register_test('test_hook_logging_bad_transaction');
+    $self->register_test('test_reopen_without_transaction');
+}
+
+sub test_note {
+    my $self = shift;
+
+    # note() is a no-op returning undef for anything that can't do ->notes
+    is( $self->_note(undef,        'k'), undef, "note(): undef transaction" );
+    is( $self->_note(\'scalarref', 'k'), undef, "note(): unblessed scalar ref" );
+    is( $self->_note({},           'k'), undef, "note(): unblessed hash ref" );
+
+    # and reads/writes a real transaction
+    my $txn = $self->qp->transaction;
+    $self->_note($txn, 'file-test-note', 'value');
+    is( $self->_note($txn, 'file-test-note'), 'value',
+        "note(): sets and gets on a real transaction" );
+    $txn->notes('file-test-note', undef);
+}
+
+sub test_hook_logging_bad_transaction {
+    my $self = shift;
+
+    # log everything so we reach the notes-handling code, not the early return
+    local $self->{_loglevel} = LOGDEBUG;
+
+    # the #227 crash: a non-object in the transaction slot must not die
+    my %bad = ( 'undef' => undef, 'scalar ref' => \'x', 'hash ref' => {}, 'array ref' => [] );
+    for my $desc ( sort keys %bad ) {
+        my $r = eval {
+            $self->hook_logging($bad{$desc}, LOGWARN, 'connect', 'someplugin', 'log line');
+            1;
+        };
+        ok( $r, "hook_logging survives $desc transaction" );
+    }
+}
+
+sub test_reopen_without_transaction {
+    my $self = shift;
+
+    # With reopen enabled but no transaction (global/startup logs), the log
+    # must not be reopened on every call -- only when the filename changes.
+    local $self->{_reopen}         = 1;
+    local $self->{_current_output} = '';
+    local $self->{_f};
+
+    ok( $self->maybe_reopen(undef), "first non-transaction log opens the file" );
+    is( $self->maybe_reopen(undef), 0,
+        "reopen is not forced again for non-transaction logging" );
+}
