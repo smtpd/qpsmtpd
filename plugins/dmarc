@@ -162,7 +162,7 @@ sub check_dmarc {
 
     if ( $dmarc->result->result eq 'pass' ) {
         $self->log(LOGINFO, "pass");
-        $self->store_auth_results( $auth_str . " d=" . $dmarc->header_from);
+        $self->transaction->store_auth_results( $auth_str . " d=" . $dmarc->header_from);
         return DECLINED;
     };
 
@@ -184,7 +184,7 @@ sub check_dmarc {
     $log_mess   .= ", $comment"  if $comment;
     $self->log(LOGINFO, $log_mess);
 
-    $self->store_auth_results( $auth_str . " d=" . $dmarc->header_from);
+    $self->transaction->store_auth_results( $auth_str . " d=" . $dmarc->header_from);
 
     return DECLINED if $disposition eq 'none';
     return DECLINED if ! $disposition;  # for safety

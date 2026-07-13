@@ -226,10 +226,15 @@ sub __authentication_results {
     ok($ar =~ /auth=pass/, "added A-R header with auth: $ar");
 
     delete $smtpd->{_auth};
-    $smtpd->connection->notes('authentication_results', 'spf=pass smtp.mailfrom=ietf.org' );
+    $smtpd->connection->notes('authentication_results', 'iprev=pass' );
     $smtpd->authentication_results();
     $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
-    ok($ar =~ /spf/, "added A-R header with SPF: $ar");
+    ok($ar =~ /iprev/, "added A-R header with connection results: $ar");
+
+    $smtpd->transaction->notes('authentication_results', 'spf=pass smtp.mailfrom=ietf.org' );
+    $smtpd->authentication_results();
+    $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
+    ok($ar =~ /iprev/ && $ar =~ /spf/, "A-R header collates connection + transaction: $ar");
 
 }
 

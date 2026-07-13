@@ -115,6 +115,13 @@ sub notes {
     return $self->{_notes}->{$key} = shift;
 }
 
+sub store_auth_results {
+    my ($self, $result) = @_;
+    my $auths = $self->notes('authentication_results');
+    return $self->notes('authentication_results', $result) if !$auths;
+    return $self->notes('authentication_results', join('; ', $auths, $result));
+}
+
 sub reset {
     my $self = shift;
     $self->{_notes} = undef;

@@ -229,7 +229,7 @@ sub validate_it {
     if ( $dkim->signature && $dkim->signature->domain ) {
         $auth_str .= " header.i=@" . $dkim->signature->domain;
     };
-    $self->store_auth_results( $auth_str );
+    $self->transaction->store_auth_results( $auth_str );
 
     foreach my $t (qw/ pass fail invalid temperror none /) {
         next if $t ne $result;

@@ -798,8 +798,11 @@ sub authentication_results {
     }
 
     # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
-    if ($self->connection->notes('authentication_results')) {
-        push @auth_list, $self->connection->notes('authentication_results');
+    # Connection results (iprev, SPF helo, AUTH) apply to every message;
+    # transaction results (DKIM, DMARC, SPF mailfrom) apply to this one.
+    for my $ar ($self->connection->notes('authentication_results'),
+                $self->transaction->notes('authentication_results')) {
+        push @auth_list, $ar if $ar;
     }
 
     $self->log(LOGDEBUG, "adding auth results header");
