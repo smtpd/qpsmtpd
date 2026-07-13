@@ -75,6 +75,14 @@ sub test_hook_rcpt {
     $recipient = Qpsmtpd::Address->new( '<any@bad.example.com>' );
     ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
     cmp_ok( $r, '==', DENY, "bad host match, +, $mess");
+
+    # #223: a closed mailbox is blocked even for whitelisted/relay senders
+    $self->qp->connection->relay_client(1);
+    $self->qp->connection->notes('whitelisthost', 'listed at dnswl.org');
+    $recipient = Qpsmtpd::Address->new( '<bad@example.com>' );
+    ($r, $mess) = $self->hook_rcpt( $transaction, $recipient );
+    cmp_ok( $r, '==', DENY, "bad match still denied when immune, +, $mess");
+    $self->_reset_connection_flags();
 }
 
 sub test_get_host_and_to {
