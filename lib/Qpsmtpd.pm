@@ -13,6 +13,10 @@ use Qpsmtpd::Constants;
 
 our $hooks = {};
 our $LOGGING_LOADED = 0;
+
+# private, unforgeable sentinel so a plugin can't die() its way into looking
+# like a hook timeout
+my $HOOK_TIMEOUT = \'hook timeout';
 my $git = git_version();
 
 sub _restart {
@@ -291,25 +295,30 @@ sub run_continuation {
         $self->varlog(LOGDEBUG, $hook, $name);
         my $tran = $self->transaction;
         my $timeout = $self->hook_timeout($name);
+        my $prev_alarm;
         eval {
             # localize here so the handler stays in effect for the hook call
             local $SIG{ALRM};
             if ($timeout) {
-                $SIG{ALRM} = sub { die "hook timeout\n" };
-                alarm $timeout;
+                $SIG{ALRM} = sub { die $HOOK_TIMEOUT };
+                $prev_alarm = alarm $timeout;    # seconds left on any prior timer
             }
             @r = $code->{code}->($self, $tran, @$args);
         };
         my $err = $@;
-        alarm 0 if $timeout;
+        if ($timeout) {
+            alarm 0;
+            alarm $prev_alarm if $prev_alarm;    # restore any pre-existing timer
+        }
         if ($err) {
-            chomp $err;
-            if ($err eq 'hook timeout') {
+            @r = ();    # don't carry a previous plugin's return value forward
+            if (ref $err && $err == $HOOK_TIMEOUT) {
                 $self->log(LOGCRIT,
                     "PLUGIN TIMEOUT [$name]: hook $hook exceeded ${timeout}s");
             }
             else {
-                $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $err);
+                chomp(my $msg = "$err");
+                $self->log(LOGCRIT, "FATAL PLUGIN ERROR [$name]: ", $msg);
             }
             next;
         }

@@ -95,6 +95,11 @@ are shown below in ["Plugin settings"](#plugin-settings).
     whole connection. `0` (the default) disables the limit. A plugin that
     manages its own `alarm` will override this while it runs.
 
+    The limit applies to the main connection hooks (`connect`, `mail`, `rcpt`,
+    `data`, `data_post`, `queue`, and the like). The auxiliary hooks run outside
+    the normal dispatch — `config`, `user_config`, `logging`, `ok`, and `deny` —
+    are not bounded.
+
 - plugin\_timeouts
 
     Per-plugin overrides of `hook_timeout`, one plugin per line as
