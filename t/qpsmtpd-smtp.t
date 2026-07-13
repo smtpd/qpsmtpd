@@ -236,6 +236,17 @@ sub __authentication_results {
     $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
     ok($ar =~ /iprev/ && $ar =~ /spf/, "A-R header collates connection + transaction: $ar");
 
+    # #322 regression: a second message on the same connection must not inherit
+    # the first transaction's auth results, but must keep connection results.
+    $smtpd->reset_transaction;
+    $smtpd->transaction->header(
+        Mail::Header->new(Modify => 0, MailFrom => 'COERCE')
+    );
+    $smtpd->authentication_results();
+    $ar = $smtpd->transaction->header->get('Authentication-Results'); chomp $ar;
+    ok($ar =~ /iprev/, "connection results persist to next transaction: $ar");
+    ok($ar !~ /spf/, "transaction results do not leak to next transaction: $ar");
+
 }
 
 sub response_is {
