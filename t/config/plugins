@@ -41,6 +41,8 @@ quit_fortune
 count_unrecognized_commands 4
 relay
 
+karma db_dir ./t/tmp
+
 resolvable_fromhost
 
 rhsbl
@@ -62,6 +64,10 @@ auth/authdeny
 
 # this plugin needs to run after all other "rcpt" plugins
 rcpt_ok
+
+# dispose of naughty connections; 'reject data' runs after rcpt so an async
+# whitelist (dns_whitelist_soft) has set its note before disposal
+naughty reject data
 
 headers days 5 reject_type temp require From,Date
 #domainkeys

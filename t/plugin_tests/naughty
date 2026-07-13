@@ -1,0 +1,45 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('test_naughty');
+}
+
+sub _reset {
+    my $self = shift;
+    my $conn = $self->qp->connection;
+    $conn->relay_client(0);
+    $conn->notes('whitelisthost',   undef);
+    $conn->notes('naughty',         undef);
+    $self->qp->transaction->notes('whitelistsender', undef);
+}
+
+sub test_naughty {
+    my $self = shift;
+
+    $self->_reset;
+    cmp_ok( ($self->naughty)[0], '==', DECLINED,
+        "not flagged naughty => DECLINED" );
+
+    $self->_reset;
+    $self->connection->notes('naughty', 'go away');
+    my ($rc, $mess) = $self->naughty;
+    cmp_ok( $rc,   '==', DENY_DISCONNECT, "flagged naughty => disconnect" );
+    cmp_ok( $mess, 'eq', 'go away',       "naughty message returned" );
+
+    # #203: a host flagged naughty at connect but whitelisted at rcpt (e.g. by
+    # dns_whitelist_soft) must not be disconnected at disposal time.
+    $self->_reset;
+    $self->connection->notes('naughty', 'go away');
+    $self->connection->notes('whitelisthost', 'listed at dnswl.org');
+    cmp_ok( ($self->naughty)[0], '==', DECLINED,
+        "whitelisted host is not disconnected despite naughty flag" );
+
+    $self->_reset;
+}
