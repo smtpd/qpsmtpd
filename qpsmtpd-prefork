@@ -562,7 +562,7 @@ sub shmem {
 # arg0: ref to hash where shared memory should be copied to
 # arg1: ref to arr with pid(s) to delete
 # arg2: int with pid to add (key)
-# arg3: str with packed iaddr to add (value)
+# arg3: str with printable iaddr to add (value)
 # arg4: int 0|1 check and cleanup shared memory (0 = no, 1 = yes - default 0)
 # ret0: int with number of busy children (undef if error)
 sub shmem_opt {
@@ -677,9 +677,11 @@ sub qpsmtpd_session {
     my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) =
         $qpsmtpd->lrpip($socket, $client, $iinfo);
 
-    # get current connected ip addresses (from shared memory)
+    # get current connected ip addresses (from shared memory). Store the
+    # printable IP (same form the pre-connection hook gets as remote_ip) so
+    # plugins can compare child_addrs against it.
     my %children;
-    shmem_opt(\%children, undef, $$, $iaddr);
+    shmem_opt(\%children, undef, $$, $nto_iaddr);
 
     my ($rc, @msg) =
       $qpsmtpd->run_hooks(
