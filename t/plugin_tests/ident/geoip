@@ -11,17 +11,17 @@ sub register_tests {
 
     eval 'use GeoIP2::Database::Reader';
     if ( !$@ ) {
-        $self->register_test('test_geoip2_lookup');
+        $self->register_test('test_geoip_lookup');
     }
 }
 
-sub test_geoip2_lookup {
+sub test_geoip_lookup {
     my $self = shift;
 
     $self->qp->connection->remote_ip('24.24.24.24');
-    cmp_ok( $self->geoip2_lookup(), '==', DECLINED, "exit code DECLINED");
+    cmp_ok( $self->geoip_lookup(), '==', DECLINED, "exit code DECLINED");
 
-    if (!$self->load_geoip2()) {
+    if (!$self->load_geoip()) {
         warn "failed to load GeoIP2\n";
     }
 
