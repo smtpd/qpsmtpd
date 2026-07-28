@@ -188,7 +188,7 @@ sub inject_mail {
 
     my %at  = $strm->get_attr;
     my $qid = $at{queue_id};
-    print STDERR "qid=$qid\n";
+    #print STDERR "qid=$qid\n";
     $strm->print_attr('flags' => $transaction->notes('postfix-queue-flags'));
     $strm->print_rec_time();
     $strm->print_rec('REC_TYPE_FROM', $transaction->sender->address || "");
