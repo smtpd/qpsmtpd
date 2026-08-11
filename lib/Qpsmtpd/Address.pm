@@ -181,10 +181,28 @@ address).  It returns a list of (local-part, domain).
 # address components are defined as package variables so that they can
 # be overriden (in hook_pre_connection, for example) if people have
 # different needs.
-our $atom_expr = '[a-zA-Z0-9!#%&*+=?^_`{|}~\$\x27\x2D\/]+';
+
+# UTF8-non-ascii, per RFC 6531/6532. Addresses are handled as raw octets
+# throughout qpsmtpd, so this matches the encoded form: well-formed UTF-8
+# only, i.e. no overlong encodings, no surrogates and nothing beyond
+# U+10FFFF.
+our $utf8_expr =
+    '(?:[\xC2-\xDF][\x80-\xBF]'
+  . '|\xE0[\xA0-\xBF][\x80-\xBF]'
+  . '|[\xE1-\xEC][\x80-\xBF]{2}'
+  . '|\xED[\x80-\x9F][\x80-\xBF]'
+  . '|[\xEE-\xEF][\x80-\xBF]{2}'
+  . '|\xF0[\x90-\xBF][\x80-\xBF]{2}'
+  . '|[\xF1-\xF3][\x80-\xBF]{3}'
+  . '|\xF4[\x80-\x8F][\x80-\xBF]{2})';
+our $atom_expr =
+  '(?:[a-zA-Z0-9!#%&*+=?^_`{|}~\$\x27\x2D\/]|' . $utf8_expr . ')+';
 our $address_literal_expr =
   '(?:\[(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|IPv6:[0-9A-Fa-f:.]+)\])';
-our $subdomain_expr = '(?:[a-zA-Z0-9](?:[-a-zA-Z0-9]*[a-zA-Z0-9])?)';
+our $subdomain_expr =
+    '(?:(?:[a-zA-Z0-9]|' . $utf8_expr . ')'
+  . '(?:(?:[-a-zA-Z0-9]|' . $utf8_expr . ')*'
+  . '(?:[a-zA-Z0-9]|' . $utf8_expr . '))?)';
 our $domain_expr;
 our $qtext_expr = '[\x01-\x08\x0B\x0C\x0E-\x1F\x21\x23-\x5B\x5D-\x7F]';
 our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
@@ -197,6 +215,13 @@ sub canonify {
         return undef, undef, 'missing delimiters'; ## no critic (undef)
     };
     $path = $1;
+
+    # RFC 6531: non-ASCII is only ever legal as well-formed UTF-8. Check the
+    # whole path up front, because the atom match below is deliberately
+    # lenient and would otherwise let malformed octets through.
+    if ($path =~ /[\x80-\xFF]/ && $path !~ /^(?:[\x00-\x7F]|$utf8_expr)*$/) {
+        return undef, undef, 'malformed UTF-8'; ## no critic (undef)
+    }
 
     my $domain_re = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
 
@@ -227,7 +252,7 @@ sub canonify {
         return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
     }
 
-    if ($localpart =~ /^"(($qtext_expr|\\$text_expr)*)"$/) {
+    if ($localpart =~ /^"(($qtext_expr|$utf8_expr|\\$text_expr)*)"$/) {
         $localpart = $1;
         $localpart =~ s/\\($text_expr)/$1/g;
         return $localpart, $domainpart;
@@ -278,7 +303,10 @@ stringification operator, so the following are equivalent:
 
 sub format {
     my ($self) = @_;
-    my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.]';
+
+    # UTF-8 octets are legal unquoted in an internationalized mailbox
+    # (RFC 6531), so they must not be escaped one byte at a time.
+    my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.\x80-\xFF]';
     return '<>' if !defined $self->{_user};
     if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
         return
@@ -318,6 +346,25 @@ sub host {
     my ($self, $host) = @_;
     $self->{_host} = $host if defined $host;
     return $self->{_host};
+}
+
+=head2 has_utf8()
+
+Returns true if the address contains non-ASCII octets in either the
+localpart or the domain, i.e. if it needs the SMTPUTF8 extension
+(RFC 6531) to be transported.
+
+Note that this reports on the I<content> of the address, which qpsmtpd
+keeps as raw octets; it is unrelated to perl's C<utf8::is_utf8()>.
+
+=cut
+
+sub has_utf8 {
+    my ($self) = @_;
+    for my $part ($self->{_user}, $self->{_host}) {
+        return 1 if defined $part && $part =~ /[\x80-\xFF]/;
+    }
+    return 0;
 }
 
 =head2 notes($key[,$value])

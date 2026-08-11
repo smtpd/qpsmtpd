@@ -18,6 +18,7 @@ __new();
 __config();
 __parse();
 __canonify();
+__utf8();
 
 done_testing();
 
@@ -211,4 +212,70 @@ sub __canonify {
     @r = Qpsmtpd::Address->canonify('<@192.168.1.1>');
     is_deeply(\@r, [ undef, undef, 'fall through' ], 'canonify, fall through, @192.168.1.1')
         or diag Data::Dumper::Dumper(@r);
+}
+
+sub __utf8 {
+
+    # NB: no 'use utf8' here on purpose -- qpsmtpd handles addresses as the
+    # raw octets it read off the wire, so the literals below are UTF-8 bytes.
+    # Malformed input is written as \x escapes to keep this file valid UTF-8.
+
+    my ($as, $ao);
+
+    $as = '<müller@example.com>';
+    $ao = Qpsmtpd::Address->new($as);
+    ok($ao, "new $as");
+    is($ao->format, $as, "format $as, UTF-8 localpart is not escaped");
+    is($ao->has_utf8, 1, "has_utf8, UTF-8 localpart");
+
+    $as = '<user@müller.example>';
+    $ao = Qpsmtpd::Address->new($as);
+    ok($ao, "new $as");
+    is($ao->format, $as, "format $as");
+    is($ao->has_utf8, 1, "has_utf8, UTF-8 domain");
+
+    $as = '<λ@παράδειγμα.δοκιμή>';
+    $ao = Qpsmtpd::Address->new($as);
+    ok($ao, "new $as");
+    is($ao->format, $as, "format $as");
+    is($ao->user, 'λ',                'user, UTF-8');
+    is($ao->host, 'παράδειγμα.δοκιμή', 'host, UTF-8');
+
+    # non-BMP: an emoji localpart is a 4 byte sequence
+    $as = '<🐪@example.com>';
+    $ao = Qpsmtpd::Address->new($as);
+    ok($ao, "new $as");
+    is($ao->format, $as, "format $as");
+
+    # quoted-string form, RFC 6531 QcontentSMTP. The quotes are not needed
+    # for UTF-8, so canonify drops them
+    $ao = Qpsmtpd::Address->new('<"müller"@example.com>');
+    ok($ao, 'new <"müller"@example.com>');
+    is($ao->format, '<müller@example.com>', 'format <"müller"@example.com>');
+
+    $as = '<foo@example.com>';
+    $ao = Qpsmtpd::Address->new($as);
+    is($ao->has_utf8, 0, "has_utf8 is false for ASCII $as");
+
+    $ao = Qpsmtpd::Address->new(undef);
+    is($ao->has_utf8, 0, 'has_utf8 is false for the null sender');
+
+    # only well-formed UTF-8 is acceptable (RFC 6531 3.3)
+    my %malformed = (
+        "<m\xffller\@example.com>"     => 'bare non-UTF-8 octet',
+        "<m\xc3\@example.com>"         => 'truncated sequence',
+        "<\xc0\xaf\@example.com>"      => 'overlong encoding',
+        "<\xed\xa0\x80\@example.com>"  => 'surrogate half',
+        "<\xf5\x80\x80\x80\@example.com>" => 'beyond U+10FFFF',
+        "<user\@m\xffller.example>"    => 'bad octet in the domain',
+        "<\x80\x80\@example.com>"      => 'stray continuation bytes',
+    );
+    for my $bad (sort keys %malformed) {
+        my @r = Qpsmtpd::Address->canonify($bad);
+        is_deeply(\@r, [undef, undef, 'malformed UTF-8'],
+                  "canonify rejects $malformed{$bad}")
+          or diag Data::Dumper::Dumper(@r);
+        is(Qpsmtpd::Address->new($bad), undef,
+           "new returns undef for $malformed{$bad}");
+    }
 }

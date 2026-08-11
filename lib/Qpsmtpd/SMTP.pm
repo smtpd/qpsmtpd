@@ -254,6 +254,7 @@ sub ehlo_respond {
                     'PIPELINING',
                     '8BITMIME',
                     $self->ehlo_size(),
+                    $self->ehlo_smtputf8(),
                     @capabilities,
                     );
 }
@@ -262,6 +263,21 @@ sub ehlo_size {
     my $self = shift;
     return () if ! $self->config('databytes');
     return 'SIZE ' . ($self->config('databytes'))[0];
+};
+
+sub ehlo_smtputf8 {
+    my $self = shift;
+    return () if ! ($self->config('smtputf8'))[0];
+    return 'SMTPUTF8';
+};
+
+sub smtputf8_required {
+    my ($self, $cmd) = @_;
+
+    # RFC 6531 3.5: a non-ASCII mailbox cannot be delivered unless the client
+    # announced SMTPUTF8 on the MAIL command. There is no downgrade to ASCII.
+    return $self->respond($cmd eq 'rcpt' ? 553 : 550,
+                    'Non-ASCII address requires SMTPUTF8 (#5.6.7)');
 };
 
 sub auth {
@@ -380,6 +396,16 @@ sub mail_pre_respond {
     return $self->respond(501, "could not parse your mail from command")
       unless $from =~ /^<.*>$/;
 
+    if (exists $param->{smtputf8}) {
+        # RFC 6531 3.4: the parameter must not carry a value
+        return $self->respond(501, 'SMTPUTF8 takes no value')
+          if defined $param->{smtputf8};
+
+        # only honor it if we actually offered the extension; the note is what
+        # permits non-ASCII addresses below, and it dies with the transaction
+        $self->transaction->notes('smtputf8', 1) if $self->ehlo_smtputf8();
+    }
+
     if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
         $from = $self->address("<>");
     }
@@ -388,6 +414,9 @@ sub mail_pre_respond {
     }
     return $self->respond(501, "could not parse your mail from command")
       unless $from;
+
+    return $self->smtputf8_required('mail')
+      if $from->has_utf8 && !$self->transaction->notes('smtputf8');
 
     $self->run_hooks("mail", $from, %$param);
 }
@@ -476,6 +505,9 @@ sub rcpt_pre_respond {
 
     return $self->respond(501, "could not parse recipient")
       if (!$rcpt or ($rcpt->format eq '<>'));
+
+    return $self->smtputf8_required('rcpt')
+      if $rcpt->has_utf8 && !$self->transaction->notes('smtputf8');
 
     $self->run_hooks("rcpt", $rcpt, %$param);
 }
@@ -847,8 +879,12 @@ sub clean_authentication_results {
 sub received_line {
     my ($self) = @_;
 
-    my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
-    my $esmtp      = substr($smtp, 0, 1) eq "E";
+    my $esmtp = $self->connection->hello eq "ehlo";
+    my $smtp  = $esmtp ? "ESMTP" : "SMTP";
+
+    # RFC 6531 4.3 registers UTF8SMTP and its S/A variants for the WITH clause
+    $smtp = "UTF8SMTP" if $esmtp && $self->transaction->notes('smtputf8');
+
     my $authheader = '';
     my $sslheader  = '';
 

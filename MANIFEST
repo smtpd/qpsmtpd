@@ -24,6 +24,7 @@ config.sample/relayclients
 config.sample/rhsbl_zones
 config.sample/size_threshold
 config.sample/smtpauth-checkpassword
+config.sample/smtputf8
 config.sample/tls_before_auth
 config.sample/tls_ciphers
 CREDITS
