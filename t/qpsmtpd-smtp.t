@@ -51,6 +51,29 @@ sub __smtputf8 {
         'EHLO response still advertises 8BITMIME' );
     $smtpd->unmock_config;
 
+    # The parameter may only be used once it has been advertised. In a HELO
+    # session that never happened, so it is refused even when configured.
+    # (parse_addr_withhelo, when loaded, rejects any ESMTP parameter in a HELO
+    # session earlier still; this is the check for setups without it.)
+    my $offer_param = sub {
+        my ($hello, %arg) = @_;
+        my ($smtpd) = Test::Qpsmtpd->new_conn();
+        $smtpd->connection->hello($hello);
+        $smtpd->mock_config(smtputf8 => 1) if $arg{configured};
+        $smtpd->{_response} = undef;
+        $smtpd->mail_pre_respond(DECLINED, [''],
+                                 ['<ask@perl.org>', {smtputf8 => undef}]);
+        $smtpd->unmock_config if $arg{configured};
+        return $smtpd->{_response};
+    };
+
+    is_deeply($offer_param->('helo', configured => 1),
+        [555, 'SMTPUTF8 is not supported'],
+        'the SMTPUTF8 parameter is refused in a HELO session');
+    is_deeply($offer_param->('ehlo', configured => 0),
+        [555, 'SMTPUTF8 is not supported'],
+        'the SMTPUTF8 parameter is refused when the extension is not configured');
+
     # RFC 6531 3.5: 550 for the sender, 553 for a recipient
     is_deeply( $smtpd->smtputf8_required('mail'),
         [550, 'Non-ASCII address requires SMTPUTF8 (#5.6.7)'],

@@ -50,8 +50,8 @@ $command = 'MAIL FROM:<jörg@example.com>';
 is(($smtpd->command($command))[0], 550, "$command, refused without SMTPUTF8");
 
 $command = 'MAIL FROM:<jörg@example.com> SMTPUTF8';
-is(($smtpd->command($command))[0], 550,
-    "$command, refused while SMTPUTF8 is not configured");
+is(($smtpd->command($command))[0], 555,
+    "$command, parameter rejected while SMTPUTF8 is not configured");
 
 $smtpd->mock_config(smtputf8 => 1);
 

@@ -17,6 +17,7 @@ use_ok('Test::Qpsmtpd');
 
 __smtp_forward();
 __postfix_queue();
+__exim_bsmtp();
 
 done_testing();
 
@@ -181,4 +182,50 @@ sub __postfix_queue {
               . ($utf8 ? 'set' : 'not set') . " for an $kind envelope");
         ok($flags & 0x2, "the configured flags are kept for an $kind envelope");
     }
+}
+
+sub __exim_bsmtp {
+    my ($qp) = Test::Qpsmtpd->new_conn();
+
+    # Stand in for exim -bS: keep the batch it was fed so it can be inspected.
+    my $batch = 't/tmp/exim-bsmtp-batch';
+    my $fake_exim = 't/tmp/fake-exim';
+    open my $fh, '>', $fake_exim or die "$fake_exim: $!";
+    print {$fh} "#!/bin/sh\ncat > $batch\n";
+    close $fh;
+    chmod 0755, $fake_exim or die "chmod: $!";
+
+    my $plugin = $qp->_load_plugin("queue/exim-bsmtp exim_path ./$fake_exim",
+                                   $qp->plugin_dirs);
+
+    my $run = sub {
+        my (%arg) = @_;
+        unlink $batch;
+        local $plugin->{_qp} = $qp;
+        my @rc = $plugin->hook_queue(
+            transaction($qp, sender   => $arg{sender},
+                             smtputf8 => $arg{smtputf8}));
+        open my $read, '<', $batch or die "$batch: $!";
+        chomp(my @lines = <$read>);
+        close $read;
+        return (\@rc, \@lines);
+    };
+
+    my ($rc, $lines) = $run->(sender => 'ask@perl.org');
+    is($rc->[0], OK, 'ASCII envelope is enqueued');
+    is($lines->[1], 'MAIL FROM:<ask@perl.org>',
+        'MAIL FROM carries no SMTPUTF8 parameter when it is not needed')
+      or diag explain $lines;
+    like($lines->[0], qr/^HELO /, 'an ASCII batch still opens with HELO');
+
+    # NB: no 'use utf8' in this file, the address below is raw UTF-8 octets
+    ($rc, $lines) = $run->(sender => 'jörg@example.com', smtputf8 => 1);
+    is($rc->[0], OK, 'internationalized envelope is enqueued');
+    is($lines->[1], 'MAIL FROM:<jörg@example.com> SMTPUTF8',
+        'MAIL FROM carries the SMTPUTF8 parameter')
+      or diag explain $lines;
+    like($lines->[0], qr/^EHLO /,
+        'the batch opens with EHLO, as SMTPUTF8 is an ESMTP parameter');
+
+    unlink $batch, $fake_exim;
 }
