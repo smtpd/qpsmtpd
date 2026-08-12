@@ -401,9 +401,10 @@ sub mail_pre_respond {
         return $self->respond(501, 'SMTPUTF8 takes no value')
           if defined $param->{smtputf8};
 
-        # only honor it if we actually offered the extension; the note is what
-        # permits non-ASCII addresses below, and it dies with the transaction
-        $self->transaction->notes('smtputf8', 1) if $self->ehlo_smtputf8();
+        # SMTPUTF8 may only be used after it was advertised in an EHLO reply.
+        return $self->respond(555, 'SMTPUTF8 is not supported')
+          if $self->connection->hello ne 'ehlo' || !$self->ehlo_smtputf8();
+        $self->transaction->notes('smtputf8', 1);
     }
 
     if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
