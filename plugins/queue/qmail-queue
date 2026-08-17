@@ -18,6 +18,13 @@ makes it easy to use a qmail-queue replacement.
 
 If set the environment variable QMAILQUEUE overrides this setting.
 
+=head1 SMTPUTF8
+
+The envelope is passed on as the raw octets it arrived as, so an
+internationalized address (RFC 6531) reaches qmail-queue intact. Plain qmail
+cannot route non-ASCII domains, though, so do not enable the C<smtputf8>
+config setting unless the queue this feeds knows what to do with them.
+
 =cut
 
 use strict;

@@ -28,8 +28,121 @@ __clean_authentication_results();
 __authentication_results();
 __queue_liveness();
 __hook_timeout();
+__smtputf8();
 
 done_testing();
+
+sub __smtputf8 {
+    my ($smtpd) = Test::Qpsmtpd->new_conn();
+
+    # not offered unless configured
+    is_deeply( [$smtpd->ehlo_smtputf8], [],
+        'SMTPUTF8 is not offered by default' );
+
+    $smtpd->mock_config( smtputf8 => 1 );
+    is_deeply( [$smtpd->ehlo_smtputf8], ['SMTPUTF8'],
+        'SMTPUTF8 is offered once configured' );
+
+    $smtpd->{_response} = undef;
+    $smtpd->ehlo_respond(DECLINED, [''], ['helo.example.com']);
+    ok( grep({ $_ eq 'SMTPUTF8' } @{ $smtpd->{_response} }),
+        'EHLO response advertises SMTPUTF8' );
+    ok( grep({ $_ eq '8BITMIME' } @{ $smtpd->{_response} }),
+        'EHLO response still advertises 8BITMIME' );
+    $smtpd->unmock_config;
+
+    # The parameter may only be used once it has been advertised. In a HELO
+    # session that never happened, so it is refused even when configured.
+    # (parse_addr_withhelo, when loaded, rejects any ESMTP parameter in a HELO
+    # session earlier still; this is the check for setups without it.)
+    my $offer_param = sub {
+        my ($hello, %arg) = @_;
+        my ($smtpd) = Test::Qpsmtpd->new_conn();
+        $smtpd->connection->hello($hello);
+        $smtpd->mock_config(smtputf8 => 1) if $arg{configured};
+        $smtpd->{_response} = undef;
+        $smtpd->mail_pre_respond(DECLINED, [''],
+                                 ['<ask@perl.org>', {smtputf8 => undef}]);
+        $smtpd->unmock_config if $arg{configured};
+        return $smtpd->{_response};
+    };
+
+    is_deeply($offer_param->('helo', configured => 1),
+        [555, 'SMTPUTF8 is not supported'],
+        'the SMTPUTF8 parameter is refused in a HELO session');
+    is_deeply($offer_param->('ehlo', configured => 0),
+        [555, 'SMTPUTF8 is not supported'],
+        'the SMTPUTF8 parameter is refused when the extension is not configured');
+
+    # RFC 6531 3.5: 550 for the sender, 553 for a recipient
+    is_deeply( $smtpd->smtputf8_required('mail'),
+        [550, 'Non-ASCII address requires SMTPUTF8 (#5.6.7)'],
+        'MAIL with a non-ASCII address is refused with 550' );
+    is_deeply( $smtpd->smtputf8_required('rcpt'),
+        [553, 'Non-ASCII address requires SMTPUTF8 (#5.6.7)'],
+        'RCPT with a non-ASCII address is refused with 553' );
+
+    # RFC 6531 4.3: the WITH protocol type in the Received: trace field
+    my %expect = (
+        ''         => 'ESMTP',
+        'smtputf8' => 'UTF8SMTP',
+    );
+    for my $note (sort keys %expect) {
+        my ($smtpd) = Test::Qpsmtpd->new_conn();
+        $smtpd->connection->hello('ehlo');
+        $smtpd->connection->hello_host('helo.example.com');
+        $smtpd->transaction->notes($note, 1) if $note;
+        # data_respond() normally installs this before the trace field is added
+        $smtpd->transaction->header(Mail::Header->new);
+        $smtpd->received_line;
+        my $received = $smtpd->transaction->header->get('Received');
+        like( $received, qr/ with $expect{$note} /,
+            "Received: says 'with $expect{$note}'" );
+    }
+
+    # the authenticated variant keeps its RFC 3848 suffix
+    my ($auth) = Test::Qpsmtpd->new_conn();
+    $auth->connection->hello('ehlo');
+    $auth->connection->hello_host('helo.example.com');
+    $auth->transaction->notes('smtputf8', 1);
+    $auth->transaction->header(Mail::Header->new);
+    @$auth{qw( _auth _auth_mechanism _auth_user )} = (OK, 'PLAIN', 'user');
+    $auth->received_line;
+    like( $auth->transaction->header->get('Received'), qr/ with UTF8SMTPA /,
+        "Received: says 'with UTF8SMTPA' for an authenticated session" );
+
+    # HELO stays SMTP even if a transaction somehow got flagged
+    my ($helo) = Test::Qpsmtpd->new_conn();
+    $helo->connection->hello('helo');
+    $helo->connection->hello_host('helo.example.com');
+    $helo->transaction->notes('smtputf8', 1);
+    $helo->transaction->header(Mail::Header->new);
+    $helo->received_line;
+    like( $helo->transaction->header->get('Received'), qr/ with SMTP /,
+        'a HELO session is never recorded as UTF8SMTP' );
+
+    # RFC 6532: message data is opaque octets to qpsmtpd, so a UTF-8 header
+    # and body must come back out of DATA exactly as they went in
+    my ($data) = Test::Qpsmtpd->new_conn();
+    $data->transaction->sender(Qpsmtpd::Address->new('sender@example.com'));
+    $data->transaction->add_recipient(Qpsmtpd::Address->new('recip@example.com'));
+    $data->connection->notes( disconnected => 0 );
+    $data->mock_data([
+        "Subject: Grüße aus München\r\n",
+        "\r\n",
+        "Hätten Sie's gewusst? 🐪\r\n",
+        ".\r\n",
+    ]);
+    {
+        no warnings 'redefine';
+        local *Qpsmtpd::run_hooks = sub { return (DECLINED, '') };
+        $data->data_respond(DECLINED);
+    }
+    is( $data->transaction->header->get('Subject'), "Grüße aus München\n",
+        'UTF-8 header survives DATA unchanged' );
+    like( $data->transaction->body_as_string, qr/\QHätten Sie's gewusst? 🐪\E/,
+        'UTF-8 body survives DATA unchanged' );
+}
 
 sub __queue_liveness {
     # client still connected: queue proceeds to the queue hooks

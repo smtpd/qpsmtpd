@@ -70,6 +70,30 @@ are shown below in ["Plugin settings"](#plugin-settings).
 
     Override the default SMTP greeting with this string.
 
+- smtputf8
+
+    If set to a true value, the `SMTPUTF8` extension (RFC 6531) is offered in
+    the `EHLO` response and clients may then use UTF-8 in envelope addresses.
+    Defaults to `0`.
+
+    Non-ASCII addresses are always rejected unless the client asked for
+    `SMTPUTF8` on the `MAIL` command — there is no downgrade to ASCII, as
+    RFC 6531 does not define one.
+
+    Only enable this if the queue plugin in use, and the MTA behind it, can
+    route non-ASCII addresses:
+
+    - `queue/smtp-forward` passes `SMTPUTF8` on to the next hop, and refuses
+    to forward (asking the client to retry) if that hop does not advertise it.
+    - `queue/postfix-queue` sets `CLEANUP_FLAG_SMTPUTF8`, which needs
+    postfix 3.0 or later.
+    - `queue/qmail-queue` passes the octets through unchanged, but qmail
+    itself cannot deliver them.
+
+    Note that UTF-8 in message _headers_ and bodies (RFC 6532) needs no
+    setting: qpsmtpd treats message data as opaque octets and already offers
+    `8BITMIME`.
+
 - spool\_dir
 
     Where temporary files are stored, defaults to `~/tmp/`.
