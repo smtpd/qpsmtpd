@@ -77,8 +77,14 @@ are shown below in ["Plugin settings"](#plugin-settings).
     Defaults to `0`.
 
     Non-ASCII addresses are always rejected unless the client asked for
-    `SMTPUTF8` on the `MAIL` command — there is no downgrade to ASCII, as
-    RFC 6531 does not define one.
+    `SMTPUTF8` on the `MAIL` command. There is no downgrade to ASCII: RFC 6531
+    does not define one, and the in-transit downgrade of RFC 6857 is
+    Experimental and not implemented here.
+
+    A non-ASCII domain must also be a valid U-label. Code points that
+    IDNA2008 (RFC 5892) disallows outright — non-breaking and ideographic
+    spaces, zero-width joiners, the BOM, soft hyphen — are refused, as no
+    resolver can use them. Localparts are not restricted this way.
 
     Only enable this if the queue plugin in use, and the MTA behind it, can
     route non-ASCII addresses:
@@ -90,9 +96,11 @@ are shown below in ["Plugin settings"](#plugin-settings).
     - `queue/qmail-queue` passes the octets through unchanged, but qmail
     itself cannot deliver them.
 
-    Note that UTF-8 in message _headers_ and bodies (RFC 6532) needs no
-    setting: qpsmtpd treats message data as opaque octets and already offers
-    `8BITMIME`.
+    This setting covers the envelope only. qpsmtpd treats message data as
+    opaque octets and already offers `8BITMIME`, so UTF-8 in _headers_ and
+    bodies (RFC 6532) passes through either way. RFC 6532 does require a
+    client sending UTF-8 headers to have requested `SMTPUTF8`; qpsmtpd neither
+    inspects nor enforces that.
 
 - spool\_dir
 

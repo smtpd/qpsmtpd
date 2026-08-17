@@ -53,7 +53,12 @@ $command = 'MAIL FROM:<jörg@example.com> SMTPUTF8';
 is(($smtpd->command($command))[0], 555,
     "$command, parameter rejected while SMTPUTF8 is not configured");
 
+# A fresh connection: this session already greeted without SMTPUTF8, and the
+# offer is fixed by the EHLO reply the client saw.
+($smtpd, $conn) = Test::Qpsmtpd->new_conn();
 $smtpd->mock_config(smtputf8 => 1);
+is(($smtpd->command('EHLO localhost'))[0], 250,
+    'EHLO localhost, with SMTPUTF8 configured');
 
 # Configured, but the client has to ask for it (RFC 6531 3.5)
 $command = 'MAIL FROM:<jörg@example.com>';

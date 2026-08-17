@@ -51,34 +51,46 @@ sub __smtputf8 {
         'EHLO response still advertises 8BITMIME' );
     $smtpd->unmock_config;
 
-    # The parameter may only be used once it has been advertised. In a HELO
-    # session that never happened, so it is refused even when configured.
+    # The parameter may only be used once it has been advertised.
     # (parse_addr_withhelo, when loaded, rejects any ESMTP parameter in a HELO
     # session earlier still; this is the check for setups without it.)
     my $offer_param = sub {
-        my ($hello, %arg) = @_;
+        my (%arg) = @_;
         my ($smtpd) = Test::Qpsmtpd->new_conn();
-        $smtpd->connection->hello($hello);
         $smtpd->mock_config(smtputf8 => 1) if $arg{configured};
+        $smtpd->transaction->notes('capabilities', $arg{capabilities})
+          if $arg{capabilities};
+        my $greet = $arg{hello} eq 'ehlo' ? 'ehlo_respond' : 'helo_respond';
+        $smtpd->$greet(DECLINED, [''], ['helo.example.com']);
+        $smtpd->mock_hook('mail', sub { return OK });
         $smtpd->{_response} = undef;
         $smtpd->mail_pre_respond(DECLINED, [''],
                                  ['<ask@perl.org>', {smtputf8 => undef}]);
+        $smtpd->unmock_hook('mail');
         $smtpd->unmock_config if $arg{configured};
         return $smtpd->{_response};
     };
 
-    is_deeply($offer_param->('helo', configured => 1),
+    is_deeply($offer_param->(hello => 'helo', configured => 1),
         [555, 'SMTPUTF8 is not supported'],
         'the SMTPUTF8 parameter is refused in a HELO session');
-    is_deeply($offer_param->('ehlo', configured => 0),
+    is_deeply($offer_param->(hello => 'ehlo', configured => 0),
         [555, 'SMTPUTF8 is not supported'],
         'the SMTPUTF8 parameter is refused when the extension is not configured');
+    is_deeply($offer_param->(hello => 'ehlo', configured => 1),
+        [250, '<ask@perl.org>, sender OK - how exciting to get mail from you!'],
+        'the SMTPUTF8 parameter is accepted once it has been advertised');
+
+    is_deeply(
+        $offer_param->(hello => 'ehlo', capabilities => ['SMTPUTF8']),
+        [250, '<ask@perl.org>, sender OK - how exciting to get mail from you!'],
+        'the SMTPUTF8 parameter is accepted when a plugin advertised it');
 
     # RFC 6531 3.5: 550 for the sender, 553 for a recipient
-    is_deeply( $smtpd->smtputf8_required('mail'),
+    is_deeply( $smtpd->respond_smtputf8_required('mail'),
         [550, 'Non-ASCII address requires SMTPUTF8 (#5.6.7)'],
         'MAIL with a non-ASCII address is refused with 550' );
-    is_deeply( $smtpd->smtputf8_required('rcpt'),
+    is_deeply( $smtpd->respond_smtputf8_required('rcpt'),
         [553, 'Non-ASCII address requires SMTPUTF8 (#5.6.7)'],
         'RCPT with a non-ASCII address is refused with 553' );
 

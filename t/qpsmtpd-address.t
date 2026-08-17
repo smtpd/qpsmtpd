@@ -278,4 +278,26 @@ sub __utf8 {
         is(Qpsmtpd::Address->new($bad), undef,
            "new returns undef for $malformed{$bad}");
     }
+
+    # a domain label must be a U-label, not any well-formed UTF-8 (RFC 6531 3.3)
+    my %not_a_ulabel = (
+        "<user\@example.com\xc2\xa0>"     => 'no-break space',
+        "<user\@ex\xe3\x80\x80ample.com>" => 'ideographic space',
+        "<user\@\xef\xbb\xbfexample.com>" => 'byte order mark',
+        "<user\@ex\xe2\x80\x8bample.com>" => 'zero width space',
+        "<user\@ex\xc2\xadample.com>"     => 'soft hyphen',
+        "<user\@ex\xee\x80\x80ample.com>" => 'private use',
+    );
+    for my $bad (sort keys %not_a_ulabel) {
+        my @r = Qpsmtpd::Address->canonify($bad);
+        is_deeply(\@r, [undef, undef, 'disallowed in domain'],
+                  "canonify rejects $not_a_ulabel{$bad} in the domain")
+          or diag Data::Dumper::Dumper(@r);
+        is(Qpsmtpd::Address->new($bad), undef,
+           "new returns undef for $not_a_ulabel{$bad} in the domain");
+    }
+
+    for my $ok ("<a\xc2\xa0b\@example.com>", "<a\xef\xbb\xbfb\@example.com>") {
+        ok(Qpsmtpd::Address->new($ok), 'localpart is not held to U-label rules');
+    }
 }

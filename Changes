@@ -1,3 +1,8 @@
+
+  Add SMTPUTF8 support (#346)
+
+  postfix: disable $qid debug output (#345)
+
 1.01  Jul 13, 2026
 
   logging/file: guard all transaction notes access so logging outside a transaction cannot crash (#343)
