@@ -215,8 +215,9 @@ our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
 # The membership of every category here is frozen except Cf, which grows as
 # Unicode assigns new format characters, so an older perl rejects slightly
 # fewer code points. The union only ever grows, so the drift is always toward
-# leniency. At the 5.26 floor (Unicode 9.0) the gap is 19 code points, none of
-# them bidi controls -- those arrived in Unicode 6.3 and so are covered.
+# leniency. At the 5.32 floor (Unicode 13.0) the gap is 9 code points, all of
+# them Arabic or Egyptian hieroglyph format marks; the bidi controls arrived in
+# Unicode 6.3 and so are covered.
 our $domain_disallowed_expr = qr/[\p{Zs}\p{Zl}\p{Zp}\p{Cc}\p{Cf}\p{Co}]/;
 
 sub canonify {

@@ -20,7 +20,7 @@ See the Changes file! :-)
 
 ## Requirements
 
-Perl 5.26 or later.
+Perl 5.32 or later.
 
 ## Required Perl Modules
 

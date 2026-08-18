@@ -6,13 +6,13 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME             => 'qpsmtpd',
     VERSION_FROM     => 'lib/Qpsmtpd.pm',
-    MIN_PERL_VERSION => '5.026000',
+    # The oldest perl shipped by a distro still under vendor support
+    MIN_PERL_VERSION => '5.032000',
     CONFIGURE_REQUIRES => { 'ExtUtils::MakeMaker' => 6.64 },
 
     # What lib/ and the daemons load. A plugin's dependency does not belong
-    # here: `cpanm --installdeps .` treats every entry as mandatory, so one
-    # upstream author raising their perl floor would block installing qpsmtpd
-    # itself. Those live under recommends, below.
+    # here: `cpanm --installdeps .` treats every entry as mandatory, those
+    # live under recommends, below.
     PREREQ_PM      => {
         'Data::Dumper'    => 0,
         'File::NFSLock'   => 0,    # Qpsmtpd::DB::File::DBM locking

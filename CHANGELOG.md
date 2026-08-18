@@ -18,7 +18,7 @@ has been preserved.
 
 ### Changed
 
-- Perl 5.26 is now the minimum supported version
+- Perl 5.32 is now the minimum supported version
 - Plugin dependencies (Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
   ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) moved
   from `PREREQ_PM` to `recommends`, so installing qpsmtpd no longer requires
@@ -27,7 +27,7 @@ has been preserved.
 
 ### Removed
 
-- Perl 5.16 from the CI matrix
+- Perl 5.16 and 5.26 from the CI matrix; it now covers 5.32 and 5.38
 - `Mail::SpamAssassin` and `Math::Complex` from the prerequisites; neither is
   loaded anywhere
 
