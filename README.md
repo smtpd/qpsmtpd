@@ -18,17 +18,15 @@ See the Changes file! :-)
 
 # Installation
 
+## Requirements
+
+Perl 5.32 or later.
+
 ## Required Perl Modules
 
     * Net::DNS
     * MIME::Base64
     * Mail::Header (part of the MailTools distribution)
-
-If your Perl is older than 5.8.0, you will also need
-
-    * Data::Dumper
-    * File::Temp
-    * Time::HiRes
 
 The easiest way to install modules from CPAN is with the CPAN shell.
 Run it with
