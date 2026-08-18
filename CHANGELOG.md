@@ -27,9 +27,8 @@ has been preserved.
 
 ### Removed
 
-- Perl 5.16 and 5.26 from the CI matrix; it now covers 5.32 and 5.38
-- `Mail::SpamAssassin` and `Math::Complex` from the prerequisites; neither is
-  loaded anywhere
+- ci: remove 5.16 and 5.26 from the matrix
+- `Mail::SpamAssassin` and `Math::Complex` from the prereq; neither is loaded
 
 ## [1.01] - 2026-07-13
 

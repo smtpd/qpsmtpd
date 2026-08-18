@@ -213,8 +213,8 @@ our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
 # joiners, the BOM, soft hyphen. A localpart may hold any of them.
 #
 # The membership of every category here is frozen except Cf, which grows as
-# Unicode assigns new format characters, so an older perl rejects slightly
-# fewer code points. The union only ever grows, so the drift is always toward
+# Unicode assigns new format characters, so an perls rejects slightly
+# fewer code points. The union only grows, so the drift is always toward
 # leniency. At the 5.32 floor (Unicode 13.0) the gap is 9 code points, all of
 # them Arabic or Egyptian hieroglyph format marks; the bidi controls arrived in
 # Unicode 6.3 and so are covered.
