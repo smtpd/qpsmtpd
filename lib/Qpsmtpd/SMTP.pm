@@ -202,6 +202,7 @@ sub helo_respond {
     my $conn = $self->connection;
     $conn->hello('helo');
     $conn->hello_host($args->[0]);  # store helo hostname
+    $conn->notes('smtputf8_offered', 0);    # HELO withdraws any ESMTP offer
     $self->transaction;
 
     $self->respond( 250, $self->helo_hi_msg . '; I am so happy to meet you.');
@@ -250,13 +251,14 @@ sub ehlo_respond {
         $self->{_commands}{auth} = '';
     }
 
-    $self->respond( 250, $self->helo_hi_msg,
-                    'PIPELINING',
-                    '8BITMIME',
-                    $self->ehlo_size(),
-                    $self->ehlo_smtputf8(),
-                    @capabilities,
-                    );
+    my @extensions = ('PIPELINING', '8BITMIME', $self->ehlo_size(),
+                      $self->ehlo_smtputf8(), @capabilities);
+
+    # A plugin may offer SMTPUTF8 through the ehlo hook, so MAIL has to honour
+    # the reply the client saw rather than re-deriving it from config.
+    $conn->notes('smtputf8_offered', scalar grep { $_ eq 'SMTPUTF8' } @extensions);
+
+    $self->respond(250, $self->helo_hi_msg, @extensions);
 }
 
 sub ehlo_size {
@@ -271,7 +273,7 @@ sub ehlo_smtputf8 {
     return 'SMTPUTF8';
 };
 
-sub smtputf8_required {
+sub respond_smtputf8_required {
     my ($self, $cmd) = @_;
 
     # RFC 6531 3.5: a non-ASCII mailbox cannot be delivered unless the client
@@ -403,7 +405,7 @@ sub mail_pre_respond {
 
         # SMTPUTF8 may only be used after it was advertised in an EHLO reply.
         return $self->respond(555, 'SMTPUTF8 is not supported')
-          if $self->connection->hello ne 'ehlo' || !$self->ehlo_smtputf8();
+          if !$self->connection->notes('smtputf8_offered');
         $self->transaction->notes('smtputf8', 1);
     }
 
@@ -416,7 +418,7 @@ sub mail_pre_respond {
     return $self->respond(501, "could not parse your mail from command")
       unless $from;
 
-    return $self->smtputf8_required('mail')
+    return $self->respond_smtputf8_required('mail')
       if $from->has_utf8 && !$self->transaction->notes('smtputf8');
 
     $self->run_hooks("mail", $from, %$param);
@@ -507,7 +509,7 @@ sub rcpt_pre_respond {
     return $self->respond(501, "could not parse recipient")
       if (!$rcpt or ($rcpt->format eq '<>'));
 
-    return $self->smtputf8_required('rcpt')
+    return $self->respond_smtputf8_required('rcpt')
       if $rcpt->has_utf8 && !$self->transaction->notes('smtputf8');
 
     $self->run_hooks("rcpt", $rcpt, %$param);

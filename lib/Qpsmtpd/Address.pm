@@ -207,6 +207,12 @@ our $domain_expr;
 our $qtext_expr = '[\x01-\x08\x0B\x0C\x0E-\x1F\x21\x23-\x5B\x5D-\x7F]';
 our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
 
+# RFC 6531 3.3 allows a U-label in a domain, not an arbitrary run of UTF-8.
+# These categories are DISALLOWED by IDNA2008 (RFC 5892) yet are well-formed
+# UTF-8, so $utf8_expr passes them: NBSP, ideographic space, zero-width
+# joiners, the BOM, soft hyphen. A localpart may hold any of them.
+our $domain_disallowed_expr = qr/[\p{Zs}\p{Zl}\p{Zp}\p{Cc}\p{Cf}\p{Co}]/;
+
 sub canonify {
     my ($dummy, $path) = @_;
 
@@ -247,6 +253,14 @@ sub canonify {
     if (!defined $localpart) {
         return;
     };
+
+    if (defined $domainpart && $domainpart =~ /[\x80-\xFF]/) {
+        my $decoded = $domainpart;
+        utf8::decode($decoded);
+        if ($decoded =~ $domain_disallowed_expr) {
+            return undef, undef, 'disallowed in domain'; ## no critic (undef)
+        }
+    }
 
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
         return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
