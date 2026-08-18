@@ -18,7 +18,12 @@ has been preserved.
 
 ### Changed
 
+- Perl 5.26 is now the minimum supported version
 - postfix: disable `$qid` debug output (#345)
+
+### Removed
+
+- Perl 5.16 from the CI matrix
 
 ## [1.01] - 2026-07-13
 

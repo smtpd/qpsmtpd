@@ -2,6 +2,11 @@ package Qpsmtpd;
 use strict;
 #use warnings;
 
+# require, not use: `use 5.026` would also switch on the :5.26 feature bundle,
+# and unicode_strings in it changes how 8-bit data matches. Addresses and
+# message bodies are handled as raw octets throughout.
+require 5.026;
+
 our $VERSION = '1.01';
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 

@@ -4,8 +4,9 @@ use strict;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME           => 'qpsmtpd',
-    VERSION_FROM   => 'lib/Qpsmtpd.pm',
+    NAME             => 'qpsmtpd',
+    VERSION_FROM     => 'lib/Qpsmtpd.pm',
+    MIN_PERL_VERSION => '5.026000',
     PREREQ_PM      => {
         'CDB_File'        => 0,
         'Data::Dumper'    => 0,

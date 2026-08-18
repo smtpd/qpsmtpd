@@ -15,7 +15,6 @@ jobs:
     strategy:
       matrix:
         perl-version:
-          - "5.16"
           - "5.26"
           - "5.38"
       fail-fast: false
@@ -34,7 +33,7 @@ jobs:
           fetch-tags: true
       - uses: shogo82148/actions-setup-perl@v1
         with:
-          perl-version: ${{ matrix.perl }}
+          perl-version: ${{ matrix.perl-version }}
       - run: cpanm --installdeps -n -f .
       - run: cpanm --installdeps -n -f Mail::SPF Mail::DMARC GeoIP2 ClamAV::Client Redis
       - run: prove -lv t
