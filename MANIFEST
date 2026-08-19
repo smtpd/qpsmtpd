@@ -1,7 +1,7 @@
 .gitignore
 bin/geolite-mirror-simple.pl
 bin/install_deps.pl
-Changes
+CHANGELOG.md
 config.sample/add_geoip_headers
 config.sample/badhelo
 config.sample/badmailfrom
@@ -197,8 +197,12 @@ t/plugin_tests/fcrdns
 t/plugin_tests/greylisting
 t/plugin_tests/headers
 t/plugin_tests/helo
+t/plugin_tests/hosts_allow
 t/plugin_tests/ident/geoip
 t/plugin_tests/ident/p0f
+t/plugin_tests/karma
+t/plugin_tests/logging/file
+t/plugin_tests/naughty
 t/plugin_tests/rcpt_ok
 t/plugin_tests/relay
 t/plugin_tests/resolvable_fromhost
