@@ -59,7 +59,7 @@ sub new {
     if (! defined $user) {
         # Do nothing
     }
-    elsif ($user =~ /^<(.*)>$/) {
+    elsif ($user =~ /^<(.*)>$/s) {    # /s: a newline must not dodge canonify
         ($user, $host) = $class->canonify($user);
         return if !defined $user;
     }
@@ -224,10 +224,19 @@ sub canonify {
     my ($dummy, $path) = @_;
 
     # strip delimiters
-    if ($path !~ /^<(.*)>$/) {
+    if ($path !~ /^<(.*)>$/s) {    # /s, so the control check below sees a newline
         return undef, undef, 'missing delimiters'; ## no critic (undef)
     };
     $path = $1;
+
+    # RFC 5321 qtextSMTP/quoted-pairSMTP/atext are all printable ASCII: no
+    # control character is legal anywhere in a path, quoted or not. The atom
+    # match below is deliberately lenient about what it returns, so an
+    # unchecked NUL reaches the queue plugins -- and qmail-queue writes a
+    # NUL-delimited envelope.
+    if ($path =~ /[\x00-\x1F\x7F]/) {
+        return undef, undef, 'control character in path'; ## no critic (undef)
+    }
 
     # RFC 6531: non-ASCII is only ever legal as well-formed UTF-8. Check the
     # whole path up front, because the atom match below is deliberately
@@ -236,7 +245,10 @@ sub canonify {
         return undef, undef, 'malformed UTF-8'; ## no critic (undef)
     }
 
-    my $domain_re = $domain_expr || "$subdomain_expr(?:\.$subdomain_expr)*";
+    # NB: the label separator must survive double-quote interpolation. Written
+    # as "\." it collapses to a bare dot and matches any octet, which let
+    # control characters -- NUL included -- through into the domain.
+    my $domain_re = $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
 
     # $address_literal_expr may be empty, if a site doesn't allow them
     if (!$domain_expr && $address_literal_expr) {

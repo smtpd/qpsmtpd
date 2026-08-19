@@ -30,6 +30,7 @@ sub read_input {
         while (<STDIN>) {
             alarm 0;
             $_ =~ s/\r?\n$//s;                     # advanced chomp
+            last if $self->command_line_too_long($_);
             $self->log(LOGINFO, "dispatching $_");
             $self->connection->notes('original_string', $_);
             defined $self->dispatch(split / +/, $_, 2)

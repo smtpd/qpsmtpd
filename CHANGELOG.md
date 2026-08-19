@@ -1,20 +1,16 @@
 # Changelog
 
-All notable changes to qpsmtpd are documented in this file.
+Notable changes to qpsmtpd are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-This file was derived from the historical `Changes` file. Entries there were
-recorded as a flat list per release; they have been sorted into the categories
-below, and dates normalised to ISO 8601. Attribution recorded in the original
-has been preserved.
+and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
 
 - SMTPUTF8 support (RFC 6531), gated on the new `smtputf8` config setting (#346)
+- A 998 octet cap on SMTP command lines (RFC 5321 4.5.3.1.6)
 
 ### Changed
 
@@ -25,9 +21,19 @@ has been preserved.
   every optional plugin's dependency tree
 - postfix: disable `$qid` debug output (#345)
 
+### Fixed
+
+- `Qpsmtpd::Command`: parsing ESMTP parameters was quadratic, now linear
+- uribl: the body-scanning patterns were quadratic in line length
+
+### Security
+
+- `Qpsmtpd::Address`: reject control characters anywhere in a path, per RFC 5321.
+- `Qpsmtpd::Address::new()`: an address with a newline failed the bracket match
+
 ### Removed
 
-- ci: remove 5.16 and 5.26 from the matrix
+- ci: drop 5.16 and 5.26 from testing
 - `Mail::SpamAssassin` and `Math::Complex` from the prereq; neither is loaded
 
 ## [1.01] - 2026-07-13

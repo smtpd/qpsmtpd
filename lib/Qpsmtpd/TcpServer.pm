@@ -121,6 +121,7 @@ sub read_input {
     while (<STDIN>) {
         alarm 0;
         $_ =~ s/\r?\n$//s;                         # advanced chomp
+        last if $self->command_line_too_long($_);
         my $log = $_;
         $log =~ s/AUTH PLAIN (.*)/AUTH PLAIN <hidden credentials>/
           unless ($self->config('loglevel') || '6') >= 7;

@@ -131,10 +131,18 @@ sub _get_mail_params {
     my @params = ();
     $line =~ s/\s*$//;
 
-    while ($line =~ s/\s+([A-Za-z0-9][A-Za-z0-9\-]*(=[^= \x00-\x1f]+)?)$//) {
-        push @params, $1;
+    # Peel ESMTP parameters off the end, right to left. Tokenise once and test
+    # each candidate on its own: the $-anchored s/// this replaced rescanned
+    # the whole line per parameter, which is quadratic in the parameter count
+    # and reachable before AUTH. A parameter value cannot contain whitespace
+    # (see esmtp-value above), so a parameter is always exactly one token.
+    my $param_re = qr/^[A-Za-z0-9][A-Za-z0-9\-]*(?:=[^= \x00-\x1f]+)?$/;
+    my @token = split /(\s+)/, $line, -1;
+    while (@token > 1 && $token[-1] =~ $param_re) {
+        unshift @params, pop @token;    # the parameter
+        pop @token;                     # the whitespace ahead of it
     }
-    @params = reverse @params;
+    $line = join '', @token;
 
     # the above will "fail" (i.e. all of the line in @params) on
     # some addresses without <> like

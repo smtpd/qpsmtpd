@@ -100,6 +100,27 @@ is(($smtpd->command('MAIL FROM:<ask@perl.org>'))[0], 250, 'MAIL FROM:<ask@perl.o
 $command = 'RCPT TO:<jörg@example.com>';
 is(($smtpd->command($command))[0], 553, "$command, refused without SMTPUTF8");
 
+# RFC 5321 allows no control character in a path. A NUL that reached the
+# envelope would be written verbatim into queue/qmail-queue's NUL-delimited
+# envelope, letting the client frame extra recipient records.
+for my $ctrl ("\x00", "\x01", "\x09", "\x0d", "\x1b", "\x7f") {
+    my $name = sprintf '\x%02x', ord $ctrl;
+    is(($smtpd->command("MAIL FROM:<a\@ex${ctrl}mple.com>"))[0], 501,
+        "MAIL FROM with $name in the domain is refused");
+    is(($smtpd->command("MAIL FROM:<a${ctrl}b\@example.com>"))[0], 501,
+        "MAIL FROM with $name in the localpart is refused");
+
+    is(($smtpd->command('MAIL FROM:<ask@perl.org>'))[0], 250, 'MAIL FROM, for RCPT');
+    is(($smtpd->command("RCPT TO:<a\@ex${ctrl}mple.com>"))[0], 501,
+        "RCPT TO with $name in the domain is refused");
+}
+
+# The domain label separator is a literal dot, not any octet
+for my $sep ('!', '/', '#', ' ') {
+    is(($smtpd->command("MAIL FROM:<a\@ex${sep}mple.com>"))[0], 501,
+        "MAIL FROM with '$sep' where the dot belongs is refused");
+}
+
 $smtpd->unmock_hook('rcpt');
 $smtpd->unmock_config;
 

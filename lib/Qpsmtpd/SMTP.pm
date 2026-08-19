@@ -654,6 +654,23 @@ sub quit_respond {
     $self->disconnect();
 }
 
+# RFC 5321 4.5.3.1.4 caps a command line at 512 octets, but an AUTH exchange
+# (RFC 4954) legitimately runs past that, so use the 998 octet text line limit
+# from 4.5.3.1.6.
+our $max_command_line = 998;
+
+sub command_line_too_long {
+    my ($self, $line) = @_;
+    return 0 if !defined $line;
+    return 0 if length($line) <= $max_command_line;
+    $self->log(LOGINFO,
+               'command line of ' . length($line)
+                 . " octets exceeds $max_command_line, disconnecting");
+    $self->respond(500, 'Line too long (#5.5.2)');
+    $self->disconnect;
+    return 1;
+}
+
 sub disconnect {
     my $self = shift;
     $self->run_hooks("disconnect");

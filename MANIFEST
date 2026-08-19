@@ -208,6 +208,7 @@ t/plugin_tests/user_config
 t/plugin_tests/virus/clamdscan
 t/qpsmtpd-address.t
 t/qpsmtpd-base.t
+t/qpsmtpd-command.t
 t/qpsmtpd-config.t
 t/qpsmtpd-db-file-dbm.t
 t/qpsmtpd-db-redis.t
@@ -215,6 +216,7 @@ t/qpsmtpd-db.t
 t/qpsmtpd-plugin.t
 t/qpsmtpd-smtp.t
 t/qpsmtpd.t
+t/uribl-scaling.t
 t/queue-smtputf8.t
 t/rset.t
 t/Test/Qpsmtpd.pm

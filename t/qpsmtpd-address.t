@@ -19,6 +19,7 @@ __config();
 __parse();
 __canonify();
 __utf8();
+__control_chars();
 
 done_testing();
 
@@ -299,5 +300,59 @@ sub __utf8 {
 
     for my $ok ("<a\xc2\xa0b\@example.com>", "<a\xef\xbb\xbfb\@example.com>") {
         ok(Qpsmtpd::Address->new($ok), 'localpart is not held to U-label rules');
+    }
+}
+
+sub __control_chars {
+
+    # RFC 5321 permits no control character anywhere in a path. Before this was
+    # enforced the domain separator was an unescaped '.' -- written "\." inside
+    # a double-quoted string -- so it matched any octet, and the atom branch
+    # returned the whole localpart after matching only a prefix of it. Either
+    # route carried a NUL into $addr->address, which queue/qmail-queue writes
+    # straight into a NUL-delimited envelope.
+    my %ctrl = (
+        "\x00" => 'NUL',
+        "\x01" => 'SOH',
+        "\x07" => 'BEL',
+        "\x09" => 'TAB',
+        "\x0a" => 'LF',
+        "\x0d" => 'CR',
+        "\x1b" => 'ESC',
+        "\x1f" => 'US',
+        "\x7f" => 'DEL',
+    );
+    for my $c (sort keys %ctrl) {
+        my $name = $ctrl{$c};
+        for my $spec (
+            [ "<a\@ex${c}mple.com>",   'domain'              ],
+            [ "<a${c}b\@example.com>", 'localpart'           ],
+            [ qq{<"a${c}b"\@example.com>}, 'quoted localpart' ],
+            [ "<a\@example.com${c}>",  'end of the domain'   ],
+            [ "<${c}a\@example.com>",  'start of the path'   ],
+          )
+        {
+            my ($addr, $where) = @$spec;
+            my @r = Qpsmtpd::Address->canonify($addr);
+
+            is_deeply(\@r, [undef, undef, 'control character in path'],
+                      "canonify rejects $name in the $where")
+              or diag Data::Dumper::Dumper(@r);
+            is(Qpsmtpd::Address->new($addr), undef,
+               "new returns undef for $name in the $where");
+        }
+    }
+
+    # The separator is a literal dot again, so an arbitrary octet cannot stand
+    # in for it. These are printable, so the control-character check is not
+    # what rejects them.
+    for my $bad ('<a@example!com>', '<a@example/com>', '<a@example#com>') {
+        is(Qpsmtpd::Address->new($bad), undef,
+           "new returns undef for $bad, separator is not a wildcard");
+    }
+
+    # ... while a single label and a genuine dotted domain both still parse
+    for my $ok ('<a@examplecom>', '<a@example.com>', '<a@a.b.c.example.com>') {
+        ok(Qpsmtpd::Address->new($ok), "still parses $ok");
     }
 }
