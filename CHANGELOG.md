@@ -11,6 +11,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- config.sample/databytes, a 50MB message size limit, advertises SIZE
 - SMTPUTF8 support (RFC 6531), #346, #347
 - A 998 octet cap on SMTP command lines (RFC 5321 4.5.3.1.6)
 
@@ -21,7 +22,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - deps: drop Mail::SpamAssassin and Math::Complex from prereq; neither is loaded
 - deps(plugin): moved Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
   ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) from
-  `PREREQ_PM` to `recommends`
+  PREREQ_PM to recommends
 - postfix: disable `$qid` debug output (#345)
 - `Qpsmtpd::Address::canonify()` parses a path as one anchored match of the
   RFC 5321 grammar, in linear time. Specials such as ", (, `<` and `\` now
@@ -44,6 +45,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Qpsmtpd::Command: parsing ESMTP parameters was quadratic, now linear
+- Qpsmtpd::Address: `$qtext_expr` was RFC 2822 qtext, now RFC 5321 qtextSMTP
+- Qpsmtpd::Address: comparing an address against an unparseable string died
 - uribl: the body-scanning patterns were quadratic in line length
 - Qpsmtpd::Address: a quoted localpart may hold a space, per RFC 5321
   qtextSMTP: <"foo bar"@example.com> was rejected
