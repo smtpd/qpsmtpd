@@ -64,8 +64,10 @@ sub new {
         return if !defined $user;
     }
     elsif (!defined $host) {
-        my $address = $user;
-        ($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
+
+        # One argument is a path whether or not the client bracketed it.
+        ($user, $host) = $class->canonify("<$user>");
+        return if !defined $user;
     }
     $self->{_user} = $user;
     $self->{_host} = $host;
@@ -204,7 +206,8 @@ our $subdomain_expr =
   . '(?:(?:[-a-zA-Z0-9]|' . $utf8_expr . ')*'
   . '(?:[a-zA-Z0-9]|' . $utf8_expr . '))?)';
 our $domain_expr;
-our $qtext_expr = '[\x01-\x08\x0B\x0C\x0E-\x1F\x21\x23-\x5B\x5D-\x7F]';
+# RFC 5321 qtextSMTP = %d32-33 / %d35-91 / %d93-126.
+our $qtext_expr = '[\x20\x21\x23-\x5B\x5D-\x7E]';
 our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
 
 # RFC 6531 3.3 allows a U-label in a domain, not an arbitrary run of UTF-8.
@@ -440,13 +443,23 @@ sub _addr_cmp {
     my ($left, $right, $swap) = @_;
     my $class = ref($left);
 
-    unless (UNIVERSAL::isa($right, $class)) {
-        $right = $class->new($right);
+    if (!UNIVERSAL::isa($right, $class)) {
+        my $parsed = $class->new($right);
+
+        # new() returns undef for anything canonify rejects. Such an operand is
+        # not an address, but comparing against one must not die, so fall back
+        # to comparing its own text.
+        $right = defined $parsed  ? $parsed->format
+               : defined $right   ? $right
+               :                    '';
+    }
+    else {
+        $right = $right->format;
     }
 
     #invert the address so we can sort by domain then user
     ($left  = join('=', reverse(split(/@/, $left->format)))) =~ tr/[<>]//d;
-    ($right = join('=', reverse(split(/@/, $right->format)))) =~ tr/[<>]//d;
+    ($right = join('=', reverse(split(/@/, $right))))        =~ tr/[<>]//d;
 
     if ($swap) {
         ($right, $left) = ($left, $right);

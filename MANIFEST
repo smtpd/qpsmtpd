@@ -8,6 +8,7 @@ config.sample/badmailfrom
 config.sample/badrcptto
 config.sample/dkim/dkim_key_gen.sh
 config.sample/dnsbl_allow
+config.sample/databytes
 config.sample/dnsbl_zones
 config.sample/flat_auth_pw
 config.sample/invalid_resolvable_fromhost

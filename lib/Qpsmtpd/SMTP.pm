@@ -652,6 +652,10 @@ sub quit_respond {
         $self->respond(221, @$msg);
     }
     $self->disconnect();
+
+    # dispatch() faults with a 451 on an undefined return. Both shipped
+    # transports exit or die inside disconnect()
+    return 1;
 }
 
 # RFC 5321 4.5.3.1.4 caps a command line at 512 octets, but an AUTH exchange

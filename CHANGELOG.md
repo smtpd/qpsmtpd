@@ -11,6 +11,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- config.sample/databytes, a 50MB message size limit, advertises SIZE
 - SMTPUTF8 support (RFC 6531), #346, #347
 - A 998 octet cap on SMTP command lines (RFC 5321 4.5.3.1.6)
 
@@ -21,22 +22,22 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - deps: drop Mail::SpamAssassin and Math::Complex from prereq; neither is loaded
 - deps(plugin): moved Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
   ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) from
-  `PREREQ_PM` to `recommends`
+  PREREQ_PM to recommends
 - postfix: disable `$qid` debug output (#345)
 - doc: Changes -> CHANGELOG.md
 
 ### Fixed
 
-- `Qpsmtpd::Command`: parsing ESMTP parameters was quadratic, now linear
+- Qpsmtpd::Command: parsing ESMTP parameters was quadratic, now linear
+- Qpsmtpd::Address: `$qtext_expr` was RFC 2822 qtext, now RFC 5321 qtextSMTP
+- Qpsmtpd::Address: comparing an address against an unparseable string died
 - uribl: the body-scanning patterns were quadratic in line length
 
 ### Security
 
-- `Qpsmtpd::Address`: reject control characters anywhere in a path, per RFC 5321.
-- `Qpsmtpd::Address::new()`: an address with a newline failed the bracket match
-
-### Removed
-
+- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
+- Qpsmtpd::Address: reject control characters anywhere in a path, per RFC 5321.
+- Qpsmtpd::Address::new(): an address with a newline failed the bracket match
 
 ## [1.01] - 2026-07-13
 
