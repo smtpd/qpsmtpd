@@ -7,34 +7,37 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.02] - 2026-08-19
+
 ### Added
 
-- SMTPUTF8 support (RFC 6531), gated on the new `smtputf8` config setting (#346)
+- config.sample/databytes, a 50MB message size limit, advertises SIZE
+- SMTPUTF8 support (RFC 6531), #346, #347
 - A 998 octet cap on SMTP command lines (RFC 5321 4.5.3.1.6)
 
 ### Changed
 
-- Perl 5.32 is now the minimum supported version
-- Plugin dependencies (Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
-  ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) moved
-  from `PREREQ_PM` to `recommends`, so installing qpsmtpd no longer requires
-  every optional plugin's dependency tree
+- dep(perl): 5.32 is now the floor
+  - ci: drop 5.16 and 5.26 from testing
+- deps: drop Mail::SpamAssassin and Math::Complex from prereq; neither is loaded
+- deps(plugin): moved Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
+  ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) from
+  PREREQ_PM to recommends
 - postfix: disable `$qid` debug output (#345)
+- doc: Changes -> CHANGELOG.md
 
 ### Fixed
 
-- `Qpsmtpd::Command`: parsing ESMTP parameters was quadratic, now linear
+- Qpsmtpd::Command: parsing ESMTP parameters was quadratic, now linear
+- Qpsmtpd::Address: `$qtext_expr` was RFC 2822 qtext, now RFC 5321 qtextSMTP
+- Qpsmtpd::Address: comparing an address against an unparseable string died
 - uribl: the body-scanning patterns were quadratic in line length
 
 ### Security
 
-- `Qpsmtpd::Address`: reject control characters anywhere in a path, per RFC 5321.
-- `Qpsmtpd::Address::new()`: an address with a newline failed the bracket match
-
-### Removed
-
-- ci: drop 5.16 and 5.26 from testing
-- `Mail::SpamAssassin` and `Math::Complex` from the prereq; neither is loaded
+- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
+- Qpsmtpd::Address: reject control characters anywhere in a path, per RFC 5321.
+- Qpsmtpd::Address::new(): an address with a newline failed the bracket match
 
 ## [1.01] - 2026-07-13
 
@@ -1127,7 +1130,8 @@ The last releases on the old v0.0x branch.
 - Security: support and enable taint checking (thanks to Devin Carraway
   <qpsmtpd@devin.com>)
 
-[Unreleased]: https://github.com/smtpd/qpsmtpd/compare/v1.01...HEAD
+[Unreleased]: https://github.com/smtpd/qpsmtpd/compare/v1.02...HEAD
+[1.02]: https://github.com/smtpd/qpsmtpd/compare/v1.01...v1.02
 [1.01]: https://github.com/smtpd/qpsmtpd/compare/v1.00...v1.01
 [1.00]: https://github.com/smtpd/qpsmtpd/compare/v0.96...v1.00
 [0.96]: https://github.com/smtpd/qpsmtpd/compare/v0.95...v0.96

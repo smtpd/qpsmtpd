@@ -20,6 +20,8 @@ __parse();
 __canonify();
 __utf8();
 __control_chars();
+__cmp_safety();
+__round_trip();
 
 done_testing();
 
@@ -68,10 +70,24 @@ sub __new {
               $ao,
               'new, user=matt@test.com, deeply');
 
+    # An unbracketed argument is canonified like any other path. It used to be
+    # split naively on '@', so anything without one -- 'postmaster' included --
+    # came back as the null sender, which is a real address with bounce
+    # semantics rather than a rejection.
     $ao = Qpsmtpd::Address->new('postmaster');
-    is('<>', $ao, "new, user=postmaster, stringified");
-    is('<>', $ao->format, "new, user=postmaster, format");
-    is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
+    is('<postmaster>', $ao, "new, user=postmaster, stringified");
+    is('<postmaster>', $ao->format, "new, user=postmaster, format");
+    is_deeply(bless({_user => 'postmaster', _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
+
+    # ... and input that canonify rejects is now undef rather than a half
+    # parsed object built from a naive split
+    is(Qpsmtpd::Address->new('foo'), undef, 'new, bare word with no @');
+    is(Qpsmtpd::Address->new("a\x00b\@example.com"), undef,
+        'new, unbracketed with a NUL');
+    is(Qpsmtpd::Address->new('x@ex ample.com'), undef,
+        'new, unbracketed with a space in the domain');
+    is(Qpsmtpd::Address->new('Foo <foo@example.com>'), undef,
+        'new, unbracketed with a display name');
 
 }
 
@@ -354,5 +370,47 @@ sub __control_chars {
     # ... while a single label and a genuine dotted domain both still parse
     for my $ok ('<a@examplecom>', '<a@example.com>', '<a@a.b.c.example.com>') {
         ok(Qpsmtpd::Address->new($ok), "still parses $ok");
+    }
+}
+
+sub __cmp_safety {
+
+    # cmp is overloaded, so any string compared against an address is fed to
+    # new(). That returns undef for anything canonify rejects
+    my $addr = Qpsmtpd::Address->new('<a@example.com>');
+    for my $junk ('', 'not an address', '<<>>', "a\x00b\@c.com", 'x@ex ample.com',
+                  '@', '"', 'Foo <foo@example.com>')
+    {
+        my $r = eval { $addr eq $junk };
+        my $err = $@;
+        (my $show = $junk) =~ s/([\x00-\x1f])/sprintf("\\x%02x",ord $1)/ge;
+        is($err, '', "comparing an address with '$show' does not die");
+        ok(!$r, "  ... and does not compare equal");
+    }
+
+    my @sorted = eval { sort { $a cmp $b } map { Qpsmtpd::Address->new($_) }
+                        ('<b@example.com>', '<a@example.com>', '<a@aaa.com>') };
+    is($@, '', 'sorting addresses does not die');
+    is(scalar @sorted, 3, '  ... and keeps every element');
+}
+
+sub __round_trip {
+
+    # format() feeds Received: lines, logs and plugin comparisons, so whatever
+    # it emits has to parse back to the same thing.
+    my @addr = (
+        '<foo@example.com>', '<foo.bar@a.b.example.com>', '<postmaster>', '<>',
+        '<"foo bar"@example.com>', '<foo bar@example.com>',
+        '<"musa_ibrah@caramail.com"@wifo.ac.at>', '<a@[192.168.1.1]>',
+        "<user\@b\xc3\xbccher.example>", "<m\xc3\xbcller\@example.com>",
+        '<a-b@c-d.example.com>', '<a@examplecom>',
+    );
+    for my $as (@addr) {
+        my $ao = Qpsmtpd::Address->new($as);
+        ok($ao, "round trip: parse $as") or next;
+        my $f = $ao->format;
+        my $bo = Qpsmtpd::Address->new($f);
+        ok($bo, "  format $f re-parses") or next;
+        is($bo->format, $f, '  ... and format is idempotent');
     }
 }
