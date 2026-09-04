@@ -1,4 +1,57 @@
 
+1.00  Feb 16, 2023
+
+  Use readable file test for certificate files (#304) 
+
+  Adding IP address to logs for 535 LOGIN errors, to use with fail2ban (#301)
+
+  Add support for network ranges in whitelist plugin (#298)
+
+  Change GeoIP order (#297)
+
+  Regex fix, checkip argument & updated tld list (#283)
+
+  Support for userprefs' reject threshold (#281)
+
+  Improve RPM packaging (#276-278)
+
+  tls: fix a typo in SSL_dh_file. (#275)
+
+  Badmailfromto whitespace (#273)
+
+  Fix Can't call method 'notes' on unblessed reference in plugins/logging/file. (#272)
+
+  Use eval to get dkim policies (#268)
+
+  Check $addr is defined before using it (#266)
+
+  Check for negative strikes in karma (#265)
+
+  Dmarc policy improvements (#260-263)
+
+  Find the karma DB dir (#264)
+
+  Update data_post_headers doc (#259)
+
+  Check rua is defined before trying to parse it (#257)
+
+  Record the name of the original plugin (#256)
+
+  Make spammy_tlds configurable (#255)
+
+  Possibility to set the number of "strikes" for the karma plugin (#254)
+
+  Prevent credentials being logged in plain text (#249)
+
+  Prevent a "Use of implicit split" warning (#250)
+
+  uribl needs to hook in data_post #251
+
+  Allow setting TLS protocol versions in a config file #252
+
+  New size_limit param for spamassassin plugin #253
+
+
 0.96  Feb 16, 2016
 
   Fix DMARC authentication-result string (#244)

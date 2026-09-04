@@ -1,0 +1,19 @@
+Description: Patch for missing use statement in whitelist plugin
+Author: Andreas Erhard <erhard@wor.net>
+Origin: upstream, https://github.com/smtpd/qpsmtpd/pull/310
+Bug: https://github.com/smtpd/qpsmtpd/pull/310
+Last-Update: 2023-09-04
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: qpsmtpd/plugins/whitelist
+===================================================================
+--- qpsmtpd.orig/plugins/whitelist
++++ qpsmtpd/plugins/whitelist
+@@ -99,6 +99,7 @@ use strict;
+ use warnings;
+ 
+ use Qpsmtpd::Constants;
++use NetAddr::IP;
+ 
+ my $VERSION = 0.02;
+ 

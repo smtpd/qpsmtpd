@@ -8,7 +8,7 @@ badmailfromto - checks the badmailfromto config
 
 Much like the similar badmailfrom, this plugin references both the
 FROM: and TO: lines, and if they both are present in the badmailfromto
-config file (a tab delimited list of FROM/TO pairs), then the message is
+config file (a whitespace-delimited list of FROM/TO pairs), then the message is
 blocked as if the recipient (TO) didn't exist.  This is specifically designed
 to not give the impression that the sender is blocked (good for cases of
 harassment).
@@ -54,7 +54,7 @@ sub hook_rcpt {
     };
 
     foreach ($self->qp->config("badmailfromto")) {
-        my ($from, $to) = m/^\s*(\S+)\t(\S+).*/;
+        my ($from, $to) = m/^\s*(\S+)\s+(\S+).*/;
         if ( lc($from) eq $sender && lc($to) eq $recipient ) {
             return DENY, "mail to $recipient not accepted here";
         }

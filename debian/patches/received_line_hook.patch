@@ -1,0 +1,21 @@
+Description: Fix the received_line hook
+ When the received_line hook returned a result, the calling method
+ returned the new line instead of adding it to the header (see Debian
+ bug #933679)
+Author: Peter J. Holzer <hjp@hjp.at>
+Last-Update: 2023-08-20
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+Index: qpsmtpd/lib/Qpsmtpd/SMTP.pm
+===================================================================
+--- qpsmtpd.orig/lib/Qpsmtpd/SMTP.pm
++++ qpsmtpd/lib/Qpsmtpd/SMTP.pm
+@@ -861,7 +861,7 @@ sub received_line {
+     my ($rc, @received) =
+       $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
+     if ($rc == OK) {
+-        return join("\n", @received);
++        $header_str = join("\n", @received);
+     }
+     else {    # assume $rc == DECLINED
+         $header_str =

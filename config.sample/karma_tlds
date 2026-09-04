@@ -1,0 +1,14 @@
+# Karma to apply depending on the tld of the envelope sender
+# Used by the karma plugin
+# Warning: setting karma too low can blacklist the entire tld
+work:-4
+rocks:-3
+ninja:-3
+info:-2
+biz:-2
+pw:-2
+me:-1
+us:-5
+eu:-4
+link:-3
+science:-6

@@ -1,7 +1,8 @@
-diff -aruN qpsmtpd-0.94.orig/plugins/auth/auth_ldap_bind qpsmtpd-0.94/plugins/auth/auth_ldap_bind
---- qpsmtpd-0.94.orig/plugins/auth/auth_ldap_bind	2014-09-05 20:14:28.000000000 -0700
-+++ qpsmtpd-0.94/plugins/auth/auth_ldap_bind	2014-10-29 00:01:04.914170133 -0700
-@@ -81,7 +81,7 @@
+Index: qpsmtpd/plugins/auth/auth_ldap_bind
+===================================================================
+--- qpsmtpd.orig/plugins/auth/auth_ldap_bind
++++ qpsmtpd/plugins/auth/auth_ldap_bind
+@@ -81,7 +81,7 @@ Please see the LICENSE file included wit
  use strict;
  use warnings;
  
@@ -10,3 +11,12 @@ diff -aruN qpsmtpd-0.94.orig/plugins/auth/auth_ldap_bind qpsmtpd-0.94/plugins/au
  use Qpsmtpd::Constants;
  
  sub register {
+@@ -173,7 +173,7 @@ sub authldap {
+     $ldh->unbind if $ldh;
+ 
+     # bind against directory as user with password supplied
+-    if (!$mesg->count || $lduserdn = $mesg->entry->dn) {
++    if (!$mesg->count or $lduserdn = $mesg->entry->dn) {
+         $self->log(LOGALERT, "fail: user not found");
+         return DECLINED, "authldap - wrong username or password";
+     }

@@ -1,23 +1,23 @@
 # Translation of qpsmtpd debconf template to Swedish
-# Copyright (C) 2010 Martin Bagge <brother@bsnet.se>
-# This file is distributed under the same license as the XX package.
+# Copyright (C) 2021 Martin Bagge <brother@persilja.net>
+# This file is distributed under the same license as the qpsmtpd package.
 #
 # Martin Ågren <martin.agren@gmail.com>, 2008.
-# Martin Bagge <brother@bsnet.se>, 2010
+# Martin Bagge <brother@persilja.net>, 2010, 2021
+# Anders Jonsson <anders.jonsson@norsjovallen.se>, 2021
 msgid ""
 msgstr ""
 "Project-Id-Version: qpsmtpd_0.40-2_sv\n"
 "Report-Msgid-Bugs-To: qpsmtpd@packages.debian.org\n"
 "POT-Creation-Date: 2019-01-11 10:02+0100\n"
-"PO-Revision-Date: 2010-01-07 22:54+0100\n"
-"Last-Translator: Martin Bagge <brother@bsnet.se>\n"
+"PO-Revision-Date: 2021-09-13 14:02+0200\n"
+"Last-Translator: Martin Bagge <brother@persilja.net>\n"
 "Language-Team: Swedish <debian-l10n-swedish@lists.debian.org>\n"
 "Language: sv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Poedit-Language: Swedish\n"
-"X-Poedit-Country: Sweden\n"
+"X-Generator: Poedit 3.0\n"
 
 #. Type: boolean
 #. Description
@@ -83,7 +83,7 @@ msgid ""
 msgstr ""
 "Qpsmtpd har stöd för två typer av processmodeller för att hantera "
 "anslutningar. Modellen \"forkserver\" innebär att en enda process skapar nya "
-"processer som hanterar inkommande anslutningr. Denna metod använder mindre "
+"processer som hanterar inkommande anslutningar. Denna metod använder mindre "
 "minne men resulterar i något lägre hastighet för genomströmningen. Modellen "
 "\"prefork\" skapar en pool med väntande processer som hanterar inkommande "
 "processer, denna metod ger något snabbare genomströmningshastighet men "
@@ -300,7 +300,7 @@ msgstr ""
 #. Description
 #: ../qpsmtpd.templates:9001
 msgid "Incompatible upstream naming of check_* plugins"
-msgstr ""
+msgstr "Felaktig namngivning av insticken som hette check_*"
 
 #. Type: note
 #. Description
@@ -311,3 +311,8 @@ msgid ""
 "are shipped in this release, but will be removed in the future; see /usr/"
 "share/doc/qpsmtpd/plugins/README.check_plugins for upgrade instructions."
 msgstr ""
+"I och med version 0.94 har namnen på insticken check_* bytt namn och tagit "
+"bort prefixet check_*, utöver att ha fått nya versioner. Enkla lösningar för "
+"att fortsätta använda de äldre namnen finns med i detta paket men de kommer "
+"att tas bort i framtida versioner av paketet, läs mer om detta i /usr/share/"
+"doc/qsmtpd/plugins/README.check_plugins för information om uppgradering."

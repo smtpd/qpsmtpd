@@ -7,7 +7,7 @@ Standards-Version: 3.9.6
 
 Package: qpsmtpd
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}, debconf (>= 1.0.0), adduser (>= 3.0), libdigest-hmac-perl, libmail-spf-perl (>= 2.8.0), libnet-dns-perl, libnet-perl, libmailtools-perl, libipc-shareable-perl, libclamav-client-perl, libsocket6-perl, libio-socket-inet6-perl, lsb-base
+Depends: ${misc:Depends}, ${perl:Depends}, debconf (>= 1.0.0), adduser (>= 3.0), libdigest-hmac-perl, libmail-spf-perl (>= 2.8.0), libnet-dns-perl, libnet-perl, libmailtools-perl, libipc-shareable-perl, libclamav-client-perl, libsocket6-perl, libio-socket-inet6-perl, lsb-base, libnetaddr-ip-perl
 Suggests: spamassassin (>= 3.0.0), clamav-daemon, tinycdb, libnet-ldap-perl
 Homepage: http://smtpd.develooper.com/
 Description: Flexible SMTP daemon for network-level spam detection

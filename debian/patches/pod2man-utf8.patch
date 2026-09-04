@@ -1,7 +1,8 @@
-diff -aru qpsmtpd-0.94.orig/lib/Qpsmtpd.pm qpsmtpd-0.94/lib/Qpsmtpd.pm
---- qpsmtpd-0.94.orig/lib/Qpsmtpd.pm	2014-09-05 20:14:28.000000000 -0700
-+++ qpsmtpd-0.94/lib/Qpsmtpd.pm	2014-09-16 23:56:24.783290009 -0700
-@@ -674,6 +674,8 @@
+Index: qpsmtpd/lib/Qpsmtpd.pm
+===================================================================
+--- qpsmtpd.orig/lib/Qpsmtpd.pm
++++ qpsmtpd/lib/Qpsmtpd.pm
+@@ -456,6 +456,8 @@ sub address {
  
  __END__
  

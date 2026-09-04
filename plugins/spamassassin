@@ -32,7 +32,7 @@ the options.  Confused yet?  :-)  It looks like this in practice:
 
 =over 4
 
-=item reject [threshold]
+=item reject [threshold|userprefs]
 
 Set the threshold where the plugin will reject the mail.  Some
 mail servers are so useless that they ignore 55x responses not coming
@@ -41,6 +41,10 @@ retrying until the mail expires from their queue.
 
 Depending on your spamassassin configuration a reasonable setting is
 typically somewhere between 12 to 20.
+
+By setting reject = userprefs, the required threshold will be taken
+from spamassassin userprefs. Usually used in conjunction with
+spamd_user = vpopmail.
 
 The default is to never reject mail based on the SpamAssassin score.
 
@@ -95,6 +99,11 @@ If SpamAssasin has certain network tests enabled, users may get elevated spam
 scores because their dynamic IP space is properly listed on DUL blocking lists.
 If the user is authenticated or coming from a trusted IP, odds are we don't
 want to be reject their messages. Especially when running qpsmtpd on port 587.
+
+=item size_limit [limit]
+
+Set the maximum email size in bytes to scan. Above this limit, no scan will be
+done by spamd. The default value is 500_000
 
 =back
 
@@ -172,7 +181,8 @@ sub data_post_handler {
 
     return DECLINED if $self->is_immune();
 
-    if ($transaction->data_size > 500_000) {
+    my $limit = $self->{_args}->{size_limit} || 500_000;
+    if ($transaction->data_size > $limit) {
         $self->log(LOGINFO,
                    "skip, too large (" . $transaction->data_size . ")");
         return DECLINED;
@@ -418,6 +428,13 @@ sub reject {
         return DECLINED;
     };
 
+    if ($reject eq 'userprefs') {
+        $reject = $sa_results->{required} or do {
+            $self->log(LOGERROR, "error, reject disabled ($status, $learn)");
+            return DECLINED;
+        };
+    }
+    
     if ($score < $reject) {
         if ($ham_or_spam eq 'Spam') {
             $self->log(LOGINFO, "fail, tolerated, $status < $reject, $learn");

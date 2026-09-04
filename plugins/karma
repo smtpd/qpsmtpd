@@ -50,6 +50,16 @@ With the default negative limit of one, there's a very small chance you could
 penalize a "mostly good" sender. Raising it to 2 reduces that possibility to
 improbable.
 
+=head2 strikes <integer>
+
+How many strikes are needed to consider the connection nice or naughty.
+Various plugins can adjust the karma (see USING KARMA IN OTHER PLUGINS).
+For example, with the default value of 3, if the karma of this message is 3
+or above, the connection is considered to be a nice one. If it's -3 or less,
+it's considered a naughty one. Between -2 and +2 it's neutral
+
+Default: 3
+
 =head2 penalty_days <days>
 
 The number of days a naughty sender is refused connections. Use a decimal
@@ -91,6 +101,20 @@ following list will be used:
 =head2 loglevel
 
 Adjust the quantity of logging for this plugin. See docs/logging.pod
+
+=head1 CONFIG FILES
+
+This plugin uses the following configuration files. All are optional.
+
+=head2 karma_tlds
+
+This file can contain semicolon separated tlds and the corresponding
+karma adjustment to apply when the envelope sender match. It can be used to
+penalize "spammy" tlds, or to raise the karma from (mostly) good tlds.
+
+jp:-4
+ch:-3
+fr:+1
 
 =head1 BENEFITS
 
@@ -238,6 +262,7 @@ sub register {
     $self->log(LOGERROR, "Bad arguments") if @_ % 2;
     $self->{_args} = {@_};
     $self->{_args}{negative}     ||= 1;
+    $self->{_args}{strikes}      ||= 3;
     $self->{_args}{penalty_days} ||= 1;
     $self->{_args}{reject_type}  ||= 'disconnect';
 
@@ -341,18 +366,14 @@ sub from_handler {
     my $full_from = $self->connection->notes('envelope_from');
     $self->illegal_envelope_format( $full_from );
 
-    my %spammy_tlds = (
-            map { $_ => 4 } qw/ info pw /,
-            map { $_ => 3 } qw/ tw biz /,
-            map { $_ => 2 } qw/ cl br fr be jp no se sg /,
-            );
-    foreach my $tld ( keys %spammy_tlds ) {
+    my $karma_tlds = $self->get_karma_tlds() or return DECLINED;
+    foreach my $tld ( keys %$karma_tlds ) {
         my $len = length $tld;
-        my $score = $spammy_tlds{$tld} or next;
+        my $score = $karma_tlds->{$tld} or next;
         $len ++;
         if ( $sender->host && ".$tld" eq substr($sender->host,-$len,$len) ) {
-            $self->log(LOGINFO, "penalizing .$tld envelope sender");
-            $self->adjust_karma(-$score);
+            $self->log(LOGINFO, "adjusting karma for .$tld envelope sender");
+            $self->adjust_karma($score);
         }
     }
 
@@ -428,7 +449,7 @@ sub disconnect_handler {
     my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
-    if ($karma < -2) {    # they achieved at least 2 strikes
+    if ($karma <= -$self->{_args}{strikes}) {    # Enough negative strikes ?
         $history--;
         my $negative_limit = 0 - $self->{_args}{negative};
         if ($history <= $negative_limit) {
@@ -445,7 +466,7 @@ sub disconnect_handler {
             $log_mess = "negative";
         }
     }
-    elsif ($karma > 2) {
+    elsif ($karma >= $self->{_args}{strikes}) {
         $nice++;
         $log_mess = "positive";
     }
@@ -466,6 +487,19 @@ sub illegal_envelope_format {
         $self->log(LOGINFO, "illegal envelope address format: $addr" );
         $self->adjust_karma(-2);
     }
+}
+
+sub get_karma_tlds {
+    my $self = shift;
+
+    my %karma_tlds =
+      map { (split /:/, $_, 2)[0, 1] } $self->qp->config('karma_tlds');
+    if (!%karma_tlds) {
+        $self->log(LOGDEBUG, "no specific karma for tlds defined");
+        return;
+    }
+
+    return \%karma_tlds;
 }
 
 sub parse_db_record {

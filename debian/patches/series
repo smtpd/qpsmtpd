@@ -1,3 +1,6 @@
+forkserver_pre-connection_hook.patch
+whitelist_plugin.patch
 pod2man-utf8.patch
 auth_ldap_bind-syntax.patch
 pre0.94-checkplugins.patch
+received_line_hook.patch

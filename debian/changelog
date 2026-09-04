@@ -1,3 +1,29 @@
+qpsmtpd (1.00) unstable; urgency=medium
+  
+   * New upstream release.  1.00 has many upstream changes.
+     See UPGRADING.md for more details.
+
+ -- Andreas Erhard <erhard@wor.net>  Tue, 29 Aug 2023 14:30:21 +0200
+
+qpsmtpd (0.94-6) unstable; urgency=medium
+
+  * QA upload.
+  * Prepend header properly. (Closes: #933679)
+
+ -- Peter J. Holzer <hjp@hjp.at>  Sun, 20 Aug 2023 21:32:18 +0200
+
+qpsmtpd (0.94-5) unstable; urgency=medium
+
+  * QA upload.
+  * Update Italian debconf translation from Beatrice Torracca. (Closes:
+    #952803)
+  * Update Swedish debconf translation from Martin Bagge / brother and Anders
+    Jonsson. (Closes: #994185)
+  * Add Brazilian Portuguese debconf translation from Paulo Henrique de Lima
+    Santana. (Closes: #1025723)
+
+ -- Helge Kreutzmann <debian@helgefjell.de>  Sun, 26 Feb 2023 07:27:27 +0100
+
 qpsmtpd (0.94-4) unstable; urgency=medium
 
   * QA upload.

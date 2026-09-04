@@ -145,8 +145,8 @@ sub register {
 
 sub load_geoip {
     my ( $self ) = @_;
-    $self->load_geoip1() and return 1;
     $self->load_geoip2() and return 1;
+    $self->load_geoip1() and return 1;
     return 0;
 }
 

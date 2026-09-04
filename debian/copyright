@@ -29,20 +29,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 Translations:
-nl.po (C) 2014,2018 by Frans Spiesschaert <Frans.Spiesschaert@yucom.be>
-fr.po (C) 2006,2015 by Steve Petruzzello <dlist@bluewin.ch>
+cs.po (C) 2010 by Miroslav Kure <kurem@debian.cz>
 da.po (C) 2012,2015 by Joe Hansen <joedalton2@yahoo.dk>
 de.po (C) 2007,2009,2016 by Helge Kreutzmann <debian@helgefjell.de>
+es.po (C) 2010 by Francisco Javier Cuadrado <fcocuadrado@gmail.com>
+fr.po (C) 2006,2015 by Steve Petruzzello <dlist@bluewin.ch>
+it.po (C) 2012,2020 by Beatrice Torracca <beatricet@libero.it>
 ja.po (C) 2013 by victory <victory.deb@gmail.com>
           2016 by Takuma Yamada <tyamada@takumayamada.com>
+nl.po (C) 2014,2018 by Frans Spiesschaert <Frans.Spiesschaert@yucom.be>
 pt.po (C) 2010 by Tiago Fernandes <tjg.fernandes@gmail.com>
           2017 by Rui Branco - DebianPT <ruipb@debianpt.org>
 	  2017 by Tiago Fernandes <tjg.fernandes@gmail.com>
+pt_BR.po (C) 2022 Paulo Henrique de Lima Santana <phls@debian.org>
 ru.po (C) 2009 by Sergey Alyoshin <alyoshin.s@gmail.com>
           2009,2019 by Yuri Kozlov <yuray@komyakino.ru>
-cs.po (C) 2010 by Miroslav Kure <kurem@debian.cz>
-es.po (C) 2010 by Francisco Javier Cuadrado <fcocuadrado@gmail.com>
-it.po (C) 2012 by Beatrice Torracca <beatricet@libero.it>
 sk.po (C) 2012 by Slavko <linux@slavino.sk>
 sv.po (C) 2008 by Martin Ågren <martin.agren@gmail.com>
-      (C) 2010 by Martin Bagge <brother@bsnet.se>
+      (C) 2010,2021 by Martin Bagge <brother@bsnet.se>
+      (C) 2021 Anders Jonsson <anders.jonsson@norsjovallen.se>
