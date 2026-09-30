@@ -72,109 +72,34 @@ sub new {
     return bless $self, $class;
 }
 
-# Definition of an address ("path") from RFC 2821:
+# The path grammar, RFC 5321 4.1.2 with the RFC 6531 3.3 extensions:
 #
-#   Path = "<" [ A-d-l ":" ] Mailbox ">"
+#   Path            = "<" [ A-d-l ":" ] Mailbox ">"
+#   A-d-l           = At-domain *( "," At-domain )   ; source route, ignored
+#   At-domain       = "@" Domain
+#   Mailbox         = Local-part "@" ( Domain / address-literal )
+#   Local-part      = Dot-string / Quoted-string
+#   Dot-string      = Atom *( "." Atom )
+#   Atom            = 1*atext                        ; 6531: / UTF8-non-ascii
+#   Quoted-string   = DQUOTE *QcontentSMTP DQUOTE
+#   QcontentSMTP    = qtextSMTP / quoted-pairSMTP
+#   qtextSMTP       = %d32-33 / %d35-91 / %d93-126   ; 6531: / UTF8-non-ascii
+#   quoted-pairSMTP = %d92 %d32-126
+#   Domain          = sub-domain *( "." sub-domain )
+#   sub-domain      = Let-dig [ Ldh-str ]            ; 6531: / U-label
 #
-#   A-d-l = At-domain *( "," A-d-l )
-#       ; Note that this form, the so-called "source route",
-#       ; MUST BE accepted, SHOULD NOT be generated, and SHOULD be
-#       ; ignored.
-#
-#   At-domain = "@" domain
-#
-#   Mailbox = Local-part "@" Domain
-#
-#   Local-part = Dot-string / Quoted-string
-#       ; MAY be case-sensitive
-#
-#   Dot-string = Atom *("." Atom)
-#
-#   Atom = 1*atext
-#
-#   Quoted-string = DQUOTE *qcontent DQUOTE
-#
-#   Domain = (sub-domain 1*("." sub-domain)) / address-literal
-#   sub-domain = Let-dig [Ldh-str]
-#
-#   address-literal = "[" IPv4-address-literal /
-#                     IPv6-address-literal /
-#                     General-address-literal "]"
-#
-#   IPv4-address-literal = Snum 3("." Snum)
-#   IPv6-address-literal = "IPv6:" IPv6-addr
-#   General-address-literal = Standardized-tag ":" 1*dcontent
-#   Standardized-tag = Ldh-str
-#         ; MUST be specified in a standards-track RFC
-#         ; and registered with IANA
-#
-#   Snum = 1*3DIGIT  ; representing a decimal integer
-#         ; value in the range 0 through 255
-#   Let-dig = ALPHA / DIGIT
-#   Ldh-str = *( ALPHA / DIGIT / "-" ) Let-dig
-#
-#   IPv6-addr = IPv6-full / IPv6-comp / IPv6v4-full / IPv6v4-comp
-#   IPv6-hex  = 1*4HEXDIG
-#   IPv6-full = IPv6-hex 7(":" IPv6-hex)
-#   IPv6-comp = [IPv6-hex *5(":" IPv6-hex)] "::" [IPv6-hex *5(":"
-#          IPv6-hex)]
-#         ; The "::" represents at least 2 16-bit groups of zeros
-#         ; No more than 6 groups in addition to the "::" may be
-#         ; present
-#   IPv6v4-full = IPv6-hex 5(":" IPv6-hex) ":" IPv4-address-literal
-#   IPv6v4-comp = [IPv6-hex *3(":" IPv6-hex)] "::"
-#            [IPv6-hex *3(":" IPv6-hex) ":"] IPv4-address-literal
-#         ; The "::" represents at least 2 16-bit groups of zeros
-#         ; No more than 4 groups in addition to the "::" and
-#         ; IPv4-address-literal may be present
-#
-#
-#
-# atext and qcontent are not defined in RFC 2821.
-# From RFC 2822:
-#
-# atext           =       ALPHA / DIGIT / ; Any character except controls,
-#                         "!" / "#" /     ;  SP, and specials.
-#                         "$" / "%" /     ;  Used for atoms
-#                         "&" / "'" /
-#                         "*" / "+" /
-#                         "-" / "/" /
-#                         "=" / "?" /
-#                         "^" / "_" /
-#                         "`" / "{" /
-#                         "|" / "}" /
-#                         "~"
-# qtext           =       NO-WS-CTL /     ; Non white space controls
-#
-#                         %d33 /          ; The rest of the US-ASCII
-#                         %d35-91 /       ;  characters not including "\"
-#                         %d93-126        ;  or the quote character
-#
-# qcontent        =       qtext / quoted-pair
-#
-# NO-WS-CTL       =       %d1-8 /         ; US-ASCII control characters
-#                         %d11 /          ;  that do not include the
-#                         %d12 /          ;  carriage return, line feed,
-#                         %d14-31 /       ;  and white space characters
-#                         %d127
-#
-# quoted-pair     =       ("\" text) / obs-qp
-#
-# text            =       %d1-9 /         ; Characters excluding CR and LF
-#                         %d11 /
-#                         %d12 /
-#                         %d14-127 /
-#                         obs-text
-#
-#
-# (We ignore all obs forms)
+# Beyond the grammar, an unquoted localpart may also hold empty atoms and
+# spaces: <a..b@example>, <a.@example>, <ask @example>. Japanese mobile
+# carriers issued addresses of the first two forms for years, and broken
+# clients send the third. They are accepted as if quoted, and format()
+# quotes them on the way out.
 
 =head2 canonify()
 
 Primarily an internal method, it is used only on the path portion of
-an e-mail message, as defined in RFC-2821 (this is the part inside the
+an e-mail message, as defined in RFC 5321 (this is the part inside the
 angle brackets and does not include the "human readable" portion of an
-address).  It returns a list of (local-part, domain).
+address).  It returns a list of (local-part, domain, reason).
 
 =cut
 
@@ -204,8 +129,8 @@ our $subdomain_expr =
   . '(?:(?:[-a-zA-Z0-9]|' . $utf8_expr . ')*'
   . '(?:[a-zA-Z0-9]|' . $utf8_expr . '))?)';
 our $domain_expr;
-our $qtext_expr = '[\x01-\x08\x0B\x0C\x0E-\x1F\x21\x23-\x5B\x5D-\x7F]';
-our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
+our $qtext_expr = '[\x20\x21\x23-\x5B\x5D-\x7E]';
+our $text_expr  = '[\x20-\x7E]';
 
 # RFC 6531 3.3 allows a U-label in a domain, not an arbitrary run of UTF-8.
 # These categories are DISALLOWED by IDNA2008 (RFC 5892) yet are well-formed
@@ -223,81 +148,87 @@ our $domain_disallowed_expr = qr/[\p{Zs}\p{Zl}\p{Zp}\p{Cc}\p{Cf}\p{Co}]/;
 sub canonify {
     my ($dummy, $path) = @_;
 
-    # strip delimiters
-    if ($path !~ /^<(.*)>$/s) {    # /s, so the control check below sees a newline
+    if ($path !~ /^<(.*)>\z/s) {
         return undef, undef, 'missing delimiters'; ## no critic (undef)
-    };
+    }
     $path = $1;
 
-    # RFC 5321 qtextSMTP/quoted-pairSMTP/atext are all printable ASCII: no
-    # control character is legal anywhere in a path, quoted or not. The atom
-    # match below is deliberately lenient about what it returns, so an
-    # unchecked NUL reaches the queue plugins -- and qmail-queue writes a
-    # NUL-delimited envelope.
-    if ($path =~ /[\x00-\x1F\x7F]/) {
-        return undef, undef, 'control character in path'; ## no critic (undef)
+    return '', undef, 'empty path' if $path eq '';
+
+    # RFC 5321 4.5.1
+    return 'postmaster', undef, 'bare postmaster' if $path =~ /^postmaster\z/i;
+
+    my $domain_re = _domain_re();
+    if ($path !~ /^${\ _path_re($domain_re)}\z/) {
+        return undef, undef, _why_invalid($path, $domain_re); ## no critic (undef)
     }
+    my ($quoted, $unquoted, $domain) = @+{qw(quoted unquoted domain)};
 
-    # RFC 6531: non-ASCII is only ever legal as well-formed UTF-8. Check the
-    # whole path up front, because the atom match below is deliberately
-    # lenient and would otherwise let malformed octets through.
-    if ($path =~ /[\x80-\xFF]/ && $path !~ /^(?:[\x00-\x7F]|$utf8_expr)*$/) {
-        return undef, undef, 'malformed UTF-8'; ## no critic (undef)
-    }
-
-    # NB: the label separator must survive double-quote interpolation. Written
-    # as "\." it collapses to a bare dot and matches any octet, which let
-    # control characters -- NUL included -- through into the domain.
-    my $domain_re = $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
-
-    # $address_literal_expr may be empty, if a site doesn't allow them
-    if (!$domain_expr && $address_literal_expr) {
-        $domain_re = "(?:$address_literal_expr|$domain_re)";
-    };
-
-    # strip source route
-    $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
-
-    # empty path is ok
-    if ($path eq '') {
-        return '', undef, 'empty path';
-    };
-
-    # bare postmaster is permissible, per RFC-2821 (4.5.1)
-    if ( $path =~ m/^postmaster$/i ) {
-        return 'postmaster', undef, 'bare postmaster';
-    }
-
-    my ($localpart, $domainpart) = $path =~ /^(.*)\@($domain_re)$/;
-    if (!defined $localpart) {
-        return;
-    };
-
-    if (defined $domainpart && $domainpart =~ /[\x80-\xFF]/) {
-        my $decoded = $domainpart;
+    if ($domain =~ /[\x80-\xFF]/) {
+        my $decoded = $domain;
         utf8::decode($decoded);
         if ($decoded =~ $domain_disallowed_expr) {
             return undef, undef, 'disallowed in domain'; ## no critic (undef)
         }
     }
 
+    if (defined $quoted) {
+        $quoted =~ s/\\($text_expr)/$1/g;
+        return $quoted, $domain, 'quoted string';
+    }
+    if ($unquoted =~ / |\.\.|\.\z/) {
+        return $unquoted, $domain, 'lenient localpart';
+    }
+    return $unquoted, $domain, 'local matches atom';
+}
+
+sub _domain_re {
+
+    # NB: the label separator must survive double-quote interpolation. Written
+    # as "\." it collapses to a bare dot and matches any octet.
+    my $domain_re = $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
+
+    # $address_literal_expr may be empty, if a site doesn't allow them
+    if (!$domain_expr && $address_literal_expr) {
+        $domain_re = "(?:$address_literal_expr|$domain_re)";
+    }
+    return $domain_re;
+}
+
+# The unquoted form matches the lenient superset of Dot-string, which canonify
+# tells apart after the match. The first octet then picks the only localpart
+# alternative that can apply, and the group is atomic, so a domain that fails
+# to match is never retried against a shorter localpart: parse time stays
+# linear in the length of the path. The pattern string is identical from call
+# to call unless a site overrides a component, so perl compiles it only once.
+sub _path_re {
+    my ($domain_re) = @_;
+    my $qcontent = "(?:$qtext_expr|$utf8_expr|\\\\$text_expr)";
+    return "(?:\@$domain_re(?:,\@$domain_re)*:)?"
+      . '(?>'
+      . "\"(?<quoted>$qcontent*+)\""
+      . "|(?<unquoted>$atom_expr(?:$atom_expr|[. ])*+)"
+      . ')'
+      . "\@(?<domain>$domain_re)";
+}
+
+# Only reached once the grammar has already rejected the path, to say why.
+sub _why_invalid {
+    my ($path, $domain_re) = @_;
+
+    return 'control character in path' if $path =~ /[\x00-\x1F\x7F]/;
+
+    if ($path =~ /[\x80-\xFF]/ && $path !~ /^(?:[\x00-\x7F]|$utf8_expr)*+\z/) {
+        return 'malformed UTF-8';
+    }
+
     # '@' is a special, not atext: only a quoted localpart may carry one. The
-    # atom match below is lenient about what follows the first atom, so
-    # without this <a@b@example.com> got through with the localpart "a@b".
-    if ($localpart =~ /\@/ && $localpart !~ /^"/) {
-        return undef, undef, 'unquoted @ in localpart'; ## no critic (undef)
-    }
+    # domain cannot hold an '@' either, so the separator is the last one.
+    $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
+    my $localpart = substr $path, 0, rindex($path, '@');
+    return 'unquoted @ in localpart' if $localpart =~ /\@/ && $localpart !~ /^"/;
 
-    if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
-        return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
-    }
-
-    if ($localpart =~ /^"(($qtext_expr|$utf8_expr|\\$text_expr)*)"$/) {
-        $localpart = $1;
-        $localpart =~ s/\\($text_expr)/$1/g;
-        return $localpart, $domainpart;
-    }
-    return undef, undef, 'fall through';  ## no critic (undef)
+    return 'syntax error';
 }
 
 sub parse {

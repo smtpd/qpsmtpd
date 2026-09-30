@@ -14,6 +14,8 @@ BEGIN {
     use_ok('Test::Qpsmtpd');
 }
 
+use Time::HiRes qw(time);
+
 __new();
 __config();
 __parse();
@@ -21,6 +23,8 @@ __canonify();
 __utf8();
 __control_chars();
 __unquoted_at();
+__grammar();
+__linear_time();
 
 done_testing();
 
@@ -212,7 +216,7 @@ sub __canonify {
     is_deeply(\@r, [ 'postmáster', 'test', 'local matches atom' ], 'canonify, postmáster@test, local matches atom');
 
     @r = Qpsmtpd::Address->canonify('<@192.168.1.1>');
-    is_deeply(\@r, [ undef, undef, 'fall through' ], 'canonify, fall through, @192.168.1.1')
+    is_deeply(\@r, [ undef, undef, 'syntax error' ], 'canonify, syntax error, @192.168.1.1')
         or diag Data::Dumper::Dumper(@r);
 }
 
@@ -386,7 +390,7 @@ sub __unquoted_at {
     $ao = Qpsmtpd::Address->new('<@r1.example,@r2.example:u@example.com>');
     is($ao && $ao->address, 'u@example.com', 'source route is still stripped');
 
-    # the rest of the lenient localpart handling is unchanged
+    # the documented leniency survives
     for my $ok ('<a.@example.com>', '<a..b@example.com>', '<a b@example.com>') {
         ok(Qpsmtpd::Address->new($ok), "still parses $ok");
     }
@@ -398,4 +402,74 @@ sub __unquoted_at {
        'MAIL FROM:<a@b@example.com> gets 501');
     is(($qp->command('MAIL FROM:<"a@b"@example.com>'))[0], 250,
        'MAIL FROM:<"a@b"@example.com> is still accepted');
+}
+
+sub __grammar {
+
+    # specials are only legal inside a quoted localpart (RFC 5321 4.1.2)
+    for my $bad ('<a"b@example.com>', '<a(b@example.com>', '<a)b@example.com>',
+                 '<a<b@example.com>', '<a>b@example.com>', '<a,b@example.com>',
+                 '<a;b@example.com>', '<a:b@example.com>', '<a[b@example.com>',
+                 '<a]b@example.com>', '<a\\b@example.com>', '<.a@example.com>',
+                 '<"a"b@example.com>', '<"a@example.com>')
+    {
+        my @r = Qpsmtpd::Address->canonify($bad);
+        is_deeply(\@r, [undef, undef, 'syntax error'], "canonify rejects $bad")
+          or diag Data::Dumper::Dumper(@r);
+    }
+
+    # qtextSMTP includes SP, so a quoted space needs no backslash
+    my $ao = Qpsmtpd::Address->new('<"foo bar"@example.com>');
+    ok($ao, 'new <"foo bar"@example.com>');
+    is($ao && $ao->user,   'foo bar',                  'user keeps its space');
+    is($ao && $ao->format, '<"foo\ bar"@example.com>', 'format re-quotes it');
+
+    my %parsed = (
+        '<"a\"b"@example.com>'  => ['a"b',   'example.com', 'quoted string'],
+        '<"a.b"@example.com>'   => ['a.b',   'example.com', 'quoted string'],
+        '<a..b@example.com>'    => ['a..b',  'example.com', 'lenient localpart'],
+        '<a.@example.com>'      => ['a.',    'example.com', 'lenient localpart'],
+        '<ask @perl.org>'       => ['ask ',  'perl.org',    'lenient localpart'],
+        '<a.b-c@example.com>'   => ['a.b-c', 'example.com', 'local matches atom'],
+        '<a@[IPv6:2001:db8::1]>' => ['a', '[IPv6:2001:db8::1]', 'local matches atom'],
+    );
+    for my $path (sort keys %parsed) {
+        my @r = Qpsmtpd::Address->canonify($path);
+        is_deeply(\@r, $parsed{$path}, "canonify $path")
+          or diag Data::Dumper::Dumper(@r);
+    }
+
+    # a source route leads a mailbox; it is not a path of its own
+    for my $bad ('<@a.example:>', '<@a.example:postmaster>') {
+        my @r = Qpsmtpd::Address->canonify($bad);
+        is_deeply(\@r, [undef, undef, 'syntax error'], "canonify rejects $bad");
+    }
+
+    my @r = Qpsmtpd::Address->canonify("<a\@example.com>\n");
+    is_deeply(\@r, [undef, undef, 'missing delimiters'],
+              'canonify rejects a newline after the closing bracket');
+}
+
+sub __linear_time {
+
+    # Every one of these fails, which is where a backtracking parser goes
+    # quadratic or worse. Linear is milliseconds at this size.
+    my $n = 20_000;
+    my %attack = (
+        'long localpart, bad character' => '<' . ('a' x $n) . '(@example.com>',
+        'dotted localpart, bad domain'  => '<' . ('a.' x $n) . 'a@' . ('a' x $n) . '!>',
+        'many unquoted @'               => '<' . ('a@' x $n) . 'example.com!>',
+        'unclosed quote'                => '<"' . ('a' x $n) . '@example.com>',
+        'source route, no mailbox'      => '<' . ('@a,' x $n) . '>',
+        'domain ending in a hyphen'     => '<a@' . ('a-' x $n) . '>',
+        'domain ending in a dot'        => '<a@' . ('a.' x $n) . '>',
+        'labels, bad last character'    => '<a@' . ('ab.' x $n) . 'a!>',
+    );
+    for my $name (sort keys %attack) {
+        my $start = time;
+        my ($user) = Qpsmtpd::Address->canonify($attack{$name});
+        my $elapsed = time - $start;
+        ok(!defined $user, "rejects $name");
+        cmp_ok($elapsed, '<', 1, sprintf('%s: %.3fs', $name, $elapsed));
+    }
 }
