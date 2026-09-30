@@ -20,6 +20,7 @@ __parse();
 __canonify();
 __utf8();
 __control_chars();
+__unquoted_at();
 
 done_testing();
 
@@ -355,4 +356,46 @@ sub __control_chars {
     for my $ok ('<a@examplecom>', '<a@example.com>', '<a@a.b.c.example.com>') {
         ok(Qpsmtpd::Address->new($ok), "still parses $ok");
     }
+}
+
+sub __unquoted_at {
+
+    # '@' is not atext (RFC 5321 4.1.2, RFC 5322 3.2.3): outside a quoted
+    # localpart the only legal '@' separates the localpart from the domain.
+    # The atom branch only matches a prefix of the localpart, so these used
+    # to be accepted with everything before the last '@' as the localpart.
+    for my $bad ('<a@b@example.com>', '<a@@example.com>',
+                 '<a@b.de@example.com>', '<a%b@c@example.com>',
+                 '<x"@"y@example.com>', '<a@b@[192.168.1.1]>',
+                 '<@r1.example:a@b@example.com>')
+    {
+        my @r = Qpsmtpd::Address->canonify($bad);
+        is_deeply(\@r, [undef, undef, 'unquoted @ in localpart'],
+                  "canonify rejects $bad")
+          or diag Data::Dumper::Dumper(@r);
+        is(Qpsmtpd::Address->new($bad), undef, "new returns undef for $bad");
+    }
+
+    # the quoted form is legal and must keep working
+    my $ao = Qpsmtpd::Address->new('<"a@b"@example.com>');
+    ok($ao, 'new <"a@b"@example.com>');
+    is($ao && $ao->user, 'a@b', 'user of quoted localpart keeps its @');
+    is($ao && $ao->host, 'example.com', 'host of quoted localpart');
+
+    # as does a source route, the other place a path may hold several '@'
+    $ao = Qpsmtpd::Address->new('<@r1.example,@r2.example:u@example.com>');
+    is($ao && $ao->address, 'u@example.com', 'source route is still stripped');
+
+    # the rest of the lenient localpart handling is unchanged
+    for my $ok ('<a.@example.com>', '<a..b@example.com>', '<a b@example.com>') {
+        ok(Qpsmtpd::Address->new($ok), "still parses $ok");
+    }
+
+    # and the SMTP layer answers with a syntax error
+    ok(my ($qp, $cxn) = Test::Qpsmtpd->new_conn(), "get new connection");
+    ok($qp->command('HELO test'), 'HELO');
+    is(($qp->command('MAIL FROM:<a@b@example.com>'))[0], 501,
+       'MAIL FROM:<a@b@example.com> gets 501');
+    is(($qp->command('MAIL FROM:<"a@b"@example.com>'))[0], 250,
+       'MAIL FROM:<"a@b"@example.com> is still accepted');
 }

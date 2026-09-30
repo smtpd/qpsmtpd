@@ -281,6 +281,13 @@ sub canonify {
         }
     }
 
+    # '@' is a special, not atext: only a quoted localpart may carry one. The
+    # atom match below is lenient about what follows the first atom, so
+    # without this <a@b@example.com> got through with the localpart "a@b".
+    if ($localpart =~ /\@/ && $localpart !~ /^"/) {
+        return undef, undef, 'unquoted @ in localpart'; ## no critic (undef)
+    }
+
     if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
         return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
     }
