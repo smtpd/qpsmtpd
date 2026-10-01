@@ -7,24 +7,27 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.02] - 2026-10-01
+
 ### Added
 
-- SMTPUTF8 support (RFC 6531), gated on the new `smtputf8` config setting (#346)
+- config.sample/databytes, a 50MB message size limit, advertises SIZE
+- SMTPUTF8 support (RFC 6531), #346, #347
 - A 998 octet cap on SMTP command lines (RFC 5321 4.5.3.1.6)
+- xt/fuzz-address.t: fuzzes Qpsmtpd::Address against an independent parser
 
 ### Changed
 
-- Perl 5.32 is now the minimum supported version
-- Plugin dependencies (Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
-  ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) moved
-  from `PREREQ_PM` to `recommends`, so installing qpsmtpd no longer requires
-  every optional plugin's dependency tree
+- dep(perl): 5.32 is now the floor
+- deps(plugin): moved Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
+  ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64 from
+  PREREQ_PM to recommends
 - postfix: disable `$qid` debug output (#345)
 - `Qpsmtpd::Address::canonify()` parses a path as one anchored match of the
   RFC 5321 grammar, in linear time. Specials such as ", (, `<` and `\` now
   need quotes. A source route must lead a mailbox. The reason for an
-  unparseable path is now 'syntax error'
-- xt/fuzz-address.t: fuzzes Qpsmtpd::Address against an independent parser
+  unparseable path is now `syntax error`
+- doc: Changes -> CHANGELOG.md
 - Qpsmtpd::Address: one parser, one serializer. Every way of building or
   changing an address (new($user, $host), user(), host(), address()) is
   checked by formatting it and parsing it back with canonify(). new()
@@ -49,7 +52,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   accepted, and the `IPv6:` tag is now case-insensitive
 - Qpsmtpd::Address: comparing an address against a string that is not a
   valid path died, and `<a@[1.2.3.4]>` matched `<a@1.2.3.4>`
-- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
+- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @,
+  bypassing canonify()
 
 ### Security
 
@@ -1152,7 +1156,8 @@ The last releases on the old v0.0x branch.
 - Security: support and enable taint checking (thanks to Devin Carraway
   <qpsmtpd@devin.com>)
 
-[Unreleased]: https://github.com/smtpd/qpsmtpd/compare/v1.01...HEAD
+[Unreleased]: https://github.com/smtpd/qpsmtpd/compare/v1.02...HEAD
+[1.02]: https://github.com/smtpd/qpsmtpd/compare/v1.01...v1.02
 [1.01]: https://github.com/smtpd/qpsmtpd/compare/v1.00...v1.01
 [1.00]: https://github.com/smtpd/qpsmtpd/compare/v0.96...v1.00
 [0.96]: https://github.com/smtpd/qpsmtpd/compare/v0.95...v0.96
