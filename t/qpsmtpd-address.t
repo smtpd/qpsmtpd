@@ -25,6 +25,10 @@ __control_chars();
 __unquoted_at();
 __grammar();
 __linear_time();
+__cmp_safety();
+__round_trip();
+__address_literals();
+__one_gate();
 
 done_testing();
 
@@ -64,7 +68,8 @@ sub __new {
     $ao = Qpsmtpd::Address->new(undef);
     is('<>', $ao, "new, user=undef, stringified");
     is('<>', $ao->format, "new, user=undef, format");
-    is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=undef, deeply");
+    is_deeply(bless({_user => '', _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=undef, deeply");
+    is_deeply(Qpsmtpd::Address->new('<>'), $ao, '  ... the same null sender as <>');
 
     $ao = Qpsmtpd::Address->new('<matt@test.com>');
     is('<matt@test.com>', $ao, 'new, user=matt@test.com, stringified');
@@ -73,10 +78,22 @@ sub __new {
               $ao,
               'new, user=matt@test.com, deeply');
 
+    # An unbracketed argument is canonified like any other path. It used to be
+    # split naively on '@', so anything without one -- 'postmaster' included --
+    # came back as the null sender, a real address with bounce semantics.
     $ao = Qpsmtpd::Address->new('postmaster');
-    is('<>', $ao, "new, user=postmaster, stringified");
-    is('<>', $ao->format, "new, user=postmaster, format");
-    is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
+    is('<postmaster>', $ao, "new, user=postmaster, stringified");
+    is('<postmaster>', $ao->format, "new, user=postmaster, format");
+    is_deeply(bless({_user => 'postmaster', _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
+
+    # ... and input that canonify rejects is now undef
+    is(Qpsmtpd::Address->new('foo'), undef, 'new, bare word with no @');
+    is(Qpsmtpd::Address->new("a\x00b\@example.com"), undef,
+        'new, unbracketed with a NUL');
+    is(Qpsmtpd::Address->new('x@ex ample.com'), undef,
+        'new, unbracketed with a space in the domain');
+    is(Qpsmtpd::Address->new('Foo <foo@example.com>'), undef,
+        'new, unbracketed with a display name');
 
 }
 
@@ -101,20 +118,17 @@ sub __parse {
     is($ao->user, 'foo',         'user');
     is($ao->host, 'example.com', 'host');
 
-    # the \ before the @ in the local part is not required, but
-    # allowed. For simplicity we add a backslash before all characters
-    # which are not allowed in a dot-string.
+    # quoting escapes only what qtextSMTP excludes: '"' and '\'
     $as = '<"musa_ibrah@caramail.comandrea.luger"@wifo.ac.at>';
     $ao = Qpsmtpd::Address->parse($as);
     ok($ao, "parse $as");
-    is($ao->format, '<"musa_ibrah\@caramail.comandrea.luger"@wifo.ac.at>',
-        "format $as");
+    is($ao->format, $as, "format $as");
 
     # email addresses with spaces
     $as = '<foo bar@example.com>';
     $ao = Qpsmtpd::Address->parse($as);
     ok($ao, "parse $as");
-    is($ao->format, '<"foo\ bar"@example.com>', "format $as");
+    is($ao->format, '<"foo bar"@example.com>', "format $as");
 
     $as = 'foo@example.com';
     $ao = Qpsmtpd::Address->new($as);
@@ -285,7 +299,7 @@ sub __utf8 {
            "new returns undef for $malformed{$bad}");
     }
 
-    # a domain label must be a U-label, not any well-formed UTF-8 (RFC 6531 3.3)
+    # a domain label must be a U-label (RFC 6531 3.3)
     my %not_a_ulabel = (
         "<user\@example.com\xc2\xa0>"     => 'no-break space',
         "<user\@ex\xe3\x80\x80ample.com>" => 'ideographic space',
@@ -436,7 +450,7 @@ sub __grammar {
     my $ao = Qpsmtpd::Address->new('<"foo bar"@example.com>');
     ok($ao, 'new <"foo bar"@example.com>');
     is($ao && $ao->user,   'foo bar',                  'user keeps its space');
-    is($ao && $ao->format, '<"foo\ bar"@example.com>', 'format re-quotes it');
+    is($ao && $ao->format, '<"foo bar"@example.com>', 'format re-quotes it');
 
     my %parsed = (
         '<"a\"b"@example.com>'  => ['a"b',   'example.com', 'quoted string'],
@@ -457,7 +471,7 @@ sub __grammar {
     my %formatted = (
         '<a..b@example.com>' => '<"a..b"@example.com>',
         '<a.@example.com>'   => '<"a."@example.com>',
-        '<ask @perl.org>'    => '<"ask\ "@perl.org>',
+        '<ask @perl.org>'    => '<"ask "@perl.org>',
         '<""@example.com>'   => '<""@example.com>',
         '<a.b@example.com>'  => '<a.b@example.com>',
         '<"a.b"@example.com>' => '<a.b@example.com>',
@@ -471,8 +485,8 @@ sub __grammar {
         is($again && $again->user, $ao && $ao->user, "$path round-trips");
     }
 
-    # a source route leads a mailbox; it is not a path of its own. Its
-    # At-domain is a Domain only: address literals belong to the mailbox.
+    # a source route must lead a mailbox, and its At-domain is a Domain
+    # (RFC 5321 4.1.2)
     for my $bad ('<@a.example:>', '<@a.example:postmaster>',
                  '<@[127.0.0.1]:u@example.com>',
                  '<@a.example,@[IPv6:::1]:u@example.com>')
@@ -512,4 +526,145 @@ sub __linear_time {
         ok(!defined $user, "rejects $name");
         cmp_ok($elapsed, '<', 1, sprintf('%s: %.3fs', $name, $elapsed));
     }
+}
+
+sub __cmp_safety {
+
+    # cmp is overloaded, so any string compared against an address is fed to
+    # new(). That returns undef for anything canonify rejects
+    my $addr = Qpsmtpd::Address->new('<a@example.com>');
+    for my $junk ('', 'not an address', '<<>>', "a\x00b\@c.com", 'x@ex ample.com',
+                  '@', '"', 'Foo <foo@example.com>', '<<a@example.com>>',
+                  'a@example.com>', '<[a@example.com]>')
+    {
+        my $r = eval { $addr eq $junk };
+        my $err = $@;
+        (my $show = $junk) =~ s/([\x00-\x1f])/sprintf("\\x%02x",ord $1)/ge;
+        is($err, '', "comparing an address with '$show' does not die");
+        ok(!$r, "  ... and does not compare equal");
+    }
+
+    my @sorted = eval { sort { $a cmp $b } map { Qpsmtpd::Address->new($_) }
+                        ('<b@example.com>', '<a@example.com>', '<a@aaa.com>') };
+    is($@, '', 'sorting addresses does not die');
+    is(scalar @sorted, 3, '  ... and keeps every element');
+
+    ok($addr eq '<a@example.com>', 'an address equals its own path');
+    ok($addr eq 'a@example.com',   '  ... bracketed or not');
+    cmp_ok($addr cmp '<<>>', '>', 0, 'a rejected operand sorts before an address');
+    cmp_ok('<<>>' cmp $addr, '<', 0, '  ... from either side');
+
+    my $literal = Qpsmtpd::Address->new('<a@[1.2.3.4]>');
+    ok($literal ne '<a@1.2.3.4>', 'an address literal is not the hostname of its digits');
+    ok($literal eq '<a@[1.2.3.4]>', '  ... but equals itself');
+}
+
+sub __round_trip {
+
+    # format() feeds Received: lines, logs and plugin comparisons, so whatever
+    # it emits has to parse back to the same thing.
+    my @addr = (
+        '<foo@example.com>', '<foo.bar@a.b.example.com>', '<postmaster>', '<>',
+        '<"foo bar"@example.com>', '<foo bar@example.com>',
+        '<"musa_ibrah@caramail.com"@wifo.ac.at>', '<a@[192.168.1.1]>',
+        "<user\@b\xc3\xbccher.example>", "<m\xc3\xbcller\@example.com>",
+        '<a-b@c-d.example.com>', '<a@examplecom>',
+    );
+    for my $as (@addr) {
+        my $ao = Qpsmtpd::Address->new($as);
+        ok($ao, "round trip: parse $as") or next;
+        my $f = $ao->format;
+        my $bo = Qpsmtpd::Address->new($f);
+        ok($bo, "  format $f re-parses") or next;
+        is($bo->format, $f, '  ... and format is idempotent');
+    }
+}
+
+sub __address_literals {
+
+    # RFC 5321 4.1.3: a Snum is 0 through 255, leading zeros allowed, and "::"
+    # stands for at least two zero groups, so it leaves room for six explicit
+    # groups at most, or four beside an embedded IPv4 address. The tag, like
+    # any ABNF string, is case-insensitive.
+    for my $ok ('1.2.3.4', '0.0.0.0', '255.255.255.255', '010.001.000.099',
+                'IPv6:2001:db8:0:0:0:0:0:1', 'IPv6:2001:db8::1', 'IPv6:::',
+                'IPv6:::1', 'IPv6:1:2:3:4:5:6::', 'IPv6:1:2:3:4:5:6:1.2.3.4',
+                'IPv6:::ffff:1.2.3.4', 'IPv6:1:2:3:4::1.2.3.4', 'ipv6:FE80::1')
+    {
+        my $ao = Qpsmtpd::Address->new("<a\@[$ok]>");
+        is($ao && $ao->host, "[$ok]", "address literal [$ok]");
+    }
+
+    for my $bad ('256.0.0.1', '1.2.3.999', '1.2.3', '1.2.3.4.5', '1.2.3.0001',
+                 'IPv6:', 'IPv6:.', 'IPv6:::::::::', 'IPv6:1.2.3.4.5.6',
+                 'IPv6:1:2:3:4:5:6:7', 'IPv6:1:2:3:4:5:6:7:8:9',
+                 'IPv6:1:2:3:4:5:6:7::', 'IPv6:1::2::3', 'IPv6:12345::',
+                 'IPv6:1:2:3:4:5::1.2.3.4', 'IPv6:::256.1.1.1', 'IPv6:fe80::1%eth0',
+                 'IPv6 ::1', 'IPv7:::1')
+    {
+        my @r = Qpsmtpd::Address->canonify("<a\@[$bad]>");
+        is_deeply(\@r, [undef, undef, 'syntax error'], "canonify rejects [$bad]")
+          or diag Data::Dumper::Dumper(@r);
+    }
+}
+
+sub __one_gate {
+
+    # Every way of building or changing an address goes through canonify, so
+    # no object can hold something format() writes as an unparseable path.
+    my %two_arg = (
+        'a|example.com'  => '<a@example.com>',
+        'a b|example.com' => '<"a b"@example.com>',
+        'a"b|example.com' => '<"a\"b"@example.com>',
+        'a..b|example.com' => '<"a..b"@example.com>',
+        'a|[1.2.3.4]'    => '<a@[1.2.3.4]>',
+        '<>|example.com' => '<"<>"@example.com>',
+    );
+    for my $parts (sort keys %two_arg) {
+        my $ao = Qpsmtpd::Address->new(split /\|/, $parts);
+        is($ao && $ao->format, $two_arg{$parts}, "new($parts)");
+    }
+    my $pm = Qpsmtpd::Address->new('PostMaster', undef);
+    is($pm && $pm->format, '<postmaster>', 'new(PostMaster, undef)');
+
+    for my $bad (['x', "bad host\x00"], ['x', '[[['], ['x', ''], ['x', 'a b'],
+                 ["a\x00", 'example.com'], ['a', 'b@c'], ['a', 'example.com>'],
+                 ["\xff", 'example.com'], ['a', "ex\xc2\xa0ample"],
+                 [undef, 'example.com'])
+    {
+        (my $show = join '|', map { $_ // 'undef' } @$bad) =~ s/([^\x20-\x7e])/sprintf '\\x%02x', ord $1/ge;
+        is(Qpsmtpd::Address->new(@$bad), undef, "new($show) is not an address");
+    }
+
+    my $ao = Qpsmtpd::Address->new('<a@example.com>');
+    is($ao->user('b.c'), 'b.c', 'user() sets a valid localpart');
+    is($ao->host('example.org'), 'example.org', 'host() sets a valid domain');
+    is($ao->format, '<b.c@example.org>', '  ... and the address follows');
+
+    for my $bad (['host', ''], ['host', 'a b'], ['host', '[999.1.1.1]'],
+                 ['host', "ex\x00ample"], ['user', "a\x00b"], ['user', "\xff"])
+    {
+        my ($method, $value) = @$bad;
+        ok(!eval { $ao->$method($value); 1 }, "$method() croaks on an invalid value");
+        like($@, qr/^not a valid address/, '  ... saying why');
+        is($ao->format, '<b.c@example.org>', '  ... and leaves the address alone');
+    }
+
+    my $null = Qpsmtpd::Address->new('<>');
+    ok(!eval { $null->host('example.com'); 1 }, 'host() on the null sender croaks');
+    is($null->format, '<>', '  ... and it stays the null sender');
+
+    ok(!eval { $ao->address('<a@b@example.com>'); 1 }, 'address() croaks on an invalid path');
+    is($ao->format, '<b.c@example.org>', '  ... and leaves the address alone');
+    $ao->address('<>');
+    is($ao->format, '<>', 'address(<>) sets the null sender');
+
+    # RFC 5321 2.4: domains are not case sensitive, localparts may be
+    my $mixed = Qpsmtpd::Address->new('<a@Example.COM>');
+    ok($mixed eq '<a@example.com>', 'domains compare case-insensitively');
+    ok($mixed ne '<A@example.com>', 'localparts compare case-sensitively');
+    ok(Qpsmtpd::Address->new("<a\@b\xc3\xbccher.example>") ne "<a\@B\xc3\x9cCHER.example>",
+       'only ASCII is folded');
+    ok(Qpsmtpd::Address->new('<"a.b"@example.com>') eq '<a.b@example.com>',
+       'a needlessly quoted localpart equals the bare one');
 }
