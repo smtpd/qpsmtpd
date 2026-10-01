@@ -122,8 +122,31 @@ our $utf8_expr =
   . '|\xF4[\x80-\x8F][\x80-\xBF]{2})';
 our $atom_expr =
   '(?:[a-zA-Z0-9!#%&*+=?^_`{|}~\$\x27\x2D\/]|' . $utf8_expr . ')+';
-our $address_literal_expr =
-  '(?:\[(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|IPv6:[0-9A-Fa-f:.]+)\])';
+
+# RFC 5321 4.1.3. A Snum is 1*3DIGIT "representing a decimal integer value in
+# the range 0 through 255", so leading zeros are allowed. The "::" stands for
+# at least two groups of zeros, so it leaves room for at most six explicit
+# groups, or four beside an embedded IPv4 address.
+our $address_literal_expr = do {
+    my $snum = '(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])';
+    my $ipv4 = "$snum(?:\\.$snum){3}";
+    my $hex  = '[0-9A-Fa-f]{1,4}';
+    my $groups = sub {    # $min to $max hex groups, ':' separated
+        my ($min, $max) = @_;
+        return '' if !$max;
+        my $re = "$hex(?::$hex){" . ($min ? $min - 1 : 0) . ',' . ($max - 1) . '}';
+        return $min ? $re : "(?:$re)?";
+    };
+    my @ipv6 = ("$hex(?::$hex){7}", "(?:$hex:){6}$ipv4");
+    for my $left (0 .. 6) {
+        push @ipv6, $groups->($left, $left) . '::' . $groups->(0, 6 - $left);
+    }
+    for my $left (0 .. 4) {
+        my $right = 4 - $left ? "(?:$hex:){0," . (4 - $left) . '}' : '';
+        push @ipv6, $groups->($left, $left) . "::$right$ipv4";
+    }
+    '(?:\\[(?>' . $ipv4 . '\\]|(?i:IPv6):(?:' . join('|', @ipv6) . ')\\]))';
+};
 our $subdomain_expr =
     '(?:(?:[a-zA-Z0-9]|' . $utf8_expr . ')'
   . '(?:(?:[-a-zA-Z0-9]|' . $utf8_expr . ')*'

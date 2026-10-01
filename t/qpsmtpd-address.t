@@ -25,6 +25,9 @@ __control_chars();
 __unquoted_at();
 __grammar();
 __linear_time();
+__cmp_safety();
+__round_trip();
+__address_literals();
 
 done_testing();
 
@@ -511,5 +514,75 @@ sub __linear_time {
         my $elapsed = time - $start;
         ok(!defined $user, "rejects $name");
         cmp_ok($elapsed, '<', 1, sprintf('%s: %.3fs', $name, $elapsed));
+    }
+}
+
+sub __cmp_safety {
+
+    # cmp is overloaded, so any string compared against an address is fed to
+    # new(). That returns undef for anything canonify rejects
+    my $addr = Qpsmtpd::Address->new('<a@example.com>');
+    for my $junk ('', 'not an address', '<<>>', "a\x00b\@c.com", 'x@ex ample.com',
+                  '@', '"', 'Foo <foo@example.com>')
+    {
+        my $r = eval { $addr eq $junk };
+        my $err = $@;
+        (my $show = $junk) =~ s/([\x00-\x1f])/sprintf("\\x%02x",ord $1)/ge;
+        is($err, '', "comparing an address with '$show' does not die");
+        ok(!$r, "  ... and does not compare equal");
+    }
+
+    my @sorted = eval { sort { $a cmp $b } map { Qpsmtpd::Address->new($_) }
+                        ('<b@example.com>', '<a@example.com>', '<a@aaa.com>') };
+    is($@, '', 'sorting addresses does not die');
+    is(scalar @sorted, 3, '  ... and keeps every element');
+}
+
+sub __round_trip {
+
+    # format() feeds Received: lines, logs and plugin comparisons, so whatever
+    # it emits has to parse back to the same thing.
+    my @addr = (
+        '<foo@example.com>', '<foo.bar@a.b.example.com>', '<postmaster>', '<>',
+        '<"foo bar"@example.com>', '<foo bar@example.com>',
+        '<"musa_ibrah@caramail.com"@wifo.ac.at>', '<a@[192.168.1.1]>',
+        "<user\@b\xc3\xbccher.example>", "<m\xc3\xbcller\@example.com>",
+        '<a-b@c-d.example.com>', '<a@examplecom>',
+    );
+    for my $as (@addr) {
+        my $ao = Qpsmtpd::Address->new($as);
+        ok($ao, "round trip: parse $as") or next;
+        my $f = $ao->format;
+        my $bo = Qpsmtpd::Address->new($f);
+        ok($bo, "  format $f re-parses") or next;
+        is($bo->format, $f, '  ... and format is idempotent');
+    }
+}
+
+sub __address_literals {
+
+    # RFC 5321 4.1.3: a Snum is 0 through 255, leading zeros allowed, and "::"
+    # stands for at least two zero groups, so it leaves room for six explicit
+    # groups at most, or four beside an embedded IPv4 address. The tag, like
+    # any ABNF string, is case-insensitive.
+    for my $ok ('1.2.3.4', '0.0.0.0', '255.255.255.255', '010.001.000.099',
+                'IPv6:2001:db8:0:0:0:0:0:1', 'IPv6:2001:db8::1', 'IPv6:::',
+                'IPv6:::1', 'IPv6:1:2:3:4:5:6::', 'IPv6:1:2:3:4:5:6:1.2.3.4',
+                'IPv6:::ffff:1.2.3.4', 'IPv6:1:2:3:4::1.2.3.4', 'ipv6:FE80::1')
+    {
+        my $ao = Qpsmtpd::Address->new("<a\@[$ok]>");
+        is($ao && $ao->host, "[$ok]", "address literal [$ok]");
+    }
+
+    for my $bad ('256.0.0.1', '1.2.3.999', '1.2.3', '1.2.3.4.5', '1.2.3.0001',
+                 'IPv6:', 'IPv6:.', 'IPv6:::::::::', 'IPv6:1.2.3.4.5.6',
+                 'IPv6:1:2:3:4:5:6:7', 'IPv6:1:2:3:4:5:6:7:8:9',
+                 'IPv6:1:2:3:4:5:6:7::', 'IPv6:1::2::3', 'IPv6:12345::',
+                 'IPv6:1:2:3:4:5::1.2.3.4', 'IPv6:::256.1.1.1', 'IPv6:fe80::1%eth0',
+                 'IPv6 ::1', 'IPv7:::1')
+    {
+        my @r = Qpsmtpd::Address->canonify("<a\@[$bad]>");
+        is_deeply(\@r, [undef, undef, 'syntax error'], "canonify rejects [$bad]")
+          or diag Data::Dumper::Dumper(@r);
     }
 }

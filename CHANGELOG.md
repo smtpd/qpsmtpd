@@ -7,6 +7,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.02] - 2026-10-01
+
 ### Added
 
 - SMTPUTF8 support (RFC 6531), gated on the new `smtputf8` config setting (#346)
@@ -24,6 +26,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   RFC 5321 grammar, in linear time. Specials such as ", (, `<` and `\` now
   need quotes. A source route must lead a mailbox. The reason for an
   unparseable path is now `syntax error`
+- xt/fuzz-address.t: fuzzes `Qpsmtpd::Address` against an independent parser
 
 ### Fixed
 
@@ -32,6 +35,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Qpsmtpd::Address`: a quoted localpart may hold a space, per RFC 5321
   qtextSMTP: `<"foo bar"@example.com>` was rejected
 - `Qpsmtpd::Address`: reject an unquoted `@` in a localpart (#351, #352)
+- `Qpsmtpd::Address`: address literals follow the RFC 5321 grammar. An IPv4
+  octet above 255 and malformed IPv6, such as `[IPv6:::::::::]`, were
+  accepted, and the `IPv6:` tag is now case-insensitive
 
 ### Security
 
