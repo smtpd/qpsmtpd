@@ -439,6 +439,24 @@ sub __grammar {
           or diag Data::Dumper::Dumper(@r);
     }
 
+    # whatever canonify accepts, format must write back as a valid path
+    my %formatted = (
+        '<a..b@example.com>' => '<"a..b"@example.com>',
+        '<a.@example.com>'   => '<"a."@example.com>',
+        '<ask @perl.org>'    => '<"ask\ "@perl.org>',
+        '<""@example.com>'   => '<""@example.com>',
+        '<a.b@example.com>'  => '<a.b@example.com>',
+        '<"a.b"@example.com>' => '<a.b@example.com>',
+        '<>'                 => '<>',
+        '<postmaster>'       => '<postmaster>',
+    );
+    for my $path (sort keys %formatted) {
+        my $ao = Qpsmtpd::Address->new($path);
+        is($ao && $ao->format, $formatted{$path}, "format $path");
+        my $again = $ao && Qpsmtpd::Address->new($ao->format);
+        is($again && $again->user, $ao && $ao->user, "$path round-trips");
+    }
+
     # a source route leads a mailbox; it is not a path of its own
     for my $bad ('<@a.example:>', '<@a.example:postmaster>') {
         my @r = Qpsmtpd::Address->canonify($bad);

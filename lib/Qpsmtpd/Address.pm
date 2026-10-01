@@ -279,10 +279,14 @@ sub format {
     # (RFC 6531), so they must not be escaped one byte at a time.
     my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.\x80-\xFF]';
     return '<>' if !defined $self->{_user};
-    if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
-        return
-          qq(<"$user")
-          . (defined $self->{_host} ? '@' . $self->{_host} : '') . ">";
+    my $user = $self->{_user};
+    my $at_host = defined $self->{_host} ? '@' . $self->{_host} : '';
+
+    # A Dot-string has no empty atom, so a localpart canonify accepted
+    # leniently (a..b, a.) or from an empty quoted string must be quoted too.
+    my $not_dot_string = $user =~ /^\.|\.\.|\.\z/ || ($user eq '' && $at_host);
+    if ($user =~ s/($qchar)/\\$1/g || $not_dot_string) {
+        return qq(<"$user"$at_host>);
     }
     return "<" . $self->address() . ">";
 }
