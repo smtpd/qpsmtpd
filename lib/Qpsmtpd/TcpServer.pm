@@ -28,11 +28,7 @@ sub has_ipv6 {
 
 my $first_0;
 
-sub conn_info_tcpserver {
-
-    # started from tcpserver (or some other superserver which
-    # exports the TCPREMOTE* variables.
-
+sub conn_info_env {
     my $r_host = $ENV{TCPREMOTEHOST} || '[' . $ENV{TCPREMOTEIP} . ']';
     return (
         local_ip    => $ENV{TCPLOCALIP},
@@ -53,7 +49,7 @@ sub conn_info_inetd {
     # ignore ident/tap/...
 
     my $hersockaddr = getpeername(STDIN) or die "getpeername failed:" .
-        " $0 must be called from tcpserver, (x)inetd or" .
+        " $0 must be called from (x)inetd or" .
         " a similar program which passes a socket to stdin";
 
     my ($r_port, $iaddr) = sockaddr_in($hersockaddr);
@@ -76,7 +72,7 @@ sub start_connection {
 
     my %info;
     if ($ENV{TCPREMOTEIP}) {
-        %info = $self->conn_info_tcpserver();
+        %info = $self->conn_info_env();
     }
     else {
         %info = $self->conn_info_inetd();

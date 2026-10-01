@@ -10,7 +10,7 @@
 # to support legacy port 465, tls must load before connection plugins
 #tls
 
-# hosts_allow does not work with the tcpserver deployment model!
+# hosts_allow does not work under (x)inetd!
 #   perldoc plugins/hosts_allow for an alternative.
 #
 # The hosts_allow module must be loaded if you want the -m / --max-from-ip /

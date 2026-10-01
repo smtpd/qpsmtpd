@@ -12,6 +12,12 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
   recommended way to run qpsmtpd
 
+### Removed
+
+- the tcpserver run model: run.tcpserver, config.sample/IP and the ucspi-tcp
+  dependency. Use qpsmtpd.service, or run qpsmtpd from (x)inetd; see
+  UPGRADING.md
+
 ## [1.02] - 2026-10-01
 
 ### Added
