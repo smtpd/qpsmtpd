@@ -14,14 +14,13 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - config.sample/databytes, a 50MB message size limit, advertises SIZE
 - SMTPUTF8 support (RFC 6531), #346, #347
 - A 998 octet cap on SMTP command lines (RFC 5321 4.5.3.1.6)
+- xt/fuzz-address.t: fuzzes Qpsmtpd::Address against an independent parser
 
 ### Changed
 
 - dep(perl): 5.32 is now the floor
-  - ci: drop 5.16 and 5.26 from testing
-- deps: drop Mail::SpamAssassin and Math::Complex from prereq; neither is loaded
 - deps(plugin): moved Mail::DMARC, Mail::SPF, Mail::DKIM, GeoIP2,
-  ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64) from
+  ClamAV::Client, Redis, CDB_File, Date::Parse, File::Tail, Time::TAI64 from
   PREREQ_PM to recommends
 - postfix: disable `$qid` debug output (#345)
 - `Qpsmtpd::Address::canonify()` parses a path as one anchored match of the
@@ -29,7 +28,6 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   need quotes. A source route must lead a mailbox. The reason for an
   unparseable path is now `syntax error`
 - doc: Changes -> CHANGELOG.md
-- xt/fuzz-address.t: fuzzes Qpsmtpd::Address against an independent parser
 - Qpsmtpd::Address: one parser, one serializer. Every way of building or
   changing an address (new($user, $host), user(), host(), address()) is
   checked by formatting it and parsing it back with canonify(). new()
@@ -45,8 +43,6 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Qpsmtpd::Command: parsing ESMTP parameters was quadratic, now linear
-- Qpsmtpd::Address: `$qtext_expr` was RFC 2822 qtext, now RFC 5321 qtextSMTP
-- Qpsmtpd::Address: comparing an address against an unparseable string died
 - uribl: the body-scanning patterns were quadratic in line length
 - Qpsmtpd::Address: a quoted localpart may hold a space, per RFC 5321
   qtextSMTP: <"foo bar"@example.com> was rejected
@@ -56,7 +52,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   accepted, and the `IPv6:` tag is now case-insensitive
 - Qpsmtpd::Address: comparing an address against a string that is not a
   valid path died, and `<a@[1.2.3.4]>` matched `<a@1.2.3.4>`
-- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
+- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @,
+  bypassing canonify()
 
 ### Security
 

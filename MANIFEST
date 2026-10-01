@@ -165,6 +165,7 @@ t/config/content_log_enabled
 t/config/dnsbl_allow
 t/config/dnsbl_zones
 t/config/flat_auth_pw
+t/config/greylist_exclude_files
 t/config/invalid_resolvable_fromhost
 t/config/norelayclients
 t/config/plugins
@@ -229,3 +230,4 @@ t/Test/Qpsmtpd/Plugin.pm
 UPGRADING.md
 xt/01-syntax.t
 xt/02-pod.t
+xt/fuzz-address.t
