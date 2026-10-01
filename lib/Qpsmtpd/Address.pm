@@ -64,8 +64,10 @@ sub new {
         return if !defined $user;
     }
     elsif (!defined $host) {
-        my $address = $user;
-        ($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
+
+        # One argument is a path whether or not the client bracketed it.
+        ($user, $host) = $class->canonify("<$user>");
+        return if !defined $user;
     }
     $self->{_user} = $user;
     $self->{_host} = $host;
@@ -415,25 +417,25 @@ sub _addr_cmp {
         my $parsed = $class->new($right);
 
         # new() returns undef for anything canonify rejects. Such an operand is
-        # not an address, but comparing against one must not die, so fall back
-        # to comparing its own text.
-        $right = defined $parsed  ? $parsed->format
-               : defined $right   ? $right
-               :                    '';
-    }
-    else {
-        $right = $right->format;
+        # not an address: comparing against one must not die, and it must not
+        # reach the key below, which would strip <<a@example.com>> down to a
+        # match for <a@example.com>. It sorts before every address instead.
+        return $swap ? -1 : 1 if !defined $parsed;
+        $right = $parsed;
     }
 
-    #invert the address so we can sort by domain then user
-    ($left  = join('=', reverse(split(/@/, $left->format)))) =~ tr/[<>]//d;
-    ($right = join('=', reverse(split(/@/, $right))))        =~ tr/[<>]//d;
+    my ($left_key, $right_key) = map { _cmp_key($_) } $left, $right;
+    ($left_key, $right_key) = ($right_key, $left_key) if $swap;
+    return $left_key cmp $right_key;
+}
 
-    if ($swap) {
-        ($right, $left) = ($left, $right);
-    }
-
-    return $left cmp $right;
+# invert the address so we can sort by domain then user. Only the angle
+# brackets go: an address literal keeps its [], so <a@[1.2.3.4]> and
+# <a@1.2.3.4> stay distinct.
+sub _cmp_key {
+    my ($addr) = @_;
+    (my $key = join '=', reverse split /@/, $addr->format) =~ tr/<>//d;
+    return $key;
 }
 
 =head1 COPYRIGHT

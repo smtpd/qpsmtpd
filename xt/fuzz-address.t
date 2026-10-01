@@ -22,7 +22,7 @@ if (!$ENV{'QPSMTPD_DEVELOPER'}) {
 }
 
 my $iterations = $ENV{FUZZ_ITERATIONS} || 50_000;
-my $seed       = $ENV{FUZZ_SEED}       || int time;
+my $seed       = length($ENV{FUZZ_SEED} // '') ? $ENV{FUZZ_SEED} : int time;
 srand($seed);
 diag "FUZZ_SEED=$seed FUZZ_ITERATIONS=$iterations";
 
@@ -319,6 +319,7 @@ sub check {
         return 'format changes the host: ' . show($formatted) if !same($again->host, $ao->host);
         return 'format is not idempotent: ' . show($formatted) if $again->format ne $formatted;
         return 'address ne its own format: ' . show($formatted) if !eval { $ao eq $formatted };
+        return 'address eq a rejected wrapping of it' if eval { $ao eq "<$formatted>" };
     }
 
     (my $bare = $in) =~ s/^<|>\z//g;

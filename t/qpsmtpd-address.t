@@ -76,10 +76,24 @@ sub __new {
               $ao,
               'new, user=matt@test.com, deeply');
 
+    # An unbracketed argument is canonified like any other path. It used to be
+    # split naively on '@', so anything without one -- 'postmaster' included --
+    # came back as the null sender, which is a real address with bounce
+    # semantics rather than a rejection.
     $ao = Qpsmtpd::Address->new('postmaster');
-    is('<>', $ao, "new, user=postmaster, stringified");
-    is('<>', $ao->format, "new, user=postmaster, format");
-    is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
+    is('<postmaster>', $ao, "new, user=postmaster, stringified");
+    is('<postmaster>', $ao->format, "new, user=postmaster, format");
+    is_deeply(bless({_user => 'postmaster', _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
+
+    # ... and input that canonify rejects is now undef rather than a half
+    # parsed object built from a naive split
+    is(Qpsmtpd::Address->new('foo'), undef, 'new, bare word with no @');
+    is(Qpsmtpd::Address->new("a\x00b\@example.com"), undef,
+        'new, unbracketed with a NUL');
+    is(Qpsmtpd::Address->new('x@ex ample.com'), undef,
+        'new, unbracketed with a space in the domain');
+    is(Qpsmtpd::Address->new('Foo <foo@example.com>'), undef,
+        'new, unbracketed with a display name');
 
 }
 
@@ -523,7 +537,8 @@ sub __cmp_safety {
     # new(). That returns undef for anything canonify rejects
     my $addr = Qpsmtpd::Address->new('<a@example.com>');
     for my $junk ('', 'not an address', '<<>>', "a\x00b\@c.com", 'x@ex ample.com',
-                  '@', '"', 'Foo <foo@example.com>')
+                  '@', '"', 'Foo <foo@example.com>', '<<a@example.com>>',
+                  'a@example.com>', '<[a@example.com]>')
     {
         my $r = eval { $addr eq $junk };
         my $err = $@;
@@ -536,6 +551,15 @@ sub __cmp_safety {
                         ('<b@example.com>', '<a@example.com>', '<a@aaa.com>') };
     is($@, '', 'sorting addresses does not die');
     is(scalar @sorted, 3, '  ... and keeps every element');
+
+    ok($addr eq '<a@example.com>', 'an address equals its own path');
+    ok($addr eq 'a@example.com',   '  ... bracketed or not');
+    cmp_ok($addr cmp '<<>>', '>', 0, 'a rejected operand sorts before an address');
+    cmp_ok('<<>>' cmp $addr, '<', 0, '  ... from either side');
+
+    my $literal = Qpsmtpd::Address->new('<a@[1.2.3.4]>');
+    ok($literal ne '<a@1.2.3.4>', 'an address literal is not the hostname of its digits');
+    ok($literal eq '<a@[1.2.3.4]>', '  ... but equals itself');
 }
 
 sub __round_trip {

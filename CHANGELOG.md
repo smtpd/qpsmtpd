@@ -7,8 +7,6 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.02] - 2026-10-01
-
 ### Added
 
 - SMTPUTF8 support (RFC 6531), gated on the new `smtputf8` config setting (#346)
@@ -38,6 +36,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Qpsmtpd::Address`: address literals follow the RFC 5321 grammar. An IPv4
   octet above 255 and malformed IPv6, such as `[IPv6:::::::::]`, were
   accepted, and the `IPv6:` tag is now case-insensitive
+- `Qpsmtpd::Address`: comparing an address against a string that is not a
+  valid path no longer dies, and never compares equal: `<<a@example.com>>`
+  matched `<a@example.com>`, and `<a@[1.2.3.4]>` matched `<a@1.2.3.4>`
+- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
 
 ### Security
 
