@@ -20,11 +20,18 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from `PREREQ_PM` to `recommends`, so installing qpsmtpd no longer requires
   every optional plugin's dependency tree
 - postfix: disable `$qid` debug output (#345)
+- `Qpsmtpd::Address::canonify()` parses a path as one anchored match of the
+  RFC 5321 grammar, in linear time. Specials such as ", (, `<` and `\` now
+  need quotes. A source route must lead a mailbox. The reason for an
+  unparseable path is now `syntax error`
 
 ### Fixed
 
 - `Qpsmtpd::Command`: parsing ESMTP parameters was quadratic, now linear
 - uribl: the body-scanning patterns were quadratic in line length
+- `Qpsmtpd::Address`: a quoted localpart may hold a space, per RFC 5321
+  qtextSMTP: `<"foo bar"@example.com>` was rejected
+- `Qpsmtpd::Address`: reject an unquoted `@` in a localpart (#351, #352)
 
 ### Security
 
