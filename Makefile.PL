@@ -53,7 +53,7 @@ WriteMakefile(
     },
     ABSTRACT       => 'Flexible smtpd daemon written in Perl',
     AUTHOR         => 'Ask Bjoern Hansen <ask@develooper.com>',
-    EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver qpsmtpd-prefork)],
+    EXE_FILES      => [qw(qpsmtpd qpsmtpd-forkserver)],
     clean          => { FILES => [ '*.bak', 't/tmp' ], },
 );
 
