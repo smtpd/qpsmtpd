@@ -48,8 +48,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   octet above 255 and malformed IPv6, such as `[IPv6:::::::::]`, were
   accepted, and the `IPv6:` tag is now case-insensitive
 - Qpsmtpd::Address: comparing an address against a string that is not a
-  valid path no longer dies, and never compares equal: `<<a@example.com>>`
-  matched `<a@example.com>`, and `<a@[1.2.3.4]>` matched `<a@1.2.3.4>`
+  valid path died, and `<a@[1.2.3.4]>` matched `<a@1.2.3.4>`
 - Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
 
 ### Security
