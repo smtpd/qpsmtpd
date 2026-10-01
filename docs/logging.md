@@ -66,8 +66,8 @@ daemontools is already set up, setting up qpsmtpd may be as simple as:
 
 `ln -s /usr/home/smtpd /var/service/`
 
-If svcscan is running, the symlink will be detected and tcpserver will
-run the 'run' files in the ./ and ./log directories. Any log entries
+If svscan is running, it will detect the symlink and run the 'run' files in
+the ./ and ./log directories. Any log entries
 emitted will get handled per the instructions in log/run. The default
 location specified in log/run is log/main/current.
 
