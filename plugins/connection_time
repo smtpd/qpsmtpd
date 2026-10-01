@@ -47,7 +47,7 @@ sub register {
         $self->{_args} = {@_};    # named args, inherits loglevel
     }
 
-    # pre-connection is not available in the tcpserver deployment model.
+    # pre-connection is not available under (x)inetd.
     # duplicate the handler, so it works both ways with no redudant methods
     $self->register_hook('pre-connection', 'connect_handler');
     $self->register_hook('connect',        'connect_handler');

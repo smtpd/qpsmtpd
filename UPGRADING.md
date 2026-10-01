@@ -27,6 +27,19 @@ unchanged. Most options carry over:
 there is no pool of idle children to size. Its default port is 2525, so set
 `--port` explicitly.
 
+### tcpserver is gone
+
+Run qpsmtpd-forkserver from qpsmtpd.service (see "qpsmtpd installation" in
+README.md). Under daemontools, copy run.forkserver to run and set its listen
+address and ports; config/IP is no longer read. qpsmtpd still runs from
+(x)inetd.
+
+Rules in a tcprules file move into qpsmtpd config:
+
+- `:allow,RELAYCLIENT=""` entries go in config/relayclients
+- `:deny` entries go in config/hosts\_allow, with the hosts\_allow plugin
+  enabled
+
 ## v0.84 or below
 
 ### CHECK\_RELAY, CHECK\_NORELAY, RELAY\_ONLY

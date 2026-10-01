@@ -112,7 +112,7 @@ Therefore the file handle will be shared by all qpsmtpd processes and the
 database will probably be confused if several different queries arrive on
 the same file handle at the same time (and you may get the wrong answer, if
 any). This is also true for the pperl flavor but
-not for `qpsmtpd` started by (x)inetd or tcpserver.
+not for `qpsmtpd` started by (x)inetd.
 
 In short: don't do it if you want to write portable plugins.
 

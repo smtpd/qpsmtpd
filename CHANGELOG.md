@@ -16,6 +16,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - qpsmtpd-prefork, the prefork run model. Use qpsmtpd-forkserver; see
   UPGRADING.md
+- the tcpserver run model: run.tcpserver, config.sample/IP and the ucspi-tcp
+  dependency. Use qpsmtpd.service, or run qpsmtpd from (x)inetd; see
 
 ## [1.02] - 2026-10-01
 

@@ -75,9 +75,7 @@ Log entries go to the journal (`journalctl -u qpsmtpd`), and
 chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
 in) to make supervise start the log process.
 
-Copy run.forkserver or run.tcpserver to run. run.tcpserver reads the ip
-address to listen on from the first line of config/IP (use 0 to bind to
-all interfaces).
+Copy run.forkserver to run and set the listen address and ports in it.
 
 If you use the supervise tools, then you are practically done!
 Just symlink /home/smtpd/qpsmtpd into your /services (or /var/services
@@ -85,9 +83,6 @@ or /var/svscan or whatever) directory.
 
 If you don't use supervise, then you need to run the ./run script in
 some other way.
-
-As of version 0.25 run.tcpserver runs tcpserver with the -R flag to
-disable identd lookups.  Remove the -R flag if that's not what you want.
 
 
 # Configuration
