@@ -58,17 +58,17 @@ use overload (
 
 sub new {
     my ($class, $user, $host) = @_;
-    my $self = bless {_user => undef, _host => undef}, $class;
-    return $self if !defined $user;
 
     # Given a domain, the first argument is a localpart, which may itself be
-    # <...> once quoted. Alone, it is a path whether or not it is bracketed.
-    my @parts = defined $host        ? $class->_canonical($user, $host)
+    # <...> once quoted. Alone, it is a path whether or not it is bracketed,
+    # and no argument at all is the null path, parsed like any other so the
+    # null sender always holds canonify's ''.
+    my @parts = defined $host  ? $class->_canonical($user, $host)
+              : !defined $user ? $class->canonify('<>')
               : $user =~ /^<.*>\z/s ? $class->canonify($user)
-              :                        $class->canonify("<$user>");
+              :                  $class->canonify("<$user>");
     return if !defined $parts[0];
-    @$self{qw(_user _host)} = @parts[0, 1];
-    return $self;
+    return bless {_user => $parts[0], _host => $parts[1]}, $class;
 }
 
 # The path grammar, RFC 5321 4.1.2 with the RFC 6531 3.3 extensions:
@@ -154,7 +154,7 @@ our $domain_expr;
 our $qtext_expr = '[\x20\x21\x23-\x5B\x5D-\x7E]';
 our $text_expr  = '[\x20-\x7E]';
 
-# RFC 6531 3.3 allows a U-label in a domain, not an arbitrary run of UTF-8.
+# RFC 6531 3.3 requires every domain label to be a U-label.
 # These categories are DISALLOWED by IDNA2008 (RFC 5892) yet are well-formed
 # UTF-8, so $utf8_expr passes them: NBSP, ideographic space, zero-width
 # joiners, the BOM, soft hyphen. A localpart may hold any of them.
@@ -214,7 +214,7 @@ sub canonify {
 # is exactly what it would accept.
 sub _path {
     my ($user, $host) = @_;
-    return '<>' if !defined $user || ($user eq '' && !defined $host);
+    return '<>' if $user eq '' && !defined $host;
     if ($user !~ /^${\ _dot_string_re()}\z/) {
         (my $escaped = $user) =~ s/(["\\])/\\$1/g;
         $user = qq{"$escaped"};
@@ -264,8 +264,8 @@ sub _domain_re {
 sub _path_re {
     my ($domain_re) = @_;
 
-    # An address literal may only follow the mailbox '@', never a source
-    # route's. $address_literal_expr may be empty, if a site doesn't allow them.
+    # An address literal may only follow the mailbox '@' (RFC 5321 4.1.2).
+    # $address_literal_expr may be empty, if a site doesn't allow them.
     my $destination_re = $domain_re;
     if (!$domain_expr && $address_literal_expr) {
         $destination_re = "(?:$address_literal_expr|$domain_re)";
@@ -289,7 +289,7 @@ sub _why_invalid {
         return 'malformed UTF-8';
     }
 
-    # '@' is a special, not atext: only a quoted localpart may carry one. The
+    # '@' is a special: only a quoted localpart may carry one. The
     # domain cannot hold an '@' either, so the separator is the last one.
     $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
     return 'syntax error' if $path =~ /^\@/;    # a malformed source route
@@ -325,8 +325,7 @@ sub address {
         croak "not a valid address: $val" if !defined $user;
         @$self{qw(_user _host)} = ($user, $host);
     }
-    return (defined $self->{_user} ? $self->{_user}       : '')
-      . (defined $self->{_host}    ? '@' . $self->{_host} : '');
+    return $self->{_user} . (defined $self->{_host} ? '@' . $self->{_host} : '');
 }
 
 =head2 format()
@@ -382,7 +381,7 @@ sub host {
         # The null path has no localpart: '' only stands in for it, and given
         # a domain it would become the mailbox <""@domain>.
         croak 'not a valid address: the null sender has no domain'
-          if !defined $self->{_host} && ($self->{_user} // '') eq '';
+          if !defined $self->{_host} && $self->{_user} eq '';
         $self->_set($self->{_user}, $host);
     }
     return $self->{_host};
@@ -457,11 +456,11 @@ sub _addr_cmp {
 
     # By domain, then localpart. Domains follow DNS and are not case
     # sensitive, a localpart MUST be treated as case sensitive (RFC 5321 2.4).
-    # tr folds ASCII only, leaving UTF-8 octets alone.
+    # tr folds ASCII only.
     my ($left_host, $right_host) =
       map { ($_->{_host} // '') =~ tr/A-Z/a-z/r } $left, $right;
     return $left_host cmp $right_host
-      || ($left->{_user} // '') cmp ($right->{_user} // '');
+      || $left->{_user} cmp $right->{_user};
 }
 
 =head1 COPYRIGHT

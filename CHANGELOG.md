@@ -28,13 +28,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Qpsmtpd::Address: one parser, one serializer. Every way of building or
   changing an address (new($user, $host), user(), host(), address()) is
   checked by formatting it and parsing it back with canonify(). new()
-  returns undef and the setters croak on anything else
+  returns undef and the setters croak on anything else. new(undef, $host)
+  is refused, and the null sender has one form: new() and new('<>') both
+  hold an empty localpart
 - Qpsmtpd::Address::format() quotes a localpart only when it is not a
-  Dot-string, and escapes only " and \: `<"foo bar"@example.com>`, not
-  `<"foo\ bar"@example.com>`
-- Qpsmtpd::Address comparison works on the localpart and domain, not on
-  the formatted string, and the domain compares case-insensitively
-  (RFC 5321 2.4): <a@Example.COM> eq <a@example.com>
+  Dot-string, and escapes only " and \: `<"foo bar"@example.com>`
+- Qpsmtpd::Address comparison works on the localpart and domain, and the
+  domain compares case-insensitively (RFC 5321 2.4): <a@Example.COM> eq
+  <a@example.com>
 
 ### Fixed
 

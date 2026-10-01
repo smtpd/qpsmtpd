@@ -349,11 +349,22 @@ sub check {
     my $at = rindex $bare, '@';
     my ($raw_user, $raw_host) = $at < 0 ? ($bare, undef)
       : (substr($bare, 0, $at), substr($bare, $at + 1));
-    my $built = eval { Qpsmtpd::Address->new($raw_user, $raw_host) };
-    return "new(user, host) died: $@" if $@;
-    if ($built) {
+    for my $parts ([$raw_user, $raw_host], [undef, $raw_host]) {
+        my ($want_user, $want_host) = @$parts;
+        my $built = eval { Qpsmtpd::Address->new($want_user, $want_host) };
+        return "new(user, host) died: $@" if $@;
+        next if !$built;
         my $err = round_trip_error($built);
         return "new(user, host): $err" if $err;
+
+        # an object built from parts holds those parts. Only a bare
+        # postmaster is folded to lower case.
+        next if !defined $want_user && !defined $want_host;
+        return 'new(user, host) changed the host to ' . show($built->host)
+          if !same($built->host, $want_host);
+        return 'new(user, host) changed the user to ' . show($built->user)
+          if !same($built->user, $want_user)
+          && !(!defined $want_host && lc($want_user // '') eq 'postmaster');
     }
     for my $setter (['user', $raw_user], ['host', $raw_host]) {
         my ($method, $value) = @$setter;

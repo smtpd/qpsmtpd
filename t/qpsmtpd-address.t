@@ -68,7 +68,8 @@ sub __new {
     $ao = Qpsmtpd::Address->new(undef);
     is('<>', $ao, "new, user=undef, stringified");
     is('<>', $ao->format, "new, user=undef, format");
-    is_deeply(bless({_user => undef, _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=undef, deeply");
+    is_deeply(bless({_user => '', _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=undef, deeply");
+    is_deeply(Qpsmtpd::Address->new('<>'), $ao, '  ... the same null sender as <>');
 
     $ao = Qpsmtpd::Address->new('<matt@test.com>');
     is('<matt@test.com>', $ao, 'new, user=matt@test.com, stringified');
@@ -79,15 +80,13 @@ sub __new {
 
     # An unbracketed argument is canonified like any other path. It used to be
     # split naively on '@', so anything without one -- 'postmaster' included --
-    # came back as the null sender, which is a real address with bounce
-    # semantics rather than a rejection.
+    # came back as the null sender, a real address with bounce semantics.
     $ao = Qpsmtpd::Address->new('postmaster');
     is('<postmaster>', $ao, "new, user=postmaster, stringified");
     is('<postmaster>', $ao->format, "new, user=postmaster, format");
     is_deeply(bless({_user => 'postmaster', _host=>undef}, 'Qpsmtpd::Address'), $ao, "new, user=postmaster, deeply");
 
-    # ... and input that canonify rejects is now undef rather than a half
-    # parsed object built from a naive split
+    # ... and input that canonify rejects is now undef
     is(Qpsmtpd::Address->new('foo'), undef, 'new, bare word with no @');
     is(Qpsmtpd::Address->new("a\x00b\@example.com"), undef,
         'new, unbracketed with a NUL');
@@ -300,7 +299,7 @@ sub __utf8 {
            "new returns undef for $malformed{$bad}");
     }
 
-    # a domain label must be a U-label, not any well-formed UTF-8 (RFC 6531 3.3)
+    # a domain label must be a U-label (RFC 6531 3.3)
     my %not_a_ulabel = (
         "<user\@example.com\xc2\xa0>"     => 'no-break space',
         "<user\@ex\xe3\x80\x80ample.com>" => 'ideographic space',
@@ -486,8 +485,8 @@ sub __grammar {
         is($again && $again->user, $ao && $ao->user, "$path round-trips");
     }
 
-    # a source route leads a mailbox; it is not a path of its own. Its
-    # At-domain is a Domain only: address literals belong to the mailbox.
+    # a source route must lead a mailbox, and its At-domain is a Domain
+    # (RFC 5321 4.1.2)
     for my $bad ('<@a.example:>', '<@a.example:postmaster>',
                  '<@[127.0.0.1]:u@example.com>',
                  '<@a.example,@[IPv6:::1]:u@example.com>')
@@ -630,9 +629,10 @@ sub __one_gate {
 
     for my $bad (['x', "bad host\x00"], ['x', '[[['], ['x', ''], ['x', 'a b'],
                  ["a\x00", 'example.com'], ['a', 'b@c'], ['a', 'example.com>'],
-                 ["\xff", 'example.com'], ['a', "ex\xc2\xa0ample"])
+                 ["\xff", 'example.com'], ['a', "ex\xc2\xa0ample"],
+                 [undef, 'example.com'])
     {
-        (my $show = join '|', @$bad) =~ s/([^\x20-\x7e])/sprintf '\\x%02x', ord $1/ge;
+        (my $show = join '|', map { $_ // 'undef' } @$bad) =~ s/([^\x20-\x7e])/sprintf '\\x%02x', ord $1/ge;
         is(Qpsmtpd::Address->new(@$bad), undef, "new($show) is not an address");
     }
 
