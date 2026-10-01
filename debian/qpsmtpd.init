@@ -17,6 +17,9 @@ set -e
 
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 
+# On systemd hosts this redirects /etc/init.d/qpsmtpd to qpsmtpd.service
+[ -r /lib/lsb/init-functions ] && . /lib/lsb/init-functions
+
 
 PORT="25"
 RUNAS="qpsmtpd"

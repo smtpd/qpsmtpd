@@ -1,0 +1,44 @@
+#!/bin/sh
+#
+# Helper for qpsmtpd.service.  It evaluates the same debconf settings as
+# /etc/init.d/qpsmtpd, so that both init systems honour
+# 'dpkg-reconfigure qpsmtpd'.
+#
+#   condition  exit 0 if qpsmtpd is enabled in debconf, 1 otherwise
+#              (used as ExecCondition, so a disabled qpsmtpd is skipped
+#              instead of failing)
+#   start      exec the selected server in the foreground
+
+set -e
+
+PORT="25"
+RUNAS="qpsmtpd"
+INTERFACES=""
+LISTEN=""
+ENABLED="false"
+SERVER="forkserver"
+EXTRA_ARGS=""
+
+[ -f "/etc/qpsmtpd/debconf-settings" ] && . "/etc/qpsmtpd/debconf-settings"
+
+case "$1" in
+	condition)
+		[ "$ENABLED" = "true" ] || [ "$ENABLED" = "1" ] || exit 1
+		[ -x "/usr/bin/qpsmtpd-$SERVER" ] || exit 1
+		exit 0
+		;;
+	start)
+		if [ -n "$INTERFACES" ] ; then
+			LISTEN=$(echo "$INTERFACES" | \
+				perl -pe 's/(\S+)/--listen-address $1/g')
+		fi
+		export QPSMTPD_CONFIG="/etc/qpsmtpd"
+		# shellcheck disable=SC2086
+		exec "/usr/bin/qpsmtpd-$SERVER" --port "$PORT" --user "$RUNAS" \
+			$LISTEN $EXTRA_ARGS
+		;;
+	*)
+		echo "usage: $0 {condition|start}" >&2
+		exit 2
+		;;
+esac

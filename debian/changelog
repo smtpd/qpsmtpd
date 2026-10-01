@@ -18,6 +18,20 @@ qpsmtpd (1.02) unstable; urgency=medium
     1.02~beta1+wornet1 entries are renamed to 1.01-1 and 1.02~beta1.
   * Supported targets are Debian 11 (bullseye) and later and Ubuntu 22.04
     and later, following the perl (>= 5.32) requirement.
+  * Ship a native systemd unit, qpsmtpd.service, next to the init script
+    (lintian: missing-systemd-service-for-init.d-script).  It reads the same
+    debconf settings via /usr/libexec/qpsmtpd/qpsmtpd-service and is skipped
+    through ExecCondition unless qpsmtpd/startup_enabled is set, so qpsmtpd
+    still does not grab port 25 on a fresh install.
+  * Add Pre-Depends: ${misc:Pre-Depends} for the init-system-helpers
+    prerequisite of invoke-rc.d --skip-systemd-native.
+  * Source /lib/lsb/init-functions in the init script, if present, so that
+    /etc/init.d/qpsmtpd is redirected to qpsmtpd.service on systemd hosts.
+  * postinst: chown the newly created Maildir spool and its new/, cur/ and
+    tmp/ one by one instead of recursively (lintian:
+    recursive-privilege-change).
+  * Convert the German debconf translation from ISO-8859-15 to UTF-8.
+  * Drop debian/watch; it is not evaluated for a native package.
 
  -- Andreas Erhard <erhard@wor.net>  Thu, 01 Oct 2026 22:28:27 +0200
 

@@ -21,6 +21,8 @@ Vcs-Browser: https://github.com/wornet-aer/qpsmtpd/tree/debian
 
 Package: qpsmtpd
 Architecture: all
+Pre-Depends:
+ ${misc:Pre-Depends}
 Depends:
  adduser (>= 3.0),
  libdigest-hmac-perl,

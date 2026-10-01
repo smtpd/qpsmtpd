@@ -27,6 +27,9 @@ override_dh_auto_install:
 	rm -f $(PKGDIR)/usr/bin/qpsmtpd
 	# pf2qp.pl only generates Qpsmtpd::Postfix::Constants upstream
 	rm -f $(PKGDIR)/usr/share/perl5/Qpsmtpd/Postfix/pf2qp.pl
+	# start helper for qpsmtpd.service
+	install -D -m 0755 debian/qpsmtpd-service \
+		$(PKGDIR)/usr/libexec/qpsmtpd/qpsmtpd-service
 	# configuration; permissions on the spool/state dirs are applied by
 	# postinst via dpkg-statoverride
 	install -d $(ETCDIR)

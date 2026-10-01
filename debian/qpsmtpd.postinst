@@ -143,14 +143,15 @@ setup_maildir_spool()
 				mkdir -m 0755 -p "`dirname "$QUEUE_MAILDIR_DESTINATION"`"
 			[ -d "$QUEUE_MAILDIR_DESTINATION" ] || \
 				mkdir -m 0700 -p "$QUEUE_MAILDIR_DESTINATION"
+			chown $RUNAS "$QUEUE_MAILDIR_DESTINATION"
 			for d in "$QUEUE_MAILDIR_DESTINATION/new" \
 					 "$QUEUE_MAILDIR_DESTINATION/cur" \
 					 "$QUEUE_MAILDIR_DESTINATION/tmp" ; do
 				if [ ! -d "$d" ] ; then
 					mkdir -m 0700 "$d"
 				fi
+				chown $RUNAS "$d"
 			done
-			chown -R $RUNAS "$QUEUE_MAILDIR_DESTINATION"
 		fi
 	fi
 }
