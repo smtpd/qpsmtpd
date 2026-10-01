@@ -471,11 +471,19 @@ sub __grammar {
         is($again && $again->user, $ao && $ao->user, "$path round-trips");
     }
 
-    # a source route leads a mailbox; it is not a path of its own
-    for my $bad ('<@a.example:>', '<@a.example:postmaster>') {
+    # a source route leads a mailbox; it is not a path of its own. Its
+    # At-domain is a Domain only: address literals belong to the mailbox.
+    for my $bad ('<@a.example:>', '<@a.example:postmaster>',
+                 '<@[127.0.0.1]:u@example.com>',
+                 '<@a.example,@[IPv6:::1]:u@example.com>')
+    {
         my @r = Qpsmtpd::Address->canonify($bad);
         is_deeply(\@r, [undef, undef, 'syntax error'], "canonify rejects $bad");
     }
+
+    my @routed = Qpsmtpd::Address->canonify('<@a.example,@b.example:u@[127.0.0.1]>');
+    is_deeply(\@routed, ['u', '[127.0.0.1]', 'local matches atom'],
+              'a routed mailbox may still end in an address literal');
 
     my @r = Qpsmtpd::Address->canonify("<a\@example.com>\n");
     is_deeply(\@r, [undef, undef, 'missing delimiters'],

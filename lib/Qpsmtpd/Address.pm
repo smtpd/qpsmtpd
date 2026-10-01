@@ -190,13 +190,7 @@ sub _domain_re {
 
     # NB: the label separator must survive double-quote interpolation. Written
     # as "\." it collapses to a bare dot and matches any octet.
-    my $domain_re = $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
-
-    # $address_literal_expr may be empty, if a site doesn't allow them
-    if (!$domain_expr && $address_literal_expr) {
-        $domain_re = "(?:$address_literal_expr|$domain_re)";
-    }
-    return $domain_re;
+    return $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
 }
 
 # The unquoted form matches the lenient superset of Dot-string, which canonify
@@ -207,13 +201,20 @@ sub _domain_re {
 # to call unless a site overrides a component, so perl compiles it only once.
 sub _path_re {
     my ($domain_re) = @_;
+
+    # An address literal may only follow the mailbox '@', never a source
+    # route's. $address_literal_expr may be empty, if a site doesn't allow them.
+    my $destination_re = $domain_re;
+    if (!$domain_expr && $address_literal_expr) {
+        $destination_re = "(?:$address_literal_expr|$domain_re)";
+    }
     my $qcontent = "(?:$qtext_expr|$utf8_expr|\\\\$text_expr)";
     return "(?<route>\@$domain_re(?:,\@$domain_re)*:)?"
       . '(?>'
       . "\"(?<quoted>$qcontent*+)\""
       . "|(?<unquoted>$atom_expr(?:$atom_expr|[. ])*+)"
       . ')'
-      . "\@(?<domain>$domain_re)";
+      . "\@(?<domain>$destination_re)";
 }
 
 # Only reached once the grammar has already rejected the path, to say why.
@@ -229,6 +230,7 @@ sub _why_invalid {
     # '@' is a special, not atext: only a quoted localpart may carry one. The
     # domain cannot hold an '@' either, so the separator is the last one.
     $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
+    return 'syntax error' if $path =~ /^\@/;    # a malformed source route
     my $localpart = substr $path, 0, rindex($path, '@');
     return 'unquoted @ in localpart' if $localpart =~ /\@/ && $localpart !~ /^"/;
 
