@@ -35,7 +35,8 @@ sub test_hook_mail {
     ok( $self->hook_mail( $transaction, $sender ) );
     ok( $self->hook_mail( $transaction, $sender ) );
 
-    $sender->host('');
+    # a valid path with no domain to resolve
+    $sender = Qpsmtpd::Address->new('<postmaster>');
     $self->{_args}{reject} = 1;
     $self->{_args}{reject_type} = 'soft';
     my ($r) = $self->hook_mail( $transaction, $sender );

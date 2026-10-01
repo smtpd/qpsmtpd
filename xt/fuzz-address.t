@@ -275,6 +275,19 @@ sub same {
 
 my $reference = Qpsmtpd::Address->new('<a@example.com>');
 
+# Whatever an object holds, format() writes a path that parses back to it.
+# format() feeds Received: lines, logs and plugin comparisons.
+sub round_trip_error {
+    my ($ao) = @_;
+    my $formatted = $ao->format;
+    my $again = Qpsmtpd::Address->new($formatted);
+    return 'format does not re-parse: ' . show($formatted) if !$again;
+    return 'format changes the user: ' . show($formatted) if !same($again->user, $ao->user);
+    return 'format changes the host: ' . show($formatted) if !same($again->host, $ao->host);
+    return 'format is not idempotent: ' . show($formatted) if $again->format ne $formatted;
+    return '';
+}
+
 # '' when every property holds, otherwise what broke. The text before the
 # first ':' names the class of failure.
 sub check {
@@ -308,23 +321,53 @@ sub check {
             return 'malformed UTF-8 in result: ' . show($part) if !utf8::decode($copy);
         }
 
-        # format() feeds Received: lines, logs and plugin comparisons
         my $ao = eval { Qpsmtpd::Address->new($in) };
         return "new died: $@" if $@;
         return 'new rejects what canonify accepts' if !$ao;
+        my $err = round_trip_error($ao);
+        return $err if $err;
         my $formatted = $ao->format;
-        my $again = Qpsmtpd::Address->new($formatted);
-        return 'format does not re-parse: ' . show($formatted) if !$again;
-        return 'format changes the user: ' . show($formatted) if !same($again->user, $ao->user);
-        return 'format changes the host: ' . show($formatted) if !same($again->host, $ao->host);
-        return 'format is not idempotent: ' . show($formatted) if $again->format ne $formatted;
         return 'address ne its own format: ' . show($formatted) if !eval { $ao eq $formatted };
         return 'address eq a rejected wrapping of it' if eval { $ao eq "<$formatted>" };
+
+        my $from_parts = Qpsmtpd::Address->new($ao->user, $ao->host);
+        if (defined $ao->host) {
+            return 'new(user, host) rejects its own parts' if !$from_parts;
+            return 'new(user, host) ne the parsed address' if $from_parts ne $ao;
+            (my $shouted = $ao->host) =~ tr/a-z/A-Z/;
+            my $other_case = Qpsmtpd::Address->new($ao->user, $shouted);
+            return 'domain case changes equality' if !$other_case || $other_case ne $ao;
+        }
     }
 
     (my $bare = $in) =~ s/^<|>\z//g;
     eval { Qpsmtpd::Address->new($bare) };
     return "new died on unbracketed input: $@" if $@;
+
+    # Split anywhere and handed over as raw parts, the input must give either
+    # no address or one that round-trips, through new() and the setters alike.
+    my $at = rindex $bare, '@';
+    my ($raw_user, $raw_host) = $at < 0 ? ($bare, undef)
+      : (substr($bare, 0, $at), substr($bare, $at + 1));
+    my $built = eval { Qpsmtpd::Address->new($raw_user, $raw_host) };
+    return "new(user, host) died: $@" if $@;
+    if ($built) {
+        my $err = round_trip_error($built);
+        return "new(user, host): $err" if $err;
+    }
+    for my $setter (['user', $raw_user], ['host', $raw_host]) {
+        my ($method, $value) = @$setter;
+        next if !defined $value;
+        my $target = Qpsmtpd::Address->new('<a@example.com>');
+        my $before = $target->format;
+        if (eval { $target->$method($value); 1 }) {
+            my $err = round_trip_error($target);
+            return "$method(): $err" if $err;
+        }
+        elsif ($target->format ne $before) {
+            return "$method() croaked but changed the address to " . show($target->format);
+        }
+    }
     eval { my @sorted = sort { $a cmp $b } $reference, $in; 1 } or return "cmp died: $@";
     return "warning: @warnings" if @warnings;
     return '';
