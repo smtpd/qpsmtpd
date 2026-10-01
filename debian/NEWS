@@ -1,0 +1,19 @@
+qpsmtpd (1.02) unstable; urgency=medium
+
+  Envelope addresses (MAIL FROM, RCPT TO) are now parsed strictly along the
+  RFC 5321 grammar.  Some paths that earlier releases accepted are rejected
+  with "syntax error", among them:
+
+   - unquoted specials in the localpart, such as ", (, < or \
+   - more than one unquoted @, e.g. <a@b@example.com>
+   - control characters anywhere in the path
+   - malformed address literals, e.g. an IPv4 octet above 255
+
+  Third-party plugins should be checked: Qpsmtpd::Address->new() returns
+  undef for an invalid path, and the user(), host() and address() setters
+  croak instead of storing an invalid value.
+
+  The SMTPUTF8 extension (RFC 6531) is new in this release and disabled by
+  default via /etc/qpsmtpd/smtputf8; see README.Debian before enabling it.
+
+ -- Andreas Erhard <erhard@wor.net>  Thu, 01 Oct 2026 22:28:27 +0200

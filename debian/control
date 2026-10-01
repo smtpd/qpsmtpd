@@ -42,7 +42,9 @@ Recommends:
 Suggests:
  clamav-daemon,
  libclamav-client-perl,
+ libgeoip2-perl,
  libmail-dkim-perl,
+ libmail-dmarc-perl,
  libnet-ldap-perl,
  libredis-perl,
  libtimedate-perl,

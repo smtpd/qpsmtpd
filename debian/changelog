@@ -1,8 +1,31 @@
-qpsmtpd (1.02~beta1+wornet1) unstable; urgency=medium
+qpsmtpd (1.02) unstable; urgency=medium
+
+  * New upstream release.  See CHANGELOG.md and UPGRADING.md for details.
+  * Envelope addresses are parsed strictly along the RFC 5321 grammar now
+    (#352, #353, #354).  Paths that earlier releases let through are
+    rejected with 'syntax error': unquoted specials in the localpart, more
+    than one unquoted @, control characters and malformed address literals.
+    Qpsmtpd::Address->new() returns undef for an invalid path and the
+    user(), host() and address() setters croak; third-party plugins that
+    rewrite addresses may need adjusting.  See debian/NEWS.
+  * Extend the plugin dependencies to the upstream recommends:
+    - Add libmail-dmarc-perl (dmarc) and libgeoip2-perl (geoip) to
+      Suggests.  Neither plugin is enabled in the default configuration.
+    - The log/ helpers are not installed, so File::Tail and Time::TAI64 are
+      not needed.
+  * Drop the vendor suffix from the package versions.  This repository is
+    the official qpsmtpd repository; the earlier 1.01+wornet1 and
+    1.02~beta1+wornet1 entries are renamed to 1.01-1 and 1.02~beta1.
+  * Supported targets are Debian 11 (bullseye) and later and Ubuntu 22.04
+    and later, following the perl (>= 5.32) requirement.
+
+ -- Andreas Erhard <erhard@wor.net>  Thu, 01 Oct 2026 22:28:27 +0200
+
+qpsmtpd (1.02~beta1) unstable; urgency=medium
 
   * Package the current upstream master, which will become 1.02.  This is a
-    pre-release for live testing; the version sorts above 1.01+wornet1 and
-    below a future 1.02.  lib/Qpsmtpd.pm still declares 1.01, so the package
+    pre-release for live testing; the version sorts above 1.01-1 and below
+    a future 1.02.  lib/Qpsmtpd.pm still declares 1.01, so the package
     version is deliberately ahead of it.
   * Install CHANGELOG.md as the upstream changelog.  Upstream renamed Changes
     to CHANGELOG.md, which broke dh_installchangelogs.
@@ -22,7 +45,7 @@ qpsmtpd (1.02~beta1+wornet1) unstable; urgency=medium
 
  -- Andreas Erhard <erhard@wor.net>  Tue, 08 Sep 2026 22:09:04 +0200
 
-qpsmtpd (1.01+wornet1) unstable; urgency=medium
+qpsmtpd (1.01-1) unstable; urgency=medium
 
   * Overhaul of the Debian packaging, which was still largely the 0.94-6
     Debian QA state:
