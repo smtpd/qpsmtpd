@@ -3,6 +3,30 @@
 When upgrading please review these notes for the versions you are
 upgrading _from_.
 
+## v1.02 or below
+
+### qpsmtpd-prefork is gone
+
+Run qpsmtpd-forkserver instead, ideally from qpsmtpd.service (see "qpsmtpd
+installation" in README.md). It takes the same plugins and config, and
+hands hook\_pre\_connection the same arguments, so hosts\_allow works
+unchanged. Most options carry over:
+
+| qpsmtpd-prefork | qpsmtpd-forkserver |
+|---|---|
+| `--interface`, `--listen-address` | `-l`, `--listen-address` |
+| `--port` | `-p`, `--port` |
+| `--max-from-ip` | `-m`, `--max-from-ip` |
+| `--children` | `-c`, `--limit-connections` |
+| `--user` | `-u`, `--user` |
+| `--detach` | `-d`, `--detach` |
+| `--pid-file` | `--pid-file` |
+
+`--idle-children`, `--pretty-child`, `--renice-parent`, `--debug` and
+`--quiet` have no equivalent. qpsmtpd-forkserver forks per connection, so
+there is no pool of idle children to size. Its default port is 2525, so set
+`--port` explicitly.
+
 ## v0.84 or below
 
 ### CHECK\_RELAY, CHECK\_NORELAY, RELAY\_ONLY
