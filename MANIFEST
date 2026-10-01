@@ -147,7 +147,6 @@ plugins/virus/klez_filter
 plugins/virus/sophie
 plugins/virus/uvscan
 plugins/whitelist
-qpsmtpd
 qpsmtpd-forkserver
 qpsmtpd.service
 qpsmtpd-prefork

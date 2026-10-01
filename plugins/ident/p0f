@@ -140,9 +140,7 @@ Default: none (p0f rejections disabled)
 p0f v3 requires only the remote IP.
 
 p0f v2 requires four pieces of information to look up the p0f fingerprint:
-local_ip, local_port, remote_ip, and remote_port. qpsmtpd-forkserver and
-qpsmtpd-prefork provide all four. Under (x)inetd the local IP and port are
-unknown.
+local_ip, local_port, remote_ip, and remote_port.
 
 =head1 ACKNOWLEDGEMENTS
 

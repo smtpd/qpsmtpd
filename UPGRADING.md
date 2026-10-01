@@ -5,18 +5,21 @@ upgrading _from_.
 
 ## v1.02 or below
 
-### tcpserver is gone
+### tcpserver and (x)inetd are gone
 
-Run qpsmtpd-forkserver from qpsmtpd.service (see "qpsmtpd installation" in
+The qpsmtpd script they ran is gone, along with the RPM's xinetd files. Run
+qpsmtpd-forkserver from qpsmtpd.service (see "qpsmtpd installation" in
 README.md). Under daemontools, copy run.forkserver to run and set its listen
-address and ports; config/IP is no longer read. qpsmtpd still runs from
-(x)inetd.
+address and ports; config/IP is no longer read.
 
 Rules in a tcprules file move into qpsmtpd config:
 
 - `:allow,RELAYCLIENT=""` entries go in config/relayclients
 - `:deny` entries go in config/hosts\_allow, with the hosts\_allow plugin
   enabled
+
+Nothing sets `$RELAYCLIENT` or `$WHITELISTCLIENT` per client any more. Use
+config/relayclients and the whitelist plugin's whitelisthosts.
 
 ## v0.84 or below
 

@@ -29,8 +29,8 @@ whitelisthosts file is exempted from any further validation during
 'connect', and can be selectively exempted at other stages by 
 plugins testing for a 'whitelisthost' connection note.
 
-Similarly, if the environment variable $WHITELISTCLIENT is set
-(e.g. by xinetd's I<env> attribute), the connection will be exempt from
+Similarly, if the environment variable $WHITELISTCLIENT is set, the
+connection will be exempt from
 further 'connect' validation, and the host can be selectively 
 exempted by other plugins testing for a 'whitelistclient' connection 
 note.
