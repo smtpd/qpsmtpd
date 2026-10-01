@@ -1,6 +1,8 @@
 package Qpsmtpd::Address;
 use strict;
 
+use Carp qw(croak);
+
 =head1 NAME
 
 Qpsmtpd::Address - Lightweight E-Mail address objects
@@ -35,16 +37,17 @@ parsed via the L<canonify> method, using the full RFC 2821 rules.
 
 =item * Qpsmtpd::Address->new("user", "host")
 
-If the caller has already split the address from the domain/host,
-this mode will not L<canonify> the input values.  This is not 
-recommended in cases of user-generated input for that reason.  This 
-can be used to generate Qpsmtpd::Address objects for accounts like 
-"<postmaster>" or indeed for the bounce address "<>".
+If the caller has already split the address from the domain/host, the
+localpart and domain are given unquoted. They are held to the same
+rules as a parsed path: an object is returned only if the path
+L<format> would write for them parses back to the same parts.
 
 =back
 
-The resulting objects can be stored in arrays or used in plugins to 
-test for equality (like in badmailfrom).
+Either way, new() returns undef for anything that is not a valid
+address, so every object holds one. The resulting objects can be
+stored in arrays or used in plugins to test for equality (like in
+badmailfrom).
 
 =cut
 
@@ -55,126 +58,47 @@ use overload (
 
 sub new {
     my ($class, $user, $host) = @_;
-    my $self = {};
-    if (! defined $user) {
-        # Do nothing
-    }
-    elsif ($user =~ /^<(.*)>$/s) {    # /s: a newline must not dodge canonify
-        ($user, $host) = $class->canonify($user);
-        return if !defined $user;
-    }
-    elsif (!defined $host) {
-        my $address = $user;
-        ($user, $host) = $address =~ m/(.*)(?:\@(.*))/;
-    }
-    $self->{_user} = $user;
-    $self->{_host} = $host;
-    return bless $self, $class;
+
+    # Given a domain, the first argument is a localpart, which may itself be
+    # <...> once quoted. Alone, it is a path whether or not it is bracketed,
+    # and no argument at all is the null path, parsed like any other so the
+    # null sender always holds canonify's ''.
+    my @parts = defined $host  ? $class->_canonical($user, $host)
+              : !defined $user ? $class->canonify('<>')
+              : $user =~ /^<.*>\z/s ? $class->canonify($user)
+              :                  $class->canonify("<$user>");
+    return if !defined $parts[0];
+    return bless {_user => $parts[0], _host => $parts[1]}, $class;
 }
 
-# Definition of an address ("path") from RFC 2821:
+# The path grammar, RFC 5321 4.1.2 with the RFC 6531 3.3 extensions:
 #
-#   Path = "<" [ A-d-l ":" ] Mailbox ">"
+#   Path            = "<" [ A-d-l ":" ] Mailbox ">"
+#   A-d-l           = At-domain *( "," At-domain )   ; source route, ignored
+#   At-domain       = "@" Domain
+#   Mailbox         = Local-part "@" ( Domain / address-literal )
+#   Local-part      = Dot-string / Quoted-string
+#   Dot-string      = Atom *( "." Atom )
+#   Atom            = 1*atext                        ; 6531: / UTF8-non-ascii
+#   Quoted-string   = DQUOTE *QcontentSMTP DQUOTE
+#   QcontentSMTP    = qtextSMTP / quoted-pairSMTP
+#   qtextSMTP       = %d32-33 / %d35-91 / %d93-126   ; 6531: / UTF8-non-ascii
+#   quoted-pairSMTP = %d92 %d32-126
+#   Domain          = sub-domain *( "." sub-domain )
+#   sub-domain      = Let-dig [ Ldh-str ]            ; 6531: / U-label
 #
-#   A-d-l = At-domain *( "," A-d-l )
-#       ; Note that this form, the so-called "source route",
-#       ; MUST BE accepted, SHOULD NOT be generated, and SHOULD be
-#       ; ignored.
-#
-#   At-domain = "@" domain
-#
-#   Mailbox = Local-part "@" Domain
-#
-#   Local-part = Dot-string / Quoted-string
-#       ; MAY be case-sensitive
-#
-#   Dot-string = Atom *("." Atom)
-#
-#   Atom = 1*atext
-#
-#   Quoted-string = DQUOTE *qcontent DQUOTE
-#
-#   Domain = (sub-domain 1*("." sub-domain)) / address-literal
-#   sub-domain = Let-dig [Ldh-str]
-#
-#   address-literal = "[" IPv4-address-literal /
-#                     IPv6-address-literal /
-#                     General-address-literal "]"
-#
-#   IPv4-address-literal = Snum 3("." Snum)
-#   IPv6-address-literal = "IPv6:" IPv6-addr
-#   General-address-literal = Standardized-tag ":" 1*dcontent
-#   Standardized-tag = Ldh-str
-#         ; MUST be specified in a standards-track RFC
-#         ; and registered with IANA
-#
-#   Snum = 1*3DIGIT  ; representing a decimal integer
-#         ; value in the range 0 through 255
-#   Let-dig = ALPHA / DIGIT
-#   Ldh-str = *( ALPHA / DIGIT / "-" ) Let-dig
-#
-#   IPv6-addr = IPv6-full / IPv6-comp / IPv6v4-full / IPv6v4-comp
-#   IPv6-hex  = 1*4HEXDIG
-#   IPv6-full = IPv6-hex 7(":" IPv6-hex)
-#   IPv6-comp = [IPv6-hex *5(":" IPv6-hex)] "::" [IPv6-hex *5(":"
-#          IPv6-hex)]
-#         ; The "::" represents at least 2 16-bit groups of zeros
-#         ; No more than 6 groups in addition to the "::" may be
-#         ; present
-#   IPv6v4-full = IPv6-hex 5(":" IPv6-hex) ":" IPv4-address-literal
-#   IPv6v4-comp = [IPv6-hex *3(":" IPv6-hex)] "::"
-#            [IPv6-hex *3(":" IPv6-hex) ":"] IPv4-address-literal
-#         ; The "::" represents at least 2 16-bit groups of zeros
-#         ; No more than 4 groups in addition to the "::" and
-#         ; IPv4-address-literal may be present
-#
-#
-#
-# atext and qcontent are not defined in RFC 2821.
-# From RFC 2822:
-#
-# atext           =       ALPHA / DIGIT / ; Any character except controls,
-#                         "!" / "#" /     ;  SP, and specials.
-#                         "$" / "%" /     ;  Used for atoms
-#                         "&" / "'" /
-#                         "*" / "+" /
-#                         "-" / "/" /
-#                         "=" / "?" /
-#                         "^" / "_" /
-#                         "`" / "{" /
-#                         "|" / "}" /
-#                         "~"
-# qtext           =       NO-WS-CTL /     ; Non white space controls
-#
-#                         %d33 /          ; The rest of the US-ASCII
-#                         %d35-91 /       ;  characters not including "\"
-#                         %d93-126        ;  or the quote character
-#
-# qcontent        =       qtext / quoted-pair
-#
-# NO-WS-CTL       =       %d1-8 /         ; US-ASCII control characters
-#                         %d11 /          ;  that do not include the
-#                         %d12 /          ;  carriage return, line feed,
-#                         %d14-31 /       ;  and white space characters
-#                         %d127
-#
-# quoted-pair     =       ("\" text) / obs-qp
-#
-# text            =       %d1-9 /         ; Characters excluding CR and LF
-#                         %d11 /
-#                         %d12 /
-#                         %d14-127 /
-#                         obs-text
-#
-#
-# (We ignore all obs forms)
+# Beyond the grammar, an unquoted localpart may also hold empty atoms and
+# spaces: <a..b@example>, <a.@example>, <ask @example>. Japanese mobile
+# carriers issued addresses of the first two forms for years, and broken
+# clients send the third. They are accepted as if quoted, and format()
+# quotes them on the way out.
 
 =head2 canonify()
 
 Primarily an internal method, it is used only on the path portion of
-an e-mail message, as defined in RFC-2821 (this is the part inside the
+an e-mail message, as defined in RFC 5321 (this is the part inside the
 angle brackets and does not include the "human readable" portion of an
-address).  It returns a list of (local-part, domain).
+address).  It returns a list of (local-part, domain, reason).
 
 =cut
 
@@ -197,17 +121,40 @@ our $utf8_expr =
   . '|\xF4[\x80-\x8F][\x80-\xBF]{2})';
 our $atom_expr =
   '(?:[a-zA-Z0-9!#%&*+=?^_`{|}~\$\x27\x2D\/]|' . $utf8_expr . ')+';
-our $address_literal_expr =
-  '(?:\[(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|IPv6:[0-9A-Fa-f:.]+)\])';
+
+# RFC 5321 4.1.3. A Snum is 1*3DIGIT "representing a decimal integer value in
+# the range 0 through 255", so leading zeros are allowed. The "::" stands for
+# at least two groups of zeros, so it leaves room for at most six explicit
+# groups, or four beside an embedded IPv4 address.
+our $address_literal_expr = do {
+    my $snum = '(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])';
+    my $ipv4 = "$snum(?:\\.$snum){3}";
+    my $hex  = '[0-9A-Fa-f]{1,4}';
+    my $groups = sub {    # $min to $max hex groups, ':' separated
+        my ($min, $max) = @_;
+        return '' if !$max;
+        my $re = "$hex(?::$hex){" . ($min ? $min - 1 : 0) . ',' . ($max - 1) . '}';
+        return $min ? $re : "(?:$re)?";
+    };
+    my @ipv6 = ("$hex(?::$hex){7}", "(?:$hex:){6}$ipv4");
+    for my $left (0 .. 6) {
+        push @ipv6, $groups->($left, $left) . '::' . $groups->(0, 6 - $left);
+    }
+    for my $left (0 .. 4) {
+        my $right = 4 - $left ? "(?:$hex:){0," . (4 - $left) . '}' : '';
+        push @ipv6, $groups->($left, $left) . "::$right$ipv4";
+    }
+    '(?:\\[(?>' . $ipv4 . '\\]|(?i:IPv6):(?:' . join('|', @ipv6) . ')\\]))';
+};
 our $subdomain_expr =
     '(?:(?:[a-zA-Z0-9]|' . $utf8_expr . ')'
   . '(?:(?:[-a-zA-Z0-9]|' . $utf8_expr . ')*'
   . '(?:[a-zA-Z0-9]|' . $utf8_expr . '))?)';
 our $domain_expr;
-our $qtext_expr = '[\x01-\x08\x0B\x0C\x0E-\x1F\x21\x23-\x5B\x5D-\x7F]';
-our $text_expr  = '[\x01-\x09\x0B\x0C\x0E-\x7F]';
+our $qtext_expr = '[\x20\x21\x23-\x5B\x5D-\x7E]';
+our $text_expr  = '[\x20-\x7E]';
 
-# RFC 6531 3.3 allows a U-label in a domain, not an arbitrary run of UTF-8.
+# RFC 6531 3.3 requires every domain label to be a U-label.
 # These categories are DISALLOWED by IDNA2008 (RFC 5892) yet are well-formed
 # UTF-8, so $utf8_expr passes them: NBSP, ideographic space, zero-width
 # joiners, the BOM, soft hyphen. A localpart may hold any of them.
@@ -223,74 +170,133 @@ our $domain_disallowed_expr = qr/[\p{Zs}\p{Zl}\p{Zp}\p{Cc}\p{Cf}\p{Co}]/;
 sub canonify {
     my ($dummy, $path) = @_;
 
-    # strip delimiters
-    if ($path !~ /^<(.*)>$/s) {    # /s, so the control check below sees a newline
+    if ($path !~ /^<(.*)>\z/s) {
         return undef, undef, 'missing delimiters'; ## no critic (undef)
-    };
+    }
     $path = $1;
 
-    # RFC 5321 qtextSMTP/quoted-pairSMTP/atext are all printable ASCII: no
-    # control character is legal anywhere in a path, quoted or not. The atom
-    # match below is deliberately lenient about what it returns, so an
-    # unchecked NUL reaches the queue plugins -- and qmail-queue writes a
-    # NUL-delimited envelope.
-    if ($path =~ /[\x00-\x1F\x7F]/) {
-        return undef, undef, 'control character in path'; ## no critic (undef)
+    return '', undef, 'empty path' if $path eq '';
+
+    # RFC 5321 4.5.1
+    return 'postmaster', undef, 'bare postmaster' if $path =~ /^postmaster\z/i;
+
+    my $domain_re = _domain_re();
+    if ($path !~ /^${\ _path_re($domain_re)}\z/) {
+        return undef, undef, _why_invalid($path, $domain_re); ## no critic (undef)
     }
+    my ($route, $quoted, $unquoted, $domain) =
+      @+{qw(route quoted unquoted domain)};
 
-    # RFC 6531: non-ASCII is only ever legal as well-formed UTF-8. Check the
-    # whole path up front, because the atom match below is deliberately
-    # lenient and would otherwise let malformed octets through.
-    if ($path =~ /[\x80-\xFF]/ && $path !~ /^(?:[\x00-\x7F]|$utf8_expr)*$/) {
-        return undef, undef, 'malformed UTF-8'; ## no critic (undef)
-    }
-
-    # NB: the label separator must survive double-quote interpolation. Written
-    # as "\." it collapses to a bare dot and matches any octet, which let
-    # control characters -- NUL included -- through into the domain.
-    my $domain_re = $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
-
-    # $address_literal_expr may be empty, if a site doesn't allow them
-    if (!$domain_expr && $address_literal_expr) {
-        $domain_re = "(?:$address_literal_expr|$domain_re)";
-    };
-
-    # strip source route
-    $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
-
-    # empty path is ok
-    if ($path eq '') {
-        return '', undef, 'empty path';
-    };
-
-    # bare postmaster is permissible, per RFC-2821 (4.5.1)
-    if ( $path =~ m/^postmaster$/i ) {
-        return 'postmaster', undef, 'bare postmaster';
-    }
-
-    my ($localpart, $domainpart) = $path =~ /^(.*)\@($domain_re)$/;
-    if (!defined $localpart) {
-        return;
-    };
-
-    if (defined $domainpart && $domainpart =~ /[\x80-\xFF]/) {
-        my $decoded = $domainpart;
+    # RFC 6531 3.3 holds every domain to U-label rules, the ignored source
+    # route's included. The localpart is exempt, so it stays out of this.
+    my $domains = ($route // '') . $domain;
+    if ($domains =~ /[\x80-\xFF]/) {
+        my $decoded = $domains;
         utf8::decode($decoded);
         if ($decoded =~ $domain_disallowed_expr) {
             return undef, undef, 'disallowed in domain'; ## no critic (undef)
         }
     }
 
-    if ($localpart =~ /^$atom_expr(\.$atom_expr)*/) {
-        return $localpart, $domainpart, 'local matches atom';  # simple case, we are done
+    if (defined $quoted) {
+        $quoted =~ s/\\($text_expr)/$1/g;
+        return $quoted, $domain, 'quoted string';
+    }
+    if ($unquoted =~ /^${\ _dot_string_re()}\z/) {
+        return $unquoted, $domain, 'local matches atom';
+    }
+    return $unquoted, $domain, 'lenient localpart';
+}
+
+# The inverse of canonify(): the path for a localpart and domain. A localpart
+# that is not a Dot-string is quoted, escaping only the two octets qtextSMTP
+# excludes. format() and every setter go through here, so what qpsmtpd writes
+# is exactly what it would accept.
+sub _path {
+    my ($user, $host) = @_;
+    return '<>' if $user eq '' && !defined $host;
+    if ($user !~ /^${\ _dot_string_re()}\z/) {
+        (my $escaped = $user) =~ s/(["\\])/\\$1/g;
+        $user = qq{"$escaped"};
+    }
+    return '<' . $user . (defined $host ? "\@$host" : '') . '>';
+}
+
+# The parts canonify() gives back for the path _path() writes, or an empty
+# list. Every way of setting an address goes through here, so an object never
+# holds anything that does not survive that round trip.
+sub _canonical {
+    my ($class, $user, $host) = @_;
+    return if !defined $user;
+    my ($canon_user, $canon_host) = $class->canonify(_path($user, $host));
+    return if !defined $canon_user;
+    return ($canon_user, $canon_host);
+}
+
+sub _set {
+    my ($self, $user, $host) = @_;
+    my @parts = $self->_canonical($user, $host);
+    if (!@parts) {
+        croak sprintf 'not a valid address: localpart %s, domain %s',
+          map { defined $_ ? "'$_'" : 'undef' } $user, $host;
+    }
+    @$self{qw(_user _host)} = @parts;
+    return;
+}
+
+sub _dot_string_re {
+    return "$atom_expr(?:\\.$atom_expr)*";
+}
+
+sub _domain_re {
+
+    # NB: the label separator must survive double-quote interpolation. Written
+    # as "\." it collapses to a bare dot and matches any octet.
+    return $domain_expr || "$subdomain_expr(?:\\.$subdomain_expr)*";
+}
+
+# The unquoted form matches the lenient superset of Dot-string, which canonify
+# tells apart after the match. The first octet then picks the only localpart
+# alternative that can apply, and the group is atomic, so a domain that fails
+# to match is never retried against a shorter localpart: parse time stays
+# linear in the length of the path. The pattern string is identical from call
+# to call unless a site overrides a component, so perl compiles it only once.
+sub _path_re {
+    my ($domain_re) = @_;
+
+    # An address literal may only follow the mailbox '@' (RFC 5321 4.1.2).
+    # $address_literal_expr may be empty, if a site doesn't allow them.
+    my $destination_re = $domain_re;
+    if (!$domain_expr && $address_literal_expr) {
+        $destination_re = "(?:$address_literal_expr|$domain_re)";
+    }
+    my $qcontent = "(?:$qtext_expr|$utf8_expr|\\\\$text_expr)";
+    return "(?<route>\@$domain_re(?:,\@$domain_re)*:)?"
+      . '(?>'
+      . "\"(?<quoted>$qcontent*+)\""
+      . "|(?<unquoted>$atom_expr(?:$atom_expr|[. ])*+)"
+      . ')'
+      . "\@(?<domain>$destination_re)";
+}
+
+# Only reached once the grammar has already rejected the path, to say why.
+sub _why_invalid {
+    my ($path, $domain_re) = @_;
+
+    return 'control character in path' if $path =~ /[\x00-\x1F\x7F]/;
+
+    if ($path =~ /[\x80-\xFF]/ && $path !~ /^(?:[\x00-\x7F]|$utf8_expr)*+\z/) {
+        return 'malformed UTF-8';
     }
 
-    if ($localpart =~ /^"(($qtext_expr|$utf8_expr|\\$text_expr)*)"$/) {
-        $localpart = $1;
-        $localpart =~ s/\\($text_expr)/$1/g;
-        return $localpart, $domainpart;
-    }
-    return undef, undef, 'fall through';  ## no critic (undef)
+    # '@' is a special: only a quoted localpart may carry one. The
+    # domain cannot hold an '@' either, so the separator is the last one.
+    $path =~ s/^\@$domain_re(?:,\@$domain_re)*://;
+    return 'syntax error' if $path =~ /^\@/;    # a malformed source route
+    my $localpart = substr $path, 0, rindex($path, '@');
+    return 'unquoted @ in localpart' if $localpart =~ /\@/ && $localpart !~ /^"/;
+
+    return 'syntax error';
 }
 
 sub parse {
@@ -301,7 +307,8 @@ sub parse {
 =head2 address()
 
 Can be used to reset the value of an existing Q::A object, in which
-case it takes a parameter with or without the angle brackets.
+case it takes a parameter with or without the angle brackets. It
+croaks if that is not a valid path, leaving the object unchanged.
 
 Returns the stringified representation of the address.  NOTE: does
 not escape any of the characters that need escaping, nor does it
@@ -312,21 +319,21 @@ L<format>.
 
 sub address {
     my ($self, $val) = @_;
-    if (defined($val)) {
-        $val = "<$val>" unless $val =~ /^<.+>$/;
+    if (defined $val) {
+        $val = "<$val>" if $val !~ /^<.*>\z/s;
         my ($user, $host) = $self->canonify($val);
-        $self->{_user} = $user;
-        $self->{_host} = $host;
+        croak "not a valid address: $val" if !defined $user;
+        @$self{qw(_user _host)} = ($user, $host);
     }
-    return (defined $self->{_user} ? $self->{_user}       : '')
-      . (defined $self->{_host}    ? '@' . $self->{_host} : '');
+    return $self->{_user} . (defined $self->{_host} ? '@' . $self->{_host} : '');
 }
 
 =head2 format()
 
-Returns the canonical stringified representation of the address.  It
-does escape any characters requiring it (per RFC-2821/2822) and it
-does include the surrounding angle brackets.  It is also the default
+Returns the canonical stringified representation of the address: the
+path, angle brackets included, with the localpart quoted only when it
+is not a Dot-string (RFC 5321 4.1.2). canonify() parses it back to
+the same localpart and domain.  It is also the default
 stringification operator, so the following are equivalent:
 
   print $rcpt->format();
@@ -336,17 +343,7 @@ stringification operator, so the following are equivalent:
 
 sub format {
     my ($self) = @_;
-
-    # UTF-8 octets are legal unquoted in an internationalized mailbox
-    # (RFC 6531), so they must not be escaped one byte at a time.
-    my $qchar = '[^a-zA-Z0-9!#\$\%\&\x27\*\+\x2D\/=\?\^_`{\|}~.\x80-\xFF]';
-    return '<>' if !defined $self->{_user};
-    if ((my $user = $self->{_user}) =~ s/($qchar)/\\$1/g) {
-        return
-          qq(<"$user")
-          . (defined $self->{_host} ? '@' . $self->{_host} : '') . ">";
-    }
-    return "<" . $self->address() . ">";
+    return _path($self->{_user}, $self->{_host});
 }
 
 =head2 user([$user])
@@ -355,13 +352,14 @@ Returns the "localpart" of the address, per RFC-2821, or the portion
 before the '@' sign.
 
 If called with one parameter, the localpart is set and the new value is
-returned.
+returned. It croaks, leaving the address unchanged, if the result would
+not be a valid address.
 
 =cut
 
 sub user {
     my ($self, $user) = @_;
-    $self->{_user} = $user if defined $user;
+    $self->_set($user, $self->{_host}) if defined $user;
     return $self->{_user};
 }
 
@@ -371,13 +369,21 @@ Returns the "domain" part of the address, per RFC-2821, or the portion
 after the '@' sign.
 
 If called with one parameter, the domain is set and the new value is
-returned.
+returned. It croaks, leaving the address unchanged, if the result would
+not be a valid address.
 
 =cut
 
 sub host {
     my ($self, $host) = @_;
-    $self->{_host} = $host if defined $host;
+    if (defined $host) {
+
+        # The null path has no localpart: '' only stands in for it, and given
+        # a domain it would become the mailbox <""@domain>.
+        croak 'not a valid address: the null sender has no domain'
+          if !defined $self->{_host} && $self->{_user} eq '';
+        $self->_set($self->{_user}, $host);
+    }
     return $self->{_host};
 }
 
@@ -436,23 +442,25 @@ sub config {
 }
 
 sub _addr_cmp {
-    require UNIVERSAL;
     my ($left, $right, $swap) = @_;
     my $class = ref($left);
 
-    unless (UNIVERSAL::isa($right, $class)) {
-        $right = $class->new($right);
+    if (!UNIVERSAL::isa($right, $class)) {
+
+        # new() returns undef for anything that is not a path. Comparing
+        # against one must not die; it sorts before every address and equals
+        # none of them.
+        $right = $class->new($right) // return $swap ? -1 : 1;
     }
+    ($left, $right) = ($right, $left) if $swap;
 
-    #invert the address so we can sort by domain then user
-    ($left  = join('=', reverse(split(/@/, $left->format)))) =~ tr/[<>]//d;
-    ($right = join('=', reverse(split(/@/, $right->format)))) =~ tr/[<>]//d;
-
-    if ($swap) {
-        ($right, $left) = ($left, $right);
-    }
-
-    return $left cmp $right;
+    # By domain, then localpart. Domains follow DNS and are not case
+    # sensitive, a localpart MUST be treated as case sensitive (RFC 5321 2.4).
+    # tr folds ASCII only.
+    my ($left_host, $right_host) =
+      map { ($_->{_host} // '') =~ tr/A-Z/a-z/r } $left, $right;
+    return $left_host cmp $right_host
+      || $left->{_user} cmp $right->{_user};
 }
 
 =head1 COPYRIGHT

@@ -20,28 +20,53 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   from `PREREQ_PM` to `recommends`, so installing qpsmtpd no longer requires
   every optional plugin's dependency tree
 - postfix: disable `$qid` debug output (#345)
+- `Qpsmtpd::Address::canonify()` parses a path as one anchored match of the
+  RFC 5321 grammar, in linear time. Specials such as ", (, `<` and `\` now
+  need quotes. A source route must lead a mailbox. The reason for an
+  unparseable path is now 'syntax error'
+- xt/fuzz-address.t: fuzzes Qpsmtpd::Address against an independent parser
+- Qpsmtpd::Address: one parser, one serializer. Every way of building or
+  changing an address (new($user, $host), user(), host(), address()) is
+  checked by formatting it and parsing it back with canonify(). new()
+  returns undef and the setters croak on anything else. new(undef, $host)
+  is refused, and the null sender has one form: new() and new('<>') both
+  hold an empty localpart
+- Qpsmtpd::Address::format() quotes a localpart only when it is not a
+  Dot-string, and escapes only " and \: `<"foo bar"@example.com>`
+- Qpsmtpd::Address comparison works on the localpart and domain, and the
+  domain compares case-insensitively (RFC 5321 2.4): <a@Example.COM> eq
+  <a@example.com>
 
 ### Fixed
 
-- `Qpsmtpd::Command`: parsing ESMTP parameters was quadratic, now linear
+- Qpsmtpd::Command: parsing ESMTP parameters was quadratic, now linear
 - uribl: the body-scanning patterns were quadratic in line length
+- Qpsmtpd::Address: a quoted localpart may hold a space, per RFC 5321
+  qtextSMTP: <"foo bar"@example.com> was rejected
+- Qpsmtpd::Address: reject an unquoted @ in a localpart (#351, #352)
+- Qpsmtpd::Address: address literals follow the RFC 5321 grammar. An IPv4
+  octet above 255 and malformed IPv6, such as `[IPv6:::::::::]`, were
+  accepted, and the `IPv6:` tag is now case-insensitive
+- Qpsmtpd::Address: comparing an address against a string that is not a
+  valid path died, and `<a@[1.2.3.4]>` matched `<a@1.2.3.4>`
+- Qpsmtpd::Address::new(): an unbracketed arg was split naively on @, bypassing canonify()
 
 ### Security
 
-- `Qpsmtpd::Address`: reject control characters anywhere in a path, per RFC 5321.
-- `Qpsmtpd::Address::new()`: an address with a newline failed the bracket match
+- Qpsmtpd::Address: reject control characters anywhere in a path, per RFC 5321.
+- Qpsmtpd::Address::new(): an address with a newline failed the bracket match
 
 ### Removed
 
 - ci: drop 5.16 and 5.26 from testing
-- `Mail::SpamAssassin` and `Math::Complex` from the prereq; neither is loaded
+- Mail::SpamAssassin and Math::Complex from the prereq; neither is loaded
 
 ## [1.01] - 2026-07-13
 
 ### Added
 
 - hosts_allow: support IPv6 addresses (#330)
-- Allow an alternate ID for the `Authentication-Results` header (#323)
+- Allow an alternate ID for the Authentication-Results header (#323)
 
 ### Changed
 
