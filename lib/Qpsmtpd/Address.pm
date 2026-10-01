@@ -162,10 +162,14 @@ sub canonify {
     if ($path !~ /^${\ _path_re($domain_re)}\z/) {
         return undef, undef, _why_invalid($path, $domain_re); ## no critic (undef)
     }
-    my ($quoted, $unquoted, $domain) = @+{qw(quoted unquoted domain)};
+    my ($route, $quoted, $unquoted, $domain) =
+      @+{qw(route quoted unquoted domain)};
 
-    if ($domain =~ /[\x80-\xFF]/) {
-        my $decoded = $domain;
+    # RFC 6531 3.3 holds every domain to U-label rules, the ignored source
+    # route's included. The localpart is exempt, so it stays out of this.
+    my $domains = ($route // '') . $domain;
+    if ($domains =~ /[\x80-\xFF]/) {
+        my $decoded = $domains;
         utf8::decode($decoded);
         if ($decoded =~ $domain_disallowed_expr) {
             return undef, undef, 'disallowed in domain'; ## no critic (undef)
@@ -204,7 +208,7 @@ sub _domain_re {
 sub _path_re {
     my ($domain_re) = @_;
     my $qcontent = "(?:$qtext_expr|$utf8_expr|\\\\$text_expr)";
-    return "(?:\@$domain_re(?:,\@$domain_re)*:)?"
+    return "(?<route>\@$domain_re(?:,\@$domain_re)*:)?"
       . '(?>'
       . "\"(?<quoted>$qcontent*+)\""
       . "|(?<unquoted>$atom_expr(?:$atom_expr|[. ])*+)"

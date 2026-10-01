@@ -301,7 +301,21 @@ sub __utf8 {
           or diag Data::Dumper::Dumper(@r);
         is(Qpsmtpd::Address->new($bad), undef,
            "new returns undef for $not_a_ulabel{$bad} in the domain");
+
+        # ... and so must every domain of a source route, though it is ignored
+        my ($domain) = $bad =~ /\@(.*)>/;
+        for my $routed ("<\@$domain:user\@example.com>",
+                        "<\@a.example,\@$domain:user\@example.com>")
+        {
+            my @r = Qpsmtpd::Address->canonify($routed);
+            is_deeply(\@r, [undef, undef, 'disallowed in domain'],
+                      "canonify rejects $not_a_ulabel{$bad} in a source route")
+              or diag Data::Dumper::Dumper(@r);
+        }
     }
+
+    ok(Qpsmtpd::Address->new("<\@b\xc3\xbccher.example:user\@example.com>"),
+       'a U-label in a source route is fine');
 
     for my $ok ("<a\xc2\xa0b\@example.com>", "<a\xef\xbb\xbfb\@example.com>") {
         ok(Qpsmtpd::Address->new($ok), 'localpart is not held to U-label rules');
