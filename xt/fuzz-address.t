@@ -357,14 +357,13 @@ sub check {
         my $err = round_trip_error($built);
         return "new(user, host): $err" if $err;
 
-        # an object built from parts holds those parts. Only a bare
-        # postmaster is folded to lower case.
-        next if !defined $want_user && !defined $want_host;
+        # an object built from parts holds those parts. Without a domain the
+        # argument is a path, which the round trip above covers.
+        next if !defined $want_host;
         return 'new(user, host) changed the host to ' . show($built->host)
           if !same($built->host, $want_host);
         return 'new(user, host) changed the user to ' . show($built->user)
-          if !same($built->user, $want_user)
-          && !(!defined $want_host && lc($want_user // '') eq 'postmaster');
+          if !same($built->user, $want_user);
     }
     for my $setter (['user', $raw_user], ['host', $raw_host]) {
         my ($method, $value) = @$setter;

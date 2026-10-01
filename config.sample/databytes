@@ -1,0 +1,9 @@
+# Maximum size in bytes that a message may be. Without this file there is no
+# limit and qpsmtpd does not advertise SIZE in its EHLO reply.
+#
+# It also bounds memory: while reading DATA, header lines accumulate in memory
+# until the blank line that ends the header. This is what limits that.
+#
+# Keep it below what the backend MTA accepts. 50MB is deliberately generous;
+# Postfix defaults to 10MB (message_size_limit).
+52428800

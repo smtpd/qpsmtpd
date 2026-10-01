@@ -1,6 +1,7 @@
 CVS/.*
 \.cvsignore$
 \.bak$
+\.claude/.*
 \.sw[a-z]$
 \.tar$
 \.tgz$
@@ -36,5 +37,4 @@ packaging
 ^config/
 ^supervise/
 ^ssl/
-^t/config/greylist
 ^.github/
