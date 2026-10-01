@@ -411,13 +411,23 @@ sub _addr_cmp {
     my ($left, $right, $swap) = @_;
     my $class = ref($left);
 
-    unless (UNIVERSAL::isa($right, $class)) {
-        $right = $class->new($right);
+    if (!UNIVERSAL::isa($right, $class)) {
+        my $parsed = $class->new($right);
+
+        # new() returns undef for anything canonify rejects. Such an operand is
+        # not an address, but comparing against one must not die, so fall back
+        # to comparing its own text.
+        $right = defined $parsed  ? $parsed->format
+               : defined $right   ? $right
+               :                    '';
+    }
+    else {
+        $right = $right->format;
     }
 
     #invert the address so we can sort by domain then user
     ($left  = join('=', reverse(split(/@/, $left->format)))) =~ tr/[<>]//d;
-    ($right = join('=', reverse(split(/@/, $right->format)))) =~ tr/[<>]//d;
+    ($right = join('=', reverse(split(/@/, $right))))        =~ tr/[<>]//d;
 
     if ($swap) {
         ($right, $left) = ($left, $right);
