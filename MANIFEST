@@ -54,9 +54,7 @@ lib/Qpsmtpd/Postfix.pm
 lib/Qpsmtpd/Postfix/Constants.pm
 lib/Qpsmtpd/Postfix/pf2qp.pl
 lib/Qpsmtpd/SMTP.pm
-lib/Qpsmtpd/SMTP/Prefork.pm
 lib/Qpsmtpd/TcpServer.pm
-lib/Qpsmtpd/TcpServer/Prefork.pm
 lib/Qpsmtpd/Transaction.pm
 LICENSE
 log/log2sql
@@ -152,7 +150,6 @@ plugins/whitelist
 qpsmtpd
 qpsmtpd-forkserver
 qpsmtpd.service
-qpsmtpd-prefork
 README.md
 README.plugins.md
 run.forkserver

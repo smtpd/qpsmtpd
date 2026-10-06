@@ -3,6 +3,10 @@
 /pm_to_blib
 /blib/
 
+config.sample/me
+config.sample/spool_dir
+t/config/me
+
 # only ignore top-level Makefile; we need the one in packaging/rpm!
 /Makefile
 Makefile.[a-z]*
@@ -29,3 +33,4 @@ nytprof.out
 run
 log/main
 ssl
+

@@ -20,6 +20,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `554 (#5.6.0)` instead of a temporary 421, so senders bounce at once
   instead of retrying a message that can never pass
 
+### Removed
+
+- qpsmtpd-prefork, the prefork run model. Use qpsmtpd-forkserver; see
+  UPGRADING.md
+
 ## [1.02] - 2026-10-01
 
 ### Added

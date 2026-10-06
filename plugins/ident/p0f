@@ -142,7 +142,7 @@ p0f v3 requires only the remote IP.
 p0f v2 requires four pieces of information to look up the p0f fingerprint:
 local_ip, local_port, remote_ip, and remote_port. TcpServer.pm has been
 has been updated to provide that information when running under djb's
-tcpserver. The forkserver and prefork models will likely require
+tcpserver. The forkserver model will likely require
 some additional changes to make sure these fields are populated.
 
 =head1 ACKNOWLEDGEMENTS
