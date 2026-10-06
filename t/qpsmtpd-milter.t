@@ -13,6 +13,7 @@ use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
 use Qpsmtpd::Milter;
 use Qpsmtpd::Transaction;
+use Test::Qpsmtpd;    # creates t/tmp, where the fake milter logs
 
 use constant ALL_ACTIONS  => Qpsmtpd::Milter::ACTIONS;
 use constant SMFIP_HDR_LEADSPC => 0x100000;
@@ -26,7 +27,9 @@ __body_chunks_and_skip();
 __end_of_body_modifications();
 __v2_milter_gets_no_data();
 __body_replace();
+__milter_gone();
 __plugin();
+__plugin_replies();
 __plugin_unreachable();
 unhook_milter();
 
@@ -63,6 +66,7 @@ sub fake_milter {
                 print $sock pack('N', 1 + length $r->[1]) . $r->[0] . $r->[1];
             }
             $sock->flush;
+            last if $script{exit_after} && $cmd eq $script{exit_after};
         }
         exit 0;
     }
@@ -185,11 +189,9 @@ sub __end_of_body_modifications {
             ['i', pack('N', 0) . "X-First\0top\0"],
             ['m', pack('N', 1) . "Subject\0\0"],
             ['+', "<new\@example.com>\0"],
-            ['2', "<par\@example.com>\0NOTIFY=NEVER\0"],
             ['-', "<old\@example.com>\0"],
             ['e', "<from\@example.com>\0"],
             ['b', "new body\r\n"],
-            ['q', "suspicious\0"],
             ['a', ''],
         ]]
     );
@@ -205,11 +207,9 @@ sub __end_of_body_modifications {
             {cmd => 'i', index => 0, name => 'X-First', value => 'top'},
             {cmd => 'm', index => 1, name => 'Subject', value => ''},
             {cmd => '+', address => '<new@example.com>', args => ''},
-            {cmd => '2', address => '<par@example.com>', args => 'NOTIFY=NEVER'},
             {cmd => '-', address => '<old@example.com>', args => ''},
             {cmd => 'e', address => '<from@example.com>', args => ''},
             {cmd => 'b', body => "new body\r\n"},
-            {cmd => 'q', reason => 'suspicious'},
             {cmd => 'a'},
         ],
         'end of body modifications are decoded'
@@ -223,6 +223,19 @@ sub __v2_milter_gets_no_data {
     is_deeply([$m->data], [], 'DATA is not sent to a v2 milter');
     $m->quit;
     is_deeply([map { $_->[0] } @{$done->()}], [qw(O Q)], 'only O and Q sent');
+}
+
+sub __milter_gone {
+    my ($port, $done) = fake_milter(exit_after => 'H');
+    my $m = client($port);
+    $m->helo('h');
+    $done->();
+
+    local $SIG{PIPE} = 'DEFAULT';
+    ok(!eval { $m->body('x' x (1024 * 1024)); 1 },
+       'writing to a milter that went away dies');
+    like($@, qr/^milter (write failed|closed the connection)/,
+         'with an error the plugin can catch, not SIGPIPE');
 }
 
 sub __body_replace {
@@ -282,10 +295,13 @@ sub __plugin {
     is($plugin->hook_mail($txn, $from, size => 100), DECLINED, 'mail continues');
 
     my $rcpt = Qpsmtpd::Address->new('<to@example.com>');
-    is_deeply([$plugin->hook_rcpt($txn, $rcpt)],
-              [DENY, '5.7.1 no such', '5.7.1 user'],
-              'multi-line reply code rejects the recipient');
+    is($plugin->hook_rcpt($txn, $rcpt), DONE, 'reply code rejects the recipient');
+    is_deeply([$smtpd->response], [550, '5.7.1 no such', '5.7.1 user'],
+              'with the milter\'s code and multi-line text');
     is($plugin->hook_rcpt($txn, $rcpt), DECLINED, 'next rcpt continues');
+
+    $txn->sender($from);
+    $txn->add_recipient($rcpt);
     is($plugin->hook_data($txn), DECLINED, 'data continues');
 
     $txn->header(Mail::Header->new(["Subject: hi\n", "From: <from\@example.com>\n"],
@@ -294,7 +310,7 @@ sub __plugin {
     $txn->set_body_start;
     $txn->body_write("\nspam body\n");
 
-    is($plugin->hook_data_post($txn), DECLINED, 'data_post continues');
+    is(($plugin->hook_data_post($txn))[0], DECLINED, 'data_post continues');
     is($txn->header->get('X-Spam'), "yes\n", 'header added');
     is($txn->header->get('Subject'), "changed\n", 'header changed');
     $txn->body_resetpos;
@@ -323,6 +339,50 @@ sub __plugin {
     $plugin->hook_disconnect($txn);
     is_deeply([map { $_->[0] } grep { $_->[0] ne 'D' } @{$done->()}],
               [qw(O C M A Q)], 'milter is not consulted after discard; abort on reset');
+}
+
+sub __plugin_replies {
+    my $from = Qpsmtpd::Address->new('<from@example.com>');
+    my $rcpt = Qpsmtpd::Address->new('<to@example.com>');
+
+    my ($port, $done) = fake_milter(
+        L => [[['y', "554 5.7.1 bad header\0"]]],
+        E => [[['+', "<\xe7\x94\xa8\xe6\x88\xb7\@example.com>\0"], ['c', '']]],
+        R => [[["c", ""]], [["c", ""]], [['y', "421 4.7.0 go away\0"]]],
+    );
+    my ($smtpd, $plugin) = plugin($port);
+    my $txn = $smtpd->transaction;
+    $plugin->hook_connect($txn);
+
+    is($plugin->hook_data($txn), DECLINED, 'DATA without an envelope');
+    $plugin->hook_mail($txn, $from);
+    $plugin->hook_rcpt($txn, $rcpt);
+    $txn->sender($from);
+    $txn->add_recipient($rcpt);
+    $txn->header(Mail::Header->new(["Subject: hi\n"], Modify => 0));
+
+    is(($plugin->hook_data_post($txn))[0], DONE, 'reply code at end of message');
+    is(($smtpd->response)[0], 554, 'keeps the milter\'s code');
+    isnt($smtpd->transaction, $txn, 'and ends the transaction');
+
+    $txn = $smtpd->transaction;
+    $plugin->hook_mail($txn, $from);
+    is($plugin->hook_rcpt($txn, $rcpt), DECLINED, 'rcpt continues');
+    $txn->sender($from);
+    $txn->add_recipient($rcpt);
+    $txn->header(Mail::Header->new([], Modify => 0));
+    is(($plugin->hook_data_post($txn))[0], DECLINED, 'message continues');
+    ok($txn->notes('smtputf8'), 'an added UTF-8 recipient requires SMTPUTF8');
+
+    $txn = $smtpd->reset_transaction;
+    $plugin->hook_mail($txn, $from);
+    is($plugin->hook_rcpt($txn, $rcpt), DONE, '421 at RCPT');
+    is(($smtpd->response)[0], 421, 'keeps the 421');
+    ok($smtpd->connection->notes('disconnected'), 'and disconnects');
+
+    is_deeply([map { $_->[0] } grep { $_->[0] ne 'D' } @{$done->()}],
+              [qw(O C M R L A M R N E M R Q)],
+              'no DATA without an envelope; abort after a rejected message');
 }
 
 sub __plugin_unreachable {

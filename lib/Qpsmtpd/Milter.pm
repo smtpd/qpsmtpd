@@ -15,9 +15,7 @@ use constant {
     SMFIF_ADDRCPT     => 0x04,
     SMFIF_DELRCPT     => 0x08,
     SMFIF_CHGHDRS     => 0x10,
-    SMFIF_QUARANTINE  => 0x20,
     SMFIF_CHGFROM     => 0x40,
-    SMFIF_ADDRCPT_PAR => 0x80,
 
     SMFIP_NOCONNECT   => 0x1,
     SMFIP_NOHELO      => 0x2,
@@ -40,9 +38,11 @@ use constant {
     SMFIP_NR_BODY     => 0x80000,
 };
 
+# SMFIF_QUARANTINE and SMFIF_ADDRCPT_PAR are left out: qpsmtpd has no hold
+# queue, and its recipients carry no ESMTP parameters. A milter that requires
+# them sees that during negotiation.
 use constant ACTIONS => SMFIF_ADDHDRS | SMFIF_CHGBODY | SMFIF_ADDRCPT
-  | SMFIF_DELRCPT | SMFIF_CHGHDRS | SMFIF_QUARANTINE | SMFIF_CHGFROM
-  | SMFIF_ADDRCPT_PAR;
+  | SMFIF_DELRCPT | SMFIF_CHGHDRS | SMFIF_CHGFROM;
 
 # SMFIP_RCPT_REJ and SMFIP_HDR_LEADSPC are left out: we never send rejected
 # recipients, and header values go out without their leading space.
@@ -92,6 +92,7 @@ sub _open {
           or die "milter connect to [$self->{host}]:$self->{port} failed: $@\n";
     }
     binmode $sock;
+    $sock->blocking(0);
     return $sock;
 }
 
@@ -202,14 +203,11 @@ sub _decode {
         $r{index} = unpack 'N', $data;
         @r{qw(name value)} = split /\0/, substr($data, 4), -1;
     }
-    elsif ($cmd eq '+' || $cmd eq '-' || $cmd eq '2' || $cmd eq 'e') {
+    elsif ($cmd eq '+' || $cmd eq '-' || $cmd eq 'e') {
         @r{qw(address args)} = split /\0/, $data, -1;
     }
     elsif ($cmd eq 'b') {
         $r{body} = $data;
-    }
-    elsif ($cmd eq 'q') {
-        ($r{reason} = $data) =~ s/\0\z//;
     }
     elsif (!$final{$cmd}) {
         die "milter sent unknown reply '$cmd'\n";
@@ -226,10 +224,16 @@ sub _send {
 
 sub _write {
     my ($self, $sock, $buf) = @_;
+
+    # the forkserver restores the default SIGPIPE action, which would kill
+    # the SMTP session when the milter goes away
+    local $SIG{PIPE} = 'IGNORE';
+
     my $sel = IO::Select->new($sock);
     while (length $buf) {
         $sel->can_write($self->{timeout}) or die "milter write timed out\n";
         my $n = syswrite($sock, $buf);
+        next if !defined $n && $!{EAGAIN};
         die "milter write failed: $!\n" if !defined $n;
         substr($buf, 0, $n, '');
     }
@@ -252,6 +256,7 @@ sub _read_bytes {
     while (length $buf < $want) {
         $sel->can_read($self->{timeout}) or die "milter read timed out\n";
         my $n = sysread($sock, $buf, $want - length $buf, length $buf);
+        next if !defined $n && $!{EAGAIN};
         die "milter read failed: $!\n" if !defined $n;
         die "milter closed the connection\n" if !$n;
     }
@@ -285,11 +290,9 @@ modifications that the milter sends at end of body precede the verdict:
   i  insert header    index, name, value
   m  change header    index, name, value (empty value deletes)
   +  add recipient    address
-  2  add recipient    address, args
   -  delete recipient address
   e  change sender    address, args
   b  replace body     body (one chunk; there may be several)
-  q  quarantine       reason
 
 A command returns an empty list when the milter asked, during
 negotiation, to skip that step or to not reply to it. Errors and timeouts
