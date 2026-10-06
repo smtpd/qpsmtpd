@@ -11,6 +11,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
   recommended way to run qpsmtpd
+- config/barelf: `strict` (default), `tolerant` or `lazy` handling of a
+  bare LF/CR in the message data
+
+### Changed
+
+- a bare LF/CR in the message data is rejected with a permanent
+  `554 (#5.6.0)` instead of a temporary 421, so senders bounce at once
+  instead of retrying a message that can never pass
 
 ## [1.02] - 2026-10-01
 

@@ -1,0 +1,5 @@
+# How a bare LF/CR in the message data is handled, see docs/config.md.
+#   strict   - reject any line not ending in CRLF (default)
+#   tolerant - accept bare LF lines, but only <CRLF>.<CRLF> ends the data
+#   lazy     - only check the final dot, as before 1.02 (allows SMTP smuggling)
+strict

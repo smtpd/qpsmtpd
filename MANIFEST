@@ -6,6 +6,7 @@ config.sample/add_geoip_headers
 config.sample/badhelo
 config.sample/badmailfrom
 config.sample/badrcptto
+config.sample/barelf
 config.sample/dkim/dkim_key_gen.sh
 config.sample/dnsbl_allow
 config.sample/databytes

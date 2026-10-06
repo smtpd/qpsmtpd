@@ -675,6 +675,21 @@ sub command_line_too_long {
     return 1;
 }
 
+# How a bare LF/CR in DATA is handled, from the 'barelf' config:
+#   strict   - reject any line not ending in CRLF (default)
+#   tolerant - accept bare LF lines, but only <CRLF>.<CRLF> ends the data
+#   lazy     - only reject a bare LF/CR on the final dot (pre 1.02 behaviour)
+sub barelf_mode {
+    my $self = shift;
+    my ($mode) = $self->config('barelf');
+    return 'strict' if !defined $mode;
+    $mode = lc $mode;
+    $mode =~ s/^\s+|\s+$//g;
+    return $mode if $mode =~ /^(?:strict|tolerant|lazy)$/;
+    $self->log(LOGWARN, "unknown barelf mode '$mode', using strict");
+    return 'strict';
+}
+
 sub disconnect {
     my $self = shift;
     $self->run_hooks("disconnect");
@@ -736,13 +751,26 @@ sub data_respond {
     my $header = Mail::Header->new(Modify => 0, MailFrom => 'COERCE');
 
     my $timeout = $self->config('timeout');
+    my $barelf  = $self->barelf_mode;
+    my $prev_bare = 0;
     while (defined($_ = $self->getline($timeout))) {
 
-        if ($_ !~ /\r\n$/) {
-            $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
+        # A bare LF/CR is a permanent defect of the message, a retry would
+        # fail the same way, so reject with a 5xx (RFC 5321 2.3.8). The
+        # 'barelf' config relaxes this, see docs/config.md.
+        my $bare = $_ !~ /\r\n$/;
+        my $bare_dot = $_ eq ".\n" || $_ eq ".\r";
+        my $reject
+          = $barelf eq 'lazy'     ? $bare_dot
+          : $barelf eq 'tolerant' ? $bare_dot || ($prev_bare && $_ eq ".\r\n")
+          :                         $bare;
+        if ($reject) {
+            $self->respond(554,
+                'Bare LF in message data not permitted, see RFC 5321 2.3.8 (#5.6.0)');
             $self->disconnect;
             return 1;
         }
+        $prev_bare = $bare;
 
         if ($_ eq ".\r\n") {
             $complete++;

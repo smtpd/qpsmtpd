@@ -60,6 +60,20 @@ are shown below in ["Plugin settings"](#plugin-settings).
     size. Should be something less than the backend MTA has set as it's maximum
     message size (if there is one).
 
+- barelf
+
+    How a line in the message data that does not end in CRLF (a bare LF or
+    CR, RFC 5321 2.3.8) is handled. Such a message is rejected with
+    `554 (#5.6.0)` and the connection is closed. Defaults to `strict`.
+
+    - `strict`: reject any line not ending in CRLF.
+    - `tolerant`: accept bare LF lines, but the data only ends at
+      `<CRLF>.<CRLF>`. A bare LF/CR on the final dot, or a final dot right
+      after a bare LF, is rejected.
+    - `lazy`: only reject a bare LF/CR on the final dot, as qpsmtpd did before
+      1.02. __NOTE:__ this accepts `<LF>.<CRLF>` as the end of the data, which
+      allows SMTP smuggling. Prefer `tolerant`.
+
 - size\_threshold
 
     When a message is greater than the size given in this config file, it will be

@@ -360,17 +360,56 @@ sub __data_respond_barelf {
     };
 
     my $code = $drive->("From: a\@example.com\r\n", "Date: now\r\n", "\r\n", "body\r\n", ".\r\n");
-    isnt( $code, 421, 'well-formed message is not rejected as bare-LF' );
+    isnt( $code, 554, 'well-formed message is not rejected as bare-LF' );
     isnt( $smtpd->connection->notes('disconnected'), 1,
         'well-formed message does not disconnect' );
 
     $code = $drive->("From: a\@example.com\r\n", "bare\n", ".\r\n");
-    is( $code, 421, 'bare LF in body is rejected' );
+    is( $code, 554, 'bare LF in body is rejected' );
     is( $smtpd->connection->notes('disconnected'), 1, 'bare LF in body disconnects' );
 
     $code = $drive->("From: a\@example.com\r\n", "\r\n", "body\r\n", ".\n");
-    is( $code, 421, 'bare LF terminator is rejected' );
+    is( $code, 554, 'bare LF terminator is rejected' );
     is( $smtpd->connection->notes('disconnected'), 1, 'bare LF terminator disconnects' );
+
+    # the 'barelf' config relaxes the check
+    my $orig_config = Test::Qpsmtpd->can('config');
+    my $with_mode = sub {
+        my ($mode, @lines) = @_;
+        no warnings 'redefine';
+        local *Test::Qpsmtpd::config = sub {
+            my ($self, $key) = @_;
+            return ($mode) if $key eq 'barelf';
+            return $orig_config->(@_);
+        };
+        my $c = $drive->(@lines);
+        return ($c, $smtpd->connection->notes('disconnected'));
+    };
+    my @body     = ("From: a\@example.com\r\n", "\r\n", "bare\n", "body\r\n", ".\r\n");
+    my @bare_dot = ("From: a\@example.com\r\n", "\r\n", "body\r\n", ".\n");
+    my @smuggle  = ("From: a\@example.com\r\n", "\r\n", "body\n", ".\r\n");
+    my $disc;
+
+    ($code) = $with_mode->('strict', @body);
+    is( $code, 554, 'strict: bare LF in body is rejected' );
+    ($code) = $with_mode->('bogus', @body);
+    is( $code, 554, 'unknown mode falls back to strict' );
+
+    ($code, $disc) = $with_mode->('tolerant', @body);
+    isnt( $code, 554, 'tolerant: bare LF in body is accepted' );
+    isnt( $disc, 1, 'tolerant: bare LF in body does not disconnect' );
+    ($code) = $with_mode->('tolerant', @bare_dot);
+    is( $code, 554, 'tolerant: bare LF terminator is rejected' );
+    ($code) = $with_mode->('tolerant', @smuggle);
+    is( $code, 554, 'tolerant: <LF>.<CRLF> is rejected (SMTP smuggling)' );
+
+    ($code, $disc) = $with_mode->('lazy', @body);
+    isnt( $code, 554, 'lazy: bare LF in body is accepted' );
+    isnt( $disc, 1, 'lazy: bare LF in body does not disconnect' );
+    ($code) = $with_mode->('lazy', @bare_dot);
+    is( $code, 554, 'lazy: bare LF terminator is rejected' );
+    ($code) = $with_mode->('lazy', @smuggle);
+    isnt( $code, 554, 'lazy: <LF>.<CRLF> ends the data, as before 1.02' );
 }
 
 sub __clean_authentication_results {
