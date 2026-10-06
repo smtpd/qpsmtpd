@@ -1,0 +1,338 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+use IO::Socket::IP;
+use Mail::Header;
+use Test::More;
+
+use lib 't';
+use lib 'lib';
+
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+use Qpsmtpd::Milter;
+use Qpsmtpd::Transaction;
+
+use constant ALL_ACTIONS  => Qpsmtpd::Milter::ACTIONS;
+use constant SMFIP_HDR_LEADSPC => 0x100000;
+
+__negotiate();
+__unsupported_version();
+__connect();
+__no_reply_and_skipped_steps();
+__progress();
+__body_chunks_and_skip();
+__end_of_body_modifications();
+__v2_milter_gets_no_data();
+__body_replace();
+__plugin();
+__plugin_unreachable();
+unhook_milter();
+
+done_testing();
+
+# A milter that serves one connection, logs every packet it receives, and
+# answers each command with the scripted replies, or 'c'ontinue.
+sub fake_milter {
+    my (%script) = @_;
+    my $log    = "t/tmp/milter-$$.log";
+    my $listen = IO::Socket::IP->new(LocalHost => '127.0.0.1', LocalPort => 0,
+                                     Listen => 1, ReuseAddr => 1)
+      or die "listen: $@";
+    unlink $log;
+
+    my $pid = fork // die "fork: $!";
+    if (!$pid) {
+        alarm 30;
+        my $sock = $listen->accept or exit 1;
+        open my $fh, '>', $log or exit 1;
+        $fh->autoflush(1);
+        my %no_reply = map { $_ => 1 } qw(A D Q), @{$script{no_reply} || []};
+        while (1) {
+            read($sock, my $len, 4) == 4 or last;
+            read($sock, my $packet, unpack('N', $len));
+            my ($cmd, $data) = (substr($packet, 0, 1), substr($packet, 1));
+            print $fh "$cmd " . unpack('H*', $data) . "\n";
+            last if $cmd eq 'Q';
+            my $replies = $cmd eq 'O'
+              ? [['O', pack('NNN', @{$script{optneg} || [6, ALL_ACTIONS, 0]})]]
+              : shift @{$script{$cmd} || []};
+            next if !$replies && $no_reply{$cmd};
+            for my $r (@{$replies || [['c', '']]}) {
+                print $sock pack('N', 1 + length $r->[1]) . $r->[0] . $r->[1];
+            }
+            $sock->flush;
+        }
+        exit 0;
+    }
+
+    my $port = $listen->sockport;
+    close $listen;
+    my $done = sub {
+        waitpid $pid, 0;
+        open my $fh, '<', $log or return [];
+        my @packets = map { [/^(\S) (\S*)$/] } <$fh>;
+        unlink $log;
+        return [map { [$_->[0], pack('H*', $_->[1])] } @packets];
+    };
+    return ($port, $done);
+}
+
+sub client {
+    my ($port) = @_;
+    return Qpsmtpd::Milter->new(host => '127.0.0.1', port => $port,
+                                timeout => 5)->negotiate;
+}
+
+sub __negotiate {
+    my ($port, $done) = fake_milter(
+        optneg => [6, ALL_ACTIONS, Qpsmtpd::Milter::SMFIP_NR_HDR | SMFIP_HDR_LEADSPC]);
+    my $m = client($port);
+    is($m->version, 6, 'negotiates version 6');
+    is($m->actions, ALL_ACTIONS, 'milter actions');
+    is($m->protocol, Qpsmtpd::Milter::SMFIP_NR_HDR,
+       'unsupported protocol flags are masked off');
+    $m->quit;
+
+    my $sent = $done->();
+    is($sent->[0][0], 'O', 'first packet is option negotiation');
+    is_deeply([unpack 'NNN', $sent->[0][1]],
+              [6, ALL_ACTIONS, Qpsmtpd::Milter::PROTOCOL],
+              'offers v6, all actions, and every step flag');
+    is($sent->[-1][0], 'Q', 'quit');
+}
+
+sub __unsupported_version {
+    my ($port, $done) = fake_milter(optneg => [7, 0, 0]);
+    ok(!eval { client($port) }, 'version 7 is refused');
+    like($@, qr/unsupported protocol version 7/, 'error names the version');
+    $done->();
+}
+
+sub __connect {
+    my ($port, $done) = fake_milter(C => [[['y', "554 5.7.1 go away\0"]]]);
+    my $m = client($port);
+    $m->macros('C', j => 'mx.example.com', '{client_addr}' => undef);
+    my @r = $m->connect('host.example.com', '192.0.2.1', 2525);
+    is_deeply(\@r, [{cmd => 'y', reply => '554 5.7.1 go away'}], 'replycode');
+    $m->helo('helo.example.com');
+    $m->quit;
+
+    my $sent = $done->();
+    is_deeply($sent->[1], ['D', "Cj\0mx.example.com\0"],
+              'macros, undefined ones left out');
+    is_deeply($sent->[2],
+              ['C', "host.example.com\0" . '4' . pack('n', 2525) . "192.0.2.1\0"],
+              'connect packet');
+    is_deeply($sent->[3], ['H', "helo.example.com\0"], 'helo packet');
+
+    ($port, $done) = fake_milter();
+    $m = client($port);
+    $m->connect('[2001:db8::1]', '2001:db8::1', 25);
+    $m->quit;
+    is(substr($done->()->[1][1], 14, 1), '6', 'IPv6 family');
+}
+
+sub __no_reply_and_skipped_steps {
+    my $nr = Qpsmtpd::Milter::SMFIP_NR_CONN | Qpsmtpd::Milter::SMFIP_NR_HDR;
+    my $skip = Qpsmtpd::Milter::SMFIP_NOHELO | Qpsmtpd::Milter::SMFIP_NOMAIL;
+    my ($port, $done) = fake_milter(optneg => [6, 0, $nr | $skip],
+                                    no_reply => [qw(C L)]);
+    my $m = client($port);
+
+    is_deeply([$m->connect('h', '192.0.2.1', 25)], [], 'NR_CONN: no reply read');
+    is_deeply([$m->helo('h')], [], 'NOHELO: skipped');
+    is_deeply([$m->mail('<a@example.com>')], [], 'NOMAIL: skipped');
+    is_deeply([$m->rcpt('<b@example.com>', 'NOTIFY=NEVER')], [{cmd => 'c'}],
+              'rcpt replies');
+    is_deeply([$m->header('Subject', 'hi')], [], 'NR_HDR: no reply read');
+    $m->quit;
+
+    my $sent = $done->();
+    is_deeply([map { $_->[0] } @$sent], [qw(O C R L Q)],
+              'skipped steps are never sent');
+    is($sent->[2][1], "<b\@example.com>\0NOTIFY=NEVER\0", 'rcpt args');
+}
+
+sub __progress {
+    my ($port, $done) = fake_milter(H => [[['p', ''], ['p', ''], ['t', '']]]);
+    my $m = client($port);
+    is_deeply([$m->helo('h')], [{cmd => 't'}], 'progress replies are skipped');
+    $m->quit;
+    $done->();
+}
+
+sub __body_chunks_and_skip {
+    my $flags = Qpsmtpd::Milter::SMFIP_SKIP;
+    my ($port, $done) = fake_milter(optneg => [6, 0, $flags],
+                                    B => [[['c', '']], [['s', '']]]);
+    my $m = client($port);
+    my @r = $m->body('x' x (3 * Qpsmtpd::Milter::MAX_BODY_CHUNK));
+    is_deeply(\@r, [{cmd => 's'}], 'skip ends the body');
+    $m->quit;
+
+    my @bodies = grep { $_->[0] eq 'B' } @{$done->()};
+    is(scalar @bodies, 2, 'no body chunks are sent after skip');
+    is(length $bodies[0][1], Qpsmtpd::Milter::MAX_BODY_CHUNK,
+       'body chunks are at most 64k');
+}
+
+sub __end_of_body_modifications {
+    my ($port, $done) = fake_milter(
+        E => [[
+            ['h', "X-Spam\0yes\0"],
+            ['i', pack('N', 0) . "X-First\0top\0"],
+            ['m', pack('N', 1) . "Subject\0\0"],
+            ['+', "<new\@example.com>\0"],
+            ['2', "<par\@example.com>\0NOTIFY=NEVER\0"],
+            ['-', "<old\@example.com>\0"],
+            ['e', "<from\@example.com>\0"],
+            ['b', "new body\r\n"],
+            ['q', "suspicious\0"],
+            ['a', ''],
+        ]]
+    );
+    my $m = client($port);
+    my @r = $m->end_of_body;
+    $m->quit;
+    $done->();
+
+    is_deeply(
+        \@r,
+        [
+            {cmd => 'h', name => 'X-Spam', value => 'yes'},
+            {cmd => 'i', index => 0, name => 'X-First', value => 'top'},
+            {cmd => 'm', index => 1, name => 'Subject', value => ''},
+            {cmd => '+', address => '<new@example.com>', args => ''},
+            {cmd => '2', address => '<par@example.com>', args => 'NOTIFY=NEVER'},
+            {cmd => '-', address => '<old@example.com>', args => ''},
+            {cmd => 'e', address => '<from@example.com>', args => ''},
+            {cmd => 'b', body => "new body\r\n"},
+            {cmd => 'q', reason => 'suspicious'},
+            {cmd => 'a'},
+        ],
+        'end of body modifications are decoded'
+    );
+}
+
+sub __v2_milter_gets_no_data {
+    my ($port, $done) = fake_milter(optneg => [2, 0, 0]);
+    my $m = client($port);
+    is($m->version, 2, 'a v2 milter is accepted');
+    is_deeply([$m->data], [], 'DATA is not sent to a v2 milter');
+    $m->quit;
+    is_deeply([map { $_->[0] } @{$done->()}], [qw(O Q)], 'only O and Q sent');
+}
+
+sub __body_replace {
+    for my $spool (0, 1) {
+        my $txn = Qpsmtpd::Transaction->new;
+        $txn->body_write("Subject: hi\n");
+        $txn->set_body_start;
+        $txn->body_write("\nold body\nmore\n");
+        $txn->body_spool if $spool;
+        $txn->body_replace("new\n");
+
+        $txn->body_resetpos;
+        my @lines;
+        while (defined(my $l = $txn->body_getline)) { push @lines, $l }
+        my $where = $spool ? 'file' : 'memory';
+        is_deeply(\@lines, ["\n", "new\n"], "body_replace in $where");
+        is($txn->data_size, length("Subject: hi\n\nnew\n"),
+           "data_size after body_replace in $where");
+    }
+}
+
+# hooks are global, and each loaded milter holds its session
+sub unhook_milter {
+    require Test::Qpsmtpd;
+    for my $hook (values %{Test::Qpsmtpd->hooks}) {
+        @$hook = grep { $_->{name} ne 'milter' } @$hook;
+    }
+}
+
+sub plugin {
+    my ($port) = @_;
+    unhook_milter();
+    my ($smtpd) = Test::Qpsmtpd->new_conn();
+    my $plugin = $smtpd->_load_plugin("milter test 127.0.0.1:$port timeout 5",
+                                      $smtpd->plugin_dirs);
+    $plugin->{_qp} = $smtpd;
+    return ($smtpd, $plugin);
+}
+
+sub __plugin {
+    my ($port, $done) = fake_milter(
+        R => [[['y', "550-5.7.1 no such\r\n550 5.7.1 user\0"]]],
+        E => [[
+            ['h', "X-Spam\0yes\0"],
+            ['m', pack('N', 1) . "Subject\0changed\0"],
+            ['b', "clean\r\nbody\r\n"],
+            ['c', ''],
+        ]],
+    );
+    my ($smtpd, $plugin) = plugin($port);
+    my $txn = $smtpd->transaction;
+
+    is($plugin->hook_connect($txn), DECLINED, 'connect continues');
+    is($plugin->hook_ehlo($txn, 'helo.example.com'), DECLINED, 'ehlo continues');
+
+    my $from = Qpsmtpd::Address->new('<from@example.com>');
+    is($plugin->hook_mail($txn, $from, size => 100), DECLINED, 'mail continues');
+
+    my $rcpt = Qpsmtpd::Address->new('<to@example.com>');
+    is_deeply([$plugin->hook_rcpt($txn, $rcpt)],
+              [DENY, '5.7.1 no such', '5.7.1 user'],
+              'multi-line reply code rejects the recipient');
+    is($plugin->hook_rcpt($txn, $rcpt), DECLINED, 'next rcpt continues');
+    is($plugin->hook_data($txn), DECLINED, 'data continues');
+
+    $txn->header(Mail::Header->new(["Subject: hi\n", "From: <from\@example.com>\n"],
+                                   Modify => 0));
+    $txn->body_write("Subject: hi\nFrom: <from\@example.com>\n");
+    $txn->set_body_start;
+    $txn->body_write("\nspam body\n");
+
+    is($plugin->hook_data_post($txn), DECLINED, 'data_post continues');
+    is($txn->header->get('X-Spam'), "yes\n", 'header added');
+    is($txn->header->get('Subject'), "changed\n", 'header changed');
+    $txn->body_resetpos;
+    $txn->body_getline;
+    is(join('', $txn->body_getline, $txn->body_getline), "clean\nbody\n",
+       'body replaced');
+    is($plugin->hook_queue($txn), DECLINED, 'not discarded');
+
+    $plugin->hook_disconnect($txn);
+    my $sent = $done->();
+    is_deeply([map { $_->[0] } grep { $_->[0] ne 'D' } @$sent],
+              [qw(O C H M R R T L L N B E Q)], 'command sequence');
+    my ($mail) = grep { $_->[0] eq 'M' } @$sent;
+    is($mail->[1], "<from\@example.com>\0SIZE=100\0", 'mail args');
+    my ($body) = grep { $_->[0] eq 'B' } @$sent;
+    is($body->[1], "spam body\r\n", 'body sent with CRLF, without separator');
+
+    ($port, $done) = fake_milter(M => [[['d', '']]]);
+    ($smtpd, $plugin) = plugin($port);
+    $txn = $smtpd->transaction;
+    $plugin->hook_connect($txn);
+    is($plugin->hook_mail($txn, $from), DECLINED, 'discard accepts');
+    is($plugin->hook_rcpt($txn, $rcpt), DECLINED, 'rcpt after discard');
+    is($plugin->hook_queue($txn), OK, 'discarded message is not queued');
+    $plugin->hook_reset_transaction($txn);
+    $plugin->hook_disconnect($txn);
+    is_deeply([map { $_->[0] } grep { $_->[0] ne 'D' } @{$done->()}],
+              [qw(O C M A Q)], 'milter is not consulted after discard; abort on reset');
+}
+
+sub __plugin_unreachable {
+    my $listen = IO::Socket::IP->new(LocalHost => '127.0.0.1', LocalPort => 0,
+                                     Listen => 1);
+    my $port = $listen->sockport;
+    close $listen;
+
+    my ($smtpd, $plugin) = plugin($port);
+    my $txn = $smtpd->transaction;
+    is($plugin->hook_connect($txn), DECLINED, 'unreachable milter is skipped');
+    is($plugin->hook_helo($txn, 'h'), DECLINED, 'and stays skipped');
+}
