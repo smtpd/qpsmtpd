@@ -402,14 +402,6 @@ sub __data_respond_barelf {
     is( $code, 554, 'tolerant: bare LF terminator is rejected' );
     ($code) = $with_mode->('tolerant', @smuggle);
     is( $code, 554, 'tolerant: <LF>.<CRLF> is rejected (SMTP smuggling)' );
-
-    ($code, $disc) = $with_mode->('lazy', @body);
-    isnt( $code, 554, 'lazy: bare LF in body is accepted' );
-    isnt( $disc, 1, 'lazy: bare LF in body does not disconnect' );
-    ($code) = $with_mode->('lazy', @bare_dot);
-    is( $code, 554, 'lazy: bare LF terminator is rejected' );
-    ($code) = $with_mode->('lazy', @smuggle);
-    isnt( $code, 554, 'lazy: <LF>.<CRLF> ends the data, as before 1.02' );
 }
 
 sub __clean_authentication_results {

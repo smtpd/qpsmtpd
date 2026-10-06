@@ -70,9 +70,10 @@ are shown below in ["Plugin settings"](#plugin-settings).
     - `tolerant`: accept bare LF lines, but the data only ends at
       `<CRLF>.<CRLF>`. A bare LF/CR on the final dot, or a final dot right
       after a bare LF, is rejected.
-    - `lazy`: only reject a bare LF/CR on the final dot, as qpsmtpd did before
-      1.02. __NOTE:__ this accepts `<LF>.<CRLF>` as the end of the data, which
-      allows SMTP smuggling. Prefer `tolerant`.
+
+    In both modes only `<CRLF>.<CRLF>` ends the data, so SMTP smuggling via
+    `<LF>.<LF>`, `<LF>.<CRLF>` or `<CRLF>.<LF>` is always rejected. An
+    unknown value logs a warning and falls back to `strict`.
 
 - size\_threshold
 

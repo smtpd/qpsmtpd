@@ -11,8 +11,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
   recommended way to run qpsmtpd
-- config/barelf: `strict` (default), `tolerant` or `lazy` handling of a
-  bare LF/CR in the message data
+- config/barelf: `strict` (default) or `tolerant` handling of a bare LF
+  in the message data. Both only accept `<CRLF>.<CRLF>` as the end of the
+  data, so SMTP smuggling stays rejected
 
 ### Changed
 
