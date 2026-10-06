@@ -20,14 +20,14 @@ still applies.
 
 ## hook\_pre\_connection
 
-Called by a controlling process (e.g. forkserver or prefork) after accepting
+Called by a controlling process (e.g. forkserver) after accepting
 the remote server, but before beginning a new instance (or handing the
 connection to the worker process).
 
 Useful for load-management and rereading large config files at some
 frequency less than once per session.
 
-This hook is available in `qpsmtpd-forkserver` and `qpsmtpd-prefork` flavors.
+This hook is available in `qpsmtpd-forkserver`.
 
 __NOTE:__ You should not use this hook to do major work and / or use lookup
 methods which (_may_) take some time, like DNS lookups. This will slow down

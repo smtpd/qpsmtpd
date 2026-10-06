@@ -12,6 +12,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
   recommended way to run qpsmtpd
 
+### Removed
+
+- qpsmtpd-prefork, the prefork run model. Use qpsmtpd-forkserver; see
+  UPGRADING.md
+
 ## [1.02] - 2026-10-01
 
 ### Added
