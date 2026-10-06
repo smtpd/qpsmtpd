@@ -28,7 +28,6 @@ use English qw( -no_match_vars );
 
 my $apps = [
    { app => 'daemontools', info => { } },
-   { app => 'ucspi-tcp',   info => { } },
 ];
 
 $EUID == 0 or die "You will have better luck if you run me as root.\n";

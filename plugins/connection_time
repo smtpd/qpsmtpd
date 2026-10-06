@@ -46,17 +46,10 @@ sub register {
     else {
         $self->{_args} = {@_};    # named args, inherits loglevel
     }
-
-    # pre-connection is not available in the tcpserver deployment model.
-    # duplicate the handler, so it works both ways with no redudant methods
-    $self->register_hook('pre-connection', 'connect_handler');
-    $self->register_hook('connect',        'connect_handler');
 }
 
-sub connect_handler {
+sub hook_pre_connection {
     my $self = shift;
-    return DECLINED
-      if ($self->hook_name eq 'connect' && defined $self->{_connection_start});
     $self->{_connection_start} = [gettimeofday];
     $self->log(LOGDEBUG, "started at " . scalar gettimeofday);
     return DECLINED;
