@@ -1,17 +1,1 @@
-[Unit]
-Description=qpsmtpd SMTP daemon
-Documentation=man:qpsmtpd-forkserver(8) man:qpsmtpd-prefork(8)
-Wants=network-online.target
-After=network-online.target nss-lookup.target remote-fs.target
-After=clamav-daemon.service spamassassin.service
-
-[Service]
-Type=simple
-# Skipped, not failed, unless qpsmtpd is enabled via 'dpkg-reconfigure
-# qpsmtpd' (qpsmtpd/startup_enabled, default false).
-ExecCondition=/usr/libexec/qpsmtpd/qpsmtpd-service condition
-ExecStart=/usr/libexec/qpsmtpd/qpsmtpd-service start
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
+../qpsmtpd.service

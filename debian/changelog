@@ -18,11 +18,14 @@ qpsmtpd (1.02) unstable; urgency=medium
     1.02~beta1+wornet1 entries are renamed to 1.01-1 and 1.02~beta1.
   * Supported targets are Debian 11 (bullseye) and later and Ubuntu 22.04
     and later, following the perl (>= 5.32) requirement.
-  * Ship a native systemd unit, qpsmtpd.service, next to the init script
-    (lintian: missing-systemd-service-for-init.d-script).  It reads the same
-    debconf settings via /usr/libexec/qpsmtpd/qpsmtpd-service and is skipped
-    through ExecCondition unless qpsmtpd/startup_enabled is set, so qpsmtpd
-    still does not grab port 25 on a fresh install.
+  * Ship the upstream systemd unit, qpsmtpd.service, next to the init script
+    (lintian: missing-systemd-service-for-init.d-script).  The Debian
+    specifics live in a drop-in, qpsmtpd.service.d/debian.conf: it runs the
+    daemon as the qpsmtpd user and starts it through
+    /usr/libexec/qpsmtpd/qpsmtpd-service, which reads the same debconf
+    settings as the init script.  ExecCondition skips the unit unless
+    qpsmtpd/startup_enabled is set, so qpsmtpd still does not grab port 25
+    on a fresh install.
   * Add Pre-Depends: ${misc:Pre-Depends} for the init-system-helpers
     prerequisite of invoke-rc.d --skip-systemd-native.
   * Source /lib/lsb/init-functions in the init script, if present, so that

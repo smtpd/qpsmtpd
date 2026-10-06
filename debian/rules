@@ -42,5 +42,13 @@ override_dh_auto_install:
 			debian/check-plugin-wrapper.in > $(PLUGINDIR)/$${p%%:*}; \
 	done
 
+# debian/qpsmtpd.service links to the upstream unit; the Debian specifics
+# go into a drop-in next to wherever dh_installsystemd put the unit.
+override_dh_installsystemd:
+	dh_installsystemd
+	set -e; unit=$$(find $(PKGDIR) -path '*/systemd/system/qpsmtpd.service'); \
+	test -n "$$unit"; \
+	install -D -m 0644 debian/systemd/debian.conf $$unit.d/debian.conf
+
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
