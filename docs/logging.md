@@ -57,7 +57,11 @@ If qpsmtpd is started using the distributed run file (cd ~smtpd; ./run), then
 you will see the log entries printed to your terminal. This solution works
 great for initial setup and testing and is the simplest case.
 
-A typical way to run qpsmtpd is as a supervised process with daemontools. If
+Under systemd (qpsmtpd.service), log entries go to the journal:
+
+`journalctl -u qpsmtpd -f`
+
+Another way to run qpsmtpd is as a supervised process with daemontools. If
 daemontools is already set up, setting up qpsmtpd may be as simple as:
 
 `ln -s /usr/home/smtpd /var/service/`

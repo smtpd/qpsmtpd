@@ -7,6 +7,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
+  recommended way to run qpsmtpd
+
 ## [1.02] - 2026-10-01
 
 ### Added

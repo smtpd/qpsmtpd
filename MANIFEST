@@ -150,6 +150,7 @@ plugins/virus/uvscan
 plugins/whitelist
 qpsmtpd
 qpsmtpd-forkserver
+qpsmtpd.service
 qpsmtpd-prefork
 README.md
 README.plugins.md

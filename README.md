@@ -14,7 +14,7 @@ more information.
 
 # What's new?
 
-See the Changes file! :-)
+See CHANGELOG.md.
 
 # Installation
 
@@ -42,36 +42,52 @@ directory.
 Put the files there.  If you install from git you can just do
 run the following command in the /home/smtpd/ directory.
 
-    git clone git://github.com/smtpd/qpsmtpd.git
+    git clone https://github.com/smtpd/qpsmtpd.git
 
 Beware that the master branch might be unsuitable for anything
 but development, so you might want to get a specific release, for
 example (after running git clone):
 
-    git checkout -b local_branch v1.00
-
-chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
-in) to make supervise start the log process.
-
-Edit the file config/IP and put the ip address you want to use for
-qpsmtpd on the first line (or use 0 to bind to all interfaces).
-
-If you use the supervise tools, then you are practically done!
-Just symlink /home/smtpd/qpsmtpd into your /services (or /var/services
-or /var/svscan or whatever) directory.  Remember to shutdown
-qmail-smtpd if you are replacing it with qpsmtpd.
-
-If you don't use supervise, then you need to run the ./run script in
-some other way.
+    git checkout -b local_branch v1.02
 
 The smtpd user needs write access to ~smtpd/qpsmtpd/tmp/ but should
 not need to write anywhere else.  This directory can be configured
 with the `spool_dir` configuration and permissions can be set with
 `spool_perms`.
 
-As of version 0.25 the distributed ./run script runs tcpserver with
-the -R flag to disable identd lookups.  Remove the -R flag if that's
-not what you want.
+Remember to shut down qmail-smtpd if you are replacing it with qpsmtpd.
+
+### systemd (recommended)
+
+qpsmtpd.service runs qpsmtpd-forkserver as the smtpd user from
+/home/smtpd/qpsmtpd, listening on ports 25 and 587. Adjust `User`,
+`WorkingDirectory` and the ports in it if yours differ, then:
+
+    cp qpsmtpd.service /etc/systemd/system/
+    systemctl daemon-reload
+    systemctl enable --now qpsmtpd
+
+Log entries go to the journal (`journalctl -u qpsmtpd`), and
+`systemctl reload qpsmtpd` rereads the config and reloads the plugins.
+
+### daemontools
+
+chmod o+t ~smtpd/qpsmtpd/ (or whatever directory you installed qpsmtpd
+in) to make supervise start the log process.
+
+Copy run.forkserver or run.tcpserver to run. run.tcpserver reads the ip
+address to listen on from the first line of config/IP (use 0 to bind to
+all interfaces).
+
+If you use the supervise tools, then you are practically done!
+Just symlink /home/smtpd/qpsmtpd into your /services (or /var/services
+or /var/svscan or whatever) directory.
+
+If you don't use supervise, then you need to run the ./run script in
+some other way.
+
+As of version 0.25 run.tcpserver runs tcpserver with the -R flag to
+disable identd lookups.  Remove the -R flag if that's not what you want.
 
 
 # Configuration

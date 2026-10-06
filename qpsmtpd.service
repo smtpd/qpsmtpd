@@ -1,0 +1,40 @@
+# qpsmtpd-forkserver under systemd. See "qpsmtpd installation" in README.md.
+#
+#   cp qpsmtpd.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now qpsmtpd
+
+[Unit]
+Description=qpsmtpd SMTP server
+Documentation=https://github.com/smtpd/qpsmtpd
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=smtpd
+WorkingDirectory=/home/smtpd/qpsmtpd
+
+# Binds ports 25 and 587 without starting as root. forkserver then stays the
+# user it started as, so it needs no --user.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+ExecStart=/usr/bin/perl -T ./qpsmtpd-forkserver \
+    --port 25 \
+    --port 587 \
+    --limit-connections 15 \
+    --max-from-ip 5
+
+# HUP clears the config cache and reloads every plugin
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Per process, like softlimit -m in run.forkserver. MemoryMax would cap all
+# connections together.
+LimitAS=300M
+
+Restart=on-failure
+
+# No NoNewPrivileges: queue/qmail-queue runs the setuid qmail-queue binary.
+
+[Install]
+WantedBy=multi-user.target
