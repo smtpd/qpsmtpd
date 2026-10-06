@@ -10,7 +10,6 @@ Q_GROUP=qpsmtpd
 SPOOLDIR=/var/spool/qpsmtpd
 GREYLISTDIR=/var/lib/qpsmtpd/greylisting
 LOGDIR=/var/log/qpsmtpd
-PIDDIR=/var/run/qpsmtpd
 
 case "$1" in
 	purge)
@@ -23,7 +22,7 @@ case "$1" in
 		rm -f /var/log/qpsmtpd/*
 
 		# unregister the statoverrides before dpkg removes the dirs
-		for d in "$SPOOLDIR" "$GREYLISTDIR" "$LOGDIR" "$PIDDIR" ; do
+		for d in "$SPOOLDIR" "$GREYLISTDIR" "$LOGDIR" ; do
 			if ( dpkg-statoverride --list "$d" > /dev/null) ; then
 				dpkg-statoverride --remove "$d" || true
 			fi

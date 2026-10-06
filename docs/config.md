@@ -31,6 +31,13 @@ are shown below in ["Plugin settings"](#plugin-settings).
     the _Received: _header, ...
     Default is whatever Sys::Hostname's hostname() returns.
 
+- me-auth-results
+
+    Sets the ID string used in Authentication-Results: header (useful
+    for multi-server clusters). If this is set to "none", no
+    Authentication-Results: header will be added or modifed.
+    Default is the same as me above.
+
 - plugin\_dirs
 
     Where to search for plugins (one directory per line), defaults to `./plugins`.
@@ -63,6 +70,38 @@ are shown below in ["Plugin settings"](#plugin-settings).
 
     Override the default SMTP greeting with this string.
 
+- smtputf8
+
+    If set to a true value, the `SMTPUTF8` extension (RFC 6531) is offered in
+    the `EHLO` response and clients may then use UTF-8 in envelope addresses.
+    Defaults to `0`.
+
+    Non-ASCII addresses are always rejected unless the client asked for
+    `SMTPUTF8` on the `MAIL` command. There is no downgrade to ASCII: RFC 6531
+    does not define one, and the in-transit downgrade of RFC 6857 is
+    Experimental and not implemented here.
+
+    A non-ASCII domain must also be a valid U-label. Code points that
+    IDNA2008 (RFC 5892) disallows outright — non-breaking and ideographic
+    spaces, zero-width joiners, the BOM, soft hyphen — are refused, as no
+    resolver can use them. Localparts are not restricted this way.
+
+    Only enable this if the queue plugin in use, and the MTA behind it, can
+    route non-ASCII addresses:
+
+    - `queue/smtp-forward` passes `SMTPUTF8` on to the next hop, and refuses
+    to forward (asking the client to retry) if that hop does not advertise it.
+    - `queue/postfix-queue` sets `CLEANUP_FLAG_SMTPUTF8`, which needs
+    postfix 3.0 or later.
+    - `queue/qmail-queue` passes the octets through unchanged, but qmail
+    itself cannot deliver them.
+
+    This setting covers the envelope only. qpsmtpd treats message data as
+    opaque octets and already offers `8BITMIME`, so UTF-8 in _headers_ and
+    bodies (RFC 6532) passes through either way. RFC 6532 does require a
+    client sending UTF-8 headers to have requested `SMTPUTF8`; qpsmtpd neither
+    inspects nor enforces that.
+
 - spool\_dir
 
     Where temporary files are stored, defaults to `~/tmp/`.
@@ -76,7 +115,31 @@ are shown below in ["Plugin settings"](#plugin-settings).
 - timeoutsmtpd
 
     Set the timeout for the clients, `timeoutsmtpd` is the qmail smtpd control
-    file, `timeout` the qpsmtpd file. Default is 1200 seconds.
+    file, `timeout` the qpsmtpd file. Default is 1200 seconds. Note that this
+    bounds client I/O, not the time a plugin may spend in a hook; see
+    `hook_timeout`.
+
+- hook_timeout
+
+    Maximum seconds any single plugin may spend in a hook before it is aborted
+    and skipped (logged as `PLUGIN TIMEOUT`). Guards against a plugin that calls
+    slow third-party software (SpamAssassin, virus scanners) and stalls the
+    whole connection. `0` (the default) disables the limit. A plugin that
+    manages its own `alarm` will override this while it runs.
+
+    The limit applies to the main connection hooks (`connect`, `mail`, `rcpt`,
+    `data`, `data_post`, `queue`, and the like). The auxiliary hooks run outside
+    the normal dispatch — `config`, `user_config`, `logging`, `ok`, and `deny` —
+    are not bounded.
+
+- plugin\_timeouts
+
+    Per-plugin overrides of `hook_timeout`, one plugin per line as
+    `plugin_name seconds` (or `plugin_name:seconds`); lines beginning with `#`
+    are ignored. A plugin not listed here uses `hook_timeout`.
+
+        spamassassin 30
+        virus/clamav 20
 
 - tls\_before\_auth
 

@@ -25,6 +25,17 @@ And a flag:
 
   queue/smtp-forward 10.2.2.2 9025 xclient
 
+=head1 SMTPUTF8
+
+If the message was accepted with the SMTPUTF8 extension (RFC 6531), the
+C<MAIL FROM> command sent onwards carries the C<SMTPUTF8> parameter too.
+Should the next hop not advertise C<SMTPUTF8>, the message is not forwarded
+and the client is asked to retry later: RFC 6531 defines no downgrade to
+ASCII, so there is nothing sensible to convert the envelope into.
+
+Enabling the C<smtputf8> config setting therefore requires a next hop that
+supports the extension as well.
+
 =cut
 
 use Net::SMTP;
@@ -76,8 +87,9 @@ sub hook_queue {
     my $xcret = $self->xclient($smtp);
     return(DECLINED, $xcret) if defined $xcret;
 
-    $smtp->mail($transaction->sender->address || "")
-      or return DECLINED, "Unable to queue message ($!)";
+    my $mailret = $self->mail_from($smtp, $transaction);
+    return(DECLINED, $mailret) if defined $mailret;
+
     for ($transaction->recipients) {
         $smtp->to($_->address)
           or return DECLINED, "Unable to queue message ($!)";
@@ -98,6 +110,35 @@ sub hook_queue {
     $smtp->quit()    or return DECLINED, "Unable to queue message ($!)";
     $self->log(LOGINFO, "finished queueing");
     return OK, "queued as $qid";
+}
+
+sub mail_from {
+    my ($self, $smtp, $transaction) = @_;
+
+    my $from = $transaction->sender->address || '';
+
+    if (!$transaction->notes('smtputf8')) {
+        $smtp->mail($from) or return "Unable to queue message ($!)";
+        return;
+    }
+
+    # RFC 6531 defines no way to downgrade an internationalized envelope to
+    # ASCII, so a next hop without SMTPUTF8 simply cannot take this message.
+    # Soft-fail and let the sender retry once the relay can accept it.
+    if (!defined $smtp->supports('SMTPUTF8')) {
+        $self->log(LOGERROR,
+            "next hop does not advertise SMTPUTF8, cannot forward this message");
+        return 'Unable to queue message (Server does not advertise SMTPUTF8)';
+    }
+
+    # Net::SMTP has no SMTPUTF8 option for mail(), so send the command as-is
+    $self->log(LOGDEBUG, 'forwarding with SMTPUTF8');
+    if ($smtp->command('MAIL', "FROM:<$from>", 'SMTPUTF8')->response()
+        != Net::Cmd::CMD_OK)
+    {
+        return 'Unable to queue message (MAIL FROM with SMTPUTF8 failed)';
+    }
+    return;
 }
 
 sub xclient {

@@ -49,7 +49,9 @@ use Qpsmtpd::DSN;
 sub hook_rcpt {
     my ($self, $transaction, $recipient, %param) = @_;
 
-    return DECLINED if $self->is_immune();
+    # No is_immune() check here: a badrcptto address is an explicit decision to
+    # close a mailbox, so it is always blocked -- a whitelisted sender must not
+    # bypass it (and must still see the custom rejection message). See #223.
 
     my ($host, $to) = $self->get_host_and_to($recipient)
       or return DECLINED;

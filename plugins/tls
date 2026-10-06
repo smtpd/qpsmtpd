@@ -119,7 +119,7 @@ sub init {
                                         SSL_server      => 1,
                                         SSL_honor_cipher_order => 1
                                        )
-      or die "Could not create SSL context: $!";
+      or die "Could not create SSL context: $!, SSL error: $SSL_ERROR";
 
     # now extract the password...
     $self->ssl_context($ssl_ctx);

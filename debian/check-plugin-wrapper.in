@@ -1,0 +1,12 @@
+# Backwards-compatibility wrapper; qpsmtpd 0.94 renamed the check_* plugins
+# from the upstream distribution to remove the check_ prefix.  This plugin
+# exists to allow older, un-migrated configurations to keep working.
+# Generated at package build time from debian/check-plugin-wrapper.in.
+
+sub init {
+  my $self = shift;
+  $self->log(LOGINFO,
+             "The @OLD@ plugin is deprecated; see " .
+             "/usr/share/doc/qpsmtpd/README.check_plugins for details.");
+  $self->isa_plugin('@NEW@');
+}

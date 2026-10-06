@@ -85,3 +85,13 @@ for some reason need the tcpserver binary, see the source to this package or
 download it from the URL above.
 
 
+
+
+5. SMTPUTF8 (RFC 6531)
+
+Qpsmtpd 1.02 can offer the SMTPUTF8 extension, allowing clients to use UTF-8
+in envelope addresses.  It is off by default in this package; to enable it,
+set /etc/qpsmtpd/smtputf8 to 1.  Please read the comments in that file first,
+as the whole delivery path behind qpsmtpd has to be able to handle non-ASCII
+addresses.  While the extension is off, non-ASCII envelope addresses are
+rejected outright, which is the behaviour of every earlier release.

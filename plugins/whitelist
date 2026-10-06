@@ -99,6 +99,7 @@ use strict;
 use warnings;
 
 use Qpsmtpd::Constants;
+use NetAddr::IP;
 
 my $VERSION = 0.02;
 

@@ -191,7 +191,7 @@ sub evaluate_spf {
             result => $code,
             } );
 
-    $self->store_auth_results("spf=$code smtp.mailfrom=".$sender->host);
+    $self->transaction->store_auth_results("spf=$code smtp.mailfrom=".$sender->host);
 
     if ($code eq 'pass') {
         $self->adjust_karma(1);

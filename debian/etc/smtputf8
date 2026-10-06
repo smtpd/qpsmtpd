@@ -1,0 +1,19 @@
+# smtputf8 -- offer the SMTPUTF8 extension (RFC 6531) in the EHLO response,
+# so that clients may use UTF-8 in envelope addresses.  New in qpsmtpd 1.02.
+#
+# Leave this at 0 unless everything behind qpsmtpd can route non-ASCII
+# addresses -- that means both the queue plugin in use and the MTA it feeds:
+#
+#   queue/smtp-forward   passes SMTPUTF8 on to the next hop and refuses to
+#                        forward if that hop does not advertise it
+#   queue/postfix-queue  needs postfix 3.0 or later
+#   queue/qmail-queue    passes the octets through, but qmail cannot deliver
+#                        them
+#
+# Non-ASCII envelope addresses are rejected while this is off; there is no
+# downgrade to ASCII.  Message headers and bodies are unaffected either way,
+# qpsmtpd treats message data as opaque octets and already offers 8BITMIME.
+#
+# See /usr/share/doc/qpsmtpd/config.md for the full description.
+#
+0

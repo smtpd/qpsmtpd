@@ -1,5 +1,5 @@
 
--i=4    # 4 space indentation (we used to use 2; in the future we'll use 4)
+-i=4    # 4 space indentation
 -ci=2   # continuation indention
 
 -bbt=0  # open code block curly braces

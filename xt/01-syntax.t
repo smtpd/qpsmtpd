@@ -31,10 +31,6 @@ sub test_syntax {
         ok(0 == 0, "skipping $f, I couldn't load w/o $1");
         return;
     }
-    if ($r =~ /^Base class package "Danga::Socket" is empty/) {
-        ok(0 == 0, "skipping $f, Danga::Socket not available.");
-        return;
-    }
     print "ec: $exit_code, r: $r\n";
 }
 

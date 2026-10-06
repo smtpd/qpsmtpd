@@ -1,0 +1,5 @@
+# Plugins are loaded and evaluated by qpsmtpd itself, never executed
+# directly, so their #! line is decorative.
+qpsmtpd: script-not-executable [usr/share/qpsmtpd/plugins/loadcheck]
+qpsmtpd: script-not-executable [usr/share/qpsmtpd/plugins/qmail_deliverable]
+qpsmtpd: script-not-executable [usr/share/qpsmtpd/plugins/tls_cert]

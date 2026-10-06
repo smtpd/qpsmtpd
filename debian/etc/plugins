@@ -15,7 +15,7 @@
 
 ## Filtering/SMTP exchange plugins
 
-# check_earlytalker -- listens to the connection breifly before the SMTP
+# earlytalker -- listens to the connection breifly before the SMTP
 # greeting is issued, disconnecting (or logging) any host that starts
 # transmitting before that point in violation of RFC; legitimate MTAs wait for
 # the greeting, while some spam agents, many viruses and most HTTP proxy
@@ -23,21 +23,21 @@
 # for the greeting will be inadvertantly blocked.
 #
 # usage:
-# check_earlytalker [wait <secs>] [action <deny|denysoft|log>] [defer-reject]
+# earlytalker [wait <secs>] [action <deny|denysoft|log>] [defer-reject]
 #
-check_earlytalker action log
+earlytalker action log
 
-# check_relay -- checks connecting hosts against /etc/qpsmtpd/relayclients and
+# relay -- checks connecting hosts against /etc/qpsmtpd/relayclients and
 # (if present) /etc/qpsmtpd/relayclients.cdb to grant or deny mail relaying.
 #
-check_relay
+relay
 
-# require_resolvable_fromhost -- checks envelope sender addresses in DNS for
+# resolvable_fromhost -- checks envelope sender addresses in DNS for
 # resovability, declining the mail if the hostname in the address has neither
 # an A or MX record (meaning, apart from any other issue, that the mail cannot
 # be bounced.)
 #
-# require_resolvable_fromhost
+# resolvable_fromhost
 
 # rhsbl -- checks the envelope sender hostname (the "right-hand side") against
 # a list of DNS blacklists given in /etc/qpsmtpd/rhsbl_zones.  Although this
@@ -55,7 +55,7 @@ rhsbl
 #
 dnsbl
 
-# check_spamhelo -- checks the HELO/EHLO greeting sent by the remote host
+# helo -- checks the HELO/EHLO greeting sent by the remote host
 # against a blacklist given in /etc/qpsmtpd/badhelo.  A host which introduces
 # itself with a matching HELO will be rejected at the HELO stage.  This can
 # be used to block spammers who forge the domain names of common email
@@ -63,15 +63,15 @@ dnsbl
 # mailserver name in their greetings.  While enabled by default, the list
 # initially has no greetings listed.
 #
-check_spamhelo
+helo
 
-# check_badmailfrom -- checks the envelope sender address of inbound mail
+# badmailfrom -- checks the envelope sender address of inbound mail
 # against a blacklist given in /etc/qpsmtpd/badmailfrom.  This plugin is
 # enabled by default but has no addresses listed.
 #
-check_badmailfrom
+badmailfrom
 
-# check_badrcptto -- checks the envelope recipient address(es) of inbound mail
+# badrcptto -- checks the envelope recipient address(es) of inbound mail
 # against a blacklist given in /etc/qpsmtpd/badrcptto.  Delivery to those
 # addresses will be declined (though if the sender lists other non-listed
 # addresses as recipients, they will be tolerated unless another plugin
@@ -79,22 +79,22 @@ check_badmailfrom
 # at locally hosted domains, with no mail accepted once those addresses are
 # closed.
 #
-check_badrcptto
+badrcptto
 
-# badrcptto_patterns -- a more sophisticated form of badrcptto, this plugin
-# checks envelope recipient addresses against a list of perl patterns given in
-# /etc/qpsmtpd/badrcptto_patterns.
+# rcpt_regexp -- a more sophisticated form of badrcptto, this plugin checks
+# envelope recipient addresses against a list of perl regular expressions,
+# return codes and comments given in /etc/qpsmtpd/rcpt_regexp.
 #
-# check_badrcptto
+# rcpt_regexp
 
-# check_loop -- implements a simple form of mail loop detection, by counting
+# loop -- implements a simple form of mail loop detection, by counting
 # the number of "Received" and "Delivered-To" headers in the mail.  If that
 # number exceeds the given limit, the mail is decliend as looping.  By
 # default, the mail is rejected if it contains more than 100 such headers.
 #
 # usage:
-# check_loop [max-hops]
-check_loop
+# loop [max-hops]
+loop
 
 # count_unrecognized_commands -- disconnects a host which issues too many
 # unrecognized SMTP commands.  This can be useful to mitigate the effects of

@@ -134,9 +134,15 @@ sub __validate_dir {
     is( $db->validate_dir('t/tmp'), 1,
         'validate_dir(): true for real directory' );
     mkdir 't/tmp/wtest', 0555;
-    eval { $db->validate_dir('t/tmp/wtest') };
-    is( $@, "DB directory 't/tmp/wtest' is not writeable\n",
-        'validate_dir(): die on non-writeable directory' );
+  SKIP: {
+        # -w (and the kernel) ignore the mode bits for the superuser, so an
+        # unwriteable directory cannot be simulated when running as root --
+        # which is how package builds are commonly done.
+        skip 'permission checks are meaningless as root', 1 if $> == 0;
+        eval { $db->validate_dir('t/tmp/wtest') };
+        is( $@, "DB directory 't/tmp/wtest' is not writeable\n",
+            'validate_dir(): die on non-writeable directory' );
+    }
     chmod 0777, 't/tmp/wtest';
     is( $db->validate_dir('t/tmp/wtest'), 1,
         'validate_dir(): true for writeable directory' );

@@ -1,0 +1,67 @@
+name: Debian package
+
+on:
+  push:
+    branches: [debian]
+  pull_request:
+    branches: [debian]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (debian:${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    container: debian:${{ matrix.suite }}
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [stable, testing]
+
+    steps:
+      - name: Install build tooling
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential devscripts equivs lintian git ca-certificates
+
+      - uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          mk-build-deps --install --remove \
+            --tool "apt-get -y --no-install-recommends" debian/control
+
+      - name: Build the package
+        run: dpkg-buildpackage -us -uc
+
+      - name: Run lintian
+        run: lintian --info --display-info --fail-on error ../qpsmtpd_*.changes
+
+      - name: Check that the shipped default config resolves
+        run: |
+          set -eu
+          dpkg-deb -x ../qpsmtpd_*_all.deb pkg
+          rc=0
+          while read -r plugin _; do
+            case "$plugin" in ''|'#'*|'$'*) continue ;; esac
+            if [ ! -e "pkg/usr/share/qpsmtpd/plugins/$plugin" ]; then
+              echo "::error::/etc/qpsmtpd/plugins enables '$plugin', which is not shipped"
+              rc=1
+            fi
+          done < pkg/etc/qpsmtpd/plugins
+          exit $rc
+
+      # dpkg-buildpackage writes into the parent directory, but
+      # upload-artifact does not accept paths containing '..'
+      - name: Collect build results
+        run: |
+          mkdir -p artifacts
+          cp ../qpsmtpd_*.deb ../qpsmtpd_*.changes ../qpsmtpd_*.buildinfo artifacts/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qpsmtpd-deb-${{ matrix.suite }}
+          path: artifacts/

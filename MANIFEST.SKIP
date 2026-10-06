@@ -1,6 +1,7 @@
 CVS/.*
 \.cvsignore$
 \.bak$
+\.claude/.*
 \.sw[a-z]$
 \.tar$
 \.tgz$
@@ -14,6 +15,7 @@ output/.*
 ^sqlite/
 ^output/
 ^tmp/
+^t/tmp/
 ^blib/
 ^blibdirs$
 ^Makefile$
@@ -28,6 +30,7 @@ output/.*
 \B\.svn\b
 ^\.perltidyrc$
 ^\.git/.*
+^debian/
 ^cover_db/
 \.(orig|rej)$
 packaging
@@ -35,4 +38,4 @@ packaging
 ^config/
 ^supervise/
 ^ssl/
-^t/config/greylist
+^.github/

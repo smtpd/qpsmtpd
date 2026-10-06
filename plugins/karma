@@ -16,6 +16,12 @@ senders. After sending a naughty message, if a sender has more naughty than
 nice connections, they are penalized for I<penalty_days>. Connections
 from senders in the penalty box are rejected per the settings in I<reject>.
 
+Karma keeps no verdict of its own. A connection is counted as naughty when
+another plugin drives its karma below I<-strikes> (see B<USING KARMA IN OTHER
+PLUGINS>) or flags it via the B<naughty> plugin, and nice when karma rises to
+I<strikes> or above. With no such plugins configured, karma has nothing to
+record and the naughty/nice counts stay empty.
+
 Karma provides other plugins with a karma value they can use to be more
 lenient, strict, or skip processing entirely.
 
@@ -436,21 +442,28 @@ sub data_handler {
 sub disconnect_handler {
     my $self = shift;
 
-    my $karma = $self->connection->notes('karma') or do {
+    return DECLINED if $self->is_immune();
+
+    my $karma   = $self->connection->notes('karma') || 0;
+    my $naughty_conn = $self->is_naughty();
+
+    # only record a verdict when a plugin adjusted karma or flagged the
+    # connection naughty; an untouched (neutral) connection has nothing to store
+    if (!$karma && !$naughty_conn) {
         $self->log(LOGDEBUG, "no karma");
         return DECLINED;
-    };
+    }
 
     $self->db->lock or return DECLINED;
     my $key  = $self->get_karma_key();
 
     my ($penalty_start_ts, $naughty, $nice, $connects) =
       $self->parse_db_record( $self->db->get($key) );
-    my $history = ($nice || 0) - $naughty;
     my $log_mess = '';
 
-    if ($karma <= -$self->{_args}{strikes}) {    # Enough negative strikes ?
-        $history--;
+    if ($karma <= -$self->{_args}{strikes} || $naughty_conn) {
+        $naughty++;
+        my $history = ($nice || 0) - $naughty;
         my $negative_limit = 0 - $self->{_args}{negative};
         if ($history <= $negative_limit) {
             if ($nice == 0 && $history < -5) {
@@ -473,6 +486,7 @@ sub disconnect_handler {
     else {
         $log_mess = "neutral";
     }
+    my $history = ($nice || 0) - $naughty;
     $self->log(LOGINFO, $log_mess . ", (msg: $karma, his: $history)");
 
     $self->db->set( $key, join(':', $penalty_start_ts, $naughty, $nice, ++$connects) );

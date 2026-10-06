@@ -6,7 +6,6 @@ RUNAS=qpsmtpd
 SPOOLDIR=/var/spool/qpsmtpd
 GREYLISTDIR=/var/lib/qpsmtpd/greylisting
 LOGDIR=/var/log/qpsmtpd
-PIDDIR=/var/run/qpsmtpd
 
 if [ -e /etc/qpsmtpd/debconf-settings ] ; then
 	. /etc/qpsmtpd/debconf-settings
@@ -133,9 +132,6 @@ setup_perms()
 	if ( ! dpkg-statoverride --list "$LOGDIR" > /dev/null ) ; then
 		dpkg-statoverride --update --add "$RUNAS" adm 2750 "$LOGDIR"
 	fi
-	if ( ! dpkg-statoverride --list "$PIDDIR" > /dev/null ) ; then
-		dpkg-statoverride --update --add "$RUNAS" adm 2755 "$PIDDIR"
-	fi
 }
 
 setup_maildir_spool()
@@ -147,14 +143,15 @@ setup_maildir_spool()
 				mkdir -m 0755 -p "`dirname "$QUEUE_MAILDIR_DESTINATION"`"
 			[ -d "$QUEUE_MAILDIR_DESTINATION" ] || \
 				mkdir -m 0700 -p "$QUEUE_MAILDIR_DESTINATION"
+			chown $RUNAS "$QUEUE_MAILDIR_DESTINATION"
 			for d in "$QUEUE_MAILDIR_DESTINATION/new" \
 					 "$QUEUE_MAILDIR_DESTINATION/cur" \
 					 "$QUEUE_MAILDIR_DESTINATION/tmp" ; do
 				if [ ! -d "$d" ] ; then
 					mkdir -m 0700 "$d"
 				fi
+				chown $RUNAS "$d"
 			done
-			chown -R $RUNAS "$QUEUE_MAILDIR_DESTINATION"
 		fi
 	fi
 }

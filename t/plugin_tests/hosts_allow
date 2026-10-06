@@ -1,0 +1,69 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+    $self->register_test('test_max_conn_ip');
+    $self->register_test('test_mixed_ip_versions');
+}
+
+sub _pre {
+    # child_addrs are printable IP strings, as the forkserver now passes them
+    my ($self, $ip, $max, @child_addrs) = @_;
+    $self->connection->notes('karma_history', undef);
+    my @r = $self->hook_pre_connection(
+        $self->qp->transaction,
+        remote_ip   => $ip,
+        max_conn_ip => $max,
+        child_addrs => [@child_addrs],
+    );
+    return $r[0];
+}
+
+sub test_max_conn_ip {
+    my $self = shift;
+
+    my $ip = '192.0.2.50';
+
+    # seed(1) + 2 matching children = 3, not over max 3
+    cmp_ok( $self->_pre($ip, 3, $ip, $ip), '==', DECLINED,
+        "at max_conn_ip is allowed" );
+
+    # seed(1) + 3 matching children = 4 > 3
+    cmp_ok( $self->_pre($ip, 3, $ip, $ip, $ip), '==', DENYSOFT,
+        "over max_conn_ip is denied" );
+
+    # connections from other IPs must not count toward this IP (the #315 bug)
+    cmp_ok(
+        $self->_pre($ip, 2, '198.51.100.1', '198.51.100.2', '203.0.113.9'),
+        '==', DECLINED, "connections from other IPs do not count" );
+
+    # IPv6 (the dual-stack default that exposed the bug) is counted too
+    my $ip6 = '2001:db8::1';
+    cmp_ok( $self->_pre($ip6, 1, $ip6), '==', DENYSOFT,
+        "IPv6 connections are counted" );
+}
+
+sub test_mixed_ip_versions {
+    my $self = shift;
+
+    # On a dual-stack server child_addrs can mix v4 and v6; Net::IP->overlaps
+    # returns undef across versions and must not warn or be miscounted.
+    my $ip  = '192.0.2.50';
+    my $ip6 = '2001:db8::1';
+
+    my @warnings;
+    local $SIG{__WARN__} = sub { push @warnings, $_[0] };
+
+    # remote v4, max 2, children: v6, v4, v6 -> only the v4 matches
+    my $rc = $self->_pre($ip, 2, $ip6, $ip, $ip6);
+
+    ok( !grep({ /uninitialized/i } @warnings),
+        "no uninitialized warning when comparing across IP versions" );
+    cmp_ok( $rc, '==', DECLINED,
+        "cross-version child_addrs are ignored, not miscounted" );
+}

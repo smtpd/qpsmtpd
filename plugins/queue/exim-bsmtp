@@ -32,6 +32,14 @@ actually redundant with rsmtp, but harmless).
 
 =back
 
+=head1 SMTPUTF8
+
+If the message was accepted with the SMTPUTF8 extension (RFC 6531), the batch
+opens with C<EHLO> instead of C<HELO> and the C<MAIL FROM> command carries the
+C<SMTPUTF8> parameter. This requires an exim built with C<SUPPORT_I18N>
+(C<EXPERIMENTAL_INTERNATIONAL> before exim 4.86); otherwise exim rejects the
+batch and the message is not queued.
+
 =head1 LICENSE
 
 Copyright (c) 2004 by Devin Carraway <qpsmtpd@devin.com>
@@ -93,8 +101,16 @@ sub hook_queue {
         return DECLINED, 'Internal error enqueueing mail';
     }
 
-    print $tmp "HELO ", hostname(), "\n",
-      "MAIL FROM:<", ($transaction->sender->address || ''), ">\n";
+    # SMTPUTF8 is an ESMTP parameter, so an internationalized envelope has to
+    # open the batch with EHLO. This needs an exim built with SUPPORT_I18N;
+    # without it exim answers 5xx and the response parsing below turns that
+    # into a queue failure rather than a silently downgraded envelope.
+    my $utf8 = $transaction->notes('smtputf8');
+    $self->log(LOGDEBUG, 'enqueueing with SMTPUTF8') if $utf8;
+
+    print $tmp $utf8 ? 'EHLO ' : 'HELO ', hostname(), "\n",
+      "MAIL FROM:<", ($transaction->sender->address || ''), '>',
+      ($utf8 ? ' SMTPUTF8' : ''), "\n";
     print $tmp "RCPT TO:<", ($_->address || ''), ">\n"
       for $transaction->recipients;
     print $tmp "DATA\n", $transaction->header->as_string;

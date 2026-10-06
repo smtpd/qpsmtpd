@@ -270,13 +270,16 @@ sub store_deferred_reject {
 
 sub store_auth_results {
     my ($self, $result) = @_;
-    my $auths = $self->qp->connection->notes('authentication_results') or do {
-        $self->qp->connection->notes('authentication_results', $result);
-        return;
-    };
-    my $ar = join('; ', $auths, $result);
-    $self->log(LOGDEBUG, "auth-results: $ar");
-    $self->qp->connection->notes('authentication_results', $ar);
+
+    # DEPRECATED: authentication results belong to a connection or a single
+    # message transaction. Call store_auth_results on the appropriate object:
+    #   $self->connection->store_auth_results($result)   # iprev, SPF helo, AUTH
+    #   $self->transaction->store_auth_results($result)  # DKIM, DMARC, SPF mailfrom
+    $self->log(LOGERROR,
+        "DEPRECATED Plugin::store_auth_results called by "
+        . $self->plugin_name
+        . "; call it on connection or transaction instead");
+    return $self->qp->transaction->store_auth_results($result);
 }
 
 sub is_immune {

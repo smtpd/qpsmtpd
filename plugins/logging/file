@@ -186,7 +186,7 @@ sub register {
 sub log_output {
     my ($self, $transaction) = @_;
     my $output = $self->{_log_format};
-    $output =~ s/%i/($transaction->notes('logging-session-id') || 'parent')/ge;
+    $output =~ s/%i/($self->_note($transaction, 'logging-session-id') || 'parent')/ge;
     $output = strftime $output, localtime;
     $output;
 }
@@ -211,7 +211,17 @@ sub open_log {
     1;
 }
 
-# Reopen the output iff the interpolated output filename has changed
+# Logging hooks fire in any phase, so the transaction slot may hold undef or
+# an unblessed ref (logging outside a transaction). Route every notes() access
+# through here so a non-object can't crash logging with "Can't call method
+# 'notes' on an unblessed reference". Returns undef when notes are unavailable.
+sub _note {
+    my ($self, $transaction, $key, @value) = @_;
+    return if !UNIVERSAL::can($transaction, 'notes');
+    return $transaction->notes($key, @value);
+}
+
+# Reopen the output if the interpolated output filename has changed
 # from the one currently open, or if reopening was selected and we haven't
 # yet done so during this session.
 #
@@ -220,19 +230,22 @@ sub maybe_reopen {
     my ($self, $transaction) = @_;
 
     my $new_output = $self->log_output($transaction);
-    if (
-          !$self->{_current_output}
+
+    # The "reopen once per connection" check only applies when we can track it
+    # in the transaction notes. Logging outside a transaction (startup/shutdown,
+    # other global logs) has no session to remember, so it must not force a
+    # reopen on every call -- only a filename change reopens in that case.
+    my $reopened = $self->_note($transaction, 'file-reopened-this-session');
+    my $session_reopen = $self->{_reopen} && defined($reopened) && !$reopened;
+
+    if (   !$self->{_current_output}
         || $self->{_current_output} ne $new_output
-        || ($self->{_reopen}
-            && !$transaction->notes('file-reopened-this-session'))
-       )
+        || $session_reopen)
     {
         unless ($self->open_log($new_output, $transaction)) {
             return undef;
         }
-        if (UNIVERSAL::can($transaction,'isa')) {
-            $transaction->notes('file-reopened-this-session', 1);
-        }
+        $self->_note($transaction, 'file-reopened-this-session', 1);
         return 1;
     }
     return 0;
@@ -241,14 +254,13 @@ sub maybe_reopen {
 sub hook_connect {
     my ($self, $transaction) = @_;
 
-    $transaction->notes('file-logged-this-session',   0);
-    $transaction->notes('file-reopened-this-session', 0);
-    $transaction->notes(
-                        'logging-session-id',
-                        sprintf("%08d-%04d-%d",
-                                scalar time, $$,
-                                ++$self->{_session_counter})
-                       );
+    $self->_note($transaction, 'file-logged-this-session',   0);
+    $self->_note($transaction, 'file-reopened-this-session', 0);
+    $self->_note($transaction, 'logging-session-id',
+                sprintf("%08d-%04d-%d",
+                        scalar time, $$,
+                        ++$self->{_session_counter})
+               );
     return DECLINED;
 }
 
@@ -278,16 +290,12 @@ sub hook_logging {
     # - We aren't in a session
     if (   !$self->{_f}
         || !$self->{_nosplit}
-        || !$transaction
-        || !UNIVERSAL::can($transaction, 'notes')
-        || !$transaction->notes('file-logged-this-session'))
+        || !$self->_note($transaction, 'file-logged-this-session'))
     {
         unless (defined $self->maybe_reopen($transaction)) {
             return DECLINED;
         }
-        if (UNIVERSAL::can($transaction,'isa')) {
-            $transaction->notes('file-logged-this-session', 1) if $transaction;
-        }
+        $self->_note($transaction, 'file-logged-this-session', 1);
     }
 
     my $f = $self->{_f};

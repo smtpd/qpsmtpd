@@ -1,15 +1,57 @@
 Source: qpsmtpd
 Section: mail
 Priority: optional
-Build-Depends: debhelper (>> 9), perl
-Maintainer: Debian QA Group <packages@qa.debian.org>
-Standards-Version: 3.9.6
+Maintainer: Andreas Erhard <erhard@wor.net>
+Build-Depends:
+ debhelper-compat (= 13),
+ perl,
+ po-debconf,
+# used by the test suite run at build time
+ libdigest-hmac-perl,
+ libmailtools-perl,
+ libnet-dns-perl,
+ libnet-ip-perl,
+ libnetaddr-ip-perl,
+ libtest-output-perl,
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+Homepage: https://github.com/smtpd/qpsmtpd
+Vcs-Git: https://github.com/wornet-aer/qpsmtpd.git -b debian
+Vcs-Browser: https://github.com/wornet-aer/qpsmtpd/tree/debian
 
 Package: qpsmtpd
 Architecture: all
-Depends: ${misc:Depends}, ${perl:Depends}, debconf (>= 1.0.0), adduser (>= 3.0), libdigest-hmac-perl, libmail-spf-perl (>= 2.8.0), libnet-dns-perl, libnet-perl, libmailtools-perl, libipc-shareable-perl, libclamav-client-perl, libsocket6-perl, libio-socket-inet6-perl, lsb-base, libnetaddr-ip-perl
-Suggests: spamassassin (>= 3.0.0), clamav-daemon, tinycdb, libnet-ldap-perl
-Homepage: http://smtpd.develooper.com/
+Pre-Depends:
+ ${misc:Pre-Depends}
+Depends:
+ adduser (>= 3.0),
+ libdigest-hmac-perl,
+ libio-socket-ssl-perl,
+ libipc-shareable-perl,
+ libmailtools-perl,
+ libnet-dns-perl,
+ libnet-ip-perl,
+ perl (>= 5.32),
+ ${misc:Depends},
+ ${perl:Depends}
+Recommends:
+ libcdb-file-perl,
+ libfile-nfslock-perl,
+ libio-socket-inet6-perl,
+ libmail-spf-perl (>= 2.8.0),
+ libnetaddr-ip-perl,
+ libsocket6-perl
+Suggests:
+ clamav-daemon,
+ libclamav-client-perl,
+ libgeoip2-perl,
+ libmail-dkim-perl,
+ libmail-dmarc-perl,
+ libnet-ldap-perl,
+ libredis-perl,
+ libtimedate-perl,
+ spamassassin (>= 3.0.0),
+ tinycdb
 Description: Flexible SMTP daemon for network-level spam detection
  This is a replacement SMTP daemon which installs alongside a mail delivery
  and transport system such as Exim, Postfix or Qmail, or used as an SMTP

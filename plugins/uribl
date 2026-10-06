@@ -297,12 +297,16 @@ sub lookup_start {
         # Dodge inserted-semicolon munging
         $l =~ tr/;//d;
 
+        # The patterns below run under /g over attacker supplied body text, so
+        # every quantifier in them needs a right-hand bound or the scan is
+        # quadratic.
+
         # Check for IP-addresses?
         if ($self->{checkip} eq 'yes') {
         while (
             $l =~ m{
             \w{3,16}:/+            # protocol
-            (?:\S+@)?            # user/pass
+            (?:[^\s@/]+@)?            # user/pass
             (\d{7,})            # raw-numeric IP
             (?::\d*)?([/?\s]|$)        # port, slash
                             #  or EOL
@@ -327,7 +331,7 @@ sub lookup_start {
         while (
             $l =~ m{
             \w{3,16}:/+                  # protocol
-            (?:\S+@)?                    # user/pass
+            (?:[^\s@/]+@)?                    # user/pass
             (\d+|0[xX][0-9A-Fa-f]+)\.    # IP address
             (\d+|0[xX][0-9A-Fa-f]+)\.
             (\d+|0[xX][0-9A-Fa-f]+)\.
@@ -355,7 +359,7 @@ sub lookup_start {
         while (
             $l =~ m{
             ((?:www\.)?                             # www?
-             [a-zA-Z0-9](?:[a-zA-Z0-9\-]+\.)+       # hostname
+             [a-zA-Z0-9](?:[a-zA-Z0-9\-]{1,63}\.)+       # hostname
              (?:$tlds4regex|[a-zA-Z]{2})            # tld
             )(?!\w)        
             }gix
@@ -395,9 +399,9 @@ sub lookup_start {
         while (
             $l =~ m{
             \w{3,16}:/+                 # protocol
-            (?:\S+@)?                   # user/pass
+            (?:[^\s@/]+@)?                   # user/pass
             (
-	     [a-zA-Z0-9](?:[a-zA-Z0-9\-]+\.)+       # hostname
+	     [a-zA-Z0-9](?:[a-zA-Z0-9\-]{1,63}\.)+       # hostname
 	     (?:$tlds4regex|[a-zA-Z]{2})            # tld
             )(?!\w)
             }gix

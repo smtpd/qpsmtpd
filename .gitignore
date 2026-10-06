@@ -14,6 +14,7 @@ packaging/rpm/build/
 *~
 *.bak
 t/tmp
+.claude/
 
 /cover_db/
 .last_cover_stats
@@ -28,3 +29,13 @@ nytprof.out
 run
 log/main
 ssl
+
+# debian build artefacts (in-tree builds)
+/.pc/
+/debian/qpsmtpd/
+/debian/files
+/debian/*.debhelper
+/debian/*.debhelper.log
+/debian/*.substvars
+/debian/debhelper-build-stamp
+/build-stamp

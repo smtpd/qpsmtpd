@@ -12,7 +12,7 @@ msgstr ""
 "Language-Team: German <debian-l10n-german@lists.debian.org>\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=ISO-8859-15\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
 #. Type: boolean
@@ -28,7 +28,7 @@ msgid ""
 "Because most MTAs in Debian listen on one or all network interfaces by "
 "default, when first installed qpsmtpd cannot normally be started."
 msgstr ""
-"Da standardmäßig die meisten MTAs in Debian auf einer oder allen "
+"Da standardmÃ¤ÃŸig die meisten MTAs in Debian auf einer oder allen "
 "Netzschnittstellen auf Anfragen warten, kann Qpsmtpd nach der "
 "Erstinstallation normalerweise nicht starten."
 
@@ -43,12 +43,12 @@ msgid ""
 "common MTAs to work with qpsmtpd can be found after installation in /usr/"
 "share/doc/qpsmtpd/README.Debian."
 msgstr ""
-"Bevor Sie Qpsmtpd aktivieren, müssen Sie zuerst Ihren lokalen MTA so "
+"Bevor Sie Qpsmtpd aktivieren, mÃ¼ssen Sie zuerst Ihren lokalen MTA so "
 "konfigurieren, dass er sich mindestens auf einer Schnittstelle nicht an den "
-"SMTP-TCP-Port bindet. Der häufigste Ansatz ist, Ihren MTA an der Loopback-"
-"Schnittstelle (127.0.0.1) auf Anfragen warten zu lassen, während Qpsmtpd auf "
+"SMTP-TCP-Port bindet. Der hÃ¤ufigste Ansatz ist, Ihren MTA an der Loopback-"
+"Schnittstelle (127.0.0.1) auf Anfragen warten zu lassen, wÃ¤hrend Qpsmtpd auf "
 "der externen Schnittstelle wartet. Anleitungen, wie verbreitete MTAs so "
-"konfiguriert werden, dass sie mit Qpsmtpd zusammenarbeiten, können nach der "
+"konfiguriert werden, dass sie mit Qpsmtpd zusammenarbeiten, kÃ¶nnen nach der "
 "Installation in /usr/share/doc/qpsmtpd/README.Debian gefunden werden."
 
 #. Type: boolean
@@ -58,9 +58,9 @@ msgid ""
 "Once you have adjusted your MTA configuration, you can enable qpsmtpd by "
 "restarting this configuration, by running 'dpkg-reconfigure qpsmtpd'."
 msgstr ""
-"Sobald Sie Ihre MTA-Konfiguration angepasst haben, können Sie Qpsmtpd "
-"aktivieren, indem Sie diese Konfiguration durch Aufruf von »dpkg-reconfigure "
-"qpsmtpd« erneut starten."
+"Sobald Sie Ihre MTA-Konfiguration angepasst haben, kÃ¶nnen Sie Qpsmtpd "
+"aktivieren, indem Sie diese Konfiguration durch Aufruf von Â»dpkg-reconfigure "
+"qpsmtpdÂ« erneut starten."
 
 #. Type: select
 #. Description
@@ -79,13 +79,13 @@ msgid ""
 "handle new connections, offering slightly better performance at the cost of "
 "more memory."
 msgstr ""
-"Qpsmtpd unterstützt zwei Prozessmodelle für den Umgang mit Verbindungen. Das "
-"Modell »forkserver« verwendet im Leerlauf einen einzelnen Prozess und "
+"Qpsmtpd unterstÃ¼tzt zwei Prozessmodelle fÃ¼r den Umgang mit Verbindungen. Das "
+"Modell Â»forkserverÂ« verwendet im Leerlauf einen einzelnen Prozess und "
 "erzeugt neue Prozesse, um Verbindungen zu bedienen. Dies verbraucht weniger "
-"Speicher, reduziert aber leicht den Serverdurchsatz. Das Modell »prefork« "
-"hält ein Reservoir an Prozessen im Leerlauf vor, um neue Verbindungen zu "
+"Speicher, reduziert aber leicht den Serverdurchsatz. Das Modell Â»preforkÂ« "
+"hÃ¤lt ein Reservoir an Prozessen im Leerlauf vor, um neue Verbindungen zu "
 "bedienen. Damit wird eine leicht bessere Leistung auf Kosten von mehr "
-"Speicher ermöglicht."
+"Speicher ermÃ¶glicht."
 
 #. Type: string
 #. Description
@@ -106,7 +106,7 @@ msgstr ""
 "Geben Sie durch Leerzeichen getrennt eine oder mehrere Ihrer lokalen IP-"
 "Adressen an, auf denen Qpsmtpd auf eingehende SMTP-Verbindungen warten soll. "
 "Falls Sie diese Einstellung leer lassen, wird Qpsmtpd auf allen "
-"Schnittstellen warten, die zum Startzeitpunkt verfügbar sind."
+"Schnittstellen warten, die zum Startzeitpunkt verfÃ¼gbar sind."
 
 #. Type: string
 #. Description
@@ -116,10 +116,10 @@ msgid ""
 "local MTA, you may wish to have qpsmtpd listen on all external interfaces, "
 "while leaving your local MTA listening on the loopback device (127.0.0.1)."
 msgstr ""
-"Falls Sie planen, Qpsmtpd zum Zwischenlagern (»spoolen«) von Auslieferungen "
-"ferner Rechner an einen lokalen MTA zu verwenden, könnte es in Ihrem Sinne "
-"sein, Qpsmtpd auf allen externen Schnittstellen warten zu lassen, während "
-"Ihr lokaler MTA auf dem Loopback-Gerät (127.0.0.1) wartet."
+"Falls Sie planen, Qpsmtpd zum Zwischenlagern (Â»spoolenÂ«) von Auslieferungen "
+"ferner Rechner an einen lokalen MTA zu verwenden, kÃ¶nnte es in Ihrem Sinne "
+"sein, Qpsmtpd auf allen externen Schnittstellen warten zu lassen, wÃ¤hrend "
+"Ihr lokaler MTA auf dem Loopback-GerÃ¤t (127.0.0.1) wartet."
 
 #. Type: string
 #. Description
@@ -129,15 +129,15 @@ msgid ""
 "the default port 25; do this by appending :<port> to the interface, as in "
 "\"127.0.0.1:2526\"."
 msgstr ""
-"Für jede Schnittstelle können Sie optional einen Port, an dem auf Anfragen "
-"gewartet werden soll (statt des Standardports 25), angegeben. Fügen Sie "
-"hierzu :<Port> zu der Schnittstelle hinzu, wie in »127.0.0.1:2526«."
+"FÃ¼r jede Schnittstelle kÃ¶nnen Sie optional einen Port, an dem auf Anfragen "
+"gewartet werden soll (statt des Standardports 25), angegeben. FÃ¼gen Sie "
+"hierzu :<Port> zu der Schnittstelle hinzu, wie in Â»127.0.0.1:2526Â«."
 
 #. Type: select
 #. Description
 #: ../qpsmtpd.templates:4001
 msgid "Queueing method for accepted mail:"
-msgstr "Warteschlangenmethode für akzeptierte E-Mail:"
+msgstr "Warteschlangenmethode fÃ¼r akzeptierte E-Mail:"
 
 #. Type: select
 #. Description
@@ -147,11 +147,11 @@ msgid ""
 "you deliver your mail locally, choose the method corresponding to the "
 "installed MTA (the installer will try to pick the correct default.)"
 msgstr ""
-"Wählen Sie die Methode aus, die zum Einreihen von E-Mail in die "
+"WÃ¤hlen Sie die Methode aus, die zum Einreihen von E-Mail in die "
 "Warteschlangen verwendet werden soll, sobald diese per SMTP angeliefert "
-"wurden. Falls Sie Ihre E-Mail lokal zustellen, wählen Sie die Methode, die "
-"zu Ihrem installierten MTA gehört (das Installationsprogramm wird versuchen, "
-"den korrekten Standardwert auszuwählen)."
+"wurden. Falls Sie Ihre E-Mail lokal zustellen, wÃ¤hlen Sie die Methode, die "
+"zu Ihrem installierten MTA gehÃ¶rt (das Installationsprogramm wird versuchen, "
+"den korrekten Standardwert auszuwÃ¤hlen)."
 
 #. Type: select
 #. Description
@@ -161,9 +161,9 @@ msgid ""
 "MTA (local or remote).  You will then be prompted to enter a destination "
 "host."
 msgstr ""
-"Wählen Sie »proxy«, falls Sie möchten, dass Qpsmtpd als Proxy für einen "
+"WÃ¤hlen Sie Â»proxyÂ«, falls Sie mÃ¶chten, dass Qpsmtpd als Proxy fÃ¼r einen "
 "anderen MTA (lokal oder entfernt) agiert. Sie werden aufgefordert, einen "
-"Zielrechner auszuwählen."
+"Zielrechner auszuwÃ¤hlen."
 
 #. Type: select
 #. Description
@@ -172,7 +172,7 @@ msgid ""
 "Select \"maildir\" to have qpsmtpd deliver into a local maildir-format spool "
 "instead of queueing it for delivery (e.g. if you're setting up a spamtrap.)"
 msgstr ""
-"Wählen Sie »maildir«, damit Qpsmtpd in ein lokales Zwischenlager im Maildir-"
+"WÃ¤hlen Sie Â»maildirÂ«, damit Qpsmtpd in ein lokales Zwischenlager im Maildir-"
 "Format ausliefert, anstatt in eine Warteschlange einzustellen (z.B. falls "
 "Sie eine Spamfalle aufsetzen)."
 
@@ -183,15 +183,15 @@ msgid ""
 "If you select \"none,\" no queueing will be done at all, unless you manually "
 "configure it yourself by editing /etc/qpsmtpd/plugins."
 msgstr ""
-"Falls Sie »none« auswählen, erfolgt kein Einstellen in Warteschlangen, falls "
-"Sie es nicht manuell durch Änderung der Datei /etc/qpsmtpd/plugins "
+"Falls Sie Â»noneÂ« auswÃ¤hlen, erfolgt kein Einstellen in Warteschlangen, falls "
+"Sie es nicht manuell durch Ã„nderung der Datei /etc/qpsmtpd/plugins "
 "einstellen."
 
 #. Type: string
 #. Description
 #: ../qpsmtpd.templates:5001
 msgid "Destination host/port for SMTP proxy delivery:"
-msgstr "Ziel-Rechner/-Port für Proxy-Zustellung:"
+msgstr "Ziel-Rechner/-Port fÃ¼r Proxy-Zustellung:"
 
 #. Type: string
 #. Description
@@ -201,16 +201,16 @@ msgid ""
 "or IP address of that host here.  You can optionally add a port number after "
 "a colon, such as \"localhost:25\"."
 msgstr ""
-"Damit Qpsmtpd als ein SMTP-Proxy für einen anderen Rechner agiert, geben Sie "
-"den Rechnernamen oder die IP-Adresse dieses Rechners hier an. Sie können "
-"optional eine Portnummer nach einem Doppelpunkt hinzufügen, wie in "
-"»localhost:25«."
+"Damit Qpsmtpd als ein SMTP-Proxy fÃ¼r einen anderen Rechner agiert, geben Sie "
+"den Rechnernamen oder die IP-Adresse dieses Rechners hier an. Sie kÃ¶nnen "
+"optional eine Portnummer nach einem Doppelpunkt hinzufÃ¼gen, wie in "
+"Â»localhost:25Â«."
 
 #. Type: string
 #. Description
 #: ../qpsmtpd.templates:6001
 msgid "Destination Maildir for maildir-type delivery:"
-msgstr "Ziel-Maildir für Maildir-artige Zustellung:"
+msgstr "Ziel-Maildir fÃ¼r Maildir-artige Zustellung:"
 
 #. Type: string
 #. Description
@@ -221,7 +221,7 @@ msgid ""
 "location if it does not exist already."
 msgstr ""
 "Damit Qpsmtpd empfangene E-Mails in ein lokales Zwischenlager im Maildir-"
-"Format ausliefert, wählen Sie einen Ort für dieses Maildir aus. Ein Maildir "
+"Format ausliefert, wÃ¤hlen Sie einen Ort fÃ¼r dieses Maildir aus. Ein Maildir "
 "wird an dieser Stelle erstellt, falls es noch nicht existiert."
 
 #. Type: boolean
@@ -241,13 +241,13 @@ msgid ""
 "potential cost of wasted bandwidth and eventual bouncing of possibly "
 "legitimate mail."
 msgstr ""
-"Indem Sie »none« für die Warteschlangen-Erweiterung ausgewählt haben, haben "
-"Sie das lokale Einstellen in eine Warteschlange für eingehende E-Mail "
+"Indem Sie Â»noneÂ« fÃ¼r die Warteschlangen-Erweiterung ausgewÃ¤hlt haben, haben "
+"Sie das lokale Einstellen in eine Warteschlange fÃ¼r eingehende E-Mail "
 "deaktiviert. Damit wird keine E-Mail von Qpsmtpd zwischengelagert, bis Sie "
 "manuell eine Warteschlangenmethode konfigurieren. Jeder Rechner, der "
 "versucht, E-Mails an Sie zuzustellen, wird bis dahin nicht schwerwiegende "
-"4xx-Fehler erhalten. Damit wird möglicherweise Bandbreite verschwendet und "
-"schließlich wird möglicherweise legitime E-Mail zurückgewiesen."
+"4xx-Fehler erhalten. Damit wird mÃ¶glicherweise Bandbreite verschwendet und "
+"schlieÃŸlich wird mÃ¶glicherweise legitime E-Mail zurÃ¼ckgewiesen."
 
 #. Type: boolean
 #. Description
@@ -260,17 +260,17 @@ msgid ""
 "suitable local address/port."
 msgstr ""
 "Um die Warteschlange manuell zu konfigurieren, bearbeiten Sie /etc/qpsmtpd/"
-"plugins und wählen Sie eine der dort aufgeführten Warteschlangenmethoden "
+"plugins und wÃ¤hlen Sie eine der dort aufgefÃ¼hrten Warteschlangenmethoden "
 "aus. Falls Sie Ihren installierten MTA nicht in der Liste gesehen haben und "
-"sich nicht sicher sind, was Sie tun sollen, wählen Sie hier »Abbruch« und "
+"sich nicht sicher sind, was Sie tun sollen, wÃ¤hlen Sie hier Â»AbbruchÂ« und "
 "stattdessen die SMTP-Proxy-Methode. Konfigurieren Sie Qpsmtpd dann so, dass "
-"es Proxy für Ihren lokalen MTA auf einer geeigneten lokalen Adresse/Port."
+"es Proxy fÃ¼r Ihren lokalen MTA auf einer geeigneten lokalen Adresse/Port."
 
 #. Type: string
 #. Description
 #: ../qpsmtpd.templates:8001
 msgid "Destination domain(s) to accept mail for (blank for none):"
-msgstr "Ziel-Domain(en), für die E-Mail akzeptiert wird (leer für keine):"
+msgstr "Ziel-Domain(en), fÃ¼r die E-Mail akzeptiert wird (leer fÃ¼r keine):"
 
 #. Type: string
 #. Description
@@ -284,11 +284,11 @@ msgid ""
 "as used for that MTA (the installer will attempt to extract that setting as "
 "a default.)"
 msgstr ""
-"Geben Sie eine durch Leerzeichen getrennte Liste von Domain-Namen an, für "
+"Geben Sie eine durch Leerzeichen getrennte Liste von Domain-Namen an, fÃ¼r "
 "die Qpsmtpd E-Mail akzeptieren soll. Diese Liste sollte alle Rechner- oder "
-"Domain-Namen beinhalten, für die Sie lokale Zustellung akzeptieren wollen, "
-"sowie alle Empfänger-Domains, für die Sie als E-Mail-Weiterleitung (»Relay«) "
-"auftreten wollen. Falls Sie vorhaben, empfangene E-Mail für einen lokalen "
+"Domain-Namen beinhalten, fÃ¼r die Sie lokale Zustellung akzeptieren wollen, "
+"sowie alle EmpfÃ¤nger-Domains, fÃ¼r die Sie als E-Mail-Weiterleitung (Â»RelayÂ«) "
+"auftreten wollen. Falls Sie vorhaben, empfangene E-Mail fÃ¼r einen lokalen "
 "MTA zwischenzulagern, sollte diese Liste im Allgemeinen identisch zu der bei "
 "diesem MTA verwendeten Liste sein (das Installationsprogramm versucht, diese "
 "Einstellung als Voreinstellung zu extrahieren)."
@@ -300,7 +300,7 @@ msgid ""
 "If you prefer to manage this list manually, leave the entry blank and edit "
 "the file /etc/qpsmtpd/rcpthosts."
 msgstr ""
-"Falls Sie diese Liste lieber manuell verwalten möchten, lassen Sie den "
+"Falls Sie diese Liste lieber manuell verwalten mÃ¶chten, lassen Sie den "
 "Eintrag leer und bearbeiten Sie die Datei /etc/qpsmtpd/rcpthosts."
 
 #. Type: note
@@ -323,4 +323,4 @@ msgstr ""
 "Fassungen ohne die check_-Vorsilbe im Namen um. Mit dieser Version werden "
 "Adapter (Wrapper) ausgeliefert, die die alten Namen reaktivieren. Diese "
 "werden aber in der Zukunft entfernt; siehe /usr/share/doc/qpsmtpd/plugins/"
-"README.check_plugins für Upgrade-Anweisungen."
+"README.check_plugins fÃ¼r Upgrade-Anweisungen."

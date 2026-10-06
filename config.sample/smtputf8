@@ -1,0 +1,5 @@
+# Offer the SMTPUTF8 extension (RFC 6531), so clients may use UTF-8 in
+# envelope addresses. Only enable this if everything behind qpsmtpd (your
+# queue plugin and the MTA it feeds) can route non-ASCII addresses.
+# Without this file, non-ASCII addresses are rejected.
+1

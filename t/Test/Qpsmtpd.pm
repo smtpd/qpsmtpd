@@ -69,6 +69,21 @@ sub command {
     $self->response;
 }
 
+sub mock_data {
+    # Queue message lines for getline() to feed to data_respond(). Accepts an
+    # arrayref of pre-split lines (each keeping its own terminator, so bare
+    # LF/CR lines can be injected) or a string split on LF.
+    my ($self, $data) = @_;
+    $self->{_mock_lines} =
+      ref $data eq 'ARRAY' ? [@$data] : [$data =~ /(.*?\n|.+)/gs];
+}
+
+sub getline {
+    my $self = shift;
+    return $self->SUPER::getline(@_) if !$self->{_mock_lines};
+    return shift @{$self->{_mock_lines}};    # undef once exhausted => EOF
+}
+
 sub input {
     my ($self, $command) = @_;
 

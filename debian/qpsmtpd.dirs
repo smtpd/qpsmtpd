@@ -1,0 +1,5 @@
+etc/qpsmtpd
+usr/share/qpsmtpd/plugins
+var/lib/qpsmtpd/greylisting
+var/log/qpsmtpd
+var/spool/qpsmtpd

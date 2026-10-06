@@ -1,0 +1,84 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Constants;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('test_disconnect_records_naughty');
+    $self->register_test('test_disconnect_flagged_naughty');
+    $self->register_test('test_disconnect_records_nice');
+    $self->register_test('test_disconnect_skips_immune');
+}
+
+sub _fresh {
+    my ($self, $ip) = @_;
+
+    delete $self->{db};
+    $self->db( class => 'Qpsmtpd::DB::File::DBM', dir => 't/tmp' );
+
+    my $conn = $self->qp->connection;
+    $conn->relay_client(0);
+    $conn->notes($_, undef) for qw( whitelisthost naughty karma );
+    $conn->remote_ip($ip);
+    $self->qp->transaction->notes('whitelistsender', undef);
+
+    my $key = $self->get_karma_key($ip);
+    $self->db->lock;
+    $self->db->set($key, '0:0:0:0');
+    $self->db->unlock;
+    return $key;
+}
+
+sub _record {
+    my ($self, $key) = @_;
+    $self->db->lock;
+    my @rec = $self->parse_db_record( $self->db->get($key) );
+    $self->db->unlock;
+    return @rec;
+}
+
+sub test_disconnect_records_naughty {
+    my $self = shift;
+    my $key = $self->_fresh('192.0.2.11');
+    $self->connection->notes('karma', -3);    # <= -strikes
+    $self->disconnect_handler;
+    my (undef, $naughty) = $self->_record($key);
+    cmp_ok( $naughty, '==', 1, "negative karma increments the naughty count" );
+}
+
+sub test_disconnect_flagged_naughty {
+    my $self = shift;
+    my $key = $self->_fresh('192.0.2.12');
+    $self->is_naughty(1);                      # flagged, karma left neutral
+    $self->disconnect_handler;
+    my (undef, $naughty) = $self->_record($key);
+    cmp_ok( $naughty, '==', 1,
+        "naughty-flagged connection is counted despite neutral karma" );
+}
+
+sub test_disconnect_records_nice {
+    my $self = shift;
+    my $key = $self->_fresh('192.0.2.13');
+    $self->connection->notes('karma', 3);      # >= strikes
+    $self->disconnect_handler;
+    my (undef, $naughty, $nice) = $self->_record($key);
+    cmp_ok( $nice, '==', 1, "positive karma increments the nice count" );
+}
+
+sub test_disconnect_skips_immune {
+    my $self = shift;
+    my $key = $self->_fresh('192.0.2.14');
+    $self->connection->notes('karma', -3);
+    $self->connection->notes('whitelisthost', 'trusted');   # immune
+    $self->disconnect_handler;
+    my (undef, $naughty) = $self->_record($key);
+    cmp_ok( $naughty, '==', 0,
+        "immune (whitelisted) connection is not recorded" );
+
+    # don't leak immunity onto the shared connection used by later plugin tests
+    $self->connection->notes($_, undef) for qw( whitelisthost naughty karma );
+}

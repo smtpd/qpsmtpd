@@ -210,20 +210,20 @@ sub has_reverse_dns {
     my $query = $res->query($ip, 'PTR') or do {
         if ($res->errorstring eq 'NXDOMAIN') {
             $self->adjust_karma(-1);
-            $self->store_auth_results("iprev=permerror");
+            $self->connection->store_auth_results("iprev=permerror");
             $self->log(LOGINFO, "fail, no rDNS: " . $res->errorstring);
             return;
         }
         if ( $res->errorstring eq 'SERVFAIL' ) {
             $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
-            $self->store_auth_results("iprev=temperror");
+            $self->connection->store_auth_results("iprev=temperror");
         }
         elsif ( $res->errorstring eq 'NOERROR' ) {
             $self->log(LOGINFO, "fail, no PTR (NOERROR)" );
-            $self->store_auth_results("iprev=permerror");
+            $self->connection->store_auth_results("iprev=permerror");
         }
         else {
-            $self->store_auth_results("iprev=fail");
+            $self->connection->store_auth_results("iprev=fail");
             $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
         };
         return;
@@ -240,7 +240,7 @@ sub has_reverse_dns {
     if (!$hits) {
         $self->adjust_karma(-1);
         $self->log(LOGINFO, "fail, no PTR records");
-        $self->store_auth_results("iprev=permerror");
+        $self->connection->store_auth_results("iprev=permerror");
         return;
     }
 
@@ -258,11 +258,11 @@ sub has_forward_dns {
         $host .= '.' if '.' ne substr($host, -1, 1);    # fully qualify name
         my $query = $res->query($host) or do {
             if ($res->errorstring eq 'NXDOMAIN') {
-                $self->store_auth_results("iprev=permerror");
+                $self->connection->store_auth_results("iprev=permerror");
                 $self->log(LOGDEBUG, "host $host does not exist");
                 next;
             }
-            $self->store_auth_results("iprev=fail");
+            $self->connection->store_auth_results("iprev=fail");
             $self->log(LOGDEBUG, "query for $host failed (",
                        $res->errorstring, ")");
             next;
@@ -275,13 +275,13 @@ sub has_forward_dns {
             $self->check_ip_match($rr->address) and return 1;
         }
         if ($hits) {
-            $self->store_auth_results("iprev=fail");
+            $self->connection->store_auth_results("iprev=fail");
             $self->log(LOGDEBUG, "PTR host has forward DNS") if $hits;
             return 1;
         }
     }
     $self->adjust_karma(-1);
-    $self->store_auth_results("iprev=fail");
+    $self->connection->store_auth_results("iprev=fail");
     $self->log(LOGINFO, "fail, no PTR hosts have forward DNS");
     return;
 }
@@ -292,7 +292,7 @@ sub check_ip_match {
 
     if ($ip eq $self->qp->connection->remote_ip) {
         $self->log(LOGDEBUG, "forward ip match");
-        $self->store_auth_results("iprev=pass");
+        $self->connection->store_auth_results("iprev=pass");
         $self->adjust_karma(1);
         return 1;
     }
@@ -304,7 +304,7 @@ sub check_ip_match {
 
     if ($dns_net eq $rem_net) {
         $self->log(LOGNOTICE, "forward network match");
-        $self->store_auth_results("iprev=pass");
+        $self->connection->store_auth_results("iprev=pass");
         return 1;
     }
     return;

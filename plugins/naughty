@@ -133,6 +133,13 @@ sub register {
 
 sub naughty {
     my $self = shift;
+
+    # An async whitelist (e.g. dns_whitelist_soft) may not set its note until
+    # rcpt, after the naughty flag was set at connect. Re-check immunity here,
+    # at disposal time, so a whitelisted host is not disconnected. Requires
+    # this hook to run after the whitelist's rcpt hook: use 'reject data'.
+    return DECLINED if $self->is_immune();
+
     my $naughty = $self->connection->notes('naughty') or do {
         $self->log(LOGINFO, 'pass');
         return DECLINED;

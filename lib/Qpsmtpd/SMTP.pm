@@ -31,7 +31,7 @@ sub new {
 
     my $self = bless({args => \%args}, $class);
 
-   # this list of valid commands should probably be a method or a set of methods
+    # this list of valid commands should probably be a method or a set of methods
     $self->{_commands} =
       {map { $_ => '' } qw(ehlo helo rset mail rcpt data help vrfy noop quit)};
 
@@ -202,6 +202,7 @@ sub helo_respond {
     my $conn = $self->connection;
     $conn->hello('helo');
     $conn->hello_host($args->[0]);  # store helo hostname
+    $conn->notes('smtputf8_offered', 0);    # HELO withdraws any ESMTP offer
     $self->transaction;
 
     $self->respond( 250, $self->helo_hi_msg . '; I am so happy to meet you.');
@@ -250,18 +251,35 @@ sub ehlo_respond {
         $self->{_commands}{auth} = '';
     }
 
-    $self->respond( 250, $self->helo_hi_msg,
-                    'PIPELINING',
-                    '8BITMIME',
-                    $self->ehlo_size(),
-                    @capabilities,
-                    );
+    my @extensions = ('PIPELINING', '8BITMIME', $self->ehlo_size(),
+                      $self->ehlo_smtputf8(), @capabilities);
+
+    # A plugin may offer SMTPUTF8 through the ehlo hook, so MAIL has to honour
+    # the reply the client saw rather than re-deriving it from config.
+    $conn->notes('smtputf8_offered', scalar grep { $_ eq 'SMTPUTF8' } @extensions);
+
+    $self->respond(250, $self->helo_hi_msg, @extensions);
 }
 
 sub ehlo_size {
     my $self = shift;
     return () if ! $self->config('databytes');
     return 'SIZE ' . ($self->config('databytes'))[0];
+};
+
+sub ehlo_smtputf8 {
+    my $self = shift;
+    return () if ! ($self->config('smtputf8'))[0];
+    return 'SMTPUTF8';
+};
+
+sub respond_smtputf8_required {
+    my ($self, $cmd) = @_;
+
+    # RFC 6531 3.5: a non-ASCII mailbox cannot be delivered unless the client
+    # announced SMTPUTF8 on the MAIL command. There is no downgrade to ASCII.
+    return $self->respond($cmd eq 'rcpt' ? 553 : 550,
+                    'Non-ASCII address requires SMTPUTF8 (#5.6.7)');
 };
 
 sub auth {
@@ -380,6 +398,17 @@ sub mail_pre_respond {
     return $self->respond(501, "could not parse your mail from command")
       unless $from =~ /^<.*>$/;
 
+    if (exists $param->{smtputf8}) {
+        # RFC 6531 3.4: the parameter must not carry a value
+        return $self->respond(501, 'SMTPUTF8 takes no value')
+          if defined $param->{smtputf8};
+
+        # SMTPUTF8 may only be used after it was advertised in an EHLO reply.
+        return $self->respond(555, 'SMTPUTF8 is not supported')
+          if !$self->connection->notes('smtputf8_offered');
+        $self->transaction->notes('smtputf8', 1);
+    }
+
     if ($from eq "<>" or $from =~ m/\[undefined\]/ or $from eq "<#@[]>") {
         $from = $self->address("<>");
     }
@@ -388,6 +417,9 @@ sub mail_pre_respond {
     }
     return $self->respond(501, "could not parse your mail from command")
       unless $from;
+
+    return $self->respond_smtputf8_required('mail')
+      if $from->has_utf8 && !$self->transaction->notes('smtputf8');
 
     $self->run_hooks("mail", $from, %$param);
 }
@@ -476,6 +508,9 @@ sub rcpt_pre_respond {
 
     return $self->respond(501, "could not parse recipient")
       if (!$rcpt or ($rcpt->format eq '<>'));
+
+    return $self->respond_smtputf8_required('rcpt')
+      if $rcpt->has_utf8 && !$self->transaction->notes('smtputf8');
 
     $self->run_hooks("rcpt", $rcpt, %$param);
 }
@@ -617,6 +652,27 @@ sub quit_respond {
         $self->respond(221, @$msg);
     }
     $self->disconnect();
+
+    # dispatch() faults with a 451 on an undefined return. Both shipped
+    # transports exit or die inside disconnect()
+    return 1;
+}
+
+# RFC 5321 4.5.3.1.4 caps a command line at 512 octets, but an AUTH exchange
+# (RFC 4954) legitimately runs past that, so use the 998 octet text line limit
+# from 4.5.3.1.6.
+our $max_command_line = 998;
+
+sub command_line_too_long {
+    my ($self, $line) = @_;
+    return 0 if !defined $line;
+    return 0 if length($line) <= $max_command_line;
+    $self->log(LOGINFO,
+               'command line of ' . length($line)
+                 . " octets exceeds $max_command_line, disconnecting");
+    $self->respond(500, 'Line too long (#5.5.2)');
+    $self->disconnect;
+    return 1;
 }
 
 sub disconnect {
@@ -681,20 +737,18 @@ sub data_respond {
 
     my $timeout = $self->config('timeout');
     while (defined($_ = $self->getline($timeout))) {
+
+        if ($_ !~ /\r\n$/) {
+            $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
+            $self->disconnect;
+            return 1;
+        }
+
         if ($_ eq ".\r\n") {
             $complete++;
             $_ = '';
         }
         $i++;
-
-        # Reject messages that have either bare LF or CR. rjkaes noticed a
-        # lot of spam that is malformed in the header.
-
-        if ($_ eq ".\n" || $_ eq ".\r") {
-            $self->respond(421, 'See http://smtpd.develooper.com/barelf.html');
-            $self->disconnect;
-            return 1;
-        }
 
         unless (($max_size and $size > $max_size)) {
             s/\r\n$/\n/;
@@ -711,8 +765,6 @@ sub data_respond {
         #   way a Received: line that is already in the header.
 
                 $header->extract(\@headers);
-
-#$header->add("X-SMTPD", "qpsmtpd/".$self->version.", http://smtpd.github.io/qpsmtpd/");
 
                 $buffer = '';
 
@@ -776,7 +828,14 @@ sub data_respond {
 sub authentication_results {
     my ($self) = @_;
 
-    my @auth_list = $self->config('me');
+    # don't add an Authentication-Results if this is "none"
+    my @auth_list = $self->config('me-auth-results');
+    if (! $auth_list[0]) {
+        @auth_list = $self->config('me');
+    }
+    elsif ($auth_list[0] eq "none") {
+        return;
+    }
 
     if (!defined $self->{_auth}) {
         push @auth_list, 'auth=none';
@@ -793,8 +852,11 @@ sub authentication_results {
     }
 
     # RFC 5451: used in AUTH, DKIM, DOMAINKEYS, SENDERID, SPF
-    if ($self->connection->notes('authentication_results')) {
-        push @auth_list, $self->connection->notes('authentication_results');
+    # Connection results (iprev, SPF helo, AUTH) apply to every message;
+    # transaction results (DKIM, DMARC, SPF mailfrom) apply to this one.
+    for my $ar ($self->connection->notes('authentication_results'),
+                $self->transaction->notes('authentication_results')) {
+        push @auth_list, $ar if $ar;
     }
 
     $self->log(LOGDEBUG, "adding auth results header");
@@ -804,6 +866,10 @@ sub authentication_results {
 
 sub clean_authentication_results {
     my $self = shift;
+
+    # don't change any Authentication-Results if this is "none"
+    my ($auth_id) = $self->config('me-auth-results');
+    return if ($auth_id && ($auth_id eq "none"));
 
     # On messages received from the internet, move Authentication-Results headers
     # to Original-AR, so our downstream can trust the A-R header we insert.
@@ -837,8 +903,12 @@ sub clean_authentication_results {
 sub received_line {
     my ($self) = @_;
 
-    my $smtp = $self->connection->hello eq "ehlo" ? "ESMTP" : "SMTP";
-    my $esmtp      = substr($smtp, 0, 1) eq "E";
+    my $esmtp = $self->connection->hello eq "ehlo";
+    my $smtp  = $esmtp ? "ESMTP" : "SMTP";
+
+    # RFC 6531 4.3 registers UTF8SMTP and its S/A variants for the WITH clause
+    $smtp = "UTF8SMTP" if $esmtp && $self->transaction->notes('smtputf8');
+
     my $authheader = '';
     my $sslheader  = '';
 
@@ -860,8 +930,8 @@ sub received_line {
     my $header_str;
     my ($rc, @received) =
       $self->run_hooks("received_line", $smtp, $authheader, $sslheader);
-    if ($rc == OK) {
-        return join("\n", @received);
+    if ($rc == OK) {        
+        $header_str = join("\n", @received);
     }
     else {    # assume $rc == DECLINED
         $header_str =
@@ -925,8 +995,21 @@ sub getline {
     return $line;
 }
 
+# overridden by the transport (Qpsmtpd::TcpServer); assume connected elsewhere
+sub check_socket { 1 }
+
 sub queue {
     my ($self, $transaction) = @_;
+
+    # The message has passed every check. If the client gave up while we were
+    # working (e.g. a slow content filter), we cannot deliver the 250 and they
+    # will retry, producing a duplicate. Discard now so their retry delivers it
+    # exactly once, rather than queueing a message we can't acknowledge.
+    if (!$self->check_socket) {
+        $self->log(LOGERROR,
+            "client disconnected before queue; discarding message (sender will retry)");
+        return $self->reset_transaction;
+    }
 
     # First fire any queue_pre hooks
     $self->run_hooks("queue_pre");

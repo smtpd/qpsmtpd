@@ -116,7 +116,7 @@ sub data_post_handler {
 
     if (defined $status) {
 #$transaction->header->add("DomainKey-Status", $status, 0);
-        $self->store_auth_results('domainkey=' . $status);
+        $self->transaction->store_auth_results('domainkey=' . $status);
         $self->log(LOGINFO, "pass, $status");
         return DECLINED;
     }

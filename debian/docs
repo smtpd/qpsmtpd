@@ -1,2 +1,11 @@
 README.md
 README.plugins.md
+UPGRADING.md
+debian/README.check_plugins
+docs/advanced.md
+docs/authentication.md
+docs/config.md
+docs/development.md
+docs/hooks.md
+docs/logging.md
+docs/writing.md

@@ -114,16 +114,33 @@ currently (postfix-2.4-20061019) the same as 2.3
 
 =back
 
-=head1 MAYBE IN FUTURE 
+=head1 SMTPUTF8
+
+If the message was accepted with the SMTPUTF8 extension (RFC 6531),
+CLEANUP_FLAG_SMTPUTF8 is added to the flags for this message only, so that
+cleanup accepts the internationalized envelope. This needs postfix 3.0 or
+later; older versions ignore unknown flags.
+
+=head1 MAYBE IN FUTURE
 
 Settings the (additional) queue flags from another plugin. Currently at the
-beginning of I<hook_queue()> all flags are reset to the flags given as plugin 
+beginning of I<hook_queue()> all flags are reset to the flags given as plugin
 parameters.
 
 =cut
 
 use Qpsmtpd::Postfix;
 use Qpsmtpd::Postfix::Constants;
+
+BEGIN {
+    # Set per message rather than from the plugin arguments, so it is only
+    # requested for envelopes that actually need it. Qpsmtpd::Postfix::Constants
+    # is generated from postfix 2.4 sources and predates the flag, which
+    # arrived in postfix 3.0 (src/global/cleanup_user.h).
+    if (!defined &CLEANUP_FLAG_SMTPUTF8) {
+        *CLEANUP_FLAG_SMTPUTF8 = sub () { 1 << 8 };
+    }
+}
 
 sub register {
     my ($self, $qp, @args) = @_;
@@ -161,7 +178,9 @@ sub register {
 
 sub hook_queue {
     my ($self, $transaction) = @_;
-    $transaction->notes('postfix-queue-flags', $self->{_queue_flags});
+    my $queue_flags = $self->{_queue_flags};
+    $queue_flags |= CLEANUP_FLAG_SMTPUTF8 if $transaction->notes('smtputf8');
+    $transaction->notes('postfix-queue-flags', $queue_flags);
     my @queue;
     @queue = ($self->{_queue_socket_env}) if $self->{_queue_socket_env};
     @queue = $self->qp->config('cleanup_sockets') unless @queue;
