@@ -11,6 +11,15 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
   recommended way to run qpsmtpd
+- config/barelf: `strict` (default) or `tolerant` handling of a bare LF
+  in the message data. Both only accept `<CRLF>.<CRLF>` as the end of the
+  data, so SMTP smuggling stays rejected
+
+### Changed
+
+- a bare LF/CR in the message data is rejected with a permanent
+  `554 (#5.6.0)` instead of a temporary 421, so senders bounce at once
+  instead of retrying a message that can never pass
 
 ### Removed
 
