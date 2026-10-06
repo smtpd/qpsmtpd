@@ -13,9 +13,6 @@ file I<hosts_allow>. It now supports IPv6 addresses.
 
 The plugin takes no config/plugin arguments.
 
-This plugin only works with the forkserver deployment model. It
-does not work with the tcpserver deployment model. See SEE ALSO below.
-
 =head1 CONFIG
 
 The I<hosts_allow> config file contains lines with two or three items. The
@@ -32,23 +29,6 @@ Example:
 
 This would exclude 192.168.3.4 from the DENY of 192.168.3.0/24, and refuse
 Tailscale IPv6 local addresses.
-
-=head1 SEE ALSO
-
-To get similar functionality for the tcpserver deployment model, use
-tcpserver's -x feature. Create a tcp.smtp file with entries like this:
-
-  70.65.227.235:deny
-  183.7.90.207:deny
-  :allow
-
-compile the tcp.smtp file like this:
-
-  /usr/local/bin/tcprules tcp.smtp.cdb tcp.smtp.tmp < tcp.smtp
-
-and add the file to the chain of arguments to tcpserver in your run file.
-
-See also: http://cr.yp.to/ucspi-tcp.html
 
 =cut
 

@@ -28,11 +28,7 @@ sub has_ipv6 {
 
 my $first_0;
 
-sub conn_info_tcpserver {
-
-    # started from tcpserver (or some other superserver which
-    # exports the TCPREMOTE* variables.
-
+sub conn_info_env {
     my $r_host = $ENV{TCPREMOTEHOST} || '[' . $ENV{TCPREMOTEIP} . ']';
     return (
         local_ip    => $ENV{TCPLOCALIP},
@@ -45,42 +41,10 @@ sub conn_info_tcpserver {
     )
 }
 
-sub conn_info_inetd {
-    my $self = shift;
-
-    # Started from inetd or similar.
-    # get info on the remote host from the socket.
-    # ignore ident/tap/...
-
-    my $hersockaddr = getpeername(STDIN) or die "getpeername failed:" .
-        " $0 must be called from tcpserver, (x)inetd or" .
-        " a similar program which passes a socket to stdin";
-
-    my ($r_port, $iaddr) = sockaddr_in($hersockaddr);
-    my $r_ip = inet_ntoa($iaddr);
-    my ($r_host) = $base->resolve_ptr($r_ip) || "[$r_ip]";
-
-    return (
-        local_ip    => '',
-        local_host  => '',
-        local_port  => '',
-        remote_ip   => $r_ip,
-        remote_host => $r_host,
-        remote_info => $r_host,
-        remote_port => $r_port,
-    )
-}
-
 sub start_connection {
     my $self = shift;
 
-    my %info;
-    if ($ENV{TCPREMOTEIP}) {
-        %info = $self->conn_info_tcpserver();
-    }
-    else {
-        %info = $self->conn_info_inetd();
-    }
+    my %info = $self->conn_info_env();
     $self->log(LOGNOTICE, "Connection from $info{remote_info} [$info{remote_ip}]");
 
     # if the local dns resolver doesn't filter it out we might get

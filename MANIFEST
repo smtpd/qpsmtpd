@@ -12,7 +12,6 @@ config.sample/databytes
 config.sample/dnsbl_zones
 config.sample/flat_auth_pw
 config.sample/invalid_resolvable_fromhost
-config.sample/IP
 config.sample/karma_tlds
 config.sample/log2sql
 config.sample/logging
@@ -146,13 +145,11 @@ plugins/virus/klez_filter
 plugins/virus/sophie
 plugins/virus/uvscan
 plugins/whitelist
-qpsmtpd
 qpsmtpd-forkserver
 qpsmtpd.service
 README.md
 README.plugins.md
 run.forkserver
-run.tcpserver
 STATUS
 t/addresses.t
 t/auth.t

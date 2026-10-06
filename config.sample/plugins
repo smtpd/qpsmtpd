@@ -10,9 +10,6 @@
 # to support legacy port 465, tls must load before connection plugins
 #tls
 
-# hosts_allow does not work with the tcpserver deployment model!
-#   perldoc plugins/hosts_allow for an alternative.
-#
 # The hosts_allow module must be loaded if you want the -m / --max-from-ip /
 # my $MAXCONNIP = 5; # max simultaneous connections from one IP
 # settings... without this it will NOT refuse more than $MAXCONNIP connections
