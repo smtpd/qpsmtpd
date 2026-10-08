@@ -29,7 +29,7 @@ sub start_connection {
     my ($self, %info) = @_;
 
     # a PTR record can hold ANSI escapes, which would reach ps output via $0
-    $info{remote_host} =~ tr/a-zA-Z\.\-0-9\[\]//cd;
+    $info{remote_host} =~ tr/a-zA-Z.:0-9[]-//cd;
     $info{remote_info} //= $info{remote_host};
     $self->log(LOGNOTICE, "Connection from $info{remote_info} [$info{remote_ip}]");
 

@@ -32,6 +32,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - qpsmtpd-forkserver no longer sets `$TCPLOCALIP`, `$TCPREMOTEIP` or
   `$TCPREMOTEHOST`. Plugins read them from `$qp->connection`
 
+### Fixed
+
+- qpsmtpd-forkserver `--no-rdns` skips the PTR lookup
+- an IPv6 client's address keeps its colons when it names the remote host
+
 ## [1.02] - 2026-10-01
 
 ### Added

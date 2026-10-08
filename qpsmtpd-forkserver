@@ -302,7 +302,10 @@ while (1) {
             exit;
         };
 
-        my $remote_host = ($qpsmtpd->resolve_ptr($nto_iaddr))[0] || 'Unknown';
+        my $remote_host =
+          $NORDNS
+          ? "[$nto_iaddr]"
+          : ($qpsmtpd->resolve_ptr($nto_iaddr))[0] || 'Unknown';
         ::log(LOGINFO,
             "Accepted connection $running/$MAXCONN from $nto_iaddr / $remote_host");
 
