@@ -62,23 +62,15 @@
 701	loop						lop		loop
 702	uribl						uri		uribl
 
-710	domainkeys					dky		dkey
 711	dkim						dkm		dkim
 712 dmarc 				        dmc     dmarc
 
 720	spamassassin				spm		spama
-721	dspam						dsp		dspam
 #
 # Anti-Virus Plugins
 #
-770	virus::aveclient			ave		avirs
-771	virus::bitdefender			bit		bitdf
 772	virus::clamav				cav		clamv
 773	virus::clamdscan			clm		clamd
-774	virus::hbedv				hbv		hbedv
-775	virus::kavscanner			kav		kavsc
-776	virus::klez_filter			klz		vklez
-777	virus::sophie				sop		sophe
 778	virus::uvscan				uvs		uvscn
 #
 # Queue Plugins

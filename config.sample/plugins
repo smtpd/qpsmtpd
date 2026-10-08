@@ -23,7 +23,6 @@ hosts_allow
 #ident/p0f /tmp/.p0f_socket version 3
 fcrdns
 
-quit_fortune
 earlytalker
 count_unrecognized_commands 4
 
@@ -74,8 +73,6 @@ dkim reject 0
 dmarc
 
 # content filters
-virus/klez_filter
-
 # You can run the spamassassin plugin with options.  See perldoc
 # plugins/spamassassin for details.
 #
@@ -85,9 +82,6 @@ spamassassin reject 12
 # of the score is higher than 10.
 #
 #   spamassassin reject 20 munge_subject_threshold 10
-
-# dspam must run after spamassassin for the learn_from_sa feature to work
-#dspam autolearn spamassassin reject 0.95
 
 # run the clamav virus checking plugin (max size in Kb)
 # virus/clamav

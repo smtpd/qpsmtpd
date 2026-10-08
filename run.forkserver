@@ -8,8 +8,6 @@ PERL=/usr/bin/perl
 IP=0.0.0.0
 LANG=C
 
-# See also: http://wiki.qpsmtpd.org/deploy:start
-
 exec 2>&1 \
 sh -c "
   exec $BIN/softlimit -m $MAXRAM   \

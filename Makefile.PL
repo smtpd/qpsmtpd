@@ -58,12 +58,6 @@ WriteMakefile(
     clean          => { FILES => [ '*.bak', 't/tmp' ], },
 );
 
-sub MY::libscan {
-    my $path = $_[1];
-    return '' if $path =~ /\B\.svn\b/;
-    return $path;
-}
-
 sub MY::postamble {
     qq[
 testcover :

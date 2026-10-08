@@ -249,8 +249,8 @@ was sent, this hook is called.
 
 __NOTE:__ This hook, like __EHLO__, __VRFY__, __QUIT__, __NOOP__, is an
 endpoint of a pipelined command group (see RFC 1854) and may be used to
-detect \`\`early talkers''. Since svn revision 758 the `earlytalker`
-plugin may be configured to check at this hook for \`\`early talkers''.
+detect \`\`early talkers''. The `earlytalker` plugin may be configured to
+check at this hook for \`\`early talkers''.
 
 Allowed return codes are
 
@@ -272,9 +272,7 @@ Allowed return codes are
 
     __NOTE:__ The only real use for _DONE_ is implementing other ways of
     receiving the message, than the default... for example the CHUNKING SMTP
-    extension (RFC 1869, 1830/3030) ... a plugin for this exists at
-    http://svn.perl.org/qpsmtpd/contrib/vetinari/experimental/chunking, but it
-    was never tested \`\`in the wild''.
+    extension (RFC 1869, 1830/3030).
 
 Arguments:
 
@@ -347,7 +345,7 @@ used by plugins that insert new headers (ex: Received-SPF) and/or
 modify headers such as appending to Authentication-Results (SPF, DKIM, DMARC).
 
 When it is desirable to have these header modifications evaluated by filtering
-software (spamassassin, dspam, etc.) running on `data_post`, this hook should be
+software (spamassassin, etc.) running on `data_post`, this hook should be
 used instead of `data_post`.
 
 Note that you cannot reject in this hook, use the data_post hook instead
@@ -394,7 +392,7 @@ Arguments:
 
     my ($self, $transaction) = @_;
 
-Example plugins: `spamassassin`, `virus/clamdscan`, `dspam`
+Example plugins: `spamassassin`, `virus/clamdscan`
 
 ## hook\_queue\_pre
 

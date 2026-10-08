@@ -5,6 +5,13 @@ upgrading _from_.
 
 ## v1.02 or below
 
+### Removed plugins
+
+virus/klez\_filter, virus/aveclient, virus/bitdefender, virus/hbedv,
+virus/kavscanner, virus/sophie, dspam and domainkeys are gone. Remove them
+from config/plugins, or qpsmtpd will not start. For virus scanning, use
+virus/clamdscan; for signatures, dkim.
+
 ### qpsmtpd-forkserver's default listen addresses
 
 With no `--listen-address`, qpsmtpd-forkserver listens on 0.0.0.0 and [::].

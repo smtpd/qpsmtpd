@@ -39,10 +39,8 @@ summarize their activity. Here's a few sample lines:
     (connect) ident::geoip: SA, Saudi Arabia
     (connect) ident::p0f: Windows 7 or 8
     (connect) earlytalker: pass: remote host said nothing spontaneous
-    (data_post) domainkeys: skip: unsigned
     (data_post) spamassassin: pass, Spam, 21.7 < 100
-    (data_post) dspam: fail: agree, Spam, 1.00 c
-    552 we agree, no spam please (#5.6.1)
+    (data_post) dkim: pass, valid signature
 
 Three plugins fired during the SMTP connection phase and 3 more ran during the
 data\_post phase. Each plugin emitted one entry stating their findings.

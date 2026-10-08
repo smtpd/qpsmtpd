@@ -127,7 +127,7 @@ fr:+1
 Karma reduces the resources wasted by naughty mailers.  When used with
 I<reject connect>, naughty senders are disconnected in about 0.1 seconds.
 
-The biggest gains to be had are by having heavy plugins (spamassassin, dspam,
+The biggest gains to be had are by having heavy plugins (spamassassin,
 virus filters) set the B<karma> connection note (see KARMA) when they encounter
 naughty senders. Reasons to send servers to the penalty box could include
 sending a virus, early talking, or sending messages with a very high spam
