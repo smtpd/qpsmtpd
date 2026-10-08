@@ -9,275 +9,469 @@ milter
 This plugin allows you to attach to milter filters (yes, those written for
 sendmail) as though they were qpsmtpd plugins.
 
-In order to do this you need the C<Net::Milter> module from CPAN.
+It speaks milter protocol version 6, the version of sendmail 8.14+ and
+Postfix 2.6+, and also works with milters that negotiate an older version.
+Rspamd, OpenDKIM, OpenDMARC, ClamAV-milter and other libmilter filters are
+supported.
 
 =head1 CONFIG
 
-It takes two required parameters - a milter name (for logging) and the port
-to connect to on the localhost. This can also contain a hostname if
-the filter is on another machine:
+It takes two required parameters - a milter name (for logging) and the
+socket to connect to:
 
-  milter Brightmail 5513
+  milter rspamd 11332
+  milter rspamd rspamd.example.com:11332
+  milter rspamd [::1]:11332
+  milter clamav unix:/var/run/clamav/clamav-milter.sock
 
-or
+A bare port connects to 127.0.0.1. The Postfix forms C<inet:host:port> and
+C<unix:/path> are accepted.
 
-  milter Brightmail bmcluster:5513
+List the plugin before your queue plugin, so that a message the milter
+asks to discard is never queued.
 
-This plugin has so far only been tested with Brightmail's milter module.
+=head2 timeout
 
-=head1 LIMITATIONS
+Seconds to wait for each read from or write to the milter. Default: 30.
 
-This plugin speaks only milter protocol version 2, as implemented by the
-long-unmaintained C<Net::Milter> module (last released in 2007). It does
-B<not> support milter protocol version 6.
+  milter rspamd 11332 timeout 10
 
-As a result it does not work with milter backends that require version 6,
-notably B<Rspamd>, which rejects the connection with "MTA specifies too old
-protocol: 2". Advertising version 6 from C<Net::Milter> is not sufficient:
-version 6 negotiates per-command "no reply" flags (C<SMFIP_NR_*>), and because
-C<Net::Milter> does not honor them it blocks waiting for responses the milter
-never sends, hanging the connection until it times out.
+=head1 BEHAVIOR
 
-To use Rspamd, integrate it via its native HTTP API or the C<rspamc> command
-rather than this plugin. See:
-L<https://github.com/smtpd/qpsmtpd/issues/329>
+The milter's reply to each SMTP command is honored. A custom reply is sent
+to the client with the milter's own code and text; reject and tempfail
+replies are sent as C<550 5.7.1 Command rejected> and C<451 4.7.1 Service
+unavailable - try again later>, as Postfix does. A 421 also closes the
+connection. Accept stops consulting the milter for the rest of the message
+(or the connection, when given at connect or HELO), and discard accepts the
+message without queuing it.
+
+At the end of the message the milter may add, insert, change and delete
+headers, replace the body, add and delete recipients and change the sender.
+The changes are applied when the milter then continues or accepts the
+message. Headers keep their original whitespace in both directions. A
+replacement body is spooled to disk as it arrives. If the changes cannot be
+applied (a full disk), the message is refused with a 451.
+
+qpsmtpd has no hold queue, and does not offer quarantine to the milter. Some
+milters (Rspamd) request it anyway: the request is logged, its reason is
+stored in the C<milter_quarantine> transaction note, and the message is
+delivered.
+
+If the milter cannot be reached, or fails mid-conversation, the error is
+logged and mail flows on without it for the rest of the connection.
+
+=head1 SEE ALSO
+
+L<Qpsmtpd::Milter>, L<https://github.com/smtpd/qpsmtpd/issues/329>
 
 =cut
 
-use Net::Milter;
+use strict;
+use warnings;
+
+use File::Temp;
+
+use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
-no warnings;
+use Qpsmtpd::Milter;
 
 sub register {
-    my ($self, $qp, @args) = @_;
+    my ($self, $qp, $name, $socket, %args) = @_;
 
-    die "Invalid milter setup args: '@args'" unless @args > 1;
-    my ($name, $port) = @args;
-    my $host = '127.0.0.1';
-    if ($port =~ s/^(.*)://) {
-        $host = $1;
+    die "usage: milter <name> <socket> [timeout <seconds>]\n"
+      if !defined $socket;
+    for my $key (keys %args) {
+        die "milter: unknown option '$key'\n" if $key ne 'timeout';
     }
 
     $self->{name} = $name;
-    $self->{host} = $host;
-    $self->{port} = $port;
-
+    $self->{peer} = {_parse_socket($socket), %args};
 }
 
-sub hook_disconnect {
-    my ($self) = @_;
+sub _parse_socket {
+    my $socket = shift;
+    return (path => $1) if $socket =~ m{^unix:(.+)} || $socket =~ m{^(/.+)};
 
-    my $milter = $self->connection->notes('milter') || return DECLINED;
-    $milter->send_quit();
-
-    $self->connection->notes('spam',   undef);
-    $self->connection->notes('milter', undef);
-
-    return DECLINED;
+    $socket =~ s/^inet6?://;
+    return (host => '127.0.0.1', port => $socket) if $socket =~ /^\d+$/;
+    return (host => $1, port => $2) if $socket =~ /^\[(.+)\]:(\d+)$/;
+    return (host => $1, port => $2) if $socket =~ /^(.+):(\d+)$/;
+    die "milter: invalid socket '$socket'\n";
 }
 
-sub check_results {
-    my ($self, $transaction, $where, @results) = @_;
-    foreach my $result (@results) {
-        next if $result->{action} eq 'continue';
-        $self->log(LOGINFO,
-                   "milter $self->{name} result action: $result->{action}");
-        if ($result->{action} eq 'reject') {
-            die(
-"Rejected at $where by $self->{name} milter ($result->{explanation})");
-        }
-        elsif ($result->{action} eq 'add') {
-            if ($result->{header} eq 'body') {
-                $transaction->body_write($result->{value});
-            }
-            else {
-                push @{$transaction->notes('milter_header_changes')->{add}},
-                  [$result->{header}, $result->{value}];
-            }
-        }
-        elsif ($result->{action} eq 'delete') {
-            push @{$transaction->notes('milter_header_changes')->{delete}},
-              $result->{header};
-        }
-        elsif ($result->{action} eq 'accept') {
+sub session { $_[0]->connection->notes("milter $_[0]{name}") }
 
-            # TODO - figure out what this is used for
-        }
-        elsif ($result->{action} eq 'replace') {
-            push @{$transaction->notes('milter_header_changes')->{replace}},
-              [$result->{header}, $result->{value}];
-        }
-    }
+sub message {
+    my $self = shift;
+    my $txn  = $self->transaction;
+    return $txn->notes("milter $self->{name}")
+      || $txn->notes("milter $self->{name}", {});
+}
+
+sub milter {
+    my $self    = shift;
+    my $session = $self->session or return;
+    return if $session->{accepted};
+    return if $self->message->{accepted};
+    return $session->{milter};
 }
 
 sub hook_connect {
     my ($self, $transaction) = @_;
 
-    $self->log(LOGDEBUG,
-               "milter $self->{name} opening connection to milter backend");
-    my $milter = Net::Milter->new();
-    $milter->open($self->{host}, $self->{port}, 'tcp');
-    $milter->protocol_negotiation();
-
-    $self->connection->notes(milter => $milter);
-
-    $self->connection->notes(
-            milter_header_changes => {add => [], delete => [], replace => [],});
-    my $remote_ip   = $self->qp->connection->remote_ip;
-    my $remote_host = $self->qp->connection->remote_host;
-    $self->log(LOGDEBUG,
-         "milter $self->{name} checking connect from $remote_host\[$remote_ip\]"
-    );
-
-    eval {
-        $self->check_results(
-                             $transaction,
-                             "connection",
-                             $milter->send_connect(
-                                             $remote_host, 'tcp4', 0, $remote_ip
-                                                  )
-                            );
+    my $conn = $self->connection;
+    my $milter = eval {
+        Qpsmtpd::Milter->new(%{$self->{peer}})->negotiate;
     };
-    $self->connection->notes('spam', $@) if $@;
+    if (!$milter) {
+        chomp(my $err = $@);
+        $self->log(LOGERROR, "skip, $self->{name}: $err");
+        return DECLINED;
+    }
+    $self->connection->notes("milter $self->{name}", {milter => $milter});
+    $self->log(LOGDEBUG,
+               sprintf('%s negotiated v%d, actions 0x%x, protocol 0x%x',
+                       $self->{name}, $milter->version, $milter->actions,
+                       $milter->protocol));
 
-    return DECLINED;
+    my $ip   = $conn->remote_ip;
+    my $host = $conn->remote_host;
+    $host = "[$ip]" if !$host || $host eq 'Unknown';
+
+    return $self->talk(
+        connect => sub {
+            $milter->macros(
+                'C',
+                j                => $self->qp->config('me'),
+                _                => "$host [$ip]",
+                v                => 'qpsmtpd ' . $self->qp->version,
+                '{daemon_name}'  => 'qpsmtpd',
+                '{daemon_addr}'  => $conn->local_ip,
+                '{daemon_port}'  => $conn->local_port,
+                '{client_addr}'  => $ip,
+                '{client_port}'  => $conn->remote_port,
+                '{client_name}'  => $host,
+            );
+            $milter->connect($host, $ip, $conn->remote_port);
+        },
+    );
 }
 
 sub hook_helo {
-    my ($self, $transaction) = @_;
-
-    if (my $txt = $self->connection->notes('spam')) {
-        return DENY, $txt;
-    }
-
-    my $milter = $self->connection->notes('milter');
-
-    my $helo = $self->qp->connection->hello;
-    my $host = $self->qp->connection->hello_host;
-
-    $self->log(LOGDEBUG, "milter $self->{name} checking HELO $host");
-
-    eval {
-        $self->check_results($transaction, "HELO", $milter->send_helo($host));
-    };
-    return DENY, $@ if $@;
-
-    return DECLINED;
+    my ($self, $transaction, $host) = @_;
+    my $milter = $self->milter or return DECLINED;
+    return $self->talk(helo => sub { $milter->helo($host) });
 }
 
+sub hook_ehlo { shift->hook_helo(@_) }
+
 sub hook_mail {
-    my ($self, $transaction, $address, %param) = @_;
+    my ($self, $transaction, $sender, %param) = @_;
+    my $milter = $self->milter or return DECLINED;
 
-    my $milter = $self->connection->notes('milter');
-
-    $self->log(LOGDEBUG,
-               "milter $self->{name} checking MAIL FROM " . $address->format);
-    eval {
-        $self->check_results($transaction, "MAIL FROM",
-                             $milter->send_mail_from($address->format));
-    };
-    return DENY, $@ if $@;
-
-    return DECLINED;
+    $self->session->{in_message} = 1;
+    return $self->talk(
+        mail => sub {
+            $milter->macros(
+                'M',
+                '{mail_addr}'   => $sender->address,
+                '{auth_authen}' => $self->qp->{_auth_user},
+                '{auth_type}'   => $self->qp->{_auth_mechanism},
+            );
+            $milter->mail($sender->format, _esmtp_args(%param));
+        }
+    );
 }
 
 sub hook_rcpt {
-    my ($self, $transaction, $address, %param) = @_;
+    my ($self, $transaction, $rcpt, %param) = @_;
+    my $milter = $self->milter or return DECLINED;
+    return $self->talk(
+        rcpt => sub {
+            $milter->macros('R', '{rcpt_addr}' => $rcpt->address);
+            $milter->rcpt($rcpt->format, _esmtp_args(%param));
+        }
+    );
+}
 
-    my $milter = $self->connection->notes('milter');
+sub _esmtp_args {
+    my %param = @_;
+    return map { uc($_) . (defined $param{$_} ? "=$param{$_}" : '') }
+      sort keys %param;
+}
 
-    $self->log(LOGDEBUG,
-               "milter $self->{name} checking RCPT TO " . $address->format);
+sub hook_data {
+    my ($self, $transaction) = @_;
 
-    eval {
-        $self->check_results($transaction, "RCPT TO",
-                             $milter->send_rcpt_to($address->format));
-    };
-    return DENY, $@ if $@;
+    # SMTP.pm answers 503 to DATA without an envelope after this hook runs
+    return DECLINED if !$transaction->sender || !$transaction->recipients;
 
-    return DECLINED;
+    my $milter = $self->milter or return DECLINED;
+    return $self->talk(data => sub { $milter->data });
 }
 
 sub hook_data_post {
     my ($self, $transaction) = @_;
 
-    my $milter = $self->connection->notes('milter');
-
-    $self->log(LOGDEBUG, "milter $self->{name} checking headers");
-
-    my $headers = $transaction->header();    # Mail::Header object
-    foreach my $h ($headers->tags) {
-
-        # munge these headers because milters prefer them this way
-        $h =~ s/\b(\w)/\U$1/g;
-        $h =~ s/\bid\b/ID/g;
-        foreach my $val ($headers->get($h)) {
-
-       # $self->log(LOGDEBUG, "milter $self->{name} checking header: $h: $val");
-            eval {
-                $self->check_results($transaction, "header $h",
-                                     $milter->send_header($h, $val));
-            };
-            return DENY, $@ if $@;
-        }
+    my @steps = (
+        (map { my $h = $_; sub { $self->milter->header(@$h) } } $self->headers),
+        sub { $self->milter->end_of_headers },
+        sub { $self->send_body },
+        sub { $self->end_of_body($transaction) },
+    );
+    for my $step (@steps) {
+        $self->milter or return DECLINED;
+        my ($rc, @msg) = $self->talk(data_post => $step);
+        return $rc, @msg if $rc != DECLINED;
     }
-
-    eval {
-        $self->check_results($transaction, "end headers",
-                             $milter->send_end_headers());
-    };
-    return DENY, $@ if $@;
-
-    $transaction->body_resetpos;
-
-    # skip past headers
-    while (my $line = $transaction->body_getline) {
-        $line =~ s/\r?\n//;
-        $line =~ s/\s*$//;
-        last unless length($line);
-    }
-
-    $self->log(LOGDEBUG, "milter $self->{name} checking body");
-
-    my $data = '';
-    while (my $line = $transaction->body_getline) {
-        $data .= $line;
-        if (length($data) > 60000) {
-            eval {
-                $self->check_results($transaction, "body",
-                                     $milter->send_body($data));
-            };
-            return DENY, $@ if $@;
-            $data = '';
-        }
-    }
-
-    if (length($data)) {
-        eval {
-            $self->check_results($transaction, "body",
-                                 $milter->send_body($data));
-        };
-        return DENY, $@ if $@;
-        $data = '';
-    }
-
-    eval {
-        $self->check_results($transaction, "end of DATA",
-                             $milter->send_end_body());
-    };
-    return DENY, $@ if $@;
-
-    my $milter_header_changes = $transaction->notes('milter_header_changes');
-
-    foreach my $add (@{$milter_header_changes->{add}}) {
-        $headers->add($add->[0], $add->[1]);
-    }
-    foreach my $del (@{$milter_header_changes->{'delete'}}) {
-        $headers->delete($del);
-    }
-    foreach my $repl (@{$milter_header_changes->{replace}}) {
-        $headers->replace($repl->[0], $repl->[1]);
-    }
-
     return DECLINED;
+}
+
+sub headers {
+    my $self = shift;
+    return map { /^([^:]+):(.*?)\n?\z/s ? [$1, $2] : () }
+      @{$self->transaction->header->header};
+}
+
+sub send_body {
+    my $self   = shift;
+    my $milter = $self->milter;
+    return if !$milter->wants('B');
+
+    my $txn = $self->transaction;
+    $txn->body_resetpos;
+    my $line = $txn->body_getline;
+    $line = $txn->body_getline if defined $line && $line eq "\n";
+
+    my $chunk = '';
+    while (defined $line) {
+        $line =~ s/\r?\n\z/\r\n/;
+        $chunk .= $line;
+        $line = $txn->body_getline;
+        next if defined $line && length $chunk < Qpsmtpd::Milter::MAX_BODY_CHUNK;
+
+        my $verdict = $milter->body($chunk);
+        return $verdict if $verdict && $verdict->{cmd} ne 'c';
+        $chunk = '';
+    }
+    return;
+}
+
+sub end_of_body {
+    my ($self, $transaction) = @_;
+
+    my %changes = (list => [], cr => '');
+    my $verdict =
+      $self->milter->end_of_body(sub { $self->collect(\%changes, @_) });
+    $self->session->{in_message} = 0;
+
+    return $verdict if $verdict->{cmd} ne 'c' && $verdict->{cmd} ne 'a';
+    return $verdict if eval { $self->apply($transaction, \%changes); 1 };
+
+    chomp(my $err = $@);
+    $self->log(LOGERROR, "$self->{name}: changes not applied: $err");
+    return {cmd => 'y', reply => '451 4.3.0 Error applying message filter changes'};
+}
+
+sub collect {
+    my ($self, $changes, $change) = @_;
+    if ($change->{cmd} ne 'b') {
+        push @{$changes->{list}}, $change;
+        return;
+    }
+
+    # a local failure must not abandon the milter mid-reply; apply() reports it
+    return if $changes->{error};
+    eval {
+        my $fh = $changes->{body} ||= File::Temp->new(DIR => $self->spool_dir);
+        my $data = $changes->{cr} . $change->{body};
+        $changes->{cr} = $data =~ s/\r\z// ? "\r" : '';    # CRLF split across chunks
+        $data =~ s/\r\n/\n/g;
+        print {$fh} $data or die "Cannot write replacement body: $!\n";
+        1;
+    } or $changes->{error} = $@;
+}
+
+sub apply {
+    my ($self, $transaction, $changes) = @_;
+    my $smtputf8 = $transaction->notes('smtputf8');
+
+    die $changes->{error} if $changes->{error};
+    my $body = $changes->{body};
+    if ($body) {
+        print {$body} $changes->{cr}
+          and $body->flush
+          and $body->seek(0, 0)
+          or die "Cannot write replacement body: $!\n";
+    }
+
+    for my $change (@{$changes->{list}}) {
+        next if eval { $self->apply_change($transaction, $change); 1 };
+        chomp(my $err = $@);
+        $self->log(LOGERROR, "$self->{name}: '$change->{cmd}' not applied: $err");
+    }
+
+    $transaction->body_replace($body) if $body;
+
+    $transaction->notes('smtputf8', 1)
+      if !$smtputf8
+      && grep { $_ && $_->has_utf8 } $transaction->sender,
+      $transaction->recipients;
+}
+
+sub apply_change {
+    my ($self, $transaction, $change) = @_;
+    my ($cmd, $name) = @$change{qw(cmd name)};
+    my $header = $transaction->header;
+    my $line   = defined $name ? "$name:$change->{value}" : undef;
+
+    if ($cmd eq 'h') {
+        $header->add($name, $line);
+    }
+    elsif ($cmd eq 'i') {
+        $header->add($name, $line, $change->{index});
+    }
+    elsif ($cmd eq 'm') {
+        my $index = $change->{index} ? $change->{index} - 1 : 0;
+        if (length $change->{value}) {
+            $header->replace($name, $line, $index);
+        }
+        else {
+            $header->delete($name, $index);
+        }
+    }
+    elsif ($cmd eq '+' || $cmd eq '2') {
+        $self->log(LOGWARN, "$self->{name}: dropped recipient args $change->{args}")
+          if $cmd eq '2' && length $change->{args};
+        $transaction->add_recipient(_address($change->{address}));
+    }
+    elsif ($cmd eq '-') {
+        $transaction->remove_recipient(_address($change->{address}));
+    }
+    elsif ($cmd eq 'e') {
+        $transaction->sender(_address($change->{address}));
+    }
+    elsif ($cmd eq 'q') {
+        $self->log(LOGWARN, "$self->{name} quarantined: $change->{reason}");
+        $transaction->notes('milter_quarantine', $change->{reason});
+    }
+}
+
+# Postfix's replies for a milter's reject and tempfail
+my %refusal = (
+    r => [550, '5.7.1 Command rejected'],
+    t => [451, '4.7.1 Service unavailable - try again later'],
+    f => [421, '4.7.0 Server closing connection'],
+    4 => [421, '4.7.0 Server closing connection'],
+);
+
+sub talk {
+    my ($self, $stage, $send) = @_;
+    my $per_session = $stage eq 'connect' || $stage eq 'helo';
+
+    my $verdict;
+    if (!eval { $verdict = $send->(); 1 }) {
+        chomp(my $err = $@);
+        $self->log(LOGERROR, "skip, $self->{name}: $err");
+        $self->close_milter;
+        return DECLINED;
+    }
+    $verdict or return DECLINED;
+    my $cmd = $verdict->{cmd};
+
+    return DECLINED if $cmd eq 'c' || $cmd eq 's';
+
+    if ($cmd eq 'a') {
+        $self->log(LOGINFO, "pass, $self->{name} accepted");
+        ($per_session ? $self->session : $self->message)->{accepted} = 1;
+        return DECLINED;
+    }
+    if ($cmd eq 'd') {
+        if ($per_session) {
+            $self->log(LOGWARN, "$self->{name} sent discard at $stage, ignored");
+            return DECLINED;
+        }
+        $self->log(LOGINFO, "$self->{name} will discard the message");
+        @{$self->message}{qw(discard accepted)} = (1, 1);
+        return DECLINED;
+    }
+    if ($cmd eq 'y') {
+        my ($code) = $verdict->{reply} =~ /^([45]\d\d)/;
+        if (!$code) {
+            $self->log(LOGERROR,
+                       "$self->{name} sent invalid reply '$verdict->{reply}'");
+            return DECLINED;
+        }
+        my @lines = map { s/^\d{3}(?:[ -]|\z)//r }
+          split /\r?\n/, $verdict->{reply};
+        return $self->refuse($stage, $code, @lines);
+    }
+
+    my ($code, $text) = @{$refusal{$cmd}};
+    $self->close_milter if $code == 421;
+    $code = 554 if $code == 550 && $stage eq 'connect';    # RFC 5321 3.1
+    $code = 421 if $code == 451 && $stage eq 'connect';
+    return $self->refuse($stage, $code, $text);
+}
+
+# Respond with the code the milter chose, then do what Qpsmtpd::SMTP does
+# after a plugin's denial at this stage: run the deny hooks, and end the
+# transaction or the connection.
+sub refuse {
+    my ($self, $stage, $code, @lines) = @_;
+    my $qp = $self->qp;
+
+    $self->log(LOGINFO, "fail, $self->{name}: $code @lines");
+    $qp->respond($code, @lines);
+
+    my $rc = $code == 421 ? DENYSOFT_DISCONNECT : $code < 500 ? DENYSOFT : DENY;
+    $qp->run_hooks_no_respond('deny', $self->plugin_name, $rc, "@lines");
+
+    if ($code == 421 || $stage eq 'connect') {
+        $qp->disconnect;
+    }
+    elsif ($stage eq 'data' || $stage eq 'data_post') {
+        $qp->reset_transaction;
+    }
+    return DONE;
+}
+
+sub _address {
+    my $addr = shift;
+    $addr = "<$addr>" if $addr !~ /^</;
+    return Qpsmtpd::Address->new($addr) || die "invalid address $addr\n";
+}
+
+sub hook_reset_transaction {
+    my ($self, $transaction) = @_;
+    my $session = $self->session or return DECLINED;
+    return DECLINED if !$session->{in_message} || !$session->{milter};
+
+    $session->{in_message} = 0;
+    eval { $session->{milter}->abort };
+    $self->close_milter if $@;
+    return DECLINED;
+}
+
+sub hook_queue {
+    my ($self, $transaction) = @_;
+    my $session = $self->session or return DECLINED;
+    return DECLINED if !$self->message->{discard};
+
+    $self->log(LOGINFO, "$self->{name} discarded the message");
+    return OK;
+}
+
+sub hook_disconnect {
+    my $self = shift;
+    $self->close_milter;
+    return DECLINED;
+}
+
+sub close_milter {
+    my $self    = shift;
+    my $session = $self->session or return;
+    my $milter  = delete $session->{milter} or return;
+    $milter->quit;
 }

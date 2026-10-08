@@ -48,6 +48,7 @@ lib/Qpsmtpd/DB.pm
 lib/Qpsmtpd/DB/File/DBM.pm
 lib/Qpsmtpd/DB/Redis.pm
 lib/Qpsmtpd/DSN.pm
+lib/Qpsmtpd/Milter.pm
 lib/Qpsmtpd/Plugin.pm
 lib/Qpsmtpd/Postfix.pm
 lib/Qpsmtpd/Postfix/Constants.pm
@@ -215,6 +216,7 @@ t/qpsmtpd-config.t
 t/qpsmtpd-db-file-dbm.t
 t/qpsmtpd-db-redis.t
 t/qpsmtpd-db.t
+t/qpsmtpd-milter.t
 t/qpsmtpd-plugin.t
 t/qpsmtpd-smtp.t
 t/qpsmtpd.t

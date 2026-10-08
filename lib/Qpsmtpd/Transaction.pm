@@ -167,6 +167,30 @@ sub body_write {
     }
 }
 
+sub body_replace {
+    my ($self, $fh) = @_;
+    my $start = $self->{_body_start} || 0;
+    if ($self->{_body_file}) {
+        $self->{_body_file}->truncate($start)
+          or die "Cannot truncate temp file: $!";
+        $self->{_body_file_writing} = 0;
+        $self->{_body_size} = $start;
+    }
+    else {
+        splice @{$self->{_body_array} ||= []}, $start;
+        $self->{_body_current_pos} = $start;
+        $self->{_body_size} = $self->{_header_size} || 0;
+    }
+    $self->body_write("\n");
+    while (defined(my $line = $fh->getline)) {
+        $self->body_write($line);
+    }
+    die "Cannot read replacement body: $!\n" if $fh->error;
+
+    my $file = $self->{_body_file} or return;
+    $file->flush && !$file->error or die "Cannot write body: $!\n";
+}
+
 sub body_size {    # deprecated, use data_size() instead
     my $self = shift;
     $self->log(LOGWARN,
@@ -375,6 +399,12 @@ config file sets this to 10000.
 Write data to the end of the email.
 
 C<$data> can be either a plain scalar, or a reference to a scalar.
+
+=head2 body_replace( $fh )
+
+Replace everything after the header with what can be read from C<$fh>.
+Dies if C<$fh> cannot be read or the new body cannot be written; the
+original body is gone by then, so the message must not be queued.
 
 =head2 body_size( )
 
