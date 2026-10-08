@@ -133,8 +133,12 @@ for my $listen_addr (@LISTENADDR) {
                        ($default_addrs ? (V6Only => 1) : ()),
                       );
     if (!$server) {
-        my $err = "Creating TCP socket $listen_addr->{addr}:$listen_addr->{port}: $IO::Socket::errstr\n";
-        if ($default_addrs && $addr eq '::') {
+        my $err = "Creating TCP socket $listen_addr->{addr}:$listen_addr->{port}: $@\n";
+
+        # EINVAL is how IO::Socket::IP reports that getaddrinfo can't map ::
+        my $no_ipv6 = $!{EAFNOSUPPORT} || $!{EPROTONOSUPPORT}
+          || $!{EADDRNOTAVAIL} || $!{EINVAL};
+        if ($default_addrs && $addr eq '::' && $no_ipv6) {
             warn "IPv6 unavailable, listening on IPv4 only. $err";
             next;
         }

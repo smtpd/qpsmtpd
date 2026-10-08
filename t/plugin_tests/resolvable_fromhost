@@ -15,6 +15,7 @@ sub register_tests {
     $self->register( $self->qp, reject => 0 );
 
     $self->register_test('test_populate_invalid_networks');
+    $self->register_test('test_mx_ipv6_only');
     $self->register_test('test_mx_address_resolves');
     $self->register_test('test_get_host_records');
     $self->register_test('test_get_and_validate_mx');
@@ -84,15 +85,34 @@ sub test_mx_address_resolves {
 sub test_populate_invalid_networks {
     my $self = shift;
 
-    my $ip = '10.9.8.7';
-    ok( $self->ip_is_valid($ip) );
-
-    $self->qp->config('invalid_resolvable_fromhost', $ip);
+    $self->mock_config(invalid_resolvable_fromhost => '');
     $self->populate_invalid_networks();
-    ok( ! $self->ip_is_valid($ip) );
+    ok( $self->ip_is_valid('10.9.8.7'), 'no blocks, valid' );
 
-    # clean up afterwards
-    $self->qp->config('invalid_resolvable_fromhost', undef );
-    $self->{invalid} = ();
+    $self->unmock_config();
+    $self->populate_invalid_networks();
+    ok( ! $self->ip_is_valid('10.9.8.7'), 'in 10.0.0.0/8' );
+    ok( $self->ip_is_valid('192.0.2.1'), 'IPv4, valid' );
+    ok( ! $self->ip_is_valid('fe80::1'), 'in fe80::/10' );
+    ok( ! $self->ip_is_valid('::1'), 'IPv6 loopback' );
+    ok( $self->ip_is_valid('2001:db8::25'), 'IPv6, valid' );
 }
 
+sub test_mx_ipv6_only {
+    my $self = shift;
+
+    my @warnings;
+    local $SIG{__WARN__} = sub { push @warnings, @_ };
+    no warnings 'redefine';
+    local *Qpsmtpd::Base::resolve_a = sub { return };
+    local *Qpsmtpd::Base::resolve_aaaa = sub {
+        return $_[1] eq 'mx.example.com' ? '2001:db8::25' : 'fe80::25';
+    };
+
+    $self->populate_invalid_networks();
+    ok( $self->mx_address_resolves('mx.example.com', 'example.com'),
+        'an MX with only an AAAA record resolves' );
+    ok( ! $self->mx_address_resolves('mx.example.net', 'example.net'),
+        'an MX whose AAAA record is link-local does not' );
+    is_deeply( \@warnings, [], 'without warnings' );
+}

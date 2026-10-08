@@ -26,7 +26,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Socket6 and IO::Socket::INET6. With no `--listen-address`, it listens on
   0.0.0.0 and [::]
 - resolvable_fromhost always looks up AAAA records, so a sender domain
-  whose mail hosts are IPv6-only resolves
+  whose mail hosts are IPv6-only resolves. config/invalid\_resolvable\_fromhost
+  takes IPv6 blocks, and the sample lists loopback, link-local, ULA and
+  multicast
 
 ### Removed
 
