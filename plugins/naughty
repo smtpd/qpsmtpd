@@ -24,7 +24,7 @@ Naughty provides the following:
 
 =head2 consistency
 
-With one change to the config of naughty, all plugins can reject their messages at the preferred time. I use this feature for spam filter training. When setting up a new server, I use 'naughty reject data_post' until after dspam is trained. Once the bayesian filters are trained, I change to 'naughty reject data', and avoid processing the message bodies.
+With one change to the config of naughty, all plugins can reject their messages at the preferred time. I use this feature for spam filter training. When setting up a new server, I use 'naughty reject data_post' until the bayesian filters are trained. Then I change to 'naughty reject data', and avoid processing the message bodies.
 
 =head2 efficiency
 

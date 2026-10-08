@@ -1,6 +1,4 @@
 .gitignore
-bin/geolite-mirror-simple.pl
-bin/install_deps.pl
 CHANGELOG.md
 config.sample/add_geoip_headers
 config.sample/badhelo
@@ -19,7 +17,6 @@ config.sample/logging
 config.sample/loglevel
 config.sample/norelayclients
 config.sample/plugins
-config.sample/public_suffix_list
 config.sample/rcpthosts
 config.sample/relayclients
 config.sample/rhsbl_zones
@@ -87,9 +84,7 @@ plugins/dkim
 plugins/dmarc
 plugins/dns_whitelist_soft
 plugins/dnsbl
-plugins/domainkeys
 plugins/dont_require_anglebrackets
-plugins/dspam
 plugins/earlytalker
 plugins/fcrdns
 plugins/greylisting
@@ -137,14 +132,8 @@ plugins/tls
 plugins/tls_cert
 plugins/uribl
 plugins/user_config
-plugins/virus/aveclient
-plugins/virus/bitdefender
 plugins/virus/clamav
 plugins/virus/clamdscan
-plugins/virus/hbedv
-plugins/virus/kavscanner
-plugins/virus/klez_filter
-plugins/virus/sophie
 plugins/virus/uvscan
 plugins/whitelist
 qpsmtpd-forkserver
@@ -152,7 +141,6 @@ qpsmtpd.service
 README.md
 README.plugins.md
 run.forkserver
-STATUS
 t/addresses.t
 t/auth.t
 t/config/add_geoip_headers
@@ -167,7 +155,6 @@ t/config/invalid_resolvable_fromhost
 t/config/norelayclients
 t/config/plugins
 t/config/postgrey_whitelist_clients
-t/config/public_suffix_list
 t/config/rcpthosts
 t/config/relayclients
 t/config/size_threshold

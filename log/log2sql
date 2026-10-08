@@ -420,7 +420,6 @@ sub parse_line_plugin {
     $plugin =~ s/:$//;
 
     return parse_line_plugin_p0f($line)          if $plugin =~ /^ident::p0f/;
-    return parse_line_plugin_dspam($line)        if $plugin =~ /^dspam/;
     return parse_line_plugin_spamassassin($line) if $plugin =~ /^spamassassin/;
 
     if ($plugin eq 'sender_permitted_from') {
@@ -437,22 +436,6 @@ sub parse_line_plugin {
     }
     elsif ($plugin =~ /resolvable_fromhost/) {
         $message = 'pass' if $message =~ /^pass/;
-    }
-
-    return 'plugin', $pid, $hook, $plugin, $message;
-}
-
-sub parse_line_plugin_dspam {
-    my $line = shift;
-
-    my ($tai, $pid, $hook, $plugin, $message) = split /\s/, $line, 5;
-    $plugin =~ s/:$//;
-
-    if ($message =~ /Innocent, (\d\.\d\d c)/) {
-        $message = "pass, $1";
-    }
-    if ($message =~ /Spam, (\d\.\d\d c)/) {
-        $message = "fail, $1";
     }
 
     return 'plugin', $pid, $hook, $plugin, $message;

@@ -127,7 +127,7 @@ fr:+1
 Karma reduces the resources wasted by naughty mailers.  When used with
 I<reject connect>, naughty senders are disconnected in about 0.1 seconds.
 
-The biggest gains to be had are by having heavy plugins (spamassassin, dspam,
+The biggest gains to be had are by having heavy plugins (spamassassin,
 virus filters) set the B<karma> connection note (see KARMA) when they encounter
 naughty senders. Reasons to send servers to the penalty box could include
 sending a virus, early talking, or sending messages with a very high spam
@@ -219,9 +219,9 @@ to be repeat offenders. Limiting them to a single offense per day(s) greatly
 reduces the resources they can waste.
 
 Of the connections that had previously passed all other checks and were caught
-only by spamassassin and/or dspam, B<karma> rejected 31 percent. Since
-spamassassin and dspam consume more resources than others plugins, this plugin
-seems to be a very big win.
+only by content filters, B<karma> rejected 31 percent. Content filters such as
+spamassassin consume more resources than other plugins, so this plugin is a
+big win.
 
 =head1 DATABASE
 

@@ -49,11 +49,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - qpsmtpd-forkserver no longer sets `$TCPLOCALIP`, `$TCPREMOTEIP` or
   `$TCPREMOTEHOST`. Plugins read them from `$qp->connection`
 - `Qpsmtpd::TcpServer::has_ipv6()` and `lrpip()`
+- virus/klez\_filter, and the virus plugins for scanners their vendors
+  discontinued: aveclient, bitdefender, hbedv, kavscanner, sophie
+- dspam (DSPAM is unmaintained since 2012) and domainkeys (DomainKeys gave
+  way to DKIM in 2007)
+- bin/geolite-mirror-simple.pl (MaxMind retired the legacy GeoLite files in
+  2019) and bin/install\_deps.pl (use `cpanm --installdeps .`)
+- config.sample/public\_suffix\_list, which nothing read, and STATUS
+- quit\_fortune from config.sample/plugins
 
 ### Fixed
 
 - qpsmtpd-forkserver `--no-rdns` skips the PTR lookup
 - an IPv6 client's address keeps its colons when it names the remote host
+- packaging/rpm builds again. Its spec file, removed with Apache::Qpsmtpd
+  in 1.01, is back, without the apache and xinetd subpackages
 - dnsbl and rhsbl reject with the message configured for a zone, or else
   the zone's TXT record
 - dnsbl and rhsbl log Spamhaus's error answers (127.255.255.252, .254 and

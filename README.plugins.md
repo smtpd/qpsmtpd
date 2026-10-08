@@ -171,8 +171,7 @@ directly in your plugin, use the `isa_plugin()` method from the
       $self->SUPER::hook_rcpt($transaction, $recipient);
     }
 
-See also chapter `Changing return values` and
-`contrib/vetinari/rcpt_ok_maxrelay` in SVN.
+See also chapter `Changing return values`.
 
 ## Config files
 

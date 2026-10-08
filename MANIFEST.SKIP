@@ -27,7 +27,6 @@ output/.*
 ^tv\.log$
 ^MakeMaker-\d
 \#$
-\B\.svn\b
 ^\.perltidyrc$
 ^\.git/.*
 ^cover_db/

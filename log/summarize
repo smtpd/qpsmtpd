@@ -36,7 +36,7 @@ my $has_cleanup;
 my %formats  = get_default_field_widths();
 my %formats3 = ( %formats, map { $_ => "%-3.3s" } qw/ badrcptto check_badrcptto
         qmail_deliverable rcpt_ok check_basicheaders headers uribl bogus_bounce
-        check_bogus_bounce domainkeys dkim dmarc spamassassin dspam
+        check_bogus_bounce dkim dmarc spamassassin
         virus::clamdscan / );
 
 while (defined(my $line = $fh->read)) {
@@ -421,11 +421,9 @@ In the second block, we have two messages that were ultimately delivered.
 
  bog - no messages were bogus bounces
  hdr - the messages had valid headers
- dky - the messages were not DomainKeys signed
  dkm - two messages were DKIM signed and passed validation
  dmc - the message from amazon.com passed DMARC validation
  spm - spamassassin, one skipped processing, one passed
- dsp - dspam, one skipped, one passed
  clm - clamav, one skipped, one passed
  qqm - qmail queue, two messages were delivered
 
