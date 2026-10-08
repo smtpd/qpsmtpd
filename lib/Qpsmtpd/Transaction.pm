@@ -185,6 +185,10 @@ sub body_replace {
     while (defined(my $line = $fh->getline)) {
         $self->body_write($line);
     }
+    die "Cannot read replacement body: $!\n" if $fh->error;
+
+    my $file = $self->{_body_file} or return;
+    $file->flush && !$file->error or die "Cannot write body: $!\n";
 }
 
 sub body_size {    # deprecated, use data_size() instead
@@ -399,6 +403,8 @@ C<$data> can be either a plain scalar, or a reference to a scalar.
 =head2 body_replace( $fh )
 
 Replace everything after the header with what can be read from C<$fh>.
+Dies if C<$fh> cannot be read or the new body cannot be written; the
+original body is gone by then, so the message must not be queued.
 
 =head2 body_size( )
 

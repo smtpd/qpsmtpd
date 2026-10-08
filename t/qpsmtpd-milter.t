@@ -33,6 +33,7 @@ __milter_gone();
 __plugin();
 __plugin_replies();
 __plugin_changes();
+__plugin_spool_failure();
 __plugin_discard_at_connect();
 __plugin_unreachable();
 unhook_milter();
@@ -517,6 +518,32 @@ sub __plugin_changes {
     my @headers = map { $_->[1] } grep { $_->[0] eq 'L' } @{$done->()};
     is($headers[0], "Subject\0 two  spaces\0",
        'header whitespace reaches the milter');
+}
+
+sub __plugin_spool_failure {
+    my ($port, $done) = fake_milter(
+        E => [[['h', "X-Spam\0yes\0"], ['b', "replaced\r\n"], ['c', '']]],
+    );
+    my ($smtpd, $plugin) = plugin($port);
+    $plugin->hook_connect($smtpd->transaction);
+
+    my $txn = message($smtpd, $plugin, "Subject: hi\n");
+    {
+        no warnings 'redefine';
+        local *Qpsmtpd::Plugin::spool_dir = sub { 't/tmp/no-such-dir' };
+        is(($plugin->hook_data_post($txn))[0], DONE,
+           'a replacement body that cannot be spooled');
+    }
+    is(($smtpd->response)[0], 451, 'tempfails the message');
+    is_deeply($txn->header->header, ["Subject: hi\n"],
+              'with none of the changes applied');
+
+    $txn = message($smtpd, $plugin, "Subject: hi\n");
+    is(($plugin->hook_data_post($txn))[0], DECLINED,
+       'and the milter still filters the next message');
+    $plugin->hook_disconnect;
+    is(scalar(grep { $_->[0] eq 'E' } @{$done->()}), 2,
+       'on the same connection');
 }
 
 sub __plugin_discard_at_connect {

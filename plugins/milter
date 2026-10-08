@@ -50,7 +50,8 @@ At the end of the message the milter may add, insert, change and delete
 headers, replace the body, add and delete recipients and change the sender.
 The changes are applied when the milter then continues or accepts the
 message. Headers keep their original whitespace in both directions. A
-replacement body is spooled to disk as it arrives.
+replacement body is spooled to disk as it arrives. If the changes cannot be
+applied (a full disk), the message is refused with a 451.
 
 qpsmtpd has no hold queue, and does not offer quarantine to the milter. Some
 milters (Rspamd) request it anyway: the request is logged, its reason is
@@ -265,9 +266,12 @@ sub end_of_body {
       $self->milter->end_of_body(sub { $self->collect(\%changes, @_) });
     $self->session->{in_message} = 0;
 
-    $self->apply($transaction, \%changes)
-      if $verdict->{cmd} eq 'c' || $verdict->{cmd} eq 'a';
-    return $verdict;
+    return $verdict if $verdict->{cmd} ne 'c' && $verdict->{cmd} ne 'a';
+    return $verdict if eval { $self->apply($transaction, \%changes); 1 };
+
+    chomp(my $err = $@);
+    $self->log(LOGERROR, "$self->{name}: changes not applied: $err");
+    return {cmd => 'y', reply => '451 4.3.0 Error applying message filter changes'};
 }
 
 sub collect {
@@ -277,16 +281,30 @@ sub collect {
         return;
     }
 
-    my $fh = $changes->{body} ||= File::Temp->new(DIR => $self->spool_dir);
-    my $data = $changes->{cr} . $change->{body};
-    $changes->{cr} = $data =~ s/\r\z// ? "\r" : '';    # CRLF split across chunks
-    $data =~ s/\r\n/\n/g;
-    print {$fh} $data or die "Cannot write replacement body: $!\n";
+    # a local failure must not abandon the milter mid-reply; apply() reports it
+    return if $changes->{error};
+    eval {
+        my $fh = $changes->{body} ||= File::Temp->new(DIR => $self->spool_dir);
+        my $data = $changes->{cr} . $change->{body};
+        $changes->{cr} = $data =~ s/\r\z// ? "\r" : '';    # CRLF split across chunks
+        $data =~ s/\r\n/\n/g;
+        print {$fh} $data or die "Cannot write replacement body: $!\n";
+        1;
+    } or $changes->{error} = $@;
 }
 
 sub apply {
     my ($self, $transaction, $changes) = @_;
     my $smtputf8 = $transaction->notes('smtputf8');
+
+    die $changes->{error} if $changes->{error};
+    my $body = $changes->{body};
+    if ($body) {
+        print {$body} $changes->{cr}
+          and $body->flush
+          and $body->seek(0, 0)
+          or die "Cannot write replacement body: $!\n";
+    }
 
     for my $change (@{$changes->{list}}) {
         next if eval { $self->apply_change($transaction, $change); 1 };
@@ -294,12 +312,7 @@ sub apply {
         $self->log(LOGERROR, "$self->{name}: '$change->{cmd}' not applied: $err");
     }
 
-    if (my $fh = $changes->{body}) {
-        print {$fh} $changes->{cr};
-        $fh->flush;
-        $fh->seek(0, 0);
-        $transaction->body_replace($fh);
-    }
+    $transaction->body_replace($body) if $body;
 
     $transaction->notes('smtputf8', 1)
       if !$smtputf8
@@ -444,7 +457,7 @@ sub hook_reset_transaction {
 sub hook_queue {
     my ($self, $transaction) = @_;
     my $session = $self->session or return DECLINED;
-    return DECLINED if !$session->{discard} && !$self->message->{discard};
+    return DECLINED if !$self->message->{discard};
 
     $self->log(LOGINFO, "$self->{name} discarded the message");
     return OK;
