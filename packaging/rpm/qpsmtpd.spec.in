@@ -62,6 +62,7 @@ rm -f ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/*.*
 cp -r config.sample/* ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/
 echo %{_datadir}/%{name}/plugins > ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/plugin_dirs
 echo %{_localstatedir}/spool/qpsmtpd > ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/spool_dir
+echo 2750 > ${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/spool_perms
 mkdir -p ${RPM_BUILD_ROOT}%{_initrddir}
 cp %{SOURCE1} ${RPM_BUILD_ROOT}%{_initrddir}/qpsmtpd-forkserver
 mkdir -p ${RPM_BUILD_ROOT}%{_sysconfdir}/sysconfig
@@ -86,7 +87,7 @@ fi
 %{_initrddir}/qpsmtpd-forkserver
 %config(noreplace) %{_sysconfdir}/qpsmtpd/*
 %config(noreplace) %{_sysconfdir}/sysconfig/qpsmtpd-forkserver
-%attr(2750,smtpd,clamav) %dir %{_localstatedir}/spool/qpsmtpd
+%attr(2750,smtpd,smtpd) %dir %{_localstatedir}/spool/qpsmtpd
 %attr(0750,smtpd,smtpd) %dir %{_localstatedir}/log/qpsmtpd
 
 %pre
@@ -105,7 +106,8 @@ fi
 - Restored the spec file, removed by accident with Apache::Qpsmtpd in 1.01
 - Dropped the apache and xinetd subpackages; those run models are gone
 - Require perl 5.32 and the modules in Makefile.PL's PREREQ_PM
-- The spool directory belongs to smtpd, the user %pre creates
+- The spool directory is smtpd:smtpd, mode 2750, and config/spool_perms
+  matches it. To scan with clamd, add clamav to the smtpd group
 
 * Tue Dec 27 2016 <robin.bowes@yo61.com> 0.96-1
 - Fixed up spec file to build cleanly with 0.96

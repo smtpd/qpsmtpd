@@ -219,9 +219,9 @@ to be repeat offenders. Limiting them to a single offense per day(s) greatly
 reduces the resources they can waste.
 
 Of the connections that had previously passed all other checks and were caught
-only by spamassassin and/or dspam, B<karma> rejected 31 percent. Since
-spamassassin and dspam consume more resources than others plugins, this plugin
-seems to be a very big win.
+only by content filters, B<karma> rejected 31 percent. Content filters such as
+spamassassin consume more resources than other plugins, so this plugin is a
+big win.
 
 =head1 DATABASE
 

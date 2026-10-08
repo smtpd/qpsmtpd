@@ -42,7 +42,7 @@ summarize their activity. Here's a few sample lines:
     (data_post) spamassassin: pass, Spam, 21.7 < 100
     (data_post) dkim: pass, valid signature
 
-Three plugins fired during the SMTP connection phase and 3 more ran during the
+Three plugins fired during the SMTP connection phase and 2 more ran during the
 data\_post phase. Each plugin emitted one entry stating their findings.
 
 If you aren't processing the logs, you can save some disk I/O by reducing the
