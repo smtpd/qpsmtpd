@@ -7,9 +7,9 @@ config.sample/badhelo
 config.sample/badmailfrom
 config.sample/badrcptto
 config.sample/barelf
+config.sample/databytes
 config.sample/dkim/dkim_key_gen.sh
 config.sample/dnsbl_allow
-config.sample/databytes
 config.sample/dnsbl_zones
 config.sample/flat_auth_pw
 config.sample/invalid_resolvable_fromhost
@@ -205,6 +205,7 @@ t/plugin_tests/naughty
 t/plugin_tests/rcpt_ok
 t/plugin_tests/relay
 t/plugin_tests/resolvable_fromhost
+t/plugin_tests/rhsbl
 t/plugin_tests/sender_permitted_from
 t/plugin_tests/spamassassin
 t/plugin_tests/user_config
@@ -220,11 +221,12 @@ t/qpsmtpd-milter.t
 t/qpsmtpd-plugin.t
 t/qpsmtpd-smtp.t
 t/qpsmtpd.t
-t/uribl-scaling.t
 t/queue-smtputf8.t
 t/rset.t
+t/Test/FakeResolver.pm
 t/Test/Qpsmtpd.pm
 t/Test/Qpsmtpd/Plugin.pm
+t/uribl-scaling.t
 UPGRADING.md
 xt/01-syntax.t
 xt/02-pod.t

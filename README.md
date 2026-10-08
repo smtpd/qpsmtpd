@@ -131,19 +131,21 @@ a subdirectory of there).
 
 ## rhsbl_zones
 
-Right hand side blocking lists, one per line. For example:
+Domain blocklists checked by the rhsbl plugin, one per line. For example:
 
-    dsn.rfc-ignorant.org does not accept bounces - http://www.rfc-ignorant.org/
+    dbl.spamhaus.org
 
-See http://www.rfc-ignorant.org/ for more examples.
+See `perldoc plugins/rhsbl`.
 
 
 ## `dnsbl_zones`
 
-Normal ip based DNS blocking lists ("RBLs"). For example:
+IP address blocklists checked by the dnsbl plugin, one per line. For example:
 
-  relays.ordb.org
-  spamsources.fabel.dk
+    zen.spamhaus.org
+    bl.spamcop.net
+
+See `perldoc plugins/dnsbl`.
 
 
 ## `spool_dir`

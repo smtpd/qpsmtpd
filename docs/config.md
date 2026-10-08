@@ -202,7 +202,7 @@ are shown below in ["Plugin settings"](#plugin-settings).
 
     Plugin: `dnsbl`
 
-    This file specifies the RBL zones list, used by the dnsbl plugin. Ihe IP
+    This file specifies the RBL zones list, used by the dnsbl plugin. The IP
     address of each connecting host will be checked against each zone given.
     A few sample DNSBLs are listed in the sample config file, but you should
     evaluate the efficacy and listing policies of a DNSBL before using it.

@@ -11,17 +11,19 @@ configurable set of RBL services.
 
 =head1 CONFIGURATION
 
-This plugin reads the lists to use from the rhsbl_zones configuration
-file. Normal domain based dns blocking lists ("RBLs") which contain TXT
-records are specified simply as:
+This plugin reads the lists to use from the rhsbl_zones configuration file,
+one domain blocklist (RFC 5782) per line, checked in order:
 
-  dsn.rfc-ignorant.org
+  dbl.spamhaus.org
 
-To configure RBL services which do not contain TXT records in the DNS,
-but only A records, specify, after a whitespace, your own error message
-to return in the SMTP conversation e.g.
+A sender's domain is listed when the zone has an A record in 127.0.0.0/8
+for it. The rejection gives the zone's TXT record as the reason. To give
+your own instead, add it after whitespace:
 
-  abuse.rfc-ignorant.org does not support abuse@domain
+  dbl.spamhaus.org is listed in the Spamhaus DBL
+
+An answer of 127.255.255.252, .254 or .255 is an error report (see
+L<dnsbl>). It is logged, and the sender is not rejected.
 
 =cut
 
@@ -65,63 +67,25 @@ sub hook_mail {
         return DECLINED;
     }
 
-    my %rhsbl_zones = $self->populate_zones() or return DECLINED;
+    my $host = $sender->host;
+    if ($host !~ /^[a-z0-9.-]+$/i) {
+        $self->log(LOGINFO, "skip, $host is not an ASCII domain");
+        return DECLINED;
+    }
 
-    my $res = $self->get_resolver();
+    my @zones = $self->populate_zones() or return DECLINED;
 
-    my @hosts = $sender->host;
-    for my $host (@hosts) {
-        for my $rhsbl (keys %rhsbl_zones) {
-            my $query;
-
-    # fix to find TXT records, if the rhsbl_zones line doesn't have second field
-            if (defined($rhsbl_zones{$rhsbl})) {
-                $self->log(LOGDEBUG, "Checking $host.$rhsbl for A record");
-                $query = $res->query("$host.$rhsbl");
-            }
-            else {
-                $self->log(LOGDEBUG, "Checking $host.$rhsbl for TXT record");
-                $query = $res->query("$host.$rhsbl", 'TXT');
-            }
-
-            if (!$query) {
-                if ($res->errorstring ne 'NXDOMAIN') {
-                    $self->log(LOGCRIT, "query failed: ", $res->errorstring);
-                }
-                next;
-            }
-
-            my $result;
-            foreach my $rr ($query->answer) {
-                $self->log(LOGDEBUG,
-                           'got an ' . $rr->type . ' record ' . $rr->name);
-                if ($rr->type eq 'A') {
-                    $self->log(LOGDEBUG,
-                          "A record found for $result with IP " . $rr->address);
-                    $result = $rr->name;
-                }
-                elsif ($rr->type eq 'TXT') {
-                    $result = $rr->txtdata;
-                    $self->log(LOGDEBUG, "TXT record found: " . $rr->txtdata);
-                }
-
-                next if !$result;
-
-                $self->log(LOGINFO, "fail, $result");
-
-                if ($transaction->sender) {
-                    my $host = $transaction->sender->host;
-                    if ($result =~ /^$host\./) {
-                        return $self->get_reject(
-                                 "Mail from $host rejected because it $result");
-                    }
-                }
-
-                my $hello = $self->qp->connection->hello_host;
-                return $self->get_reject(
-                           "Mail from HELO $hello rejected because it $result");
-            }
+    for (@zones) {
+        my ($zone, $message) = @$_;
+        my $result = $self->dnsbl_lookup("$host.$zone") or next;
+        if ($result->{error}) {
+            $self->log(LOGERROR, "skip, $result->{error}");
+            next;
         }
+
+        my $reason = $message // $result->{reason};
+        $reason = "listed by $zone" if !length $reason;
+        return $self->get_reject("Mail from $host rejected: $reason", $zone);
     }
 
     $self->log(LOGINFO, "pass");
@@ -131,14 +95,8 @@ sub hook_mail {
 sub populate_zones {
     my $self = shift;
 
-    my %rhsbl_zones =
-      map { (split /\s+/, $_, 2)[0, 1] } $self->qp->config('rhsbl_zones');
-
-    if (!keys %rhsbl_zones) {
-        $self->log(LOGINFO, 'pass, no zones');
-        return;
-    }
-
-    return %rhsbl_zones;
+    my @zones =
+      map { [split /\s+/, $_, 2] } $self->qp->config('rhsbl_zones');
+    $self->log(LOGINFO, 'pass, no zones') if !@zones;
+    return @zones;
 }
-

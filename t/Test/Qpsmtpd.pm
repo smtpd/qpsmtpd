@@ -193,7 +193,8 @@ sub mock_config {
         sub {
             my ( $self, $txn, $conf ) = @_;
             return DECLINED if ! exists $mock_config->{$conf};
-            return OK, $mock_config->{$conf};
+            my $value = $mock_config->{$conf};
+            return OK, ref $value eq 'ARRAY' ? @$value : $value;
     } );
 }
 

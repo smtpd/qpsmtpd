@@ -19,6 +19,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of retrying a message that can never pass
 - Qpsmtpd::Milter, a milter protocol v6 client, #329
 - Qpsmtpd::Transaction::body_replace()
+- `Qpsmtpd::Base::dnsbl_name()` and `dnsbl_lookup()`, the RFC 5782 lookup
+  that dnsbl and rhsbl share
+- dnsbl looks up IPv6 clients, and config/dnsbl\_allow takes IPv6
+  addresses and CIDR blocks
 
 ### Changed
 
@@ -29,6 +33,9 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   whose mail hosts are IPv6-only resolves. config/invalid\_resolvable\_fromhost
   takes IPv6 blocks, and the sample lists loopback, link-local, ULA and
   multicast
+- dnsbl and rhsbl check their zones in config file order
+- config.sample/rhsbl\_zones lists dbl.spamhaus.org. dsn.rfc-ignorant.org
+  closed in 2012
 
 ### Removed
 
@@ -47,6 +54,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - qpsmtpd-forkserver `--no-rdns` skips the PTR lookup
 - an IPv6 client's address keeps its colons when it names the remote host
+- dnsbl and rhsbl reject with the message configured for a zone, or else
+  the zone's TXT record
+- dnsbl and rhsbl log Spamhaus's error answers (127.255.255.252, .254 and
+  .255) and accept the client
+- config/dnsbl\_rejectmsg is put before the reason in each dnsbl rejection
 
 ## [1.02] - 2026-10-01
 
