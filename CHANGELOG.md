@@ -27,6 +27,15 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - the tcpserver and (x)inetd run models: the qpsmtpd script, run.tcpserver,
   config.sample/IP, the RPM's xinetd files and the ucspi-tcp dependency. Use
   qpsmtpd.service; see UPGRADING.md
+- the relay, whitelist and dnsbl plugins no longer read `$RELAYCLIENT`,
+  `$WHITELISTCLIENT` or `$RBLSMTPD`. Only tcpserver set them per client
+- qpsmtpd-forkserver no longer sets `$TCPLOCALIP`, `$TCPREMOTEIP` or
+  `$TCPREMOTEHOST`. Plugins read them from `$qp->connection`
+
+### Fixed
+
+- qpsmtpd-forkserver `--no-rdns` skips the PTR lookup
+- an IPv6 client's address keeps its colons when it names the remote host
 
 ## [1.02] - 2026-10-01
 

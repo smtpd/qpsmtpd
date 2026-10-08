@@ -40,8 +40,13 @@ Rules in a tcprules file move into qpsmtpd config:
 - `:deny` entries go in config/hosts\_allow, with the hosts\_allow plugin
   enabled
 
-Nothing sets `$RELAYCLIENT` or `$WHITELISTCLIENT` per client any more. Use
-config/relayclients and the whitelist plugin's whitelisthosts.
+The relay, whitelist and dnsbl plugins no longer read `$RELAYCLIENT`,
+`$WHITELISTCLIENT` or `$RBLSMTPD`. Use config/relayclients, the whitelist
+plugin's whitelisthosts and config/dnsbl\_allow.
+
+`$TCPLOCALIP`, `$TCPREMOTEIP` and `$TCPREMOTEHOST` are no longer set. A
+local plugin that reads them should use `$self->qp->connection->local_ip`,
+`remote_ip` and `remote_host`.
 
 ## v0.84 or below
 

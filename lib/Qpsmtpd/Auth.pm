@@ -76,7 +76,8 @@ sub SASL {
     else {
         $msg =
             uc($mechanism)
-          . " authentication failed for $user from $ENV{TCPREMOTEIP}"
+          . " authentication failed for $user from "
+          . $session->connection->remote_ip
           . ($msg ? " - $msg" : '');
         $session->respond(535, $msg);
         $session->log(LOGDEBUG, $msg);    # already logged by $session->respond

@@ -302,25 +302,22 @@ while (1) {
             exit;
         };
 
-        # set enviroment variables
-        ($ENV{TCPLOCALIP}, $ENV{TCPREMOTEIP}, $ENV{TCPREMOTEHOST}) =
-          $qpsmtpd->tcpenv($nto_laddr, $nto_iaddr);
-
-        # don't do this!
-        #$0 = "qpsmtpd-forkserver: $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}";
-
+        my $remote_host =
+          $NORDNS
+          ? "[$nto_iaddr]"
+          : ($qpsmtpd->resolve_ptr($nto_iaddr))[0] || 'Unknown';
         ::log(LOGINFO,
-"Accepted connection $running/$MAXCONN from $ENV{TCPREMOTEIP} / $ENV{TCPREMOTEHOST}"
-        );
+            "Accepted connection $running/$MAXCONN from $nto_iaddr / $remote_host");
 
         # dup to STDIN/STDOUT
         POSIX::dup2(fileno($client), 0);
         POSIX::dup2(fileno($client), 1);
 
         $qpsmtpd->start_connection(
-                                   local_ip    => $ENV{TCPLOCALIP},
+                                   local_ip    => $nto_laddr,
                                    local_port  => $lport,
-                                   remote_ip   => $ENV{TCPREMOTEIP},
+                                   remote_ip   => $nto_iaddr,
+                                   remote_host => $remote_host,
                                    remote_port => $port,
                                   );
         $qpsmtpd->run($client);

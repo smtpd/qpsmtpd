@@ -29,12 +29,6 @@ whitelisthosts file is exempted from any further validation during
 'connect', and can be selectively exempted at other stages by 
 plugins testing for a 'whitelisthost' connection note.
 
-Similarly, if the environment variable $WHITELISTCLIENT is set, the
-connection will be exempt from
-further 'connect' validation, and the host can be selectively 
-exempted by other plugins testing for a 'whitelistclient' connection 
-note.
-
 =item whitelisthelo
 
 Any host that issues a HELO matching an entry in whitelisthelo will
@@ -135,13 +129,6 @@ sub register {
 sub check_host {
     my ($self, $transaction, $rcpt) = @_;
     my $ip = $self->qp->connection->remote_ip or return DECLINED;
-
-    if (exists $ENV{WHITELISTCLIENT}) {
-        $self->qp->connection->notes('whitelistclient', 1);
-        $self->log(2, "pass, $ip is whitelisted client");
-        $self->adjust_karma(5);
-        return OK;
-    }
 
     my $config_arg = $self->{_per_recipient} ? {rcpt => $rcpt, %MERGE} : {};
     for my $h ($self->qp->config('whitelisthosts', $config_arg)) {
