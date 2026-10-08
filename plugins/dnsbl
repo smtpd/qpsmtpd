@@ -63,21 +63,20 @@ is replaced with the client's address:
 
   bl.spamcop.net:Blocked, see https://www.spamcop.net/bl.shtml?%IP%
 
-An answer in 127.255.255.0/24 is an error report: Spamhaus, for one, sends
-it to a public resolver or a query over its rate limit. It is logged, and
-the client is not rejected. Spamhaus does not answer queries through public
+An answer of 127.255.255.252, .254 or .255 is a Spamhaus error report: a
+mistyped zone, a query through a public resolver, or a query over its rate
+limit. It is logged, and the client is not rejected. Spamhaus does not answer queries through public
 resolvers such as 8.8.8.8, so a server using one needs a local resolver.
 
 =head2 dnsbl_allow
 
 Client addresses that are never looked up, one per line. An IPv4 entry
 matches whole octets, so I<172.16.33> matches 172.16.33.0/24. An IPv6 entry
-matches the address as written, or the addresses that start with it when it
-ends with a colon:
+is an address or a CIDR block:
 
   192.168.1.1
   172.16.33.
-  2001:db8:1:
+  2001:db8:1::/48
 
 =head2 dnsbl_rejectmsg
 
@@ -90,6 +89,8 @@ Text put before the reason in each rejection, to tell the sender what to do:
 See: https://github.com/smtpd/qpsmtpd/commits/master/plugins/dnsbl
 
 =cut
+
+use Net::IP qw(:PROC);
 
 sub register {
     my ($self, $qp) = (shift, shift);
@@ -155,12 +156,22 @@ sub ip_whitelisted {
     my ($self) = @_;
 
     my $remote_ip = $self->qp->connection->remote_ip;
+    my $client = Net::IP->new($remote_ip) or return;
     for my $allow ($self->qp->config('dnsbl_allow')) {
-        return 1 if $allow eq $remote_ip;
+        if ($allow =~ /:/) {
+            my $net = Net::IP->new($allow) or do {
+                $self->log(LOGERROR, "dnsbl_allow: $allow: " . Net::IP::Error());
+                next;
+            };
+            next if $net->version != $client->version;
+            my $overlap = $net->overlaps($client);
+            return 1
+              if $overlap == $IP_B_IN_A_OVERLAP || $overlap == $IP_IDENTICAL;
+            next;
+        }
 
-        # an IPv4 entry matches whole octets: 10.1 is 10.1.0.0/16
-        my $prefix = $allow =~ /:/ ? $allow : $allow =~ s/\.?$/./r;
-        return 1 if $prefix =~ /[.:]$/ && index("$remote_ip.", $prefix) == 0;
+        my $prefix = $allow =~ s/\.?$/./r;
+        return 1 if index("$remote_ip.", $prefix) == 0;
     }
     return;
 }

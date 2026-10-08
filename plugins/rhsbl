@@ -22,8 +22,8 @@ your own instead, add it after whitespace:
 
   dbl.spamhaus.org is listed in the Spamhaus DBL
 
-An answer in 127.255.255.0/24 is an error report (see L<dnsbl>). It is
-logged, and the sender is not rejected.
+An answer of 127.255.255.252, .254 or .255 is an error report (see
+L<dnsbl>). It is logged, and the sender is not rejected.
 
 =cut
 

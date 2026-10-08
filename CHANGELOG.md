@@ -21,7 +21,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Qpsmtpd::Transaction::body_replace()
 - `Qpsmtpd::Base::dnsbl_name()` and `dnsbl_lookup()`, the RFC 5782 lookup
   that dnsbl and rhsbl share
-- dnsbl looks up IPv6 clients, and config/dnsbl\_allow takes IPv6 prefixes
+- dnsbl looks up IPv6 clients, and config/dnsbl\_allow takes IPv6
+  addresses and CIDR blocks
 
 ### Changed
 
@@ -55,8 +56,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - an IPv6 client's address keeps its colons when it names the remote host
 - dnsbl and rhsbl reject with the message configured for a zone, or else
   the zone's TXT record
-- dnsbl and rhsbl log a 127.255.255.x answer, Spamhaus's report of a
-  refused query, and accept the client
+- dnsbl and rhsbl log Spamhaus's error answers (127.255.255.252, .254 and
+  .255) and accept the client
 - config/dnsbl\_rejectmsg is put before the reason in each dnsbl rejection
 
 ## [1.02] - 2026-10-01

@@ -92,9 +92,11 @@ sub dnsbl_name {
 }
 
 # A blocklist lists a name with an A record in 127.0.0.0/8, and may give the
-# reason in a TXT record (RFC 5782 2.1). Lists such as Spamhaus answer
-# 127.255.255.x when they refuse the query, from a public resolver or over a
-# rate limit.
+# reason in a TXT record (RFC 5782 2.1). Spamhaus answers a refused query
+# with an error code: .252 for a mistyped zone, .254 for a public resolver,
+# .255 for a query over its rate limit.
+my %dnsbl_error = map { ("127.255.255.$_" => 1) } 252, 254, 255;
+
 sub dnsbl_lookup {
     my ($self, $name) = @_;
     my $res = $self->get_resolver;
@@ -107,12 +109,14 @@ sub dnsbl_lookup {
     }
 
     my @codes  = map { $_->address } grep { $_->type eq 'A' } $packet->answer;
-    my @listed = grep { /^127\./ && !/^127\.255\.255\./ } @codes;
+    my @listed = grep { /^127\./ && !$dnsbl_error{$_} } @codes;
     return {error => "$name: refused (@codes)"} if !@listed;
 
     my $txt = $res->query($name, 'TXT');
-    my @reason =
-      $txt ? map { $_->txtdata } grep { $_->type eq 'TXT' } $txt->answer : ();
+    # A TXT record longer than 255 bytes arrives as several strings
+    my @reason = $txt
+      ? map { join '', $_->txtdata } grep { $_->type eq 'TXT' } $txt->answer
+      : ();
     return {codes => \@listed, reason => join(' ', @reason)};
 }
 

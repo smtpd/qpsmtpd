@@ -74,11 +74,19 @@ sub test_hook_connect {
 sub test_ip_whitelisted_ipv6 {
     my $self = shift;
 
-    $self->mock_config(dnsbl_allow => '2001:db8:1:');
-    $self->qp->connection->remote_ip('2001:db8:1:2::5');
-    ok($self->ip_whitelisted(), 'IPv6 prefix +');
-    $self->qp->connection->remote_ip('2001:db8:10::5');
-    ok(!$self->ip_whitelisted(), 'IPv6 prefix -');
+    $self->mock_config(dnsbl_allow => ['2001:DB8:1::/48', '2001:db8:2::5']);
+    for (
+        ['2001:db8:1:2::5',  1, 'in a CIDR block'],
+        ['2001:db8:10::5',   0, 'outside a CIDR block'],
+        ['2001:0DB8:2:0::5', 1, 'an address, written another way'],
+        ['2001:db8:2::6',    0, 'a different address'],
+        ['192.168.99.5',     0, 'IPv4 client, IPv6 entries'],
+      )
+    {
+        my ($ip, $allowed, $desc) = @$_;
+        $self->qp->connection->remote_ip($ip);
+        is(!!$self->ip_whitelisted(), !!$allowed, "IPv6: $desc");
+    }
     $self->unmock_config;
 }
 

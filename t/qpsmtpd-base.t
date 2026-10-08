@@ -106,7 +106,9 @@ sub __dnsbl_lookup {
     my %zone = (
         'listed.test'   => {A => ['127.0.0.2', '127.0.0.4'], TXT => ['spam', 'more']},
         'no-txt.test'   => {A => ['127.0.0.2']},
+        'split.test'    => {A => ['127.0.0.2'], TXT => ['https://ex" "ample.test/']},
         'refused.test'  => {A => ['127.255.255.254']},
+        'other.test'    => {A => ['127.255.255.2']},
         'outside.test'  => {A => ['192.0.2.1']},
         'servfail.test' => {error => 'SERVFAIL'},
     );
@@ -118,10 +120,14 @@ sub __dnsbl_lookup {
     is_deeply($base->dnsbl_lookup('no-txt.test'),
               {codes => ['127.0.0.2'], reason => ''},
               'dnsbl_lookup: listed, without a reason');
+    is($base->dnsbl_lookup('split.test')->{reason}, 'https://example.test/',
+       'dnsbl_lookup: the strings of one TXT record are joined');
     ok(!defined $base->dnsbl_lookup('absent.test'),
        'dnsbl_lookup: NXDOMAIN is not listed');
     like($base->dnsbl_lookup('refused.test')->{error}, qr/refused/,
-         'dnsbl_lookup: 127.255.255.x is an error, not a listing');
+         'dnsbl_lookup: a Spamhaus error code is an error');
+    is_deeply($base->dnsbl_lookup('other.test')->{codes}, ['127.255.255.2'],
+              'dnsbl_lookup: another 127.255.255.x answer is a listing');
     like($base->dnsbl_lookup('outside.test')->{error}, qr/refused/,
          'dnsbl_lookup: an answer outside 127/8 is not a listing');
     like($base->dnsbl_lookup('servfail.test')->{error}, qr/SERVFAIL/,
