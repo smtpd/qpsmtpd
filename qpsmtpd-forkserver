@@ -9,14 +9,12 @@ use strict;
 use lib 'lib';
 use Qpsmtpd::Constants;
 use Qpsmtpd::TcpServer;
-use IO::Socket;
+use IO::Socket::IP;
 use IO::Select;
 use Socket;
 use Getopt::Long qw(:config no_ignore_case);
 use POSIX qw(:sys_wait_h :errno_h :signal_h);
 $| = 1;
-
-my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6;
 
 # Configuration
 my $MAXCONN = 15;    # max simultaneous connections
@@ -37,7 +35,7 @@ usage: qpsmtpd-forkserver [ options ]
                              multiple times for multiple bindings. IPv6 
                              addresses must be inside square brackets [], and 
                              don't need to be zero padded.
-                             Default is [::] (if has_ipv6) or 0.0.0.0 (if not)
+                             Default is 0.0.0.0 and [::]
  -p, --port P              : listen on a specific port; default 2525; can be
                              specified multiple times for multiple bindings.
  -c, --limit-connections N : limit concurrent connections to N; default 15
@@ -64,12 +62,8 @@ GetOptions(
   || &usage;
 
 # detaint the commandline
-if ($has_ipv6) {
-    @LOCALADDR = ('[::]') if !@LOCALADDR;
-}
-else {
-    @LOCALADDR = ('0.0.0.0') if !@LOCALADDR;
-}
+my $default_addrs = !@LOCALADDR;
+@LOCALADDR = ('0.0.0.0', '[::]') if $default_addrs;
 @PORT = 2525 if !@PORT;
 
 my @LISTENADDR;
@@ -126,26 +120,26 @@ my $server;
 
 # establish SERVER socket(s), bind and listen.
 for my $listen_addr (@LISTENADDR) {
-    my @Socket_opts = (
-                       LocalPort => $listen_addr->{'port'},
-                       LocalAddr => $listen_addr->{'addr'},
-                       Proto     => 'tcp',
-                       Reuse     => 1,
+    my $addr = $listen_addr->{addr} =~ s/^\[(.*)\]$/$1/r;
+    $server = IO::Socket::IP->new(
+                       LocalHost => $addr,
+                       LocalPort => $listen_addr->{port},
+                       ReuseAddr => 1,
                        Blocking  => 0,
-                       Listen    => SOMAXCONN
-                      );
+                       Listen    => SOMAXCONN,
 
-    if ($has_ipv6) {
-        $server = IO::Socket::INET6->new(@Socket_opts)
-          or die
-"Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
+                       # Linux binds [::] to IPv4 as well, which collides
+                       # with 0.0.0.0 on the same port
+                       ($default_addrs ? (V6Only => 1) : ()),
+                      );
+    if (!$server) {
+        my $err = "Creating TCP socket $listen_addr->{addr}:$listen_addr->{port}: $IO::Socket::errstr\n";
+        if ($default_addrs && $addr eq '::') {
+            warn "IPv6 unavailable, listening on IPv4 only. $err";
+            next;
+        }
+        die $err;
     }
-    else {
-        $server = IO::Socket::INET->new(@Socket_opts)
-          or die
-"Creating TCP socket $listen_addr->{'addr'}:$listen_addr->{'port'}: $!\n";
-    }
-    IO::Handle::blocking($server, 0);
     $select->add($server);
 }
 
@@ -243,14 +237,12 @@ while (1) {
     my @ready = $select->can_read(1);
     next if !@ready;
     while (my $server = shift @ready) {
-        my ($client, $hisaddr) = $server->accept;
+        my $client = $server->accept or next;
+        $client->blocking(1);
 
-        next if !$hisaddr;
-        IO::Handle::blocking($client, 1);
-
-        # get local/remote hostname, port and ip address
-        my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr) =
-            $qpsmtpd->lrpip($server, $client, $hisaddr);
+        my ($port, $lport) = ($client->peerport, $client->sockport);
+        my ($nto_iaddr, $nto_laddr) =
+          map { s/^::ffff:(?=\d+\.)//ir } $client->peerhost, $client->sockhost;
 
         my ($rc, @msg) =
           $qpsmtpd->run_hooks(

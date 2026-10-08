@@ -20,6 +20,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Qpsmtpd::Milter, a milter protocol v6 client, #329
 - Qpsmtpd::Transaction::body_replace()
 
+### Changed
+
+- qpsmtpd-forkserver listens with IO::Socket::IP, so IPv6 works without
+  Socket6 and IO::Socket::INET6. With no `--listen-address`, it listens on
+  0.0.0.0 and [::]
+- resolvable_fromhost always looks up AAAA records, so a sender domain
+  whose mail hosts are IPv6-only resolves
+
 ### Removed
 
 - qpsmtpd-prefork, the prefork run model. Use qpsmtpd-forkserver; see
@@ -31,6 +39,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `$WHITELISTCLIENT` or `$RBLSMTPD`. Only tcpserver set them per client
 - qpsmtpd-forkserver no longer sets `$TCPLOCALIP`, `$TCPREMOTEIP` or
   `$TCPREMOTEHOST`. Plugins read them from `$qp->connection`
+- `Qpsmtpd::TcpServer::has_ipv6()` and `lrpip()`
 
 ### Fixed
 

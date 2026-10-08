@@ -72,14 +72,12 @@ use warnings;
 
 use Qpsmtpd::Constants;
 use Qpsmtpd::DSN;
-use Qpsmtpd::TcpServer;
 
 use Socket;
 use Net::DNS qw(mx);
 use Net::IP qw(:PROC);
 
-my %invalid  = ();
-my $has_ipv6 = Qpsmtpd::TcpServer::has_ipv6();
+my %invalid = ();
 
 sub register {
     my ($self, $qp, %args) = @_;
@@ -236,12 +234,10 @@ sub get_host_records {
         }
     }
 
-    if ($has_ipv6) {
-        $query = $res->search($host, 'AAAA');
-        if ($query) {
-            foreach my $rrAAAA ($query->answer) {
-                push(@answers, $rrAAAA);
-            }
+    $query = $res->search($host, 'AAAA');
+    if ($query) {
+        foreach my $rrAAAA ($query->answer) {
+            push(@answers, $rrAAAA);
         }
     }
 
@@ -264,11 +260,7 @@ sub mx_address_resolves {
     };
 
     my $res = $self->get_resolver();
-    my @mx_answers = $self->resolve_a($name);
-
-    if ($has_ipv6) {
-        push @mx_answers, $self->resolve_aaaa($name);
-    }
+    my @mx_answers = ($self->resolve_a($name), $self->resolve_aaaa($name));
 
     if (!@mx_answers) {
         if ($res->errorstring eq 'NXDOMAIN') {
