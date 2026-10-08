@@ -168,7 +168,7 @@ sub body_write {
 }
 
 sub body_replace {
-    my ($self, $body) = @_;
+    my ($self, $fh) = @_;
     my $start = $self->{_body_start} || 0;
     if ($self->{_body_file}) {
         $self->{_body_file}->truncate($start)
@@ -181,7 +181,10 @@ sub body_replace {
         $self->{_body_current_pos} = $start;
         $self->{_body_size} = $self->{_header_size} || 0;
     }
-    $self->body_write("\n$body");
+    $self->body_write("\n");
+    while (defined(my $line = $fh->getline)) {
+        $self->body_write($line);
+    }
 }
 
 sub body_size {    # deprecated, use data_size() instead
@@ -393,9 +396,9 @@ Write data to the end of the email.
 
 C<$data> can be either a plain scalar, or a reference to a scalar.
 
-=head2 body_replace( $body )
+=head2 body_replace( $fh )
 
-Replace everything after the header with C<$body>.
+Replace everything after the header with what can be read from C<$fh>.
 
 =head2 body_size( )
 

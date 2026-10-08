@@ -36,6 +36,7 @@ use constant {
     SMFIP_NR_UNKN     => 0x20000,
     SMFIP_NR_EOH      => 0x40000,
     SMFIP_NR_BODY     => 0x80000,
+    SMFIP_HDR_LEADSPC => 0x100000,
 };
 
 # SMFIF_QUARANTINE and SMFIF_ADDRCPT_PAR are left out: qpsmtpd has no hold
@@ -44,13 +45,12 @@ use constant {
 use constant ACTIONS => SMFIF_ADDHDRS | SMFIF_CHGBODY | SMFIF_ADDRCPT
   | SMFIF_DELRCPT | SMFIF_CHGHDRS | SMFIF_CHGFROM;
 
-# SMFIP_RCPT_REJ and SMFIP_HDR_LEADSPC are left out: we never send rejected
-# recipients, and header values go out without their leading space.
+# SMFIP_RCPT_REJ is left out: rejected recipients are never sent.
 use constant PROTOCOL => SMFIP_NOCONNECT | SMFIP_NOHELO | SMFIP_NOMAIL
   | SMFIP_NORCPT | SMFIP_NOBODY | SMFIP_NOHDRS | SMFIP_NOEOH | SMFIP_NR_HDR
   | SMFIP_NOUNKNOWN | SMFIP_NODATA | SMFIP_SKIP | SMFIP_NR_CONN
   | SMFIP_NR_HELO | SMFIP_NR_MAIL | SMFIP_NR_RCPT | SMFIP_NR_DATA
-  | SMFIP_NR_UNKN | SMFIP_NR_EOH | SMFIP_NR_BODY;
+  | SMFIP_NR_UNKN | SMFIP_NR_EOH | SMFIP_NR_BODY | SMFIP_HDR_LEADSPC;
 
 use constant MAX_BODY_CHUNK => 65535;
 use constant MAX_PACKET     => 16 * 1024 * 1024;
@@ -69,6 +69,20 @@ my %steps = (
 );
 
 my %final = map { $_ => 1 } qw(a c d f r s t y 4);
+
+# Every modification in the protocol is decoded, including those not
+# negotiated: Rspamd sends 'q'uarantine regardless.
+my %change = (
+    h   => [qw(name value)],
+    i   => [qw(index name value)],
+    m   => [qw(index name value)],
+    '+' => [qw(address)],
+    2   => [qw(address args)],
+    '-' => [qw(address)],
+    e   => [qw(address args)],
+    b   => [qw(body)],
+    q   => [qw(reason)],
+);
 
 sub new {
     my ($class, %args) = @_;
@@ -146,8 +160,11 @@ sub rcpt { my $self = shift; $self->_command('R', join '', map {"$_\0"} @_) }
 
 sub data { $_[0]->_command('T', '') }
 
+# $value is everything after the colon. Without SMFIP_HDR_LEADSPC, the milter
+# expects the one space after the colon gone.
 sub header {
     my ($self, $name, $value) = @_;
+    $value =~ s/^[ \t]// if !($self->{protocol} & SMFIP_HDR_LEADSPC);
     return $self->_command('L', "$name\0$value\0");
 }
 
@@ -155,15 +172,18 @@ sub end_of_headers { $_[0]->_command('N', '') }
 
 sub body {
     my ($self, $chunk) = @_;
-    my @replies;
+    my $verdict;
     while (length $chunk) {
-        @replies = $self->_command('B', substr($chunk, 0, MAX_BODY_CHUNK, ''));
-        last if @replies && $replies[-1]{cmd} ne 'c';
+        $verdict = $self->_command('B', substr($chunk, 0, MAX_BODY_CHUNK, ''));
+        last if $verdict && $verdict->{cmd} ne 'c';
     }
-    return @replies;
+    return $verdict;
 }
 
-sub end_of_body { $_[0]->_command('E', '') }
+sub end_of_body {
+    my ($self, $on_change) = @_;
+    return $self->_command('E', '', $on_change);
+}
 
 sub abort { $_[0]->_send('A', '') }
 
@@ -175,44 +195,49 @@ sub quit {
 }
 
 sub _command {
-    my ($self, $cmd, $data) = @_;
+    my ($self, $cmd, $data, $on_change) = @_;
     return if !$self->wants($cmd);
     $self->_send($cmd, $data);
     return if $self->{protocol} & $steps{$cmd}[1];
 
-    my @replies;
     while (1) {
         my ($code, $body) = $self->_read;
         next if $code eq 'p';    # progress: the milter needs more time
-        push @replies, _decode($code, $body);
-        return @replies if $final{$code};
+
+        if ($final{$code}) {
+            my %verdict = (cmd => $code);
+            ($verdict{reply} = $body) =~ s/\0\z// if $code eq 'y';
+            return \%verdict;
+        }
+        die "milter sent unknown reply '$code'\n" if !$change{$code};
+        die "milter sent '$code' before the end of the message\n"
+          if !$on_change;
+        $on_change->($self->_decode_change($code, $body));
     }
 }
 
-sub _decode {
-    my ($cmd, $data) = @_;
+sub _decode_change {
+    my ($self, $cmd, $data) = @_;
     my %r = (cmd => $cmd);
+    my @fields = @{$change{$cmd}};
 
-    if ($cmd eq 'y') {
-        ($r{reply} = $data) =~ s/\0\z//;
-    }
-    elsif ($cmd eq 'h') {
-        @r{qw(name value)} = split /\0/, $data, -1;
-    }
-    elsif ($cmd eq 'i' || $cmd eq 'm') {
-        $r{index} = unpack 'N', $data;
-        @r{qw(name value)} = split /\0/, substr($data, 4), -1;
-    }
-    elsif ($cmd eq '+' || $cmd eq '-' || $cmd eq 'e') {
-        @r{qw(address args)} = split /\0/, $data, -1;
-    }
-    elsif ($cmd eq 'b') {
+    if ($cmd eq 'b') {
         $r{body} = $data;
+        return \%r;
     }
-    elsif (!$final{$cmd}) {
-        die "milter sent unknown reply '$cmd'\n";
+    if ($fields[0] eq 'index') {
+        $r{index} = unpack 'N', substr($data, 0, 4, '');
+        shift @fields;
     }
-    defined $r{$_} or $r{$_} = '' for keys %r;
+    @r{@fields} = split /\0/, $data, -1;
+    defined $r{$_} or $r{$_} = '' for @fields;
+
+    # a header value is returned as everything after the colon
+    if (defined $r{value}) {
+        $r{value} =~ s/\r\n/\n/g;
+        $r{value} = " $r{value}"
+          if !($self->{protocol} & SMFIP_HDR_LEADSPC) && length $r{value};
+    }
     return \%r;
 }
 
@@ -275,28 +300,40 @@ Qpsmtpd::Milter - the MTA side of the sendmail milter protocol, version 6
 
   my $milter = Qpsmtpd::Milter->new(host => '127.0.0.1', port => 11332);
   $milter->negotiate;
-  my @replies = $milter->connect('mx.example.com', '192.0.2.1', 25);
-  my $verdict = $replies[-1];    # { cmd => 'c' } for continue, etc.
+  my $verdict = $milter->connect('mx.example.com', '192.0.2.1', 25);
+  # { cmd => 'c' } for continue, etc.
+
+  $verdict = $milter->end_of_body(sub { my $change = shift; ... });
 
 =head1 DESCRIPTION
 
 Each command method sends one milter command and returns the milter's
-replies as hashrefs with a C<cmd> key holding the reply code. The last reply
-is the verdict (C<c>ontinue, C<a>ccept, C<r>eject, C<t>empfail, C<d>iscard,
-repl(C<y>), C<s>kip, C<f> connection failure or C<4> shutdown). Message
-modifications that the milter sends at end of body precede the verdict:
+verdict, a hashref with a C<cmd> key holding the reply code: C<c>ontinue,
+C<a>ccept, C<r>eject, C<t>empfail, C<d>iscard, repl(C<y>) with the SMTP reply
+in C<reply>, C<s>kip, C<f> connection failure or C<4> shutdown.
+
+A command returns nothing when the milter asked, during negotiation, to
+skip that step or to not reply to it. Errors and timeouts die.
+
+Header values, sent with C<header> and received in changes, are everything
+after the colon, leading whitespace included.
+
+=head2 end_of_body( $on_change )
+
+Before its verdict, the milter may send any number of changes to the
+message. Each is passed to C<$on_change> as it arrives, as a hashref:
 
   h  add header       name, value
   i  insert header    index, name, value
   m  change header    index, name, value (empty value deletes)
   +  add recipient    address
+  2  add recipient    address, args
   -  delete recipient address
   e  change sender    address, args
-  b  replace body     body (one chunk; there may be several)
+  b  replace body     body (one chunk of it, CRLF line endings)
+  q  quarantine       reason
 
-A command returns an empty list when the milter asked, during
-negotiation, to skip that step or to not reply to it. Errors and timeouts
-die.
+C<2> and C<q> are never negotiated, but some milters send them anyway.
 
 The milter may negotiate any protocol version from 2 to 6.
 

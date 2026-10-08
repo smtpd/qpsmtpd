@@ -15,8 +15,9 @@ use Qpsmtpd::Milter;
 use Qpsmtpd::Transaction;
 use Test::Qpsmtpd;    # creates t/tmp, where the fake milter logs
 
-use constant ALL_ACTIONS  => Qpsmtpd::Milter::ACTIONS;
-use constant SMFIP_HDR_LEADSPC => 0x100000;
+use constant ALL_ACTIONS    => Qpsmtpd::Milter::ACTIONS;
+use constant SMFIP_RCPT_REJ => 0x800;
+use constant LEADSPC        => Qpsmtpd::Milter::SMFIP_HDR_LEADSPC;
 
 __negotiate();
 __unsupported_version();
@@ -25,11 +26,14 @@ __no_reply_and_skipped_steps();
 __progress();
 __body_chunks_and_skip();
 __end_of_body_modifications();
+__header_whitespace();
 __v2_milter_gets_no_data();
 __body_replace();
 __milter_gone();
 __plugin();
 __plugin_replies();
+__plugin_changes();
+__plugin_discard_at_connect();
 __plugin_unreachable();
 unhook_milter();
 
@@ -91,7 +95,7 @@ sub client {
 
 sub __negotiate {
     my ($port, $done) = fake_milter(
-        optneg => [6, ALL_ACTIONS, Qpsmtpd::Milter::SMFIP_NR_HDR | SMFIP_HDR_LEADSPC]);
+        optneg => [6, ALL_ACTIONS, Qpsmtpd::Milter::SMFIP_NR_HDR | SMFIP_RCPT_REJ]);
     my $m = client($port);
     is($m->version, 6, 'negotiates version 6');
     is($m->actions, ALL_ACTIONS, 'milter actions');
@@ -118,8 +122,8 @@ sub __connect {
     my ($port, $done) = fake_milter(C => [[['y', "554 5.7.1 go away\0"]]]);
     my $m = client($port);
     $m->macros('C', j => 'mx.example.com', '{client_addr}' => undef);
-    my @r = $m->connect('host.example.com', '192.0.2.1', 2525);
-    is_deeply(\@r, [{cmd => 'y', reply => '554 5.7.1 go away'}], 'replycode');
+    is_deeply($m->connect('host.example.com', '192.0.2.1', 2525),
+              {cmd => 'y', reply => '554 5.7.1 go away'}, 'replycode');
     $m->helo('helo.example.com');
     $m->quit;
 
@@ -148,7 +152,7 @@ sub __no_reply_and_skipped_steps {
     is_deeply([$m->connect('h', '192.0.2.1', 25)], [], 'NR_CONN: no reply read');
     is_deeply([$m->helo('h')], [], 'NOHELO: skipped');
     is_deeply([$m->mail('<a@example.com>')], [], 'NOMAIL: skipped');
-    is_deeply([$m->rcpt('<b@example.com>', 'NOTIFY=NEVER')], [{cmd => 'c'}],
+    is_deeply($m->rcpt('<b@example.com>', 'NOTIFY=NEVER'), {cmd => 'c'},
               'rcpt replies');
     is_deeply([$m->header('Subject', 'hi')], [], 'NR_HDR: no reply read');
     $m->quit;
@@ -162,7 +166,7 @@ sub __no_reply_and_skipped_steps {
 sub __progress {
     my ($port, $done) = fake_milter(H => [[['p', ''], ['p', ''], ['t', '']]]);
     my $m = client($port);
-    is_deeply([$m->helo('h')], [{cmd => 't'}], 'progress replies are skipped');
+    is_deeply($m->helo('h'), {cmd => 't'}, 'progress replies are skipped');
     $m->quit;
     $done->();
 }
@@ -172,8 +176,8 @@ sub __body_chunks_and_skip {
     my ($port, $done) = fake_milter(optneg => [6, 0, $flags],
                                     B => [[['c', '']], [['s', '']]]);
     my $m = client($port);
-    my @r = $m->body('x' x (3 * Qpsmtpd::Milter::MAX_BODY_CHUNK));
-    is_deeply(\@r, [{cmd => 's'}], 'skip ends the body');
+    is_deeply($m->body('x' x (3 * Qpsmtpd::Milter::MAX_BODY_CHUNK)),
+              {cmd => 's'}, 'skip ends the body');
     $m->quit;
 
     my @bodies = grep { $_->[0] eq 'B' } @{$done->()};
@@ -189,38 +193,73 @@ sub __end_of_body_modifications {
             ['i', pack('N', 0) . "X-First\0top\0"],
             ['m', pack('N', 1) . "Subject\0\0"],
             ['+', "<new\@example.com>\0"],
+            ['2', "<par\@example.com>\0NOTIFY=NEVER\0"],
             ['-', "<old\@example.com>\0"],
             ['e', "<from\@example.com>\0"],
             ['b', "new body\r\n"],
+            ['q', "suspicious\0"],
             ['a', ''],
-        ]]
+        ]],
+        H => [[['h', "X-Early\0no\0"]]],
     );
     my $m = client($port);
-    my @r = $m->end_of_body;
-    $m->quit;
-    $done->();
-
+    my @changes;
+    my $verdict = $m->end_of_body(sub { push @changes, @_ });
+    is_deeply($verdict, {cmd => 'a'}, 'the verdict follows the changes');
     is_deeply(
-        \@r,
+        \@changes,
         [
-            {cmd => 'h', name => 'X-Spam', value => 'yes'},
-            {cmd => 'i', index => 0, name => 'X-First', value => 'top'},
+            {cmd => 'h', name => 'X-Spam', value => ' yes'},
+            {cmd => 'i', index => 0, name => 'X-First', value => ' top'},
             {cmd => 'm', index => 1, name => 'Subject', value => ''},
-            {cmd => '+', address => '<new@example.com>', args => ''},
-            {cmd => '-', address => '<old@example.com>', args => ''},
+            {cmd => '+', address => '<new@example.com>'},
+            {cmd => '2', address => '<par@example.com>', args => 'NOTIFY=NEVER'},
+            {cmd => '-', address => '<old@example.com>'},
             {cmd => 'e', address => '<from@example.com>', args => ''},
             {cmd => 'b', body => "new body\r\n"},
-            {cmd => 'a'},
+            {cmd => 'q', reason => 'suspicious'},
         ],
-        'end of body modifications are decoded'
+        'every change is decoded, negotiated or not, as it arrives'
     );
+
+    ok(!eval { $m->helo('h'); 1 }, 'a change before end of message');
+    like($@, qr/before the end of the message/, 'is a protocol error');
+    $m->quit;
+    $done->();
+}
+
+sub __header_whitespace {
+    my %expect = (
+        0       => ["Subject\0 two spaces\0", "X-Tab\0folded\n\tline\0"],
+        (LEADSPC) => ["Subject\0  two spaces\0", "X-Tab\0\tfolded\n\tline\0"],
+    );
+    for my $leadspc (0, LEADSPC) {
+        my $mode = $leadspc ? 'with' : 'without';
+        my $sp   = $leadspc ? ' ' : '';
+        my ($port, $done) = fake_milter(
+            optneg => [6, ALL_ACTIONS, $leadspc],
+            E      => [[['h', "X-A\0$sp two\0"], ['c', '']]],
+        );
+        my $m = client($port);
+        $m->header('Subject', '  two spaces');
+        $m->header('X-Tab', "\tfolded\n\tline");
+        my @changes;
+        $m->end_of_body(sub { push @changes, @_ });
+        $m->quit;
+
+        is_deeply([map { $_->[1] } grep { $_->[0] eq 'L' } @{$done->()}],
+                  $expect{$leadspc},
+                  "$mode HDR_LEADSPC, extra whitespace reaches the milter");
+        is($changes[0]{value}, '  two',
+           "$mode HDR_LEADSPC, a changed value is what follows the colon");
+    }
 }
 
 sub __v2_milter_gets_no_data {
     my ($port, $done) = fake_milter(optneg => [2, 0, 0]);
     my $m = client($port);
     is($m->version, 2, 'a v2 milter is accepted');
-    is_deeply([$m->data], [], 'DATA is not sent to a v2 milter');
+    is($m->data, undef, 'DATA is not sent to a v2 milter');
     $m->quit;
     is_deeply([map { $_->[0] } @{$done->()}], [qw(O Q)], 'only O and Q sent');
 }
@@ -245,7 +284,8 @@ sub __body_replace {
         $txn->set_body_start;
         $txn->body_write("\nold body\nmore\n");
         $txn->body_spool if $spool;
-        $txn->body_replace("new\n");
+        open my $fh, '<', \"new\n";
+        $txn->body_replace($fh);
 
         $txn->body_resetpos;
         my @lines;
@@ -383,6 +423,113 @@ sub __plugin_replies {
     is_deeply([map { $_->[0] } grep { $_->[0] ne 'D' } @{$done->()}],
               [qw(O C M R L A M R N E M R Q)],
               'no DATA without an envelope; abort after a rejected message');
+}
+
+# Start a message on the plugin's session, ready for data_post.
+sub message {
+    my ($smtpd, $plugin, @header) = @_;
+    my $txn  = $smtpd->reset_transaction;
+    my $from = Qpsmtpd::Address->new('<from@example.com>');
+    my $rcpt = Qpsmtpd::Address->new('<to@example.com>');
+    $plugin->hook_mail($txn, $from);
+    $plugin->hook_rcpt($txn, $rcpt);
+    $txn->sender($from);
+    $txn->add_recipient($rcpt);
+    $txn->header(Mail::Header->new([@header], Modify => 0));
+    $txn->body_write(join '', @header);
+    $txn->set_body_start;
+    $txn->body_write("\noriginal body\n");
+    return $txn;
+}
+
+sub body_of {
+    my $txn = shift;
+    $txn->body_resetpos;
+    $txn->body_getline;
+    my $body = '';
+    while (defined(my $l = $txn->body_getline)) { $body .= $l }
+    return $body;
+}
+
+sub __plugin_changes {
+    my $utf8 = "<\xe7\x94\xa8\xe6\x88\xb7\@example.com>\0";
+    my ($port, $done) = fake_milter(
+        E => [
+            # Rspamd's quarantine: never negotiated, followed by accept
+            [   ['m', pack('N', 1) . "Subject\0quarantined\0"],
+                ['q', "spam\0"],
+                ['a', ''],
+            ],
+
+            # rejected: none of the changes are applied
+            [   ['h', "X-Spam\0yes\0"],
+                ['b', "replaced\r\n"],
+                ['r', ''],
+            ],
+
+            # a body in chunks, with a CRLF split between two of them
+            [   ['b', "line one\r"],
+                ['b', "\nline two\r\n"],
+                ['+', $utf8],
+                ['-', $utf8],
+                ['c', ''],
+            ],
+            [['e', $utf8], ['e', "<ascii\@example.com>\0"], ['c', '']],
+        ],
+    );
+    my ($smtpd, $plugin) = plugin($port);
+    $plugin->hook_connect($smtpd->transaction);
+
+    my $txn = message($smtpd, $plugin, "Subject:  two  spaces\n");
+    is(($plugin->hook_data_post($txn))[0], DECLINED, 'quarantine, then accept');
+    is($txn->notes('milter_quarantine'), 'spam', 'quarantine reason is noted');
+    is_deeply($txn->header->header, ["Subject: quarantined\n"],
+              'changes sent with quarantine are applied');
+
+    $txn = message($smtpd, $plugin, "Subject: hi\n");
+    my @denied;
+    $smtpd->mock_hook(deny => sub { shift; shift; push @denied, [@_]; DECLINED });
+    is(($plugin->hook_data_post($txn))[0], DONE,
+       'the milter still filters the next message');
+    $smtpd->unmock_hook('deny');
+    is_deeply([$smtpd->response], [550, '5.7.1 Command rejected'],
+              'a reject gets Postfix\'s reply, not qpsmtpd\'s 552');
+    is_deeply(\@denied, [['milter', DENY, '5.7.1 Command rejected']],
+              'and runs the deny hooks');
+    is_deeply($txn->header->header, ["Subject: hi\n"],
+              'changes before a reject are not applied');
+    is(body_of($txn), "original body\n", 'nor is the body replaced');
+
+    $txn = message($smtpd, $plugin, "Subject: hi\n");
+    $plugin->hook_data_post($txn);
+    is(body_of($txn), "line one\nline two\n",
+       'body chunks are joined, CRLF split between chunks included');
+    ok(!$txn->notes('smtputf8'),
+       'SMTPUTF8 follows the final envelope, not each change');
+
+    $txn = message($smtpd, $plugin, "Subject: hi\n");
+    $txn->notes('smtputf8', 1);
+    $plugin->hook_data_post($txn);
+    is($txn->sender->format, '<ascii@example.com>', 'sender changed twice');
+    ok($txn->notes('smtputf8'), 'the client\'s SMTPUTF8 request is kept');
+
+    $plugin->hook_disconnect;
+    my @headers = map { $_->[1] } grep { $_->[0] eq 'L' } @{$done->()};
+    is($headers[0], "Subject\0 two  spaces\0",
+       'header whitespace reaches the milter');
+}
+
+sub __plugin_discard_at_connect {
+    my ($port, $done) = fake_milter(C => [[['d', '']]]);
+    my ($smtpd, $plugin) = plugin($port);
+    $plugin->hook_connect($smtpd->transaction);
+    my $txn = message($smtpd, $plugin, "Subject: hi\n");
+    $plugin->hook_data_post($txn);
+    is($plugin->hook_queue($txn), DECLINED,
+       'discard at connect does not drop every message');
+    $plugin->hook_disconnect;
+    is_deeply([map { $_->[0] } grep { $_->[0] ne 'D' } @{$done->()}],
+              [qw(O C M R L N B E Q)], 'and the milter is still consulted');
 }
 
 sub __plugin_unreachable {

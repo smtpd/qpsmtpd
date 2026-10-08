@@ -20,14 +20,6 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Qpsmtpd::Milter, a milter protocol v6 client, #329
 - Qpsmtpd::Transaction::body_replace()
 
-### Changed
-
-- milter: speaks milter protocol v6 with Qpsmtpd::Milter, and works with
-  Rspamd. Net::Milter is no longer used. Adds EHLO, DATA, unix sockets,
-  custom reply codes, discard, header insert/change, body replacement,
-  recipient and sender changes, and a `timeout` option. An unreachable
-  milter is logged and skipped
-
 ### Removed
 
 - qpsmtpd-prefork, the prefork run model. Use qpsmtpd-forkserver; see

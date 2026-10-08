@@ -38,14 +38,24 @@ Seconds to wait for each read from or write to the milter. Default: 30.
 
 =head1 BEHAVIOR
 
-The milter's reply to each SMTP command is honored: reject and tempfail
-replies deny the command, a custom reply is sent to the client with the
-milter's own code and text (a 421 also closes the connection), accept stops consulting the milter for the rest of the message (or the
-connection, when given at connect or HELO), and discard accepts the message
-without queuing it.
+The milter's reply to each SMTP command is honored. A custom reply is sent
+to the client with the milter's own code and text; reject and tempfail
+replies are sent as C<550 5.7.1 Command rejected> and C<451 4.7.1 Service
+unavailable - try again later>, as Postfix does. A 421 also closes the
+connection. Accept stops consulting the milter for the rest of the message
+(or the connection, when given at connect or HELO), and discard accepts the
+message without queuing it.
 
 At the end of the message the milter may add, insert, change and delete
 headers, replace the body, add and delete recipients and change the sender.
+The changes are applied when the milter then continues or accepts the
+message. Headers keep their original whitespace in both directions. A
+replacement body is spooled to disk as it arrives.
+
+qpsmtpd has no hold queue, and does not offer quarantine to the milter. Some
+milters (Rspamd) request it anyway: the request is logged, its reason is
+stored in the C<milter_quarantine> transaction note, and the message is
+delivered.
 
 If the milter cannot be reached, or fails mid-conversation, the error is
 logged and mail flows on without it for the rest of the connection.
@@ -58,6 +68,8 @@ L<Qpsmtpd::Milter>, L<https://github.com/smtpd/qpsmtpd/issues/329>
 
 use strict;
 use warnings;
+
+use File::Temp;
 
 use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
@@ -205,12 +217,7 @@ sub hook_data_post {
         (map { my $h = $_; sub { $self->milter->header(@$h) } } $self->headers),
         sub { $self->milter->end_of_headers },
         sub { $self->send_body },
-        sub {
-            my @replies = $self->milter->end_of_body;
-            $self->session->{in_message} = 0;
-            $self->modify($transaction, @replies);
-            return @replies;
-        },
+        sub { $self->end_of_body($transaction) },
     );
     for my $step (@steps) {
         $self->milter or return DECLINED;
@@ -222,7 +229,7 @@ sub hook_data_post {
 
 sub headers {
     my $self = shift;
-    return map { /^([^:]+):[ \t]*(.*?)\n?\z/s ? [$1, $2] : () }
+    return map { /^([^:]+):(.*?)\n?\z/s ? [$1, $2] : () }
       @{$self->transaction->header->header};
 }
 
@@ -243,48 +250,138 @@ sub send_body {
         $line = $txn->body_getline;
         next if defined $line && length $chunk < Qpsmtpd::Milter::MAX_BODY_CHUNK;
 
-        my @replies = $milter->body($chunk);
-        return @replies if @replies && $replies[-1]{cmd} ne 'c';
+        my $verdict = $milter->body($chunk);
+        return $verdict if $verdict && $verdict->{cmd} ne 'c';
         $chunk = '';
     }
     return;
 }
 
+sub end_of_body {
+    my ($self, $transaction) = @_;
+
+    my %changes = (list => [], cr => '');
+    my $verdict =
+      $self->milter->end_of_body(sub { $self->collect(\%changes, @_) });
+    $self->session->{in_message} = 0;
+
+    $self->apply($transaction, \%changes)
+      if $verdict->{cmd} eq 'c' || $verdict->{cmd} eq 'a';
+    return $verdict;
+}
+
+sub collect {
+    my ($self, $changes, $change) = @_;
+    if ($change->{cmd} ne 'b') {
+        push @{$changes->{list}}, $change;
+        return;
+    }
+
+    my $fh = $changes->{body} ||= File::Temp->new(DIR => $self->spool_dir);
+    my $data = $changes->{cr} . $change->{body};
+    $changes->{cr} = $data =~ s/\r\z// ? "\r" : '';    # CRLF split across chunks
+    $data =~ s/\r\n/\n/g;
+    print {$fh} $data or die "Cannot write replacement body: $!\n";
+}
+
+sub apply {
+    my ($self, $transaction, $changes) = @_;
+    my $smtputf8 = $transaction->notes('smtputf8');
+
+    for my $change (@{$changes->{list}}) {
+        next if eval { $self->apply_change($transaction, $change); 1 };
+        chomp(my $err = $@);
+        $self->log(LOGERROR, "$self->{name}: '$change->{cmd}' not applied: $err");
+    }
+
+    if (my $fh = $changes->{body}) {
+        print {$fh} $changes->{cr};
+        $fh->flush;
+        $fh->seek(0, 0);
+        $transaction->body_replace($fh);
+    }
+
+    $transaction->notes('smtputf8', 1)
+      if !$smtputf8
+      && grep { $_ && $_->has_utf8 } $transaction->sender,
+      $transaction->recipients;
+}
+
+sub apply_change {
+    my ($self, $transaction, $change) = @_;
+    my ($cmd, $name) = @$change{qw(cmd name)};
+    my $header = $transaction->header;
+    my $line   = defined $name ? "$name:$change->{value}" : undef;
+
+    if ($cmd eq 'h') {
+        $header->add($name, $line);
+    }
+    elsif ($cmd eq 'i') {
+        $header->add($name, $line, $change->{index});
+    }
+    elsif ($cmd eq 'm') {
+        my $index = $change->{index} ? $change->{index} - 1 : 0;
+        if (length $change->{value}) {
+            $header->replace($name, $line, $index);
+        }
+        else {
+            $header->delete($name, $index);
+        }
+    }
+    elsif ($cmd eq '+' || $cmd eq '2') {
+        $self->log(LOGWARN, "$self->{name}: dropped recipient args $change->{args}")
+          if $cmd eq '2' && length $change->{args};
+        $transaction->add_recipient(_address($change->{address}));
+    }
+    elsif ($cmd eq '-') {
+        $transaction->remove_recipient(_address($change->{address}));
+    }
+    elsif ($cmd eq 'e') {
+        $transaction->sender(_address($change->{address}));
+    }
+    elsif ($cmd eq 'q') {
+        $self->log(LOGWARN, "$self->{name} quarantined: $change->{reason}");
+        $transaction->notes('milter_quarantine', $change->{reason});
+    }
+}
+
+# Postfix's replies for a milter's reject and tempfail
+my %refusal = (
+    r => [550, '5.7.1 Command rejected'],
+    t => [451, '4.7.1 Service unavailable - try again later'],
+    f => [421, '4.7.0 Server closing connection'],
+    4 => [421, '4.7.0 Server closing connection'],
+);
+
 sub talk {
     my ($self, $stage, $send) = @_;
-    my $scope = $stage eq 'connect' || $stage eq 'helo'
-      ? $self->session : $self->message;
+    my $per_session = $stage eq 'connect' || $stage eq 'helo';
 
-    my @replies = eval { $send->() };
-    if (my $err = $@) {
-        chomp $err;
+    my $verdict;
+    if (!eval { $verdict = $send->(); 1 }) {
+        chomp(my $err = $@);
         $self->log(LOGERROR, "skip, $self->{name}: $err");
         $self->close_milter;
         return DECLINED;
     }
-    my $verdict = $replies[-1] or return DECLINED;
-    my $cmd     = $verdict->{cmd};
+    $verdict or return DECLINED;
+    my $cmd = $verdict->{cmd};
 
     return DECLINED if $cmd eq 'c' || $cmd eq 's';
 
     if ($cmd eq 'a') {
         $self->log(LOGINFO, "pass, $self->{name} accepted");
-        $scope->{accepted} = 1;
+        ($per_session ? $self->session : $self->message)->{accepted} = 1;
         return DECLINED;
     }
     if ($cmd eq 'd') {
+        if ($per_session) {
+            $self->log(LOGWARN, "$self->{name} sent discard at $stage, ignored");
+            return DECLINED;
+        }
         $self->log(LOGINFO, "$self->{name} will discard the message");
-        $scope->{discard} = 1;
-        $scope->{accepted} = 1;
+        @{$self->message}{qw(discard accepted)} = (1, 1);
         return DECLINED;
-    }
-    if ($cmd eq 'r') {
-        $self->log(LOGINFO, "fail, $self->{name} rejected");
-        return DENY;
-    }
-    if ($cmd eq 't') {
-        $self->log(LOGINFO, "fail, $self->{name} tempfailed");
-        return DENYSOFT;
     }
     if ($cmd eq 'y') {
         my ($code) = $verdict->{reply} =~ /^([45]\d\d)/;
@@ -295,22 +392,29 @@ sub talk {
         }
         my @lines = map { s/^\d{3}(?:[ -]|\z)//r }
           split /\r?\n/, $verdict->{reply};
-        return $self->reply($stage, $code, @lines);
+        return $self->refuse($stage, $code, @lines);
     }
 
-    # 'f' (connection failure) and '4' (shutdown)
-    $self->close_milter;
-    return $self->reply($stage, 421, '4.7.0 Server closing connection');
+    my ($code, $text) = @{$refusal{$cmd}};
+    $self->close_milter if $code == 421;
+    $code = 554 if $code == 550 && $stage eq 'connect';    # RFC 5321 3.1
+    $code = 421 if $code == 451 && $stage eq 'connect';
+    return $self->refuse($stage, $code, $text);
 }
 
-# Respond with the milter's own code, then clean up as the stage's responder
-# in Qpsmtpd::SMTP does for a denial.
-sub reply {
+# Respond with the code the milter chose, then do what Qpsmtpd::SMTP does
+# after a plugin's denial at this stage: run the deny hooks, and end the
+# transaction or the connection.
+sub refuse {
     my ($self, $stage, $code, @lines) = @_;
     my $qp = $self->qp;
 
     $self->log(LOGINFO, "fail, $self->{name}: $code @lines");
     $qp->respond($code, @lines);
+
+    my $rc = $code == 421 ? DENYSOFT_DISCONNECT : $code < 500 ? DENYSOFT : DENY;
+    $qp->run_hooks_no_respond('deny', $self->plugin_name, $rc, "@lines");
+
     if ($code == 421 || $stage eq 'connect') {
         $qp->disconnect;
     }
@@ -320,57 +424,10 @@ sub reply {
     return DONE;
 }
 
-sub modify {
-    my ($self, $transaction, @replies) = @_;
-    my $header = $transaction->header;
-    my $body;
-
-    for my $r (@replies) {
-        my $cmd = $r->{cmd};
-        if ($cmd eq 'h') {
-            $header->add($r->{name}, $r->{value});
-        }
-        elsif ($cmd eq 'i') {
-            $header->add($r->{name}, $r->{value}, $r->{index});
-        }
-        elsif ($cmd eq 'm') {
-            my $index = $r->{index} ? $r->{index} - 1 : 0;
-            if (length $r->{value}) {
-                $header->replace($r->{name}, $r->{value}, $index);
-            }
-            else {
-                $header->delete($r->{name}, $index);
-            }
-        }
-        elsif ($cmd eq 'b') {
-            $body .= $r->{body};
-        }
-        elsif ($cmd eq '+') {
-            my $rcpt = _address($r->{address}) or next;
-            $transaction->add_recipient($rcpt);
-            $transaction->notes('smtputf8', 1) if $rcpt->has_utf8;
-        }
-        elsif ($cmd eq '-') {
-            my $rcpt = _address($r->{address}) or next;
-            $transaction->remove_recipient($rcpt);
-        }
-        elsif ($cmd eq 'e') {
-            my $sender = _address($r->{address}) or next;
-            $transaction->sender($sender);
-            $transaction->notes('smtputf8', 1) if $sender->has_utf8;
-        }
-    }
-
-    if (defined $body) {
-        $body =~ s/\r\n/\n/g;
-        $transaction->body_replace($body);
-    }
-}
-
 sub _address {
     my $addr = shift;
     $addr = "<$addr>" if $addr !~ /^</;
-    return Qpsmtpd::Address->new($addr);
+    return Qpsmtpd::Address->new($addr) || die "invalid address $addr\n";
 }
 
 sub hook_reset_transaction {
