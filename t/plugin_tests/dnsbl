@@ -10,7 +10,6 @@ sub register_tests {
 
     $self->register_test('test_hook_connect');
     $self->register_test('test_ip_whitelisted');
-    $self->register_test('test_is_set_rblsmtpd');
     $self->register_test('test_reject_type');
 }
 
@@ -27,22 +26,6 @@ sub test_ip_whitelisted {
     $self->qp->connection->notes('whitelisthost', 'hello honey!');
     ok( $self->ip_whitelisted(), "+");
     $self->qp->connection->notes('whitelisthost', undef);
-}
-
-sub test_is_set_rblsmtpd {
-    my $self = shift;
-
-    $self->qp->connection->remote_ip('10.1.1.1');
-    ok( ! defined $self->is_set_rblsmtpd('10.1.1.1'), "undef");
-
-    $ENV{RBLSMTPD} = "Yes we can!";
-    cmp_ok( 'Yes we can!','eq',$self->is_set_rblsmtpd('10.1.1.1'), "value");
-
-    $ENV{RBLSMTPD} = "Oh yeah?";
-    cmp_ok( 'Oh yeah?','eq',$self->is_set_rblsmtpd('10.1.1.1'), "value");
-
-    $ENV{RBLSMTPD} = '';
-    cmp_ok( 1,'==',$self->is_set_rblsmtpd('10.1.1.1'), "empty");
 }
 
 sub test_hook_connect {

@@ -6,11 +6,8 @@ use Socket;
 use IO::Select;
 
 use lib 'lib';
-use Qpsmtpd::Base;
 use Qpsmtpd::Constants;
 use parent 'Qpsmtpd::SMTP';
-
-my $base = Qpsmtpd::Base->new();
 
 my $has_ipv6 = 0;
 if (
@@ -28,35 +25,19 @@ sub has_ipv6 {
 
 my $first_0;
 
-sub conn_info_env {
-    my $r_host = $ENV{TCPREMOTEHOST} || '[' . $ENV{TCPREMOTEIP} . ']';
-    return (
-        local_ip    => $ENV{TCPLOCALIP},
-        local_host  => $ENV{TCPLOCALHOST},
-        local_port  => $ENV{TCPLOCALPORT},
-        remote_ip   => $ENV{TCPREMOTEIP},
-        remote_host => $r_host,
-        remote_info => $ENV{TCPREMOTEINFO} ? "$ENV{TCPREMOTEINFO}\@$r_host" : $r_host,
-        remote_port => $ENV{TCPREMOTEPORT},
-    )
-}
-
 sub start_connection {
-    my $self = shift;
+    my ($self, %info) = @_;
 
-    my %info = $self->conn_info_env();
-    $self->log(LOGNOTICE, "Connection from $info{remote_info} [$info{remote_ip}]");
-
-    # if the local dns resolver doesn't filter it out we might get
-    # ansi escape characters that could make a ps axw do "funny"
-    # things. So to be safe, cut them out.
+    # a PTR record can hold ANSI escapes, which would reach ps output via $0
     $info{remote_host} =~ tr/a-zA-Z\.\-0-9\[\]//cd;
+    $info{remote_info} //= $info{remote_host};
+    $self->log(LOGNOTICE, "Connection from $info{remote_info} [$info{remote_ip}]");
 
     $first_0 = $0 unless $first_0;
     my $now = POSIX::strftime("%H:%M:%S %Y-%m-%d", localtime);
     $0 = "$first_0 [$info{remote_ip} : $info{remote_host} : $now]";
 
-    $self->SUPER::connection->start(%info, @_);
+    $self->SUPER::connection->start(%info);
 }
 
 sub run {
@@ -155,19 +136,6 @@ sub lrpip {
     $nto_laddr =~ s/::ffff://;
 
     return $port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr;
-}
-
-sub tcpenv {
-    my ($self, $TCPLOCALIP, $TCPREMOTEIP, $no_rdns) = @_;
-
-    if ($no_rdns) {
-        return $TCPLOCALIP, $TCPREMOTEIP,
-               $TCPREMOTEIP ? "[$ENV{TCPREMOTEIP}]" : "[noip!]";
-    }
-    my ($TCPREMOTEHOST) = $base->resolve_ptr($TCPREMOTEIP);
-    $TCPREMOTEHOST ||= 'Unknown';
-
-    return $TCPLOCALIP, $TCPREMOTEIP, $TCPREMOTEHOST;
 }
 
 sub check_socket() {

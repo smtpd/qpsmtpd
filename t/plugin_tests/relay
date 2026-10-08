@@ -12,6 +12,7 @@ sub register_tests {
     $self->register_test('test_is_octet_match');
     $self->register_test('test_is_in_cidr_block');
     $self->register_test('test_is_in_norelayclients');
+    $self->register_test('test_env_does_not_relay');
 }
 
 sub test_relay_only {
@@ -79,3 +80,14 @@ sub test_is_in_norelayclients {
     }
 }
 
+
+sub test_env_does_not_relay {
+    my $self = shift;
+
+    local $ENV{RELAYCLIENT} = '';
+    $self->qp->connection->relay_client(0);
+    $self->qp->connection->remote_ip('198.51.100.7');
+    $self->hook_connect($self->qp->transaction);
+    ok( ! $self->qp->connection->relay_client(),
+        "RELAYCLIENT in the server's environment grants no relaying");
+}

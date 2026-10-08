@@ -8,8 +8,6 @@ relay - control whether relaying is permitted
 
 relay - check the following places to see if relaying is allowed:
 
-I<$ENV{RELAYCLIENT}>
-
 I<config/norelayclients>, I<config/relayclients>, I<config/morerelayclients>
 
 The search order is as shown and cascades until a match is found or the list
@@ -225,14 +223,7 @@ sub hook_connect {
 
     if ($self->is_in_norelayclients()) {
         $self->qp->connection->relay_client(0);
-        delete $ENV{RELAYCLIENT};
         $self->log(LOGINFO, "fail, disabled by norelayclients");
-        return DECLINED;
-    }
-
-    if (defined $ENV{RELAYCLIENT}) {
-        $self->qp->connection->relay_client(1);
-        $self->log(LOGINFO, "pass, enabled by env");
         return DECLINED;
     }
 
