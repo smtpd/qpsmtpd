@@ -218,8 +218,9 @@ are shown below in ["Plugin settings"](#plugin-settings).
     is the only value in this file. If the MX resolves to something, reject the
     sender address if it resolves to something listed in the
     `invalid_resolvable_fromhost` config file. The _invalid\_resolvable\_fromhost_
-    expects IP addresses or CIDR (i.e. `network/mask` values) one per line, IPv4
-    only currenlty.
+    file lists one IPv4 or IPv6 address or CIDR block (`network/prefix`) per
+    line, e.g. `127.0.0.0/8` or `fe80::/10`. A bare address matches only that
+    address.
 
 ## Plugin settings arguments
 
