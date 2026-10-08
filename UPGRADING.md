@@ -5,6 +5,13 @@ upgrading _from_.
 
 ## v1.02 or below
 
+### qpsmtpd-forkserver's default listen addresses
+
+With no `--listen-address`, qpsmtpd-forkserver listens on 0.0.0.0 and [::].
+It used to pick [::] or 0.0.0.0, depending on whether Socket6 and
+IO::Socket::INET6 were installed; neither is needed now. A plugin that
+called `Qpsmtpd::TcpServer::has_ipv6()` can assume IPv6.
+
 ### qpsmtpd-prefork is gone
 
 Run qpsmtpd-forkserver instead, ideally from qpsmtpd.service (see "qpsmtpd

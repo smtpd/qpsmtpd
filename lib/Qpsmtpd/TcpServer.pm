@@ -9,20 +9,6 @@ use lib 'lib';
 use Qpsmtpd::Constants;
 use parent 'Qpsmtpd::SMTP';
 
-my $has_ipv6 = 0;
-if (
-    eval { require Socket6; } &&
-    eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION('2.51'); }
-   )
-{
-    Socket6->import('inet_ntop');
-    $has_ipv6 = 1;
-}
-
-sub has_ipv6 {
-    return $has_ipv6;
-}
-
 my $first_0;
 
 sub start_connection {
@@ -110,32 +96,6 @@ sub disconnect {
     $self->run_hooks("post-connection");
     $self->connection->reset;
     exit;
-}
-
-# local/remote port and ip address
-sub lrpip {
-    my ($self, $server, $client, $hisaddr) = @_;
-
-    my $localsockaddr = getsockname($client);
-    my ($port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr);
-
-    if ($server->sockdomain == AF_INET6) {      # IPv6
-        ($port, $iaddr) = sockaddr_in6($hisaddr);
-        ($lport, $laddr) = sockaddr_in6($localsockaddr);
-        $nto_iaddr = inet_ntop(AF_INET6(), $iaddr);
-        $nto_laddr = inet_ntop(AF_INET6(), $laddr);
-    }
-    else {                                     # IPv4
-        ($port, $iaddr) = sockaddr_in($hisaddr);
-        ($lport, $laddr) = sockaddr_in($localsockaddr);
-        $nto_iaddr = inet_ntoa($iaddr);
-        $nto_laddr = inet_ntoa($laddr);
-    }
-
-    $nto_iaddr =~ s/::ffff://;
-    $nto_laddr =~ s/::ffff://;
-
-    return $port, $iaddr, $lport, $laddr, $nto_iaddr, $nto_laddr;
 }
 
 sub check_socket() {

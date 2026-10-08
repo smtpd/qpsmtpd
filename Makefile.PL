@@ -17,6 +17,7 @@ WriteMakefile(
         'Data::Dumper'    => 0,
         'File::NFSLock'   => 0,    # Qpsmtpd::DB::File::DBM locking
         'File::Temp'      => 0,
+        'IO::Socket::IP'  => 0,
         'IO::Socket::SSL' => 0,    # plugins/tls; kept required, as silently
                                    # losing STARTTLS is worse than a build stop
         'Mail::Header'    => 0,
