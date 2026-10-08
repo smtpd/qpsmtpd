@@ -1,0 +1,49 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Qpsmtpd::Address;
+use Qpsmtpd::Constants;
+use Test::FakeResolver;
+
+sub register_tests {
+    my $self = shift;
+
+    $self->register_test('test_hook_mail');
+}
+
+sub test_hook_mail {
+    my $self = shift;
+
+    $self->qp->connection->relay_client(0);
+    $self->qp->connection->notes($_, undef) for qw(whitelisthost naughty);
+    local $self->{_args}{reject} = 1;
+    local $self->{_resolver} = Test::FakeResolver->new(
+        'spam.example.listed.test'  => {A => ['127.0.1.2'], TXT => ['see example']},
+        'oops.example.listed.test'  => {A => ['127.255.255.254']},
+    );
+    $self->mock_config(rhsbl_zones => 'listed.test');
+
+    my @cases = (
+        ['<a@spam.example>', [DENY, 'Mail from spam.example rejected: see example'],
+         'listed'],
+        ['<a@oops.example>', [DECLINED], 'a refused query is not a listing'],
+        ['<a@ham.example>',  [DECLINED], 'not listed'],
+        ['<>',               [DECLINED], 'null sender'],
+        ['<a@[192.0.2.1]>',  [DECLINED], 'address literal'],
+    );
+    for (@cases) {
+        my ($addr, $expect, $name) = @$_;
+        my $sender = Qpsmtpd::Address->new($addr);
+        is_deeply([$self->hook_mail($self->qp->transaction, $sender)],
+                  $expect, $name);
+    }
+
+    $self->mock_config(rhsbl_zones => 'listed.test listed by the test zone');
+    is_deeply([$self->hook_mail($self->qp->transaction,
+                                Qpsmtpd::Address->new('<a@spam.example>'))],
+              [DENY, 'Mail from spam.example rejected: listed by the test zone'],
+              'the configured message is the reason');
+    $self->unmock_config;
+}

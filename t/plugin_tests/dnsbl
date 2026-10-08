@@ -4,12 +4,14 @@ use strict;
 use warnings;
 
 use Qpsmtpd::Constants;
+use Test::FakeResolver;
 
 sub register_tests {
     my $self = shift;
 
     $self->register_test('test_hook_connect');
     $self->register_test('test_ip_whitelisted');
+    $self->register_test('test_ip_whitelisted_ipv6');
     $self->register_test('test_reject_type');
 }
 
@@ -31,21 +33,53 @@ sub test_ip_whitelisted {
 sub test_hook_connect {
     my $self = shift;
 
-    # reset values that other tests may have fiddled with
     my $conn = $self->qp->connection;
-    $conn->relay_client(0);        # other tests may leave it enabled
-    $conn->notes('whitelisthost', undef );
-    $conn->notes('whitelistsender', undef);
-    $conn->notes('naughty', undef);
-    $conn->remote_ip('127.0.0.2'); # standard dnsbl test value
+    $conn->relay_client(0);
+    $conn->notes($_, undef) for qw(whitelisthost whitelistsender naughty);
+    local $self->{_args}{reject} = 1;
+    local $self->{_resolver} = Test::FakeResolver->new(
+        '1.2.0.192.listed.test' => {A => ['127.0.0.2'], TXT => ['see example']},
+        '2.2.0.192.listed.test' => {A => ['127.255.255.254']},
+        join('.', reverse(split //, '20010db8' . ('0' x 23) . '1'), 'listed.test')
+          => {A => ['127.0.0.2']},
+    );
 
-    my ($rc, $mess) = $self->hook_connect($self->qp->transaction);
-    if ( $rc == DENY ) {
-        cmp_ok( $rc, '==', DENY, "connect +");
+    my @cases = (
+        ['192.0.2.1', 'listed.test', [DENY, 'see example'],
+         'listed, the TXT record is the reason'],
+        ['192.0.2.1', 'listed.test:Blocked %IP%', [DENY, 'Blocked 192.0.2.1'],
+         'listed, the configured message is the reason'],
+        ['2001:db8::1', 'listed.test', [DENY, 'Blocked by listed.test'],
+         'an IPv6 client is looked up'],
+        ['192.0.2.2', 'listed.test', [DECLINED],
+         'a refused query is not a listing'],
+        ['192.0.2.3', 'listed.test', [DECLINED], 'not listed'],
+    );
+    for (@cases) {
+        my ($ip, $zones, $expect, $name) = @$_;
+        $conn->remote_ip($ip);
+        $self->mock_config(dnsbl_zones => $zones, dnsbl_allow => '');
+        is_deeply([$self->hook_connect($self->qp->transaction)], $expect, $name);
     }
-    else {
-        ok( 1, "connect +, skipped (is DNS working?)" );
-    }
+
+    $conn->remote_ip('192.0.2.1');
+    $self->mock_config(dnsbl_zones => 'listed.test', dnsbl_allow => '',
+                       dnsbl_rejectmsg => 'Ask your ISP.');
+    is_deeply([$self->hook_connect($self->qp->transaction)],
+              [DENY, 'Ask your ISP. see example'],
+              'dnsbl_rejectmsg comes before the reason');
+    $self->unmock_config;
+}
+
+sub test_ip_whitelisted_ipv6 {
+    my $self = shift;
+
+    $self->mock_config(dnsbl_allow => '2001:db8:1:');
+    $self->qp->connection->remote_ip('2001:db8:1:2::5');
+    ok($self->ip_whitelisted(), 'IPv6 prefix +');
+    $self->qp->connection->remote_ip('2001:db8:10::5');
+    ok(!$self->ip_whitelisted(), 'IPv6 prefix -');
+    $self->unmock_config;
 }
 
 sub test_reject_type {

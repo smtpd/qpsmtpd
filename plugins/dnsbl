@@ -50,46 +50,40 @@ specifying dnsbl_zones is like not using the plugin at all.
 
 =head2 dnsbl_zones
 
-Normal ip based dns blocking lists ("RBLs") which contain TXT records are
-specified simply as:
+One DNS blocklist (RFC 5782) per line, checked in order:
 
-  relays.ordb.org
-  spamsources.fabel.dk
+  zen.spamhaus.org
+  bl.spamcop.net
 
-To configure RBL services which do not contain TXT records in the DNS,
-but only A records (e.g. the RBL+ at http://www.mail-abuse.org), specify your
-own error message to return in the SMTP conversation after a colon e.g.
+A client is listed when the zone has an A record in 127.0.0.0/8 for its
+address. IPv6 clients are looked up too; a zone that does not list IPv6
+answers that the address is not listed. The rejection gives the zone's TXT
+record as the reason. To give your own instead, add it after a colon. %IP%
+is replaced with the client's address:
 
-  rbl-plus.mail-abuse.org:You are listed at - http://http://www.mail-abuse.org/cgi-bin/lookup?%IP%
+  bl.spamcop.net:Blocked, see https://www.spamcop.net/bl.shtml?%IP%
 
-The string %IP% will be replaced with the IP address of incoming connection.
-Thus a fully specified file could be:
-
-  sbl-xbl.spamhaus.org
-  list.dsbl.org
-  rbl-plus.mail-abuse.ja.net:Listed by rbl-plus.mail-abuse.ja.net - see <URL:http://www.mail-abuse.org/cgi-bin/lookup?%IP%>
-  relays.ordb.org
+An answer in 127.255.255.0/24 is an error report: Spamhaus, for one, sends
+it to a public resolver or a query over its rate limit. It is logged, and
+the client is not rejected. Spamhaus does not answer queries through public
+resolvers such as 8.8.8.8, so a server using one needs a local resolver.
 
 =head2 dnsbl_allow
 
-List of allowed ip addresses that bypass RBL checking. Format is one entry per line,
-with either a full IP address or a truncated IP address with a period at the end.
-For example:
+Client addresses that are never looked up, one per line. An IPv4 entry
+matches whole octets, so I<172.16.33> matches 172.16.33.0/24. An IPv6 entry
+matches the address as written, or the addresses that start with it when it
+ends with a colon:
 
   192.168.1.1
   172.16.33.
+  2001:db8:1:
 
 =head2 dnsbl_rejectmsg
 
-A textual message that is sent to the sender on an RBL failure. The TXT record
-from the RBL list is also sent, but this file can be used to indicate what
-action the sender should take.
+Text put before the reason in each rejection, to tell the sender what to do:
 
-For example:
-
-   If you think you have been blocked in error, then please forward
-   this entire error message to your ISP so that they can fix their problems.
-   The next line often contains a URL that can be visited for more information.
+  If you think you have been blocked in error, forward this message to your ISP.
 
 =head1 Revisions
 
@@ -122,53 +116,27 @@ sub hook_connect {
     return DECLINED if $self->is_immune();
     return DECLINED if $self->ip_whitelisted();
 
-    my $dnsbl_zones = $self->get_dnsbl_zones() or return DECLINED;
-    my $timeout     = $self->{_args}{timeout} || 30;
-    my $resolv      = $self->{_resolver} = $self->get_resolver(timeout=>$timeout)
-        or return DECLINED;
+    my @zones = $self->get_dnsbl_zones() or return DECLINED;
+    $self->get_resolver(timeout => $self->{_args}{timeout} || 30);
 
-    for my $dnsbl (keys %$dnsbl_zones) {
+    my $remote_ip = $self->qp->connection->remote_ip;
+    my $name = $self->dnsbl_name($remote_ip) or return DECLINED;
 
-        my $query = $self->get_query($dnsbl) or do {
-            if ($resolv->errorstring ne 'NXDOMAIN') {
-                $self->log(LOGERROR, "$dnsbl query failed: ",
-                           $resolv->errorstring);
-            }
+    for (@zones) {
+        my ($zone, $message) = @$_;
+        my $result = $self->dnsbl_lookup("$name.$zone") or next;
+        if ($result->{error}) {
+            $self->log(LOGERROR, "skip, $result->{error}");
             next;
-        };
-
-        my $a_record = 0;
-        my $result;
-        foreach my $rr ($query->answer) {
-            if ($rr->type eq 'A') {
-                $result = $rr->name;
-                $self->log(LOGDEBUG,
-                           "found A for $result with IP " . $rr->address);
-            }
-            elsif ($rr->type eq 'TXT') {
-                $self->log(LOGDEBUG, "found TXT, " . $rr->txtdata);
-                $result = $rr->txtdata;
-            }
-
-            next if !$result;
-
-            $self->adjust_karma(-1);
-
-            if (!$dnsbl) { ($dnsbl) = ($result =~ m/(?:\d+\.){4}(.*)/); }
-            if (!$dnsbl) { $dnsbl = $result; }
-
-            if ($a_record) {
-                if (defined $dnsbl_zones->{$dnsbl}) {
-                    my $smtp_msg  = $dnsbl_zones->{$dnsbl};
-                    my $remote_ip = $self->qp->connection->remote_ip;
-                    $smtp_msg =~ s/%IP%/$remote_ip/g;
-                    return $self->get_reject($smtp_msg, $dnsbl);
-                }
-                return $self->get_reject("Blocked by $dnsbl");
-            }
-
-            return $self->get_reject($result, $dnsbl);
         }
+
+        $self->adjust_karma(-1);
+        my $reason = $message // $result->{reason};
+        $reason = "Blocked by $zone" if !length $reason;
+        $reason =~ s/%IP%/$remote_ip/g;
+        my $advice = join ' ', $self->qp->config('dnsbl_rejectmsg');
+        return $self->get_reject(join(' ', grep { length } $advice, $reason),
+                                 $zone);
     }
 
     $self->log(LOGINFO, 'pass');
@@ -178,42 +146,23 @@ sub hook_connect {
 sub get_dnsbl_zones {
     my $self = shift;
 
-    my %dnsbl_zones =
-      map { (split /:/, $_, 2)[0, 1] } $self->qp->config('dnsbl_zones');
-    if (!%dnsbl_zones) {
-        $self->log(LOGDEBUG, "skip, no zones");
-        return;
-    }
-
-    $self->{_dnsbl}{zones} = \%dnsbl_zones;
-    return \%dnsbl_zones;
-}
-
-sub get_query {
-    my ($self, $dnsbl) = @_;
-
-    my $remote_ip = $self->qp->connection->remote_ip;
-    my $reversed_ip = join('.', reverse(split(/\./, $remote_ip)));
-
-# fix to find A records, if the dnsbl_zones line has a second field 20/1/04 ++msp
-    if (defined $self->{_dnsbl}{zones}{$dnsbl}) {
-        $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for A record");
-        return $self->{_resolver}->query("$reversed_ip.$dnsbl");
-    }
-
-    $self->log(LOGDEBUG, "Checking $reversed_ip.$dnsbl for TXT record");
-    return $self->{_resolver}->query("$reversed_ip.$dnsbl", 'TXT');
+    my @zones = map { [split /:/, $_, 2] } $self->qp->config('dnsbl_zones');
+    $self->log(LOGDEBUG, "skip, no zones") if !@zones;
+    return @zones;
 }
 
 sub ip_whitelisted {
     my ($self) = @_;
 
     my $remote_ip = $self->qp->connection->remote_ip;
+    for my $allow ($self->qp->config('dnsbl_allow')) {
+        return 1 if $allow eq $remote_ip;
 
-    return grep {
-        s/\.?$/./;
-        $_ eq substr($remote_ip . '.', 0, length $_)
-    } $self->qp->config('dnsbl_allow');
+        # an IPv4 entry matches whole octets: 10.1 is 10.1.0.0/16
+        my $prefix = $allow =~ /:/ ? $allow : $allow =~ s/\.?$/./r;
+        return 1 if $prefix =~ /[.:]$/ && index("$remote_ip.", $prefix) == 0;
+    }
+    return;
 }
 
 sub hook_rcpt {

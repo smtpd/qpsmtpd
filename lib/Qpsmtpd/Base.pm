@@ -83,6 +83,39 @@ sub resolve_ns {
     return map { $_->nsdname } grep { $_->type eq 'NS' } $q->answer;
 }
 
+# The name a DNS blocklist looks an address up by: 1.2.3.4 is 4.3.2.1, and
+# an IPv6 address is its nibbles, reversed (RFC 5782 2.4)
+sub dnsbl_name {
+    my ($self, $ip) = @_;
+    my $ip_obj = Net::IP->new($ip) or return;
+    return $ip_obj->reverse_ip =~ s/\.(?:in-addr|ip6)\.arpa\.$//r;
+}
+
+# A blocklist lists a name with an A record in 127.0.0.0/8, and may give the
+# reason in a TXT record (RFC 5782 2.1). Lists such as Spamhaus answer
+# 127.255.255.x when they refuse the query, from a public resolver or over a
+# rate limit.
+sub dnsbl_lookup {
+    my ($self, $name) = @_;
+    my $res = $self->get_resolver;
+
+    my $packet = $res->query($name, 'A');
+    if (!$packet) {
+        my $err = $res->errorstring;
+        return if $err eq 'NXDOMAIN' || $err eq 'NOERROR';
+        return {error => "$name: $err"};
+    }
+
+    my @codes  = map { $_->address } grep { $_->type eq 'A' } $packet->answer;
+    my @listed = grep { /^127\./ && !/^127\.255\.255\./ } @codes;
+    return {error => "$name: refused (@codes)"} if !@listed;
+
+    my $txt = $res->query($name, 'TXT');
+    my @reason =
+      $txt ? map { $_->txtdata } grep { $_->type eq 'TXT' } $txt->answer : ();
+    return {codes => \@listed, reason => join(' ', @reason)};
+}
+
 sub resolve_ptr {
     my ($self, $name) = @_;
     my $q = $self->get_resolver->query($name, 'PTR') or return;

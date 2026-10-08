@@ -5,6 +5,8 @@ use warnings;
 use Test::More;
 
 use lib 'lib';      # test lib/Qpsmtpd/Base (vs site_perl)
+use lib 't';
+use Test::FakeResolver;
 
 BEGIN {
     use_ok('Qpsmtpd::Base');
@@ -22,6 +24,8 @@ __resolve_aaaa();
 __resolve_mx();
 __resolve_ns();
 __resolve_ptr();
+__dnsbl_name();
+__dnsbl_lookup();
 
 done_testing();
 
@@ -88,4 +92,38 @@ sub __resolve_ptr {
 
     @r = $base->resolve_ptr('66.128.51.163');
     ok(@r, "resolve_ptr, IP: " . join(', ', @r));
+}
+
+sub __dnsbl_name {
+    is($base->dnsbl_name('192.0.2.1'), '1.2.0.192', 'dnsbl_name: IPv4');
+    is($base->dnsbl_name('2001:db8::1'),
+       join('.', reverse split //, '20010db8' . ('0' x 23) . '1'),
+       'dnsbl_name: IPv6 nibbles');
+    ok(!$base->dnsbl_name('nonsense'), 'dnsbl_name: not an address');
+}
+
+sub __dnsbl_lookup {
+    my %zone = (
+        'listed.test'   => {A => ['127.0.0.2', '127.0.0.4'], TXT => ['spam', 'more']},
+        'no-txt.test'   => {A => ['127.0.0.2']},
+        'refused.test'  => {A => ['127.255.255.254']},
+        'outside.test'  => {A => ['192.0.2.1']},
+        'servfail.test' => {error => 'SERVFAIL'},
+    );
+    local $base->{_resolver} = Test::FakeResolver->new(%zone);
+
+    is_deeply($base->dnsbl_lookup('listed.test'),
+              {codes => ['127.0.0.2', '127.0.0.4'], reason => 'spam more'},
+              'dnsbl_lookup: listed, with the TXT reason');
+    is_deeply($base->dnsbl_lookup('no-txt.test'),
+              {codes => ['127.0.0.2'], reason => ''},
+              'dnsbl_lookup: listed, without a reason');
+    ok(!defined $base->dnsbl_lookup('absent.test'),
+       'dnsbl_lookup: NXDOMAIN is not listed');
+    like($base->dnsbl_lookup('refused.test')->{error}, qr/refused/,
+         'dnsbl_lookup: 127.255.255.x is an error, not a listing');
+    like($base->dnsbl_lookup('outside.test')->{error}, qr/refused/,
+         'dnsbl_lookup: an answer outside 127/8 is not a listing');
+    like($base->dnsbl_lookup('servfail.test')->{error}, qr/SERVFAIL/,
+         'dnsbl_lookup: a failed query is an error');
 }
