@@ -105,12 +105,6 @@ sub get_auth_details_plain {
         return;
     }
 
-    # Authorization ID must not be different from Authentication ID
-    if ($loginas ne '' && $loginas ne $user) {
-        $session->respond(535, "Authentication invalid for $user");
-        return;
-    }
-
     return $loginas, $user, $passClear;
 }
 
