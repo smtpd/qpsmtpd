@@ -48,7 +48,7 @@ Beware that the master branch might be unsuitable for anything
 but development, so you might want to get a specific release, for
 example (after running git clone):
 
-    git checkout -b local_branch v1.02
+    git checkout -b local_branch v1.03
 
 The smtpd user needs write access to ~smtpd/qpsmtpd/tmp/ but should
 not need to write anywhere else.  This directory can be configured

@@ -7,7 +7,7 @@ use strict;
 # message bodies are handled as raw octets throughout.
 require 5.032;
 
-our $VERSION = '1.02';
+our $VERSION = '1.03';
 use vars qw($TraceLevel $Spool_dir $Size_threshold);
 
 use lib 'lib';
