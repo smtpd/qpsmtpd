@@ -102,6 +102,9 @@ if ! id smtpd >/dev/null 2>&1 ; then
 fi
 
 %changelog
+* Thu Oct 22 2026 <matt@tnpi.net> 1.03-1
+- Update to 1.03
+
 * Wed Oct 07 2026 <matt@tnpi.net> 1.02-1
 - Restored the spec file, removed by accident with Apache::Qpsmtpd in 1.01
 - Dropped the apache and xinetd subpackages; those run models are gone

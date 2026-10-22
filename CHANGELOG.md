@@ -7,6 +7,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.03] - 2026-10-22
+
 ### Added
 
 - qpsmtpd.service, a systemd unit for qpsmtpd-forkserver, now the
@@ -1219,7 +1221,8 @@ The last releases on the old v0.0x branch.
 - Security: support and enable taint checking (thanks to Devin Carraway
   <qpsmtpd@devin.com>)
 
-[Unreleased]: https://github.com/smtpd/qpsmtpd/compare/v1.02...HEAD
+[Unreleased]: https://github.com/smtpd/qpsmtpd/compare/v1.03...HEAD
+[1.03]: https://github.com/smtpd/qpsmtpd/compare/v1.02...v1.03
 [1.02]: https://github.com/smtpd/qpsmtpd/compare/v1.01...v1.02
 [1.01]: https://github.com/smtpd/qpsmtpd/compare/v1.00...v1.01
 [1.00]: https://github.com/smtpd/qpsmtpd/compare/v0.96...v1.00
