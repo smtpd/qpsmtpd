@@ -69,6 +69,8 @@ headers reject 0 reject_type temp require From,Date future 2 past 15
 bogus_bounce log
 #loop
 dkim reject 0
+# arc verifies ARC chains (RFC 8617), needs Mail::DKIM 1.20261105 or later
+#arc
 # dmarc requires dkim and SPF to run before it
 dmarc
 
