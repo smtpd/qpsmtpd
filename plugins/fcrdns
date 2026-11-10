@@ -129,6 +129,8 @@ completion of the evaluation.
 use strict;
 use warnings;
 
+use Net::IP;
+
 use Qpsmtpd::Constants;
 
 sub register {
@@ -150,14 +152,53 @@ sub fcrdns_tests {
 
     return DECLINED if $self->is_immune();
 
+    $self->{_iprev} = {};
+
     # run cheap tests before the more expensive DNS tests
-    foreach my $test (
-        qw/ is_valid_localhost is_fqdn has_reverse_dns has_forward_dns / ) {
-        $self->$test() or return DECLINED;
+    my $passed = 1;
+    foreach my $test (qw/ is_valid_localhost is_fqdn /) {
+        $self->$test() or do { $passed = 0; last };
     }
 
-    $self->log(LOGINFO, "pass");
+    # RFC 8601 2.7.3: iprev has no "none" result, as an evaluation is
+    # always possible. So the DNS tests run even if a cheap test failed,
+    # but then only to report the iprev result, without karma effects.
+    $self->{_iprev_only} = !$passed;
+    foreach my $test (qw/ has_reverse_dns has_forward_dns /) {
+        $self->$test() or do { $passed = 0; last };
+    }
+
+    $self->store_iprev_result();
+    $self->log(LOGINFO, "pass") if $passed;
     return DECLINED;
+}
+
+sub dns_karma {
+    my ($self, $value) = @_;
+    return if $self->{_iprev_only};
+    $self->adjust_karma($value);
+}
+
+sub iprev_result {
+    my ($self, $result) = @_;
+    $self->{_iprev}{$result}++;
+}
+
+# Each PTR name yields its own lookup outcome, but Authentication-Results
+# gets a single iprev verdict: pass if any name validated the IP, else
+# the most specific failure seen.
+sub store_iprev_result {
+    my ($self) = @_;
+
+    # an IPv6 address has ":", so it must be a quoted-string (RFC 8601 2.2)
+    my $ip = $self->qp->connection->remote_ip;
+    $ip = qq{"$ip"} if $ip =~ /:/;
+
+    foreach my $result (qw/ pass temperror fail permerror /) {
+        next if !$self->{_iprev}{$result};
+        $self->connection->store_auth_results("iprev=$result policy.iprev=$ip");
+        return;
+    }
 }
 
 sub is_valid_localhost {
@@ -209,22 +250,19 @@ sub has_reverse_dns {
 
     my $query = $res->query($ip, 'PTR') or do {
         if ($res->errorstring eq 'NXDOMAIN') {
-            $self->adjust_karma(-1);
-            $self->connection->store_auth_results("iprev=permerror");
+            $self->dns_karma(-1);
+            $self->iprev_result('permerror');
             $self->log(LOGINFO, "fail, no rDNS: " . $res->errorstring);
             return;
         }
-        if ( $res->errorstring eq 'SERVFAIL' ) {
-            $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
-            $self->connection->store_auth_results("iprev=temperror");
-        }
-        elsif ( $res->errorstring eq 'NOERROR' ) {
+        if ( $res->errorstring eq 'NOERROR' ) {
             $self->log(LOGINFO, "fail, no PTR (NOERROR)" );
-            $self->connection->store_auth_results("iprev=permerror");
+            $self->iprev_result('permerror');
         }
         else {
-            $self->connection->store_auth_results("iprev=fail");
+            # SERVFAIL, timeouts and other errors are transient (RFC 8601)
             $self->log(LOGINFO, "fail, error getting rDNS: " . $res->errorstring);
+            $self->iprev_result('temperror');
         };
         return;
     };
@@ -238,9 +276,9 @@ sub has_reverse_dns {
         $self->log(LOGDEBUG, "PTR: " . $rr->ptrdname);
     }
     if (!$hits) {
-        $self->adjust_karma(-1);
+        $self->dns_karma(-1);
         $self->log(LOGINFO, "fail, no PTR records");
-        $self->connection->store_auth_results("iprev=permerror");
+        $self->iprev_result('permerror');
         return;
     }
 
@@ -253,35 +291,52 @@ sub has_forward_dns {
 
     my $res = $self->get_resolver();
 
-    foreach my $host (keys %{$self->{_args}{ptr_hosts}}) {
+    # Ask for the record type of the client's address family. Without a
+    # type, query() only asks for A, so IPv6 clients could never match.
+    my $type = $self->is_ipv6($self->qp->connection->remote_ip) ? 'AAAA' : 'A';
+
+    # RFC 8601 section 3: the number of PTR names evaluated MUST be
+    # limited. 10 is the limit SPF uses, which the RFC cites.
+    my @hosts = sort keys %{$self->{_args}{ptr_hosts}};
+    splice(@hosts, 10) if @hosts > 10;
+
+    # Check every name: the test passes if the client IP is among the
+    # addresses of any of them, not just the first one that resolves.
+    my $has_forward = 0;
+    foreach my $host (@hosts) {
 
         $host .= '.' if '.' ne substr($host, -1, 1);    # fully qualify name
-        my $query = $res->query($host) or do {
-            if ($res->errorstring eq 'NXDOMAIN') {
-                $self->connection->store_auth_results("iprev=permerror");
-                $self->log(LOGDEBUG, "host $host does not exist");
+        my $query = $res->query($host, $type) or do {
+            my $err = $res->errorstring;
+            if ($err eq 'NXDOMAIN' || $err eq 'NOERROR') {
+                # the forward lookup completed without a result: fail
+                $self->iprev_result('fail');
+                $self->log(LOGDEBUG, "no $type for $host ($err)");
                 next;
             }
-            $self->connection->store_auth_results("iprev=fail");
-            $self->log(LOGDEBUG, "query for $host failed (",
-                       $res->errorstring, ")");
+            $self->iprev_result('temperror');
+            $self->log(LOGDEBUG, "query for $host failed ($err)");
             next;
         };
 
         my $hits = 0;
         foreach my $rr ($query->answer) {
-            next unless $rr->type =~ /^(?:A|AAAA)$/;
+            next unless $rr->type eq $type;
             $hits++;
             $self->check_ip_match($rr->address) and return 1;
         }
         if ($hits) {
-            $self->connection->store_auth_results("iprev=fail");
-            $self->log(LOGDEBUG, "PTR host has forward DNS") if $hits;
-            return 1;
+            $has_forward++;
+            $self->log(LOGDEBUG, "PTR host $host has forward DNS");
         }
+        $self->iprev_result('fail');
     }
-    $self->adjust_karma(-1);
-    $self->connection->store_auth_results("iprev=fail");
+
+    # forward DNS that doesn't include the client IP is a fail, but
+    # doesn't cost karma
+    return 1 if $has_forward;
+
+    $self->dns_karma(-1);
     $self->log(LOGINFO, "fail, no PTR hosts have forward DNS");
     return;
 }
@@ -290,21 +345,33 @@ sub check_ip_match {
     my $self = shift;
     my $ip = shift or return;
 
-    if ($ip eq $self->qp->connection->remote_ip) {
+    my $remote_ip = $self->qp->connection->remote_ip;
+    my $is_ipv6   = $self->is_ipv6($remote_ip);
+
+    # IPv6 addresses have many textual forms (Net::DNS returns
+    # 2001:db8:0:0:0:0:0:1, the client may be 2001:db8::1), so compare
+    # them fully expanded.
+    if ($is_ipv6) {
+        $ip        = Net::IP::ip_expand_address($ip,        6) or return;
+        $remote_ip = Net::IP::ip_expand_address($remote_ip, 6) or return;
+    }
+
+    if ($ip eq $remote_ip) {
         $self->log(LOGDEBUG, "forward ip match");
-        $self->connection->store_auth_results("iprev=pass");
-        $self->adjust_karma(1);
+        $self->iprev_result('pass');
+        $self->dns_karma(1);
         return 1;
     }
 
-    # TODO: make this IPv6 compatible
+    return if $is_ipv6;    # the network match below is IPv4 only
+
     my $dns_net = join('.', (split(/\./, $ip))[0, 1, 2]);
     my $rem_net =
       join('.', (split(/\./, $self->qp->connection->remote_ip))[0, 1, 2]);
 
     if ($dns_net eq $rem_net) {
         $self->log(LOGNOTICE, "forward network match");
-        $self->connection->store_auth_results("iprev=pass");
+        $self->iprev_result('pass');
         return 1;
     }
     return;
