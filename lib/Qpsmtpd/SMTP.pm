@@ -910,25 +910,50 @@ sub clean_authentication_results {
     #   http://tools.ietf.org/html/rfc5451#section-5
     #   http://tools.ietf.org/html/draft-kucherawy-original-authres-00.html
 
-    # Do not rename A-R header if DKIM signed
+    # Do not rename A-R headers if DKIM signed, so the signature still
+    # verifies. Headers that claim our own authserv-id are renamed anyway
+    # (RFC 8601, section 5): anyone can add a DKIM-Signature that lists
+    # Authentication-Results, and downstream must not mistake a forged
+    # header for ours.
+    my $dkim_signed = 0;
     my $dkim_sig = $self->transaction->header->get('DKIM-Signature');
     if ($dkim_sig) {
         my %fields = map { split /=/, $_, 2 } split /;\s+/, $dkim_sig;
         # print Data::Dumper::Dumper(\%fields);
         if ($fields{h} && $fields{h} =~ /Authentication-Results/i) {
-            return;
+            $dkim_signed = 1;
         }
     }
 
-    my @ar_headers = $self->transaction->header->get('Authentication-Results');
-    for (my $i = 0 ; $i < scalar @ar_headers ; $i++) {
-        $self->transaction->header->delete('Authentication-Results', $i);
-        $self->transaction->header->add('Original-Authentication-Results',
-                                        $ar_headers[$i]);
-    }
+    my $our_id = lc($auth_id || ($self->config('me'))[0] || '');
+    my $header = $self->transaction->header;
+    my @ar_headers = $header->get('Authentication-Results');
+    my @moved;
 
-    $self->log(LOGDEBUG,
-             "Authentication-Results moved to Original-Authentication-Results");
+    # delete from the last one down, so the remaining indexes stay valid
+    for (my $i = $#ar_headers ; $i >= 0 ; $i--) {
+        next if $dkim_signed
+             && _authserv_id($ar_headers[$i]) ne $our_id;
+        $header->delete('Authentication-Results', $i);
+        unshift @moved, $ar_headers[$i];
+    }
+    return if !@moved;
+
+    $header->add('Original-Authentication-Results', $_) for @moved;
+
+    $self->log(LOGDEBUG, scalar(@moved)
+            . " Authentication-Results moved to Original-Authentication-Results");
+}
+
+# the authserv-id of an Authentication-Results header value: the first
+# token before the first ";", without comments (RFC 8601, section 2.2)
+sub _authserv_id {
+    my ($value) = @_;
+    my ($id) = split /;/, $value, 2;
+    $id = '' if !defined $id;
+    1 while $id =~ s/\([^()]*\)/ /g;    # comments, innermost first
+    ($id) = split ' ', $id;
+    return lc($id // '');
 }
 
 sub received_line {

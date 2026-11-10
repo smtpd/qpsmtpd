@@ -427,6 +427,33 @@ sub __clean_authentication_results {
     $smtpd->clean_authentication_results();
     ok($smtpd->transaction->header->get('Authentication-Results'), "clean_authentication_results removes non-DKIM-signed A-R header");
     ok(!$smtpd->transaction->header->get('Original-Authentication-Results'), "clean_authentication_results adds non-DKIM-signed Original-A-R header");
+
+    # several A-R headers: all of them are moved, in order
+    $smtpd = _transaction_with_headers();
+    $smtpd->transaction->header->add('Authentication-Results', "mx$_.example.com; spf=pass smtp.mailfrom=example.com")
+        for 1 .. 3;
+    $smtpd->clean_authentication_results();
+    my @left  = $smtpd->transaction->header->get('Authentication-Results');
+    my @moved = $smtpd->transaction->header->get('Original-Authentication-Results');
+    is(scalar @left, 0, "clean_authentication_results removes all of several A-R headers");
+    is_deeply([ map { /^(mx\d)/ } @moved ], [qw/ mx1 mx2 mx3 /],
+        "clean_authentication_results moves several A-R headers, in order");
+
+    # DKIM signed A-R headers: foreign ones are kept, but one claiming our
+    # authserv-id is not, the signature does not even have to verify
+    $smtpd = _transaction_with_headers();
+    $smtpd->mock_config(me => 'mx.example.net');
+    $smtpd->transaction->header->add('Authentication-Results', _test_ar_header());
+    $smtpd->transaction->header->add('Authentication-Results', 'MX.example.net (forged) 1; dmarc=pass d=example.org');
+    $smtpd->transaction->header->add('DKIM-Signature', _test_dkim_sig_ar_signed());
+    $smtpd->clean_authentication_results();
+    @left  = $smtpd->transaction->header->get('Authentication-Results');
+    @moved = $smtpd->transaction->header->get('Original-Authentication-Results');
+    is_deeply([ map { /^(\S+);/ } @left ], [ 'mail.theartfarm.com' ],
+        "clean_authentication_results keeps a DKIM signed foreign A-R header");
+    is_deeply([ map { /^(\S+)/ } @moved ], [ 'MX.example.net' ],
+        "clean_authentication_results moves a DKIM signed A-R header claiming our authserv-id");
+    $smtpd->unmock_config();
 }
 
 sub _test_ar_header {
