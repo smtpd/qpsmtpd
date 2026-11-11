@@ -11,9 +11,12 @@ permissions:
 
 jobs:
   coverage:
-    # Fork PRs get no secrets, so Coveralls rejects the upload. ci.yml tests them.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    # Devel::Cover::Report::Coveralls 1.0 requires a repo token, and accepts
+    # the workflow's. A failed upload doesn't fail the build.
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      COVERALLS_NO_FAIL: 1
     steps:
     - uses: actions/checkout@v6
       with:
