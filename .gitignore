@@ -25,6 +25,7 @@ t/tmp
 
 *.tar.gz
 
+/META.*
 MYMETA.*
 MANIFEST.bak
 nytprof.out

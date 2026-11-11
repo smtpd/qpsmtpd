@@ -204,8 +204,6 @@ sub data_post_handler {
         return $self->sign_it($transaction);
     }
 
-    return DECLINED if $self->is_immune();
-
     return $self->validate_it($transaction);
 }
 
@@ -230,6 +228,11 @@ sub validate_it {
         $auth_str .= " header.i=@" . $dkim->signature->domain;
     };
     $self->transaction->store_auth_results( $auth_str );
+
+    # Immune (whitelisted) hosts are validated too, so that the dmarc plugin
+    # gets their DKIM results, but the result isn't acted on: no karma,
+    # reject or deferral.
+    return DECLINED if $self->is_immune();
 
     foreach my $t (qw/ pass fail invalid temperror none /) {
         next if $t ne $result;
