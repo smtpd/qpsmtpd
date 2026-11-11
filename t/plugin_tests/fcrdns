@@ -6,6 +6,9 @@ use strict;
 #use Qpsmtpd::Address;
 use Qpsmtpd::Constants;
 
+use lib 't';
+use Test::FakeResolver;
+
 my $test_email = 'matt@tnpi.net';
 
 sub register_tests {
@@ -13,6 +16,127 @@ sub register_tests {
 
     $self->register_test('_is_valid_localhost');
     $self->register_test('_is_fqdn');
+    $self->register_test('_check_ip_match');
+    $self->register_test('_store_iprev_result');
+    $self->register_test('_iprev');
+}
+
+sub _iprev {
+    my $self = shift;
+
+    my $v6 = '2001:db8::1';
+    my $v4 = '192.0.2.1';
+    my @eleven = map { sprintf 'n%02d.example.', $_ } 0 .. 10;
+
+    # label, client IP, expected result, DNS data,
+    # remote_host (default a.example), expected karma (unchecked if undef)
+    my @cases = (
+        [ 'IPv6, AAAA matches', $v6, 'pass',
+          { $v6 => {PTR => ['a.example.']},
+            'a.example.' => {A => ['192.0.2.9'], AAAA => ['2001:db8:0:0:0:0:0:1']} } ],
+        [ 'IPv4, A matches', $v4, 'pass',
+          { $v4 => {PTR => ['a.example.']},
+            'a.example.' => {A => [$v4], AAAA => ['2001:db8::9']} } ],
+        [ 'IPv6, second name matches after a mismatch', $v6, 'pass',
+          { $v6 => {PTR => ['a.example.', 'b.example.']},
+            'a.example.' => {AAAA => ['2001:db8::2']},
+            'b.example.' => {AAAA => [$v6]} } ],
+        [ 'IPv6, address mismatch', $v6, 'fail',
+          { $v6 => {PTR => ['a.example.']},
+            'a.example.' => {AAAA => ['2001:db8::2']} } ],
+        [ 'forward NXDOMAIN', $v6, 'fail',
+          { $v6 => {PTR => ['a.example.']} } ],
+        [ 'forward NOERROR, no AAAA', $v6, 'fail',
+          { $v6 => {PTR => ['a.example.']},
+            'a.example.' => {A => ['192.0.2.9']} } ],
+        [ 'forward NXDOMAIN and SERVFAIL', $v6, 'temperror',
+          { $v6 => {PTR => ['a.example.', 'b.example.']},
+            'b.example.' => {error => 'SERVFAIL'} } ],
+        [ 'forward timeout', $v6, 'temperror',
+          { $v6 => {PTR => ['a.example.']},
+            'a.example.' => {error => 'query timed out'} } ],
+        [ 'PTR NXDOMAIN', $v6, 'permerror', {}, undef, -1 ],
+        [ 'PTR SERVFAIL', $v6, 'temperror',
+          { $v6 => {error => 'SERVFAIL'} } ],
+        [ 'PTR timeout', $v6, 'temperror',
+          { $v6 => {error => 'query timed out'} } ],
+        [ 'only the first 10 PTR names are checked', $v6, 'fail',
+          { $v6 => {PTR => \@eleven},
+            $eleven[10] => {AAAA => [$v6]} } ],
+        [ 'no rDNS when connecting, PTR NXDOMAIN', $v4, 'permerror',
+          {}, 'Unknown', 0 ],
+        [ 'no rDNS when connecting, PTR matches now', $v4, 'pass',
+          { $v4 => {PTR => ['a.example.']},
+            'a.example.' => {A => [$v4]} }, 'Unknown', 0 ],
+        [ 'not an FQDN, forward NXDOMAIN', $v6, 'fail',
+          { $v6 => {PTR => ['mailhost.']} }, 'mailhost', -1 ],
+    );
+
+    # tests of other plugins may have left the connection immune
+    $self->qp->connection->relay_client(0);
+    $self->qp->connection->notes('whitelisthost', undef);
+    $self->qp->transaction->notes('whitelistsender', undef);
+
+    foreach my $case (@cases) {
+        my ($label, $ip, $result, $zone, $host, $karma) = @$case;
+        local $self->{_resolver} = Test::FakeResolver->new(%$zone);
+        $self->qp->connection->remote_ip($ip);
+        $self->qp->connection->remote_host($host // 'a.example');
+        $self->connection->notes('authentication_results', undef);
+        $self->connection->notes('karma', 0);
+        $self->fcrdns_tests();
+        my $policy = $ip =~ /:/ ? qq{"$ip"} : $ip;
+        is( $self->connection->notes('authentication_results'),
+            "iprev=$result policy.iprev=$policy", $label);
+        next if !defined $karma;
+        cmp_ok( $self->connection->notes('karma'), '==', $karma, "$label, karma");
+    }
+}
+
+sub _check_ip_match {
+    my $self = shift;
+
+    my @cases = (
+        # remote IP,      forward DNS address,      expected
+        [ '2001:db8::1', '2001:db8:0:0:0:0:0:1',    1, 'IPv6, long vs short form' ],
+        [ '2001:db8::1', '2001:DB8::1',             1, 'IPv6, case differs' ],
+        [ '2001:db8::1', '2001:db8::2',             0, 'IPv6, different address' ],
+        [ '2001:db8::1', '2001:db8::1:1',           0, 'IPv6, no network match' ],
+        [ '192.0.2.1',   '192.0.2.1',               1, 'IPv4, same address' ],
+        [ '192.0.2.1',   '192.0.2.99',              1, 'IPv4, same /24' ],
+        [ '192.0.2.1',   '198.51.100.1',            0, 'IPv4, different network' ],
+    );
+
+    foreach my $case (@cases) {
+        my ($remote, $ip, $expect, $label) = @$case;
+        $self->qp->connection->remote_ip($remote);
+        $self->{_iprev} = {};
+        cmp_ok( $self->check_ip_match($ip) ? 1 : 0, '==', $expect, $label);
+    }
+}
+
+sub _store_iprev_result {
+    my $self = shift;
+
+    my $v4 = 'policy.iprev=192.0.2.1';
+    my $v6 = 'policy.iprev="2001:db8::1"';
+    my @cases = (
+        [ '2001:db8::1', { fail => 1, pass => 1 },      "iprev=pass $v6",      'pass wins' ],
+        [ '2001:db8::1', { permerror => 2, fail => 1 }, "iprev=fail $v6",      'fail over permerror' ],
+        [ '2001:db8::1', { temperror => 1, fail => 1 }, "iprev=temperror $v6", 'temperror over fail' ],
+        [ '2001:db8::1', { permerror => 1 },            "iprev=permerror $v6", 'permerror alone' ],
+        [ '2001:db8::1', {},                            undef,                 'no result' ],
+        [ '192.0.2.1',   { pass => 1 },                 "iprev=pass $v4",      'IPv4 is not quoted' ],
+    );
+
+    foreach my $case (@cases) {
+        my ($ip, $results, $expect, $label) = @$case;
+        $self->qp->connection->remote_ip($ip);
+        $self->connection->notes('authentication_results', undef);
+        $self->{_iprev} = $results;
+        $self->store_iprev_result();
+        is( $self->connection->notes('authentication_results'), $expect, $label);
+    }
 }
 
 

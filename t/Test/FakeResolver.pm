@@ -24,4 +24,17 @@ sub query {
     return $packet;
 }
 
+# Mail::DKIM looks keys up with send(), which, unlike query(), also returns
+# a packet for NXDOMAIN and other DNS errors, with the error as its rcode.
+# Like Net::DNS, it returns nothing for a timeout.
+sub send {
+    my ($self, $name, $type) = @_;
+    my $packet = $self->query($name, $type);
+    return $packet if $packet;
+    return if $self->{error} !~ /^[A-Z]+$/;
+    $packet = Net::DNS::Packet->new($name, $type);
+    $packet->header->rcode($self->{error});
+    return $packet;
+}
+
 1;

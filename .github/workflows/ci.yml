@@ -38,6 +38,6 @@ jobs:
       # Optional plugin modules. Their tests skip when the module is absent, so
       # an upstream release that drops support for a perl we still target must
       # not fail the build.
-      - run: cpanm -n Mail::SPF Mail::DMARC GeoIP2 ClamAV::Client Redis
+      - run: cpanm -n Mail::SPF Mail::DKIM Crypt::OpenSSL::RSA Mail::DMARC GeoIP2 ClamAV::Client Redis
         continue-on-error: true
       - run: prove -lv t
