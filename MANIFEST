@@ -64,6 +64,7 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml			Module meta-data (added by MakeMaker)
+plugins/arc
 plugins/auth/auth_checkpassword
 plugins/auth/auth_cvm_unix_local
 plugins/auth/auth_flat_file
@@ -163,6 +164,7 @@ t/config/users.cdb
 t/helo.t
 t/misc.t
 t/plugin_tests.t
+t/plugin_tests/arc
 t/plugin_tests/auth/auth_checkpassword
 t/plugin_tests/auth/auth_flat_file
 t/plugin_tests/auth/auth_imap
@@ -207,6 +209,7 @@ t/qpsmtpd-db.t
 t/qpsmtpd-milter.t
 t/qpsmtpd-plugin.t
 t/qpsmtpd-smtp.t
+t/qpsmtpd-transaction.t
 t/qpsmtpd.t
 t/queue-smtputf8.t
 t/rset.t

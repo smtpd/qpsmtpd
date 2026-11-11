@@ -9,20 +9,6 @@ use Qpsmtpd::Constants;
 use lib 't';
 use Test::FakeResolver;
 
-# Mail::DKIM looks keys up with send(), which, unlike query(), also returns a
-# packet for NXDOMAIN and other errors, with the error as its rcode
-package Test::FakeResolver::Send {
-    our @ISA = ('Test::FakeResolver');
-    sub send {
-        my ($self, $name, $type) = @_;
-        my $packet = $self->query($name, $type);
-        return $packet if $packet;
-        $packet = Net::DNS::Packet->new($name, $type);
-        $packet->header->rcode($self->errorstring);
-        return $packet;
-    }
-}
-
 sub register_tests {
     my $self = shift;
 
@@ -74,28 +60,39 @@ sub _arc_results {
 
     my @cases = (
         # label, relay client, remote ip, header, body, expected result,
-        # expected Authentication-Results entry
+        # expected Authentication-Results entry, and optionally the DNS
+        # zone and a replacement for the verifier's CLOSE method
         [ 'no ARC headers', 0, '192.0.2.1', \@HEADER, 'test message body',
           'none', qr/^arc=none smtp\.remote-ip=192\.0\.2\.1$/ ],
         [ 'valid chain', 0, '192.0.2.1', $sealed, 'test message body',
           'pass', qr/^arc=pass smtp\.remote-ip=192\.0\.2\.1$/ ],
         [ 'body changed', 0, '192.0.2.1', $sealed, 'changed body',
-          'fail', qr/^arc=fail \([^()]+\) smtp\.remote-ip=192\.0\.2\.1$/ ],
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/ ],
         [ 'forged ARC-Authentication-Results no seal covers', 0, '192.0.2.1',
           [ 'ARC-Authentication-Results: i=2; mx.example.net; dmarc=pass'
             . ' header.from=example.org', @$sealed ], 'test message body',
-          'fail', qr/^arc=fail\b/ ],
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/ ],
         [ 'IPv6 address quoted', 0, '2001:db8::1', $sealed, 'test message body',
           'pass', qr/^arc=pass smtp\.remote-ip="2001:db8::1"$/ ],
+        [ 'key not found', 0, '192.0.2.1', $sealed, 'test message body',
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/, {} ],
+        [ 'verifier error', 0, '192.0.2.1', $sealed, 'test message body',
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/, $zone,
+          sub { die "test error\n" } ],
         [ 'relay client not checked', 1, '192.0.2.1', $sealed,
           'test message body', undef, undef ],
     );
 
-    Mail::DKIM::DNS::resolver(Test::FakeResolver::Send->new(%$zone));
-
     foreach my $case (@cases) {
-        my ($label, $relay, $ip, $header, $body, $expect_result, $expect_ar)
-          = @$case;
+        my ($label, $relay, $ip, $header, $body, $expect_result, $expect_ar,
+            $case_zone, $close) = @$case;
+
+        Mail::DKIM::DNS::resolver(
+            Test::FakeResolver->new(%{$case_zone // $zone}));
+        no warnings 'redefine';
+        # CLOSE is inherited, so the default is the method found for it
+        local *Mail::DKIM::ARC::Verifier::CLOSE
+          = $close // Mail::DKIM::ARC::Verifier->can('CLOSE');
 
         $self->qp->connection->relay_client($relay);
         $self->qp->connection->remote_ip($ip);

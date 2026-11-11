@@ -16,8 +16,9 @@ This plugin validates the ARC chain of a message and records the result
 in the Authentication-Results header, as C<arc=pass>, C<arc=fail> or
 C<arc=none> (no ARC headers), with the C<smtp.remote-ip> property (RFC
 8617, sections 4.4 and 6), and in the C<arc_result> transaction note. A
-chain whose seals or signatures can't be checked is recorded as a fail
-(section 5.2.1).
+chain whose seals or signatures can't be checked, or that can't be
+validated for any other reason, is recorded as a fail (section 5.2.1).
+The reason for a fail is logged.
 
 It doesn't reject or defer anything. Section 5.2.2 allows rejecting a
 failed chain, but ARC failures mostly come with other authentication
@@ -28,8 +29,9 @@ Messages from relay clients are not checked.
 
 =head1 REQUIREMENTS
 
-Mail::DKIM 1.20261105 or later. Earlier versions pass chains with more
-than 50 ARC sets, which RFC 8617 section 5.2 requires to fail; with
+Mail::DKIM 1.20261105 or later. Earlier versions pass chains that RFC
+8617 section 5.2 requires to fail, such as one with an
+ARC-Authentication-Results header field that no ARC-Seal covers; with
 them, the plugin disables itself.
 
 =head1 CONFIGURATION
@@ -37,8 +39,6 @@ them, the plugin disables itself.
 None.
 
     arc
-
-Place it after the dkim plugin and before dmarc in config/plugins.
 
 =head1 SEE ALSO
 
@@ -52,7 +52,6 @@ use strict;
 use warnings;
 
 use Qpsmtpd::Constants;
-use Socket qw(:crlf);
 
 sub register {
     my $self = shift;
@@ -75,54 +74,29 @@ sub data_post_handler {
         return DECLINED;
     }
 
-    my $arc = Mail::DKIM::ARC::Verifier->new();
-    my $ok = eval {
-        $self->send_message_to_arc($arc, $transaction);
-        1;
-    };
-    if (!$ok) {
-        $self->log(LOGERROR, "error, $@");
-        return DECLINED;
-    }
-
-    my $result = $arc->result // 'none';
-    my $detail = $arc->result_detail // $result;
-
     # ARC results are pass, fail or none (RFC 8617, section 4.4), and any
-    # error validating a chain is a fail (section 5.2.1)
-    $result = 'fail' if $result eq 'invalid';
+    # error validating a chain, including one that stops the validation
+    # here, is a fail (section 5.2.1)
+    my $arc = Mail::DKIM::ARC::Verifier->new();
+    my ($result, $detail);
+    if (eval { $transaction->print_message($arc); 1 }) {
+        $result = $arc->result // 'none';
+        $detail = $arc->result_detail // $result;
+        $result = 'fail' if $result eq 'invalid';
+    }
+    else {
+        chomp(my $error = $@);
+        ($result, $detail) = ('fail', "error, $error");
+    }
 
     $transaction->notes('arc_result', $result);
 
-    my $comment = '';
-    if ($result eq 'fail' && $detail ne $result) {
-        (my $why = $detail) =~ s/[()\\\r\n]+/ /g;
-        $comment = " ($why)";
-    }
     # a pvalue with a ":" (IPv6) has to be quoted (RFC 8601, section 2.2)
     my $ip = $self->qp->connection->remote_ip // '';
     $ip = qq{"$ip"} if $ip =~ /:/;
     $transaction->store_auth_results(
-        "arc=$result$comment" . (length $ip ? " smtp.remote-ip=$ip" : ''));
+        "arc=$result" . (length $ip ? " smtp.remote-ip=$ip" : ''));
 
     $self->log(LOGINFO, "$result, $detail");
     return DECLINED;
-}
-
-sub send_message_to_arc {
-    my ($self, $arc, $transaction) = @_;
-
-    foreach (split(/\n/s, $transaction->header->as_string)) {
-        $_ =~ s/\r?$//s;
-        $arc->PRINT($_ . CRLF);
-    }
-
-    $transaction->body_resetpos;
-    while (my $line = $transaction->body_getline) {
-        chomp $line;
-        $line =~ s/\015$//;
-        $arc->PRINT($line . CRLF);
-    }
-
-    $arc->CLOSE;
 }
