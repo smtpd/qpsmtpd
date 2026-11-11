@@ -453,7 +453,47 @@ sub __clean_authentication_results {
         "clean_authentication_results keeps a DKIM signed foreign A-R header");
     is_deeply([ map { /^(\S+)/ } @moved ], [ 'MX.example.net' ],
         "clean_authentication_results moves a DKIM signed A-R header claiming our authserv-id");
+
+    # the other forms of our authserv-id are moved too, and so is a value
+    # that can't be parsed
+    $smtpd = _transaction_with_headers();
+    $smtpd->mock_config(me => 'mx.example.net');
+    $smtpd->transaction->header->add('Authentication-Results', _test_ar_header());
+    $smtpd->transaction->header->add('Authentication-Results', $_) for
+        '"mx.example.net"; dmarc=pass d=example.org',
+        '(x;y) mx.example.net; dmarc=pass d=example.org',
+        '(\) x) mx.example.net; dmarc=pass d=example.org',
+        '(unterminated mx.example.net; dmarc=pass d=example.org';
+    $smtpd->transaction->header->add('DKIM-Signature', _test_dkim_sig_ar_signed());
+    $smtpd->clean_authentication_results();
+    @left  = $smtpd->transaction->header->get('Authentication-Results');
+    @moved = $smtpd->transaction->header->get('Original-Authentication-Results');
+    is_deeply([ map { /^(\S+);/ } @left ], [ 'mail.theartfarm.com' ],
+        "clean_authentication_results keeps only the foreign DKIM signed A-R header");
+    is(scalar @moved, 4,
+        "clean_authentication_results moves quoted, commented and malformed claims of our authserv-id");
     $smtpd->unmock_config();
+
+    my @ids = (
+        # Authentication-Results value,               authserv-id
+        [ 'mx.example.net; spf=pass',                  'mx.example.net' ],
+        [ 'MX.Example.NET 1; spf=pass',                'mx.example.net' ],
+        [ 'mx.example.net(c);spf=pass',                'mx.example.net' ],
+        [ ' (a (b) c) mx.example.net; spf=pass',       'mx.example.net' ],
+        [ '(x;y) mx.example.net; spf=pass',            'mx.example.net' ],
+        [ '(\) x) mx.example.net; spf=pass',           'mx.example.net' ],
+        [ '"mx.example.net"; spf=pass',                'mx.example.net' ],
+        [ '"mx.\example.net"; spf=pass',               'mx.example.net' ],
+        [ "(folded\n comment) mx.example.net; none",   'mx.example.net' ],
+        [ '(unterminated mx.example.net; spf=pass',    undef ],
+        [ '"unterminated; spf=pass',                   undef ],
+        [ '; spf=pass',                                undef ],
+    );
+    for (@ids) {
+        my ($value, $id) = @$_;
+        is(Qpsmtpd::SMTP::_authserv_id($value), $id,
+           '_authserv_id: ' . ($value =~ s/\n/\\n/r));
+    }
 }
 
 sub _test_ar_header {

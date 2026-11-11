@@ -919,7 +919,6 @@ sub clean_authentication_results {
     my $dkim_sig = $self->transaction->header->get('DKIM-Signature');
     if ($dkim_sig) {
         my %fields = map { split /=/, $_, 2 } split /;\s+/, $dkim_sig;
-        # print Data::Dumper::Dumper(\%fields);
         if ($fields{h} && $fields{h} =~ /Authentication-Results/i) {
             $dkim_signed = 1;
         }
@@ -932,8 +931,9 @@ sub clean_authentication_results {
 
     # delete from the last one down, so the remaining indexes stay valid
     for (my $i = $#ar_headers ; $i >= 0 ; $i--) {
-        next if $dkim_signed
-             && _authserv_id($ar_headers[$i]) ne $our_id;
+        # a value we can't parse might claim our authserv-id, so it's moved
+        my $id = _authserv_id($ar_headers[$i]);
+        next if $dkim_signed && defined $id && $id ne $our_id;
         $header->delete('Authentication-Results', $i);
         unshift @moved, $ar_headers[$i];
     }
@@ -945,15 +945,19 @@ sub clean_authentication_results {
             . " Authentication-Results moved to Original-Authentication-Results");
 }
 
-# the authserv-id of an Authentication-Results header value: the first
-# token before the first ";", without comments (RFC 8601, section 2.2)
+# RFC 8601 section 2.2: the value starts with [CFWS] authserv-id, a token
+# or quoted-string. Comments nest and, like quoted strings, may contain
+# quoted-pairs, ";" and ")". Returns undef for a malformed value.
+# The quantifiers are possessive: the value comes from the sender, and
+# backtracking over an unterminated comment would take exponential time.
 sub _authserv_id {
     my ($value) = @_;
-    my ($id) = split /;/, $value, 2;
-    $id = '' if !defined $id;
-    1 while $id =~ s/\([^()]*\)/ /g;    # comments, innermost first
-    ($id) = split ' ', $id;
-    return lc($id // '');
+    $value =~ m{
+        \A (?: \s++ | ( \( (?: [^()\\]++ | \\. | (?-1) )*+ \) ) )*+
+        (?: " ( (?: [^"\\]++ | \\. )*+ ) " | ( [^\s()";]++ ) )
+    }xs or return;
+    my $id = defined $2 ? $2 =~ s/\\(.)/$1/gsr : $3;
+    return lc $id;
 }
 
 sub received_line {
