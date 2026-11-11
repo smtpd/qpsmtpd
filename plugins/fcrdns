@@ -8,8 +8,9 @@ Forward Confirmed RDNS - http://en.wikipedia.org/wiki/FCrDNS
 
 Determine if the SMTP sender has matching forward and reverse DNS.
 
-Adds the 'iprev' section to the Authentication-Results header when
-there's sufficient DNS (at least rDNS) to be meaningful.
+Adds an iprev result to the Authentication-Results header of every
+connection that isn't immune, with the client address as policy.iprev.
+See L</iprev>.
 
 =head1 WHY IT WORKS
 
@@ -79,30 +80,35 @@ What type of rejection should be sent? See docs/config.pod
 Adjust the quantity of logging for this plugin. See docs/logging.pod
 
 
-=head1 RFC 1912, RFC 5451
+=head1 RFC 1912, RFC 8601
 
 From Wikipedia summary:
 
 1. First a reverse DNS lookup (PTR query) is performed on the IP address, which returns a list of zero or more PTR records. (has_reverse_dns)
 
-2. For each domain name returned in the PTR query results, a regular 'forward' DNS lookup (type A or AAAA query) is then performed on that domain name. (has_forward_dns)
+2. For each domain name returned in the PTR query results, a regular 'forward' DNS lookup (type A or AAAA query) is then performed on that domain name. (has_forward_dns) At most 10 names are looked up, the limit RFC 8601 section 3 cites from SPF.
 
 3. Any A or AAAA record returned by the second query is then compared against the original IP address (check_ip_match), and if there is a match, then the FCrDNS check passes.
 
 =head1 iprev
 
-# https://www.ietf.org/rfc/rfc5451.txt
+One iprev result is recorded per connection: pass if any PTR name
+validates the client address, otherwise temperror, fail or permerror,
+in that order. The DNS tests run even when a cheap test (localhost,
+FQDN) fails, only to report the result, without karma effects.
 
-2.4.3.  "iprev" Results
+From L<https://www.rfc-editor.org/rfc/rfc8601>:
 
-The result values are used by the "iprev" method, defined in
-Section 3, are as follows:
+2.7.3.  "iprev"
+
+The result values used by the "iprev" method, defined in Section 3,
+are as follows:
 
 pass:  The DNS evaluation succeeded, i.e., the "reverse" and
 "forward" lookup results were returned and were in agreement.
 
 fail:  The DNS evaluation failed.  In particular, the "reverse" and
-"forward" lookups each produced results but they were not in
+"forward" lookups each produced results, but they were not in
 agreement, or the "forward" query completed but produced no
 result, e.g., a DNS RCODE of 3, commonly known as NXDOMAIN, or an
 RCODE of 0 (NOERROR) in a reply containing no answers, was
@@ -118,7 +124,15 @@ permerror:  The DNS evaluation could not be completed because no PTR
 data are published for the connecting IP address, e.g., a DNS
 RCODE of 3, commonly known as NXDOMAIN, or an RCODE of 0 (NOERROR)
 in a reply containing no answers, was returned.  This prevented
-completion of the evaluation.
+completion of the evaluation.  A later attempt is unlikely to
+produce a final result.
+
+There is no "none" for this method, since any TCP connection
+delivering email has an IP address associated with it, so some kind
+of evaluation will always be possible.
+
+The result is reported using a ptype of "policy" (as this is not part
+of any established protocol) and a property of "iprev".
 
 =head1 AUTHOR
 
