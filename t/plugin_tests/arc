@@ -1,0 +1,120 @@
+#!perl -w
+
+use strict;
+use warnings;
+
+use Mail::Header;
+use Qpsmtpd::Constants;
+
+use lib 't';
+use Test::FakeResolver;
+
+sub register_tests {
+    my $self = shift;
+
+    eval 'use Mail::DKIM 1.20261105; use Mail::DKIM::ARC::Signer;'
+       . ' use Mail::DKIM::PrivateKey; use Crypt::OpenSSL::RSA; 1'
+      or do {
+        warn "unable to load Mail::DKIM 1.20261105, skipping arc tests\n";
+        return;
+      };
+
+    $self->register_test('_arc_results');
+}
+
+my @HEADER = (
+    'From: sender@example.org',
+    'To: list@example.com',
+    'Subject: arc test',
+    'Message-ID: <arc-test@example.org>',
+);
+
+# the header of a message sealed by mx.example.com, and the TXT record
+# that publishes its key
+sub _sealed_header {
+    my $rsa = Crypt::OpenSSL::RSA->generate_key(1024);
+    my $signer = Mail::DKIM::ARC::Signer->new(
+        Algorithm => 'rsa-sha256',
+        Chain     => 'none',
+        Domain    => 'example.com',
+        SrvId     => 'mx.example.com',
+        Selector  => 's1',
+        Key       => Mail::DKIM::PrivateKey->load(Cork => $rsa),
+    );
+    my @header = ('Authentication-Results: mx.example.com; spf=pass'
+                  . ' smtp.mailfrom=example.org', @HEADER);
+    $signer->PRINT("$_\015\012") for @header, '', 'test message body';
+    $signer->CLOSE;
+    die "not sealed: " . $signer->result_detail
+      unless $signer->result eq 'sealed';
+
+    (my $pub = $rsa->get_public_key_x509_string) =~ s/-----[^-]+-----|\s//g;
+    return ([ $signer->as_strings, @header ], "v=DKIM1; k=rsa; p=$pub");
+}
+
+sub _arc_results {
+    my $self = shift;
+
+    my ($sealed, $txt) = $self->_sealed_header();
+    my $zone = { 's1._domainkey.example.com' => { TXT => [$txt] } };
+
+    my @cases = (
+        # label, relay client, remote ip, header, body, expected result,
+        # expected Authentication-Results entry, and optionally the DNS
+        # zone and a replacement for the verifier's CLOSE method
+        [ 'no ARC headers', 0, '192.0.2.1', \@HEADER, 'test message body',
+          'none', qr/^arc=none smtp\.remote-ip=192\.0\.2\.1$/ ],
+        [ 'valid chain', 0, '192.0.2.1', $sealed, 'test message body',
+          'pass', qr/^arc=pass smtp\.remote-ip=192\.0\.2\.1$/ ],
+        [ 'body changed', 0, '192.0.2.1', $sealed, 'changed body',
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/ ],
+        [ 'forged ARC-Authentication-Results no seal covers', 0, '192.0.2.1',
+          [ 'ARC-Authentication-Results: i=2; mx.example.net; dmarc=pass'
+            . ' header.from=example.org', @$sealed ], 'test message body',
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/ ],
+        [ 'IPv6 address quoted', 0, '2001:db8::1', $sealed, 'test message body',
+          'pass', qr/^arc=pass smtp\.remote-ip="2001:db8::1"$/ ],
+        [ 'key not found', 0, '192.0.2.1', $sealed, 'test message body',
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/, {} ],
+        [ 'verifier error', 0, '192.0.2.1', $sealed, 'test message body',
+          'fail', qr/^arc=fail smtp\.remote-ip=192\.0\.2\.1$/, $zone,
+          sub { die "test error\n" } ],
+        [ 'relay client not checked', 1, '192.0.2.1', $sealed,
+          'test message body', undef, undef ],
+    );
+
+    foreach my $case (@cases) {
+        my ($label, $relay, $ip, $header, $body, $expect_result, $expect_ar,
+            $case_zone, $close) = @$case;
+
+        Mail::DKIM::DNS::resolver(
+            Test::FakeResolver->new(%{$case_zone // $zone}));
+        no warnings 'redefine';
+        # CLOSE is inherited, so the default is the method found for it
+        local *Mail::DKIM::ARC::Verifier::CLOSE
+          = $close // Mail::DKIM::ARC::Verifier->can('CLOSE');
+
+        $self->qp->connection->relay_client($relay);
+        $self->qp->connection->remote_ip($ip);
+
+        my $t = $self->qp->reset_transaction;
+        $t->header(Mail::Header->new([ map {"$_\n"} @$header ],
+                                     Modify => 0, MailFrom => 'COERCE'));
+        # as in a real transaction, the body starts with the blank line
+        $t->body_write("\015\012$body\015\012");
+
+        my ($rc) = $self->data_post_handler($t);
+        cmp_ok($rc, '==', DECLINED, "$label, never rejects");
+        is($t->notes('arc_result'), $expect_result, "$label, arc_result note");
+        my $ar = $t->notes('authentication_results');
+        if ($expect_ar) {
+            like($ar // '', $expect_ar, "$label, Authentication-Results");
+        }
+        else {
+            ok(!defined $ar, "$label, no Authentication-Results");
+        }
+    }
+
+    $self->qp->connection->relay_client(0);
+    Mail::DKIM::DNS::resolver(undef);
+}

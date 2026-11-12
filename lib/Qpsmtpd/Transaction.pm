@@ -6,7 +6,7 @@ use parent 'Qpsmtpd';
 use Qpsmtpd::Constants;
 
 use IO::File qw(O_RDWR O_CREAT);
-use Socket qw(inet_aton);
+use Socket qw(inet_aton :crlf);
 use Sys::Hostname;
 use Time::HiRes qw(gettimeofday);
 
@@ -258,6 +258,24 @@ sub body_fh {
     return shift->{_body_file};
 }
 
+sub print_message {
+    my ($self, $object) = @_;
+
+    foreach my $line (split /\n/, $self->header->as_string) {
+        $line =~ s/\r$//;
+        $object->PRINT($line . CRLF);
+    }
+
+    $self->body_resetpos;
+    while (defined(my $line = $self->body_getline)) {
+        chomp $line;
+        $line =~ s/\r$//;
+        $object->PRINT($line . CRLF);
+    }
+
+    $object->CLOSE;
+}
+
 sub dup_body_fh {
     my ($self) = @_;
     open(my $fh, '<&=', $self->body_fh);
@@ -453,6 +471,13 @@ Returns a dup()'d file handle to the temporary file of the email. This can be
 useful if an external module may call close() on the filehandle that is passed
 to it.  This should only be used for reads, as writing to a dup'd filehandle
 may have unintended consequences.
+
+=head2 print_message( $object )
+
+Writes the message, the header and then the body, to C<$object> a line at
+a time with its C<PRINT> method, with CRLF line endings, and then calls its
+C<CLOSE> method. The verifiers and signers of L<Mail::DKIM> take a message
+this way. Dies if C<PRINT> or C<CLOSE> does.
 
 =head1 SEE ALSO
 

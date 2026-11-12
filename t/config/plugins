@@ -68,6 +68,7 @@ naughty reject data
 
 headers days 5 reject_type temp require From,Date
 dkim
+arc
 # dmarc
 
 # content filters

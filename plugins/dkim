@@ -475,22 +475,7 @@ sub save_signatures_to_note {
 sub send_message_to_dkim {
     my ($self, $dkim, $transaction) = @_;
 
-    foreach (split(/\n/s, $transaction->header->as_string)) {
-        $_ =~ s/\r?$//s;
-        eval { $dkim->PRINT($_ . CRLF); };
-        $self->log(LOGERROR, $@) if $@;
-    }
-
-    $transaction->body_resetpos;
-    while (my $line = $transaction->body_getline) {
-        chomp $line;
-        $line =~ s/\015$//;
-        eval { $dkim->PRINT($line . CRLF); };
-        $self->log(LOGERROR, $@) if $@;
-    }
-
-    eval { $dkim->CLOSE; };
-    $self->log(LOGERROR, $@) if $@;
+    eval { $transaction->print_message($dkim); 1 } or $self->log(LOGERROR, $@);
 }
 
 sub get_policies {
